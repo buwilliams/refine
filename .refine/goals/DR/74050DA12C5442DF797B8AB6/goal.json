@@ -1,0 +1,142 @@
+{
+  "base_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+  "branch_name": "refine/DR74050DA12C5442DF797B8AB6/round-1",
+  "candidate_commit": null,
+  "created": "2026-09-10T08:26:05Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "DR74050DA12C5442DF797B8AB6",
+  "name": "Workflow scheduler wedges permanently when an agent leaks past its hard cap — new Todo goals never get classified/admitted, with no self-heal and no surfaced signal",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": "ethan.jacobson@insurity.com",
+  "rounds": [
+    {
+      "agent_context": {
+        "assembled_at": "2026-09-10T08:26:07Z",
+        "current_round": {
+          "assignee": "ethan.jacobson@insurity.com",
+          "prompt": "From: Ethan Jacobson <ethan.jacobson@insurity.com>\nSubject: Workflow scheduler wedges permanently when an agent leaks past its hard cap — new Todo goals never get classified/admitted, with no self-heal and no surfaced signal\n\nBody:\n## Objective\r\n\r\nMake the workflow runner resilient to a leaked/orphaned agent process. Today, a single agent that outlives its `agent_hard_cap_seconds` without being reaped leaves the node's scheduler silently stuck: newly created Todo goals are never classified and never admitted to `plan`, indefinitely, until a human manually restarts the daemon. Fix the reaper, the interrupted-operation recovery, and the observability so this self-heals (or at minimum fails loud).\r\n\r\n## Observed behavior (real incident — evidence)\r\n\r\n- Node `bo2lnxnevo02-ethan`, daemon port 8082, up continuously since 2026-08-24 16:20 (no restart).\r\n- Goal `00000T0ESJ4FD36A43G309R000` created 2026-08-25T23:12:16Z. ~3h later it is still `status: todo` with:\r\n  - round classification states **all `unclassified`** (`constitution_state`, `product_state`, `meta_rule_state`, `rule_state`, `quality_state`),\r\n  - `guidance_decision: null`, `implementation_plan: null`, `workflow_attempt_authority: null`,\r\n  - **zero** entries in its activity log (never touched by automation).\r\n- It is the **only** open goal on the node, yet `daemon-status.json` shows `worker_state: idle`, `workflow_paused: false`, `active_operations: []`. So the runner is idle-but-not-admitting an eligible goal with a free slot (`parallel_run_cap: 2`).\r\n- `daemon-status.json` reports `degraded_integrations: [\"process-recovery-reconciled\", \"operation-recovery-interrupted\"]`.\r\n- A **leaked agent** is the cause: PID `322837`, `claude --dangerously-skip-permissions ...`, started 2026-08-25 09:47, still alive after **12h20m** against `agent_hard_cap_seconds = 7200` (2h) — ~10h past its kill deadline. Refine has lost track of it: `refine next` reports `running_workflow_processes: 0` while the OS process is very much alive (338 MB RSS).\r\n- Since the goal was created, the workflow runner (PID 1949880) spawned **zero** goal-processing/classification processes — only git-sync / worktree-cleanup / source-update-check maintenance.\r\n\r\n## Root-cause hypotheses (verify, don't assume)\r\n\r\n1. The hard-cap reaper only enforces the cap on agents the supervisor still tracks; an agent whose supervising operation was interrupted (daemon lost the handle) is never killed, so it runs unbounded.\r\n2. `operation-recovery-interrupted` leaves the integration permanently `degraded`; the scheduler treats an unreconciled interrupted operation as a barrier and refuses to claim `workflow_attempt_authority` for *unrelated* goals.\r\n3. The degraded/wedged state is not surfaced anywhere a user looks (`refine next` suggested only \"review/converge\", never \"your node is degraded / this todo goal is stuck\") — so it silently persists until a manual restart.\r\n\r\n## Desired behavior / acceptance criteria\r\n\r\n1. **Reaper enforces the hard cap unconditionally.** Any agent process exceeding `agent_hard_cap_seconds` is terminated regardless of whether the supervisor still tracks it (reconcile by process-identity/pgid, not just in-memory handle). Add a repro: leak an agent past the cap and assert it is killed and its operation reconciled.\r\n2. **Interrupted-operation recovery self-heals or fails loud.** After a daemon-lifetime interruption, `operation-recovery-interrupted` must either reconcile automatically within a bounded window or transition the affected operation to a terminal failed state — it must not sit `degraded` forever.\r\n3. **An unreconciled/interrupted operation must not block unrelated goals.** A newly created Todo goal on an idle node (workflow not paused, slot free) must get classified and admitted (`todo -> plan`) within N minutes without any manual daemon restart. Add a regression test covering exactly this: interrupted op present + fresh todo goal => goal still advances.\r\n4. **Surface the wedge.** When `worker_state: idle` while eligible Todo goals exist on the active node with a free slot and `workflow_paused: false`, emit a diagnostic (in `refine next`, `node show`/health, and the activity log) stating the node is stalled, why, and the remediation — rather than silently doing nothing. Same for non-empty `degraded_integrations`.\r\n5. **Watchdog.** Consider a periodic self-check that detects \"idle runner + admittable work + no admission for > threshold\" and either forces admission or raises a health alarm.\r\n\r\n## Verification / evidence to include in the candidate\r\n\r\n- Repro test for the leaked-agent-past-hard-cap kill.\r\n- Repro test for \"interrupted operation does not block a fresh todo goal from being classified + admitted.\"\r\n- Demonstration that `refine next` (or node health) now reports the stalled/degraded condition with a remediation hint.\r\n- Confirmation the fix needs no manual `refine system` restart to recover.\r\n\r\n\r\n[cid:insurity-small2_2f81c33c-d951-4e5c-a467-1113541ca22c.jpg]\r\nEthan Jacobson\r\nEthan.Jacobson@insurity.com\r\n\r\n[cid:excellence2026signature(17b0688e-5473-4b74-96eb-a73f633f2c2f)_48407359-d77b-4967-95cd-277a32b50ebc.png]<https://insurity.com/excellence?utm_source=Email-Signature&utm_medium=Email&utm_campaign=Event-Excellence-2026>\r\n\r\n_____________________________________________________________________________________________________\r\n\r\nThe information contained in this e-mail message is intended only for the personal and confidential use of the intended recipient(s). This message may be an attorney-client communication and/or work product and as such is privileged and confidential. If the reader of this message is not the intended recipient or an agent responsible for delivering it to the intended recipient, you are hereby notified that you have received this document in error and that any review, dissemination, distribution, or copying of this message is strictly prohibited. If you have received this communication in error, please notify us immediately by e-mail, and delete the original message.\r\n_____________________________________________________________________________________________________\r\n~~~Insurity~~~",
+          "reporter": "ethan.jacobson@insurity.com",
+          "round": 1
+        },
+        "goal": {
+          "assignee": "ethan.jacobson@insurity.com",
+          "id": "DR74050DA12C5442DF797B8AB6",
+          "name": "Workflow scheduler wedges permanently when an agent leaks past its hard cap — new Todo goals never get classified/admitted, with no self-heal and no surfaced signal",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "ethan.jacobson@insurity.com"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Refine's components are model (entities), process (supervisor to manage running processes), prompts (LLM templates), surfaces (interfaces into refine), tools (reusable functions for workflow steps), and workflow (defined workflow which calls out to tools). These map directly to src/[model| process|prompts|surfaces|tools|workflow].\n- Refine uses a flat file persistence, file-based indexes, in-memory caching, and Rust to maintain high performance. Ensure <50ms performance on CLI and API calls (assuming we are not waiting on LLMs or outside tools).\n- Ensure that the architecture is maintained and is consistent. Do not invent new architectural concepts; instead, follow the existing architecture.\n- Ensure that documentation, especially src/intent/*, is maintained and the existing document format is preserved.\n- Ensure Refine remains \"agent-first\" by using installed coding-agent CLIs. Do not duplicate coding agent functionality.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It moves user-defined Goals through a workflow to ensure parallel implementation across Nodes, quality, and governance.",
+          "rules": [
+            {
+              "created": "2026-08-11T17:59:15.372635011+00:00",
+              "id": "generated-rule-1786471155372-1",
+              "source": "generated",
+              "text": "Keep component code within `src/{model,process,prompts,surfaces,tools,workflow}` and extend existing architecture instead of inventing new concepts.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372734717+00:00",
+              "id": "generated-rule-1786471155372-2",
+              "source": "generated",
+              "text": "Preserve Rust-based flat-file persistence, file indexes, and in-memory caching; keep non-external CLI/API work under 50ms.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372750673+00:00",
+              "id": "generated-rule-1786471155372-3",
+              "source": "generated",
+              "text": "Update affected documentation—especially `src/intent/*`—without changing its established format.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372756994+00:00",
+              "id": "generated-rule-1786471155372-4",
+              "source": "generated",
+              "text": "Use installed coding-agent CLIs for coding-agent capabilities; do not reimplement them.",
+              "updated": "2026-08-11T17:59:15Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "id": "guidance-1",
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "id": "guidance-2",
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
+      },
+      "assignee": "ethan.jacobson@insurity.com",
+      "constitution_state": "unclassified",
+      "created": "2026-09-10T08:26:05Z",
+      "failure_at": "",
+      "failure_category": "",
+      "failure_message": "",
+      "governance_candidate_commit": "",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "guidance_decision": null,
+      "implementation_plan": {
+        "binding": {
+          "base_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+          "context_digest": "c8db11834ca4cea7ad1dd66a3ec743824e63d9516d4c3b4e8300869dec5ea78f",
+          "context_version": 1,
+          "goal_id": "DR74050DA12C5442DF797B8AB6",
+          "implementation_branch": "refine/DR74050DA12C5442DF797B8AB6/round-1",
+          "round_idx": 0,
+          "target_branch": "main"
+        },
+        "phase": "plan",
+        "phase_started_at": "2026-09-10T08:26:07Z",
+        "schema_version": 2,
+        "started_at": "2026-09-10T08:26:07Z",
+        "state": "in_progress",
+        "updated_at": "2026-09-10T08:26:07Z"
+      },
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "From: Ethan Jacobson <ethan.jacobson@insurity.com>\nSubject: Workflow scheduler wedges permanently when an agent leaks past its hard cap — new Todo goals never get classified/admitted, with no self-heal and no surfaced signal\n\nBody:\n## Objective\r\n\r\nMake the workflow runner resilient to a leaked/orphaned agent process. Today, a single agent that outlives its `agent_hard_cap_seconds` without being reaped leaves the node's scheduler silently stuck: newly created Todo goals are never classified and never admitted to `plan`, indefinitely, until a human manually restarts the daemon. Fix the reaper, the interrupted-operation recovery, and the observability so this self-heals (or at minimum fails loud).\r\n\r\n## Observed behavior (real incident — evidence)\r\n\r\n- Node `bo2lnxnevo02-ethan`, daemon port 8082, up continuously since 2026-08-24 16:20 (no restart).\r\n- Goal `00000T0ESJ4FD36A43G309R000` created 2026-08-25T23:12:16Z. ~3h later it is still `status: todo` with:\r\n  - round classification states **all `unclassified`** (`constitution_state`, `product_state`, `meta_rule_state`, `rule_state`, `quality_state`),\r\n  - `guidance_decision: null`, `implementation_plan: null`, `workflow_attempt_authority: null`,\r\n  - **zero** entries in its activity log (never touched by automation).\r\n- It is the **only** open goal on the node, yet `daemon-status.json` shows `worker_state: idle`, `workflow_paused: false`, `active_operations: []`. So the runner is idle-but-not-admitting an eligible goal with a free slot (`parallel_run_cap: 2`).\r\n- `daemon-status.json` reports `degraded_integrations: [\"process-recovery-reconciled\", \"operation-recovery-interrupted\"]`.\r\n- A **leaked agent** is the cause: PID `322837`, `claude --dangerously-skip-permissions ...`, started 2026-08-25 09:47, still alive after **12h20m** against `agent_hard_cap_seconds = 7200` (2h) — ~10h past its kill deadline. Refine has lost track of it: `refine next` reports `running_workflow_processes: 0` while the OS process is very much alive (338 MB RSS).\r\n- Since the goal was created, the workflow runner (PID 1949880) spawned **zero** goal-processing/classification processes — only git-sync / worktree-cleanup / source-update-check maintenance.\r\n\r\n## Root-cause hypotheses (verify, don't assume)\r\n\r\n1. The hard-cap reaper only enforces the cap on agents the supervisor still tracks; an agent whose supervising operation was interrupted (daemon lost the handle) is never killed, so it runs unbounded.\r\n2. `operation-recovery-interrupted` leaves the integration permanently `degraded`; the scheduler treats an unreconciled interrupted operation as a barrier and refuses to claim `workflow_attempt_authority` for *unrelated* goals.\r\n3. The degraded/wedged state is not surfaced anywhere a user looks (`refine next` suggested only \"review/converge\", never \"your node is degraded / this todo goal is stuck\") — so it silently persists until a manual restart.\r\n\r\n## Desired behavior / acceptance criteria\r\n\r\n1. **Reaper enforces the hard cap unconditionally.** Any agent process exceeding `agent_hard_cap_seconds` is terminated regardless of whether the supervisor still tracks it (reconcile by process-identity/pgid, not just in-memory handle). Add a repro: leak an agent past the cap and assert it is killed and its operation reconciled.\r\n2. **Interrupted-operation recovery self-heals or fails loud.** After a daemon-lifetime interruption, `operation-recovery-interrupted` must either reconcile automatically within a bounded window or transition the affected operation to a terminal failed state — it must not sit `degraded` forever.\r\n3. **An unreconciled/interrupted operation must not block unrelated goals.** A newly created Todo goal on an idle node (workflow not paused, slot free) must get classified and admitted (`todo -> plan`) within N minutes without any manual daemon restart. Add a regression test covering exactly this: interrupted op present + fresh todo goal => goal still advances.\r\n4. **Surface the wedge.** When `worker_state: idle` while eligible Todo goals exist on the active node with a free slot and `workflow_paused: false`, emit a diagnostic (in `refine next`, `node show`/health, and the activity log) stating the node is stalled, why, and the remediation — rather than silently doing nothing. Same for non-empty `degraded_integrations`.\r\n5. **Watchdog.** Consider a periodic self-check that detects \"idle runner + admittable work + no admission for > threshold\" and either forces admission or raises a health alarm.\r\n\r\n## Verification / evidence to include in the candidate\r\n\r\n- Repro test for the leaked-agent-past-hard-cap kill.\r\n- Repro test for \"interrupted operation does not block a fresh todo goal from being classified + admitted.\"\r\n- Demonstration that `refine next` (or node health) now reports the stalled/degraded condition with a remediation hint.\r\n- Confirmation the fix needs no manual `refine system` restart to recover.\r\n\r\n\r\n[cid:insurity-small2_2f81c33c-d951-4e5c-a467-1113541ca22c.jpg]\r\nEthan Jacobson\r\nEthan.Jacobson@insurity.com\r\n\r\n[cid:excellence2026signature(17b0688e-5473-4b74-96eb-a73f633f2c2f)_48407359-d77b-4967-95cd-277a32b50ebc.png]<https://insurity.com/excellence?utm_source=Email-Signature&utm_medium=Email&utm_campaign=Event-Excellence-2026>\r\n\r\n_____________________________________________________________________________________________________\r\n\r\nThe information contained in this e-mail message is intended only for the personal and confidential use of the intended recipient(s). This message may be an attorney-client communication and/or work product and as such is privileged and confidential. If the reader of this message is not the intended recipient or an agent responsible for delivering it to the intended recipient, you are hereby notified that you have received this document in error and that any review, dissemination, distribution, or copying of this message is strictly prohibited. If you have received this communication in error, please notify us immediately by e-mail, and delete the original message.\r\n_____________________________________________________________________________________________________\r\n~~~Insurity~~~",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "ethan.jacobson@insurity.com",
+      "rule_state": "unclassified",
+      "updated": "2026-09-10T08:26:07Z",
+      "workflow_attempt_authority": {
+        "claimed_at": "2026-09-10T08:26:06Z",
+        "round_idx": 0,
+        "workflow_revision": 2
+      },
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
+    }
+  ],
+  "status": "plan",
+  "target_branch": "main",
+  "updated": "2026-09-10T08:26:07Z",
+  "workflow_revision": 7
+}

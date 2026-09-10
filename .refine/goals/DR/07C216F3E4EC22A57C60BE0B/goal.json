@@ -1,0 +1,142 @@
+{
+  "base_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+  "branch_name": "refine/DR07C216F3E4EC22A57C60BE0B/round-1",
+  "candidate_commit": null,
+  "created": "2026-09-10T08:26:00Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "DR07C216F3E4EC22A57C60BE0B",
+  "name": "Refine daemon bug",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": "ethan.jacobson@insurity.com",
+  "rounds": [
+    {
+      "agent_context": {
+        "assembled_at": "2026-09-10T08:26:01Z",
+        "current_round": {
+          "assignee": "ethan.jacobson@insurity.com",
+          "prompt": "From: Ethan Jacobson <ethan.jacobson@insurity.com>\nSubject: Refine daemon bug\n\nBody:\n## Summary\r\n  The workflow runner-worker loop stops making progress after it fails to durably settle a\r\n  stale-candidate integration, yet its OS process stays alive. Once wedged, the daemon admits\r\n  no new work (Todo Goals never reach Plan), stops reaping agents past their hard cap, and\r\n  stops cleaning worktrees �X indefinitely, until a manual daemon restart. Nothing detects or\r\n  surfaces the dead loop: `refine next` reports \"all-quiet\" and `system status` reports\r\n  daemon_healthy=true with running_workflow_processes=0.\r\n\r\n  ## Field evidence (Refine 4.2.0, node bo2lnxnevo02-ethan, daemon port 8082)\r\n  - Last log entry of ANY kind: 2026-08-18T21:50:00Z (category=workflow):\r\n    \"Goal failure was not durably settled (attempt superseded); original error:\r\n     Candidate 11818bcf�K is stale: recorded base 2a4dccff�K is not <current>\".\r\n    Preceding lines show repeated \"Candidate �K is stale\" / \"! [rejected] �K non-fast-forward\"\r\n    while integrating round branches during concurrent activity on merge_target_branch\r\n    `insurity-claims`.\r\n  - ~44h later: zero subsequent log lines. No \"Workflow status changed\" since 08-18T21:48.\r\n  - A Goal created + started today sits in `todo` and is never admitted to `plan`.\r\n  - system status: daemon_healthy=true, running_workflow_processes=0,\r\n    parallel_run_cap=2 (capacity free). refine next: suggestion \"all-quiet\".\r\n  - State-sync is healthy (sync_recovered 2026-08-18T13:48; `sync --preview` fast-forwards;\r\n    origin push of refine/state succeeded today) �X so sync is NOT the blocker.\r\n  - Collateral from the stalled loop: 3 agent sessions alive 21�V27h, far past\r\n    agent_hard_cap_seconds=7200 and agent_idle_timeout_seconds=900, unreaped; 7 orphaned\r\n    worktrees under .git/refine-worktrees not cleaned. This indicates the SAME loop that\r\n    admits work also owns reaping/cleanup, and all of it stopped together.\r\n  - Restarting the daemon respawns the worker and immediately resumes admission, reaping,\r\n    and cleanup.\r\n\r\n  ## Root-cause hypothesis (confirm in code)\r\n  The \"Goal failure was not durably settled (attempt superseded)\" path �X reached when a\r\n  candidate's recorded base is stale and the failure record is superseded by a concurrent\r\n  attempt �X is not handled as a recoverable per-Goal outcome. Instead of logging the failure\r\n  and continuing the loop to the next Goal, the worker's main loop exits or deadlocks (e.g.\r\n  an error propagates out of the loop body, an await never completes, or a lock/worktree is\r\n  left held). The supervisor keeps the process alive (so `system status` looks healthy) but\r\n  the loop no longer ticks.\r\n\r\n  Start in the workflow runner-worker entrypoint (`refine system runner-worker --kind\r\n  workflow`) and the engine loop under src/application/workflow/engine/execution/. Find where\r\n  \"Goal failure was not durably settled (attempt superseded)\" and the stale-candidate error\r\n  (\"Candidate �K is stale: recorded base �K\") are produced, and trace what happens to the loop\r\n  after that error �X specifically whether the error escapes the per-Goal iteration boundary.\r\n\r\n  ## Required behavior\r\n  1. A per-Goal failure �X including \"attempt superseded\" / stale-candidate / non-fast-forward\r\n     push rejection �X must be caught at the per-Goal boundary, recorded durably (Goal ->\r\n     failed or a recovery Round), and the worker loop MUST continue to the next Goal. No\r\n     single-Goal integration failure may terminate or wedge the loop.\r\n  2. Liveness detection: the worker must emit a periodic heartbeat/tick, and the daemon must\r\n     detect a stalled loop (alive process, no progress/heartbeat within a bound) and either\r\n     auto-restart the worker or mark itself unhealthy. system status must report a wedged\r\n     worker as NOT healthy.\r\n  3. Observability: when a Todo Goal has been waiting past a threshold with free capacity and\r\n     no active runs, `refine next` must surface it (e.g. \"workflow worker not advancing:\r\n     last tick <ts>, N Goals stuck in todo\") with a remediation command, instead of\r\n     \"all-quiet\".\r\n  4. Decouple or make independently resilient the periodic duties driven by this loop\r\n     (admission, agent hard-cap/idle reaping, worktree cleanup) so one wedged concern does\r\n     not silently stop the others.\r\n\r\n  ## Reproduction\r\n  1. Start a Goal whose implementation round races the merge_target_branch so its candidate\r\n     goes stale on integration (recorded base no longer current), and arrange a concurrent\r\n     attempt so the failure is \"superseded\" and cannot be durably settled.\r\n  2. Observe the worker log the \"attempt superseded\" line and then stop ticking.\r\n  3. Create + start another Goal; it stays in `todo` and is never admitted; refine next says\r\n     \"all-quiet\"; running_workflow_processes stays 0; agents past hard cap go unreaped.\r\n  4. Restart the daemon �� admission/reaping/cleanup resume. Confirms the loop, not the data,\r\n     was the blocker.\r\n\r\n  ## Acceptance criteria\r\n  - A stale-candidate / superseded-attempt integration failure records the Goal outcome and\r\n    the worker continues to the next Goal WITHOUT wedging; a follow-up Todo Goal is admitted\r\n    to Plan within one poll interval.\r\n  - A wedged/stalled worker loop is detected (heartbeat/tick watchdog) and auto-recovered or\r\n    reported unhealthy in system status �X no manual restart required.\r\n  - refine next surfaces a stuck-Todo-with-idle-worker condition instead of \"all-quiet\".\r\n  - Reaper and worktree-cleanup keep running independent of an admission-path failure.\r\n  - Regression tests (style of src/application/workflow/tests/ and\r\n    src/infrastructure/process/supervisor/lifecycle/tests.rs): inject a superseded/stale\r\n    candidate failure and assert the loop survives and the next Goal is admitted; assert the\r\n    watchdog flags a non-ticking worker.\r\n\r\n  ## Constraints\r\n  - Preserve fail-closed safety for genuine content conflicts and never auto-merge contested\r\n    Goal records; this fix is about loop survival, liveness detection, and surfacing �X not\r\n    about weakening conflict handling.\r\n\r\n\r\n[cid:insurity-small2_2f81c33c-d951-4e5c-a467-1113541ca22c.jpg]\r\nEthan Jacobson\r\nEthan.Jacobson@insurity.com\r\n\r\n[cid:excellence2026signature(17b0688e-5473-4b74-96eb-a73f633f2c2f)_48407359-d77b-4967-95cd-277a32b50ebc.png]<https://insurity.com/excellence?utm_source=Email-Signature&utm_medium=Email&utm_campaign=Event-Excellence-2026>\r\n\r\n_____________________________________________________________________________________________________\r\n\r\nThe information contained in this e-mail message is intended only for the personal and confidential use of the intended recipient(s). This message may be an attorney-client communication and/or work product and as such is privileged and confidential. If the reader of this message is not the intended recipient or an agent responsible for delivering it to the intended recipient, you are hereby notified that you have received this document in error and that any review, dissemination, distribution, or copying of this message is strictly prohibited. If you have received this communication in error, please notify us immediately by e-mail, and delete the original message.\r\n_____________________________________________________________________________________________________\r\n~~~Insurity~~~",
+          "reporter": "ethan.jacobson@insurity.com",
+          "round": 1
+        },
+        "goal": {
+          "assignee": "ethan.jacobson@insurity.com",
+          "id": "DR07C216F3E4EC22A57C60BE0B",
+          "name": "Refine daemon bug",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "ethan.jacobson@insurity.com"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Refine's components are model (entities), process (supervisor to manage running processes), prompts (LLM templates), surfaces (interfaces into refine), tools (reusable functions for workflow steps), and workflow (defined workflow which calls out to tools). These map directly to src/[model| process|prompts|surfaces|tools|workflow].\n- Refine uses a flat file persistence, file-based indexes, in-memory caching, and Rust to maintain high performance. Ensure <50ms performance on CLI and API calls (assuming we are not waiting on LLMs or outside tools).\n- Ensure that the architecture is maintained and is consistent. Do not invent new architectural concepts; instead, follow the existing architecture.\n- Ensure that documentation, especially src/intent/*, is maintained and the existing document format is preserved.\n- Ensure Refine remains \"agent-first\" by using installed coding-agent CLIs. Do not duplicate coding agent functionality.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It moves user-defined Goals through a workflow to ensure parallel implementation across Nodes, quality, and governance.",
+          "rules": [
+            {
+              "created": "2026-08-11T17:59:15.372635011+00:00",
+              "id": "generated-rule-1786471155372-1",
+              "source": "generated",
+              "text": "Keep component code within `src/{model,process,prompts,surfaces,tools,workflow}` and extend existing architecture instead of inventing new concepts.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372734717+00:00",
+              "id": "generated-rule-1786471155372-2",
+              "source": "generated",
+              "text": "Preserve Rust-based flat-file persistence, file indexes, and in-memory caching; keep non-external CLI/API work under 50ms.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372750673+00:00",
+              "id": "generated-rule-1786471155372-3",
+              "source": "generated",
+              "text": "Update affected documentation—especially `src/intent/*`—without changing its established format.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372756994+00:00",
+              "id": "generated-rule-1786471155372-4",
+              "source": "generated",
+              "text": "Use installed coding-agent CLIs for coding-agent capabilities; do not reimplement them.",
+              "updated": "2026-08-11T17:59:15Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "id": "guidance-1",
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "id": "guidance-2",
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
+      },
+      "assignee": "ethan.jacobson@insurity.com",
+      "constitution_state": "unclassified",
+      "created": "2026-09-10T08:26:00Z",
+      "failure_at": "",
+      "failure_category": "",
+      "failure_message": "",
+      "governance_candidate_commit": "",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "guidance_decision": null,
+      "implementation_plan": {
+        "binding": {
+          "base_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+          "context_digest": "d0192175d51d1535da94ed99aa2c0dc323a94aa787f7697f4d3f5d148b560871",
+          "context_version": 1,
+          "goal_id": "DR07C216F3E4EC22A57C60BE0B",
+          "implementation_branch": "refine/DR07C216F3E4EC22A57C60BE0B/round-1",
+          "round_idx": 0,
+          "target_branch": "main"
+        },
+        "phase": "plan",
+        "phase_started_at": "2026-09-10T08:26:01Z",
+        "schema_version": 2,
+        "started_at": "2026-09-10T08:26:01Z",
+        "state": "in_progress",
+        "updated_at": "2026-09-10T08:26:01Z"
+      },
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "From: Ethan Jacobson <ethan.jacobson@insurity.com>\nSubject: Refine daemon bug\n\nBody:\n## Summary\r\n  The workflow runner-worker loop stops making progress after it fails to durably settle a\r\n  stale-candidate integration, yet its OS process stays alive. Once wedged, the daemon admits\r\n  no new work (Todo Goals never reach Plan), stops reaping agents past their hard cap, and\r\n  stops cleaning worktrees �X indefinitely, until a manual daemon restart. Nothing detects or\r\n  surfaces the dead loop: `refine next` reports \"all-quiet\" and `system status` reports\r\n  daemon_healthy=true with running_workflow_processes=0.\r\n\r\n  ## Field evidence (Refine 4.2.0, node bo2lnxnevo02-ethan, daemon port 8082)\r\n  - Last log entry of ANY kind: 2026-08-18T21:50:00Z (category=workflow):\r\n    \"Goal failure was not durably settled (attempt superseded); original error:\r\n     Candidate 11818bcf�K is stale: recorded base 2a4dccff�K is not <current>\".\r\n    Preceding lines show repeated \"Candidate �K is stale\" / \"! [rejected] �K non-fast-forward\"\r\n    while integrating round branches during concurrent activity on merge_target_branch\r\n    `insurity-claims`.\r\n  - ~44h later: zero subsequent log lines. No \"Workflow status changed\" since 08-18T21:48.\r\n  - A Goal created + started today sits in `todo` and is never admitted to `plan`.\r\n  - system status: daemon_healthy=true, running_workflow_processes=0,\r\n    parallel_run_cap=2 (capacity free). refine next: suggestion \"all-quiet\".\r\n  - State-sync is healthy (sync_recovered 2026-08-18T13:48; `sync --preview` fast-forwards;\r\n    origin push of refine/state succeeded today) �X so sync is NOT the blocker.\r\n  - Collateral from the stalled loop: 3 agent sessions alive 21�V27h, far past\r\n    agent_hard_cap_seconds=7200 and agent_idle_timeout_seconds=900, unreaped; 7 orphaned\r\n    worktrees under .git/refine-worktrees not cleaned. This indicates the SAME loop that\r\n    admits work also owns reaping/cleanup, and all of it stopped together.\r\n  - Restarting the daemon respawns the worker and immediately resumes admission, reaping,\r\n    and cleanup.\r\n\r\n  ## Root-cause hypothesis (confirm in code)\r\n  The \"Goal failure was not durably settled (attempt superseded)\" path �X reached when a\r\n  candidate's recorded base is stale and the failure record is superseded by a concurrent\r\n  attempt �X is not handled as a recoverable per-Goal outcome. Instead of logging the failure\r\n  and continuing the loop to the next Goal, the worker's main loop exits or deadlocks (e.g.\r\n  an error propagates out of the loop body, an await never completes, or a lock/worktree is\r\n  left held). The supervisor keeps the process alive (so `system status` looks healthy) but\r\n  the loop no longer ticks.\r\n\r\n  Start in the workflow runner-worker entrypoint (`refine system runner-worker --kind\r\n  workflow`) and the engine loop under src/application/workflow/engine/execution/. Find where\r\n  \"Goal failure was not durably settled (attempt superseded)\" and the stale-candidate error\r\n  (\"Candidate �K is stale: recorded base �K\") are produced, and trace what happens to the loop\r\n  after that error �X specifically whether the error escapes the per-Goal iteration boundary.\r\n\r\n  ## Required behavior\r\n  1. A per-Goal failure �X including \"attempt superseded\" / stale-candidate / non-fast-forward\r\n     push rejection �X must be caught at the per-Goal boundary, recorded durably (Goal ->\r\n     failed or a recovery Round), and the worker loop MUST continue to the next Goal. No\r\n     single-Goal integration failure may terminate or wedge the loop.\r\n  2. Liveness detection: the worker must emit a periodic heartbeat/tick, and the daemon must\r\n     detect a stalled loop (alive process, no progress/heartbeat within a bound) and either\r\n     auto-restart the worker or mark itself unhealthy. system status must report a wedged\r\n     worker as NOT healthy.\r\n  3. Observability: when a Todo Goal has been waiting past a threshold with free capacity and\r\n     no active runs, `refine next` must surface it (e.g. \"workflow worker not advancing:\r\n     last tick <ts>, N Goals stuck in todo\") with a remediation command, instead of\r\n     \"all-quiet\".\r\n  4. Decouple or make independently resilient the periodic duties driven by this loop\r\n     (admission, agent hard-cap/idle reaping, worktree cleanup) so one wedged concern does\r\n     not silently stop the others.\r\n\r\n  ## Reproduction\r\n  1. Start a Goal whose implementation round races the merge_target_branch so its candidate\r\n     goes stale on integration (recorded base no longer current), and arrange a concurrent\r\n     attempt so the failure is \"superseded\" and cannot be durably settled.\r\n  2. Observe the worker log the \"attempt superseded\" line and then stop ticking.\r\n  3. Create + start another Goal; it stays in `todo` and is never admitted; refine next says\r\n     \"all-quiet\"; running_workflow_processes stays 0; agents past hard cap go unreaped.\r\n  4. Restart the daemon �� admission/reaping/cleanup resume. Confirms the loop, not the data,\r\n     was the blocker.\r\n\r\n  ## Acceptance criteria\r\n  - A stale-candidate / superseded-attempt integration failure records the Goal outcome and\r\n    the worker continues to the next Goal WITHOUT wedging; a follow-up Todo Goal is admitted\r\n    to Plan within one poll interval.\r\n  - A wedged/stalled worker loop is detected (heartbeat/tick watchdog) and auto-recovered or\r\n    reported unhealthy in system status �X no manual restart required.\r\n  - refine next surfaces a stuck-Todo-with-idle-worker condition instead of \"all-quiet\".\r\n  - Reaper and worktree-cleanup keep running independent of an admission-path failure.\r\n  - Regression tests (style of src/application/workflow/tests/ and\r\n    src/infrastructure/process/supervisor/lifecycle/tests.rs): inject a superseded/stale\r\n    candidate failure and assert the loop survives and the next Goal is admitted; assert the\r\n    watchdog flags a non-ticking worker.\r\n\r\n  ## Constraints\r\n  - Preserve fail-closed safety for genuine content conflicts and never auto-merge contested\r\n    Goal records; this fix is about loop survival, liveness detection, and surfacing �X not\r\n    about weakening conflict handling.\r\n\r\n\r\n[cid:insurity-small2_2f81c33c-d951-4e5c-a467-1113541ca22c.jpg]\r\nEthan Jacobson\r\nEthan.Jacobson@insurity.com\r\n\r\n[cid:excellence2026signature(17b0688e-5473-4b74-96eb-a73f633f2c2f)_48407359-d77b-4967-95cd-277a32b50ebc.png]<https://insurity.com/excellence?utm_source=Email-Signature&utm_medium=Email&utm_campaign=Event-Excellence-2026>\r\n\r\n_____________________________________________________________________________________________________\r\n\r\nThe information contained in this e-mail message is intended only for the personal and confidential use of the intended recipient(s). This message may be an attorney-client communication and/or work product and as such is privileged and confidential. If the reader of this message is not the intended recipient or an agent responsible for delivering it to the intended recipient, you are hereby notified that you have received this document in error and that any review, dissemination, distribution, or copying of this message is strictly prohibited. If you have received this communication in error, please notify us immediately by e-mail, and delete the original message.\r\n_____________________________________________________________________________________________________\r\n~~~Insurity~~~",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "ethan.jacobson@insurity.com",
+      "rule_state": "unclassified",
+      "updated": "2026-09-10T08:26:01Z",
+      "workflow_attempt_authority": {
+        "claimed_at": "2026-09-10T08:26:00Z",
+        "round_idx": 0,
+        "workflow_revision": 2
+      },
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
+    }
+  ],
+  "status": "plan",
+  "target_branch": "main",
+  "updated": "2026-09-10T08:26:01Z",
+  "workflow_revision": 7
+}
