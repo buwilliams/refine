@@ -106,6 +106,7 @@ fn web_server_copies_validated_runtime_settings_between_nodes() {
         .update(&json!({
             "automatic_agent_resource_budget_percent": 40,
             "parallel_run_cap": 2,
+            "auto_approve": true,
             "target_app_url": "https://source.invalid"
         }))
         .unwrap();
@@ -124,6 +125,7 @@ fn web_server_copies_validated_runtime_settings_between_nodes() {
     let destination = FileSettingsService::new(&refine_dir).load().unwrap();
     assert_eq!(destination["automatic_agent_resource_budget_percent"], "40");
     assert_eq!(destination["parallel_run_cap"], "2");
+    assert_eq!(destination["auto_approve"], "true");
     assert_eq!(destination["target_app_url"], "https://destination.invalid");
 
     let invalid = server.handle(ApiRequest {

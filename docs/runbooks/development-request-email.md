@@ -70,15 +70,48 @@ its canonical path with the currently active target before it reads the token
 or contacts Fastmail. Switching this installation to any other target therefore
 leaves incoming mail queued at Fastmail.
 
-Sender matching is case-insensitive. A zero auto-approve delay means the next
-poll approves an email-linked Goal as soon as it reaches Review; approval still
-uses Refine's candidate-integration and publication checks before moving it to
-Done. Older capability files may still contain `agent_cli`; unknown fields are
-tolerated for compatibility, but that field is inactive and omitted when the
-configuration is serialized.
+Sender matching is case-insensitive. `auto_approve_after_seconds` sets the delay
+for automatic approval, which also requires the worker node's
+saved `auto_approve` setting to be `true`. It defaults to `false` on new and
+existing installations, so email-linked Goals wait in Review for QA acceptance.
+Approval still uses Refine's candidate-integration and publication checks before
+moving the Goal to Done. Older capability files may still contain `agent_cli`;
+unknown fields are tolerated for compatibility, but that field is inactive and
+omitted when the configuration is serialized.
 
 Edit `allowed_senders` in this file to change the list. The runner rereads and
 validates the complete file each polling cycle.
+
+## Control Review acceptance
+
+In the email worker's node, open **Node -> Runtime Config**, edit
+**Auto-approve**, and select **On** or **Off (manual acceptance)** using the
+normal autosave flow. This setting applies to email-request Goals processed by
+that node. It is also included when copying runtime settings from another node.
+The shared settings API accepts `PATCH /api/settings` with
+`{"auto_approve": true}` or `{"auto_approve": false}`. The CLI against the running
+daemon supports the same control:
+
+```bash
+refine config settings set --set auto_approve=false
+refine config settings show
+```
+
+The worker rereads the saved setting at every automatic approval decision; no
+restart is needed. Missing values mean `false`. Invalid or unreadable settings
+keep Goals in Review and record a retry error in the local request ledger.
+
+The first observed Review time is recorded even while Auto-approve is off.
+Turning it on also affects requests already waiting in Review: the worker
+approves only after `auto_approve_after_seconds` has elapsed from that recorded
+time. A zero delay permits approval at the next attempt. Turning it off prevents
+subsequent automatic approvals and leaves already completed Goals unchanged.
+
+With Auto-approve off, use the Goal's **Approve →** action after QA testing, or
+create a follow-up Round describing the additional work. Manual acceptance uses
+the same verified Review approval path and remains available when Auto-approve
+is on. The resolution reply is sent after Done following either approval path,
+even if Auto-approve is off or its setting is unreadable.
 
 ## Processing contract
 
@@ -94,7 +127,9 @@ For each accepted Fastmail message, Refine:
    source as its sole initial Round, the sender as Reporter, and the normal
    default assignee semantics; no reviewer rewrites accepted trusted source;
 5. lets the normal backlog and workflow automation run;
-6. approves the Goal from Review only after verified Governance integration evidence; and
+6. retains the Goal in Review for manual acceptance by default, or automatically
+   approves it when the worker node's Auto-approve is on, the delay has elapsed,
+   and Governance integration evidence is verified; and
 7. sends a threaded resolution reply from `goal@getrefine.dev` after Done.
 
 Request records live only below the installation runtime at
@@ -120,10 +155,16 @@ review, Goal creation, approval, and replies; Fastmail continues queuing mail.
 3. Confirm the sole Round contains `From`, `Subject`, decoded body, and named
    text-attachment filenames and contents; image, binary, non-text, and unnamed
    attachment bodies must not appear.
-4. Let the Goal reach Review and confirm it advances to Done through approval.
+4. With Auto-approve off (the default), let the Goal reach Review and confirm it
+   stays there across polls. Use Approve after QA testing, or create a follow-up
+   Round when more work is needed. Confirm acceptance advances it to Done.
 5. Confirm the sender receives one threaded resolution reply.
 6. Stop Refine, send another request, wait longer than one polling interval,
    and confirm no Goal appears until Refine is started again.
+7. For a request waiting in Review, turn Auto-approve on without restarting the
+   worker. Confirm it advances to Done only when the configured delay from its
+   first observed Review time has elapsed, then sends one resolution reply.
+   Restore Auto-approve to off when manual QA acceptance is required.
 
 If intake fails, inspect the request record's `last_error` and the daemon's
 `refine development requests:` log line. Common causes are a missing token, a
