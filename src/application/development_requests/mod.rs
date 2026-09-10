@@ -3,7 +3,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 #[cfg(test)]
@@ -13,10 +13,8 @@ use sha2::{Digest, Sha256};
 use crate::application::work_items::{
     FeatureGoalPlacement, FileWorkItemService, GoalAuthoringRequest,
 };
-use crate::application::workflow::governance::integration::FileGovernanceIntegrationService;
 use crate::error::{RefineError, RefineResult};
 use crate::infrastructure::process::supervisor::security::{NativeSecretStore, SecretStore};
-use crate::model::workflow::GoalStatus;
 
 const JMAP_SESSION_URL: &str = "https://api.fastmail.com/jmap/session";
 const TOKEN_SCOPE: &str = "email";
@@ -25,6 +23,7 @@ const PROCESSED_KEYWORD: &str = "refine-processed";
 mod email_source;
 mod fastmail;
 mod records;
+mod review;
 
 use email_source::{ParsedEmail, parse_email};
 use fastmail::FastmailClient;
@@ -406,59 +405,6 @@ impl FileDevelopmentRequestService {
             )));
         }
         Ok(())
-    }
-
-    fn advance_goal_and_notify(
-        &self,
-        record: &mut DevelopmentRequestRecord,
-        fastmail: &dyn MailSource,
-        settings: &DevelopmentRequestSettings,
-    ) -> RefineResult<()> {
-        let goal_id = record.goal_id.as_deref().ok_or_else(|| {
-            RefineError::Serialization(format!("request {} has no linked Goal", record.id))
-        })?;
-        let work_items = FileWorkItemService::with_projection_cache(
-            &self.refine_dir,
-            &self.runtime_root,
-            self.runtime_root.join("cache"),
-        );
-        let mut goal = work_items.show_goal_summary(goal_id)?;
-        if goal.goal.status == GoalStatus::Review {
-            let now = Utc::now();
-            let first_seen = match &record.review_seen_at {
-                Some(value) => DateTime::parse_from_rfc3339(value)
-                    .map(|value| value.with_timezone(&Utc))
-                    .unwrap_or(now),
-                None => {
-                    record.review_seen_at = Some(now.to_rfc3339());
-                    self.write_record(record)?;
-                    now
-                }
-            };
-            if now.signed_duration_since(first_seen).num_seconds()
-                >= settings.auto_approve_after.as_secs() as i64
-            {
-                FileGovernanceIntegrationService::with_target_root(
-                    &self.runtime_root,
-                    &self.refine_dir,
-                    &self.target_root,
-                )
-                .approve_reviewed_goal(goal_id)?;
-                goal = work_items.show_goal_summary(goal_id)?;
-            }
-        }
-        if goal.goal.status != GoalStatus::Done {
-            return Ok(());
-        }
-        record.status = DevelopmentRequestStatus::Resolved;
-        record.last_error = None;
-        record.updated_at = Utc::now().to_rfc3339();
-        self.write_record(record)?;
-        fastmail.send_resolution(settings, record)?;
-        record.status = DevelopmentRequestStatus::Notified;
-        record.notified_at = Some(Utc::now().to_rfc3339());
-        record.updated_at = record.notified_at.clone().unwrap_or_default();
-        self.write_record(record)
     }
 
     fn records_dir(&self) -> PathBuf {

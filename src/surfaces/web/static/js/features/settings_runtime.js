@@ -86,6 +86,7 @@ function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
   const resourceIsolation = String(s.resource_isolation_mode ?? "auto");
   const agentLimitPause = String(s.agent_limit_pause_seconds ?? "60");
   const backlogPromote = String(s.backlog_promote_after_seconds ?? "3600");
+  const autoApprove = String(s.auto_approve ?? "false") === "true";
   const worktreeCleanup = String(s.worktree_cleanup_after_seconds ?? "0");
   const stateDebounce = String(s.state_sync_debounce_seconds ?? "5");
   const remoteFetchInterval = String(s.project_update_pulse_interval_seconds ?? "300");
@@ -208,6 +209,16 @@ function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
         valueLabel: optionLabel(backlogOptions, backlogPromote),
         control: `<select id="s-backlog-promote" data-testid="runtime-backlog-promote">
           ${backlogOptions.map(([v, lbl]) => `<option value="${v}" ${backlogPromote === v ? "selected" : ""}>${lbl}</option>`).join("")}
+        </select>`,
+      })}
+      ${renderSettingsEditableField({
+        id: "s-auto-approve",
+        label: "Auto-approve",
+        description: "Applies to email-request Goals processed by this node. Off by default: keep Goals in Review for manual acceptance or a follow-up Round. Changes apply on the next approval attempt, including requests already waiting in Review. When on, the configured email approval delay runs from the first observed Review time.",
+        valueLabel: autoApprove ? "On" : "Off (manual acceptance)",
+        control: `<select id="s-auto-approve" data-testid="runtime-auto-approve">
+          <option value="false" ${!autoApprove ? "selected" : ""}>Off (manual acceptance)</option>
+          <option value="true" ${autoApprove ? "selected" : ""}>On</option>
         </select>`,
       })}
       ${renderSettingsEditableField({
@@ -441,6 +452,7 @@ async function autosaveSettingsRuntime(options = {}) {
     agent_limit_pause_seconds: $("#s-agent-limit-pause").value,
     chat_idle_timeout_seconds: $("#s-chat-idle").value,
     backlog_promote_after_seconds: $("#s-backlog-promote").value,
+    auto_approve: $("#s-auto-approve").value,
     worktree_cleanup_after_seconds: $("#s-worktree-cleanup-delay").value,
     state_sync_debounce_seconds: $("#s-state-sync-debounce").value,
     project_update_pulse_interval_seconds: $("#s-project-update-pulse").value,
@@ -461,7 +473,7 @@ function bindNodeRuntimeConfigControls() {
   const root = document.querySelector('[data-tab-pane="runtime"]');
   const autosaveRuntime = bindSettingsAutosave(
     root,
-    "#s-cap, #s-automatic-resource-budget-percent, #s-pattern, #s-idle, #s-hard, #s-worker-memory, #s-ui-memory, #s-worker-cpu-priority, #s-resource-isolation, #s-agent-limit-pause, #s-chat-idle, #s-backlog-promote, #s-worktree-cleanup-delay, #s-state-sync-debounce, #s-project-update-pulse, #s-state-sync-stale-threshold, #s-state-sync-auto-recovery, #s-state-sync-agent-resolution, #s-workflow-conflict-resolution, #s-file-browser-ignore",
+    "#s-cap, #s-automatic-resource-budget-percent, #s-pattern, #s-idle, #s-hard, #s-worker-memory, #s-ui-memory, #s-worker-cpu-priority, #s-resource-isolation, #s-agent-limit-pause, #s-chat-idle, #s-backlog-promote, #s-auto-approve, #s-worktree-cleanup-delay, #s-state-sync-debounce, #s-project-update-pulse, #s-state-sync-stale-threshold, #s-state-sync-auto-recovery, #s-state-sync-agent-resolution, #s-workflow-conflict-resolution, #s-file-browser-ignore",
     autosaveSettingsRuntime,
     { event: "settings-editable-commit" },
   );
