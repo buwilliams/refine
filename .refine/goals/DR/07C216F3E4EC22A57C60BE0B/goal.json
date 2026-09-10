@@ -4576,9 +4576,46 @@
       "prompt": "Recover Goal DR07C216F3E4EC22A57C60BE0B: Keep workflow scheduling alive after Goal failures.\n\nThe user explicitly authorized restarting all six failed Goals after the Plan, Implement, Quality and Governance Skills were revised (configuration revision 26). This new Round supersedes the earlier user-directed hold; preserve its audit record and every previous attempt.\n\nOutcome: A failure in one Goal must not stop unrelated eligible work from being scheduled. Detect a live workflow worker whose scheduling loop stalls, and recover safely or expose an actionable unhealthy state while keeping daemon control responsive.\n\nRetained evidence: Round 3 was stopped by the user with useful uncommitted ownership and settlement-evidence work. Earlier Quality found that an unobserved parent exit could lose descendant ownership, and settlement panics could omit originating failure evidence. The recorded ab318054 candidate is earlier retained work, not proof that the interrupted Round 3 changes passed. Inspect /home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR07C216F3E4EC22A57C60BE0B-round-2 read-only as a reuse source: HEAD ab318054adf5a5418ee3ae8bec348c98232916f2, branch refine/DR07C216F3E4EC22A57C60BE0B/round-3, 28 tracked/untracked status entries at recovery preparation. Full prior Goal records, tracked patches and untracked-file manifests were captured at /tmp/refine-recovery-rounds-etc0wvs8/DR07C216F3E4EC22A57C60BE0B/. Prior plans, findings and test results are evidence, not instructions to reproduce their design or claims of a passed new candidate.\n\nApproach: Distinguish semantic Goal authority, transient worker ownership and proof that local execution has ended. Reuse one shared ownership assessment across capacity, replacement, deadlines and worktree protection; an empty scan alone is insufficient exit evidence. Reassess the retained guardian mechanism against existing host/process capabilities and supported platforms rather than preserving its design by default. Contain preparation, execution and settlement faults at the originating attempt, preserve cancellation/newer authority, and finalize explicit evidence even when settlement itself panics. Share maintenance and health mechanisms with the following overdue-agent Goal rather than introducing competing schedulers or watchdogs.\n\nVerification: Use real consumer paths to reproduce leader exit before descendant observation, including a setsid child, missing registration and unavailable identity evidence. Verify safe capacity/worktree retention and eventual release only with trustworthy exit proof. Inject preparation faults, task and settlement panics, transient persistence failures and supersession; verify another eligible Goal enters Plan after safe capacity becomes available. Verify stalled tick detection and bounded recovery without false alarms for pause or legitimate waiting. Run the applicable project checks and report exact commands, selected test counts, failures, skips and candidate identity. Confirm any alleged baseline failure against this Round's pinned base.\n\nUse Refine's new managed Round workspace and the target tip selected at admission, which may include earlier Goals in this ordered recovery Feature. Reconcile the concept and existing owner before selectively carrying forward useful work. Preserve all earlier branches, worktrees, commits, uncommitted files, journals and failure evidence; do not reset or clean them. Keep changes within this Goal's behavior and update only affected intent documentation. The revised Skills govern this run. Refine owns candidate capture, workflow advancement and integration; human approval and serving-installation promotion/restart remain separate.",
       "quality_agent_report": "workflow.quality.enter:default-quality: Corrected operation ownership and deadline-settlement gaps, added three regressions, and passed final Linux verification.",
       "quality_candidate_commit": "8087e73c50825c99eb780c504b913e0c34c3c596",
-      "quality_checked_at": "",
-      "quality_details": "",
-      "quality_message": "",
+      "quality_checked_at": "2026-09-10T19:33:02Z",
+      "quality_details": {
+        "candidate_commit": "8087e73c50825c99eb780c504b913e0c34c3c596",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR07C216F3E4EC22A57C60BE0B-round-4",
+        "diagnostics": [
+          "Event invocation 3ec0b553d86c4fe2ece68ffc7d36eabbd571b6897308b4b0251f9eff6af7f376: automation/invocations/3ec0b553d86c4fe2ece68ffc7d36eabbd571b6897308b4b0251f9eff6af7f376.json"
+        ],
+        "evaluation_scope": "isolated_candidate",
+        "operation_id": "1a08cca9dc8113c7684",
+        "provider_attempts": [],
+        "quality_proof": {
+          "checked_at": "2026-09-10T19:33:02Z",
+          "checked_candidate_commit": "8087e73c50825c99eb780c504b913e0c34c3c596",
+          "evaluation_scope": "isolated_candidate",
+          "goal_id": "DR07C216F3E4EC22A57C60BE0B",
+          "operation_id": "1a08cca9dc8113c7684",
+          "results": [
+            {
+              "command": "",
+              "evidence": "Observational review found incomplete ownership integration in PTY settlement and retained-log cleanup.",
+              "status": "failed",
+              "test": "workflow.quality.enter:default-quality"
+            }
+          ],
+          "round_idx": 3,
+          "schema_version": 1,
+          "source_candidate_commit": "8087e73c50825c99eb780c504b913e0c34c3c596",
+          "state": "failed"
+        },
+        "results": [
+          {
+            "command": "",
+            "evidence": "Observational review found incomplete ownership integration in PTY settlement and retained-log cleanup.",
+            "status": "failed",
+            "test": "workflow.quality.enter:default-quality"
+          }
+        ],
+        "source_candidate_commit": "8087e73c50825c99eb780c504b913e0c34c3c596"
+      },
+      "quality_message": "Quality failed: “workflow.quality.enter:default-quality” — Observational review found incomplete ownership integration in PTY settlement and retained-log cleanup.",
       "quality_skill_results": [
         {
           "artifacts": {
@@ -4696,10 +4733,10 @@
           "summary": "Corrected operation ownership and deadline-settlement gaps, added three regressions, and passed final Linux verification."
         }
       ],
-      "quality_state": "unclassified",
+      "quality_state": "failed",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T19:28:03Z",
+      "updated": "2026-09-10T19:33:03Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T18:06:05Z",
         "round_idx": 3,
@@ -4711,7 +4748,7 @@
   ],
   "status": "quality",
   "target_branch": "main",
-  "updated": "2026-09-10T19:28:03Z",
+  "updated": "2026-09-10T19:33:03Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:06:37.178169037+00:00",
@@ -4822,5 +4859,5 @@
       "to": "quality"
     }
   ],
-  "workflow_revision": 93
+  "workflow_revision": 94
 }

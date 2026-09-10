@@ -1813,11 +1813,78 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "failed",
+  "results": {
+    "default-quality": {
+      "invocation_id": "3ec0b553d86c4fe2ece68ffc7d36eabbd571b6897308b4b0251f9eff6af7f376",
+      "binding_id": "default-quality",
+      "role": "quality",
+      "outcome": "failure",
+      "summary": "Observational review found incomplete ownership integration in PTY settlement and retained-log cleanup.",
+      "evidence": [
+        "Verified clean worktree at candidate 8087e73c50825c99eb780c504b913e0c34c3c596. No files, Git state, or Goal state changed.",
+        "P1: src/application/agents/sessions/session_runtime.rs:331-350 retains the guardian as child while replacing pid with the workload PID. Completion at lines 610-613 and error/timeout handling at lines 695-699 still kill the workload group and then child. The vendored portable-pty ChildKiller sends SIGHUP directly to that guardian. This can destroy the helper before it records complete scope exit; escaped descendants can also survive. owned_groups/assessment.rs:44-69 then retains Unverified ownership, and policy/capacity.rs continues counting it, potentially blocking subsequent admission and replacement indefinitely.",
+        "Existing PTY tests do not establish safe capacity release: the hard-cap test checks list().is_empty(), but list() excludes terminal records even when retained owned-group evidence remains pending. Completion tests primarily assert returned results.",
+        "P2: src/surfaces/web_server/http/background_loops.rs:187-215 deletes old stdout, stderr, and stdin logs whenever the primary process JSON is absent. It never checks retained owned-group evidence. After primary-registration loss, the hourly sweep can therefore delete evidence for Live or Unverified work, contrary to the execution-ownership contract.",
+        "One coherent recovery request: complete adoption of shared ownership assessment across PTY settlement and artifact retirement. Preserve the guardian while stopping workloads and proving scope exit; retain logs whenever ownership remains Live, Unverified, or unreadable. Add regressions through these actual consumers, preserving existing deadline and Toolbar semantics.",
+        "Read retained verification logs: 1269 tests passed, zero failed, six ignored; the binary target selected zero tests. All 949 files in /tmp/refine-r4-quality/final-files.json match the current workspace. These are prior-run results, not behavioral tests executed in this invocation.",
+        "The findings are supported by source inspection; behavioral reproductions remain proposed for Refine supervision. macOS execution remains unverified."
+      ],
+      "artifacts": {
+        "tests": [
+          {
+            "command": "cargo fmt --all -- --check",
+            "evidence": "Executed during this invocation; exit 0.",
+            "status": "passed",
+            "test": "Candidate formatting"
+          },
+          {
+            "command": "git diff --check a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e 8087e73c50825c99eb780c504b913e0c34c3c596",
+            "evidence": "Executed during this invocation; exit 0.",
+            "status": "passed",
+            "test": "Candidate patch whitespace"
+          },
+          {
+            "command": "cargo test --lib application::agents::sessions -- --test-threads=1",
+            "evidence": "Proposed after extending completion and timeout regressions with owned-scope assertions, an escaped descendant, and deterministic guardian timing. Assert proven exit and capacity release, not merely an empty active listing.",
+            "status": "not_run",
+            "test": "PTY completion and timeout preserve scope proof and release capacity"
+          },
+          {
+            "command": "cargo test --lib surfaces::web_server::http::background_loops -- --test-threads=1",
+            "evidence": "Proposed after adding retention regressions for Live, Unverified, unreadable, and proven-exited ownership. Only proven-exited eligible artifacts should be removed.",
+            "status": "not_run",
+            "test": "Retention protects evidence after primary-registration loss"
+          },
+          {
+            "command": "cargo test --lib application::workers -- --test-threads=1",
+            "evidence": "Proposed for Refine supervision after the ownership-consumer corrections.",
+            "status": "not_run",
+            "test": "Ownership termination and replacement remain consistent"
+          },
+          {
+            "command": "cargo test --lib worker_liveness -- --test-threads=1",
+            "evidence": "Proposed after adding a real PTY failure case that verifies the next eligible Goal enters Plan within one poll interval after proven capacity release.",
+            "status": "not_run",
+            "test": "Follow-up admission after safely settled PTY failure"
+          }
+        ]
+      }
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "default-quality",
+      "diagnostic": null,
+      "operation_id": "1a08cca9dc8113c7684",
+      "process_id": "proc-1789068484805-1129590-1493",
+      "raw_output": "{\n  \"binding_id\": \"default-quality\",\n  \"invocation_id\": \"3ec0b553d86c4fe2ece68ffc7d36eabbd571b6897308b4b0251f9eff6af7f376\",\n  \"role\": \"quality\",\n  \"outcome\": \"failure\",\n  \"summary\": \"Observational review found incomplete ownership integration in PTY settlement and retained-log cleanup.\",\n  \"evidence\": [\n    \"Verified clean worktree at candidate 8087e73c50825c99eb780c504b913e0c34c3c596. No files, Git state, or Goal state changed.\",\n    \"P1: src/application/agents/sessions/session_runtime.rs:331-350 retains the guardian as child while replacing pid with the workload PID. Completion at lines 610-613 and error/timeout handling at lines 695-699 still kill the workload group and then child. The vendored portable-pty ChildKiller sends SIGHUP directly to that guardian. This can destroy the helper before it records complete scope exit; escaped descendants can also survive. owned_groups/assessment.rs:44-69 then retains Unverified ownership, and policy/capacity.rs continues counting it, potentially blocking subsequent admission and replacement indefinitely.\",\n    \"Existing PTY tests do not establish safe capacity release: the hard-cap test checks list().is_empty(), but list() excludes terminal records even when retained owned-group evidence remains pending. Completion tests primarily assert returned results.\",\n    \"P2: src/surfaces/web_server/http/background_loops.rs:187-215 deletes old stdout, stderr, and stdin logs whenever the primary process JSON is absent. It never checks retained owned-group evidence. After primary-registration loss, the hourly sweep can therefore delete evidence for Live or Unverified work, contrary to the execution-ownership contract.\",\n    \"One coherent recovery request: complete adoption of shared ownership assessment across PTY settlement and artifact retirement. Preserve the guardian while stopping workloads and proving scope exit; retain logs whenever ownership remains Live, Unverified, or unreadable. Add regressions through these actual consumers, preserving existing deadline and Toolbar semantics.\",\n    \"Read retained verification logs: 1269 tests passed, zero failed, six ignored; the binary target selected zero tests. All 949 files in /tmp/refine-r4-quality/final-files.json match the current workspace. These are prior-run results, not behavioral tests executed in this invocation.\",\n    \"The findings are supported by source inspection; behavioral reproductions remain proposed for Refine supervision. macOS execution remains unverified.\"\n  ],\n  \"artifacts\": {\n    \"tests\": [\n      {\n        \"test\": \"Candidate formatting\",\n        \"command\": \"cargo fmt --all -- --check\",\n        \"status\": \"passed\",\n        \"evidence\": \"Executed during this invocation; exit 0.\"\n      },\n      {\n        \"test\": \"Candidate patch whitespace\",\n        \"command\": \"git diff --check a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e 8087e73c50825c99eb780c504b913e0c34c3c596\",\n        \"status\": \"passed\",\n        \"evidence\": \"Executed during this invocation; exit 0.\"\n      },\n      {\n        \"test\": \"PTY completion and timeout preserve scope proof and release capacity\",\n        \"command\": \"cargo test --lib application::agents::sessions -- --test-threads=1\",\n        \"status\": \"not_run\",\n        \"evidence\": \"Proposed after extending completion and timeout regressions with owned-scope assertions, an escaped descendant, and deterministic guardian timing. Assert proven exit and capacity release, not merely an empty active listing.\"\n      },\n      {\n        \"test\": \"Retention protects evidence after primary-registration loss\",\n        \"command\": \"cargo test --lib surfaces::web_server::http::background_loops -- --test-threads=1\",\n        \"status\": \"not_run\",\n        \"evidence\": \"Proposed after adding retention regressions for Live, Unverified, unreadable, and proven-exited ownership. Only proven-exited eligible artifacts should be removed.\"\n      },\n      {\n        \"test\": \"Ownership termination and replacement remain consistent\",\n        \"command\": \"cargo test --lib application::workers -- --test-threads=1\",\n        \"status\": \"not_run\",\n        \"evidence\": \"Proposed for Refine supervision after the ownership-consumer corrections.\"\n      },\n      {\n        \"test\": \"Follow-up admission after safely settled PTY failure\",\n        \"command\": \"cargo test --lib worker_liveness -- --test-threads=1\",\n        \"status\": \"not_run\",\n        \"evidence\": \"Proposed after adding a real PTY failure case that verifies the next eligible Goal enters Plan within one poll interval after proven capacity release.\"\n      }\n    ]\n  }\n}\n",
+      "workflow_revision": 67
+    }
+  ],
   "created_at": "2026-09-10T19:28:04.459041305+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-10T19:33:02.497751252+00:00",
   "error": null,
   "action_applied": false
 }
