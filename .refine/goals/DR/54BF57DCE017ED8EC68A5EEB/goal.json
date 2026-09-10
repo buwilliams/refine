@@ -1,9 +1,9 @@
 {
   "base_commit": "b47569adb8d4c5d1d7335ba91729a3e486a38fe0",
-  "branch_name": "refine/DR54BF57DCE017ED8EC68A5EEB/round-2",
+  "branch_name": "refine/DR54BF57DCE017ED8EC68A5EEB/round-3",
   "candidate_commit": "b1426cf5fb8dcc6a66a62d56fe8620c8ba513fb5",
   "created": "2026-09-10T08:26:04Z",
-  "event_generation": 5,
+  "event_generation": 7,
   "feature_id": null,
   "feature_order": null,
   "id": "DR54BF57DCE017ED8EC68A5EEB",
@@ -486,7 +486,7 @@
         "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
       },
       "assignee": "ethan.jacobson@insurity.com",
-      "constitution_state": null,
+      "constitution_state": "passed",
       "created": "2026-09-10T13:06:36Z",
       "event_configuration": {
         "events": {
@@ -975,6 +975,37 @@
         }
       },
       "event_results": {
+        "09ab44ca49b3a80b97eacf0f762d9b0a267993270b303cd4f7d709cbbe0570f9": {
+          "candidate_commit": "b1426cf5fb8dcc6a66a62d56fe8620c8ba513fb5",
+          "results": {
+            "default-governance": {
+              "artifacts": {
+                "recovery_analysis": "Replay-journal recovery runs after workflow context hydration, but hydration rejects states created by the replay itself. After detached replay completes, branch-based worktree discovery cannot find the existing checkout and attempts to recreate it at an occupied path. After replacement attachment but before Goal persistence, hydration rejects the replacement because it does not descend from the recorded original candidate. Both paths prevent the journal recovery code from running. Existing interruption tests construct the context directly and bypass hydration.",
+                "recovery_round_prompt": "Repair replay interruption recovery for candidate b1426cf5fb8dcc6a66a62d56fe8620c8ba513fb5 in a new managed recovery Round. Preserve prior branches, worktrees, journals, plans and evidence. Before ordinary worktree discovery or candidate ancestry rejection, inspect the trusted managed workspace and reconcile its replay journal under current attempt authority and repository coordination. Handle detached replay completion, replacement attachment before Goal persistence, and persisted replacement before acknowledgement. Preserve dirty work and unexpected ref changes; never roll back a durably persisted replacement. Cover Plan/Implement and Quality/Governance resumption. Add regressions through WorkflowEngine preparation and execution, rather than directly constructing WorkflowContext. Verify replacement checks still run against the exact candidate. Proposed checks: cargo test --lib application::workflow::tests::worktree_resume -- --test-threads=1; cargo test --lib application::workflow::tests::candidate_refresh -- --test-threads=1; cargo check --all-targets. Update only affected intent documentation.",
+                "violations": [
+                  {
+                    "message": "Normal workflow restart cannot recover journalled replay states, violating the recoverable Git contract and accepted plan P3/P5/P10. src/infrastructure/git/worktrees/replay.rs:79-145 creates detached and attached-but-unpersisted replacement states. Before journal recovery at src/application/workflow/recovery/candidate_refresh/mod.rs:171-196, engine preparation invokes hydration (engine/execution/mod.rs:367-372). Hydration rejects replacement ancestry or calls branch-based worktree materialization (engine/context/execution.rs:215-225,301); detached worktrees are omitted by worktree_for_branch (infrastructure/git/worktrees/worktrees.rs:299-312), causing an attempted worktree add at the existing path (service_adapter.rs:145). Recovery request: reconcile the trusted workspace's journal before these ordinary hydration checks and verify both interruption windows through the engine entry path.",
+                    "rule_id": "intent.recoverable_git.replay_resume"
+                  }
+                ]
+              },
+              "binding_id": "default-governance",
+              "evidence": [
+                "Verified clean checkout at b1426cf5fb8dcc6a66a62d56fe8620c8ba513fb5 before and after review; recorded base b47569adb8d4c5d1d7335ba91729a3e486a38fe0 is an ancestor. Pinned git diff --check passed.",
+                "Reviewed the accepted Round 2 plan, implementation report, Quality corrections, exact-candidate Quality proof, actual diff and affected intent contracts.",
+                "Supplied exact-candidate Quality evidence records 206 workflow tests passing with one excluded fixture. No tests were rerun during this observational review.",
+                "The interruption tests in src/application/workflow/tests/candidate_refresh/proven_history.rs:155-157 and 199-202 call refresh directly with constructed contexts, bypassing the failing hydration path. The finding is established by source control flow, not a claimed runtime reproduction.",
+                "No files or Git state were changed; no merge, push or Goal-state mutation was performed."
+              ],
+              "invocation_id": "09ab44ca49b3a80b97eacf0f762d9b0a267993270b303cd4f7d709cbbe0570f9",
+              "outcome": "failure",
+              "role": "governance",
+              "summary": "One recoverability violation: workflow hydration prevents interrupted replay journals from reaching recovery."
+            }
+          },
+          "source": "workflow.governance.enter",
+          "state": "failed"
+        },
         "894cad460b1714982b449f5f3810746b6c55a76868d318f16e6a8d0976f6ddfd": {
           "candidate_commit": null,
           "results": {
@@ -1237,11 +1268,60 @@
       "failure_at": "",
       "failure_category": "",
       "failure_message": "",
-      "governance_candidate_commit": null,
-      "governance_checked_at": null,
-      "governance_details": null,
-      "governance_message": null,
-      "governance_rule_actions": [],
+      "governance_candidate_commit": "b1426cf5fb8dcc6a66a62d56fe8620c8ba513fb5",
+      "governance_checked_at": "2026-09-10T15:08:45Z",
+      "governance_details": {
+        "candidate_commit": "b1426cf5fb8dcc6a66a62d56fe8620c8ba513fb5",
+        "configured": true,
+        "failed_actions": [
+          {
+            "evidence": null,
+            "message": "Normal workflow restart cannot recover journalled replay states, violating the recoverable Git contract and accepted plan P3/P5/P10. src/infrastructure/git/worktrees/replay.rs:79-145 creates detached and attached-but-unpersisted replacement states. Before journal recovery at src/application/workflow/recovery/candidate_refresh/mod.rs:171-196, engine preparation invokes hydration (engine/execution/mod.rs:367-372). Hydration rejects replacement ancestry or calls branch-based worktree materialization (engine/context/execution.rs:215-225,301); detached worktrees are omitted by worktree_for_branch (infrastructure/git/worktrees/worktrees.rs:299-312), causing an attempted worktree add at the existing path (service_adapter.rs:145). Recovery request: reconcile the trusted workspace's journal before these ordinary hydration checks and verify both interruption windows through the engine entry path.",
+            "rule_id": "workflow.governance.enter:default-governance:intent.recoverable_git.replay_resume",
+            "state": "failed"
+          }
+        ],
+        "phase": "post_implementation",
+        "skill_results": [
+          {
+            "artifacts": {
+              "recovery_analysis": "Replay-journal recovery runs after workflow context hydration, but hydration rejects states created by the replay itself. After detached replay completes, branch-based worktree discovery cannot find the existing checkout and attempts to recreate it at an occupied path. After replacement attachment but before Goal persistence, hydration rejects the replacement because it does not descend from the recorded original candidate. Both paths prevent the journal recovery code from running. Existing interruption tests construct the context directly and bypass hydration.",
+              "recovery_round_prompt": "Repair replay interruption recovery for candidate b1426cf5fb8dcc6a66a62d56fe8620c8ba513fb5 in a new managed recovery Round. Preserve prior branches, worktrees, journals, plans and evidence. Before ordinary worktree discovery or candidate ancestry rejection, inspect the trusted managed workspace and reconcile its replay journal under current attempt authority and repository coordination. Handle detached replay completion, replacement attachment before Goal persistence, and persisted replacement before acknowledgement. Preserve dirty work and unexpected ref changes; never roll back a durably persisted replacement. Cover Plan/Implement and Quality/Governance resumption. Add regressions through WorkflowEngine preparation and execution, rather than directly constructing WorkflowContext. Verify replacement checks still run against the exact candidate. Proposed checks: cargo test --lib application::workflow::tests::worktree_resume -- --test-threads=1; cargo test --lib application::workflow::tests::candidate_refresh -- --test-threads=1; cargo check --all-targets. Update only affected intent documentation.",
+              "violations": [
+                {
+                  "message": "Normal workflow restart cannot recover journalled replay states, violating the recoverable Git contract and accepted plan P3/P5/P10. src/infrastructure/git/worktrees/replay.rs:79-145 creates detached and attached-but-unpersisted replacement states. Before journal recovery at src/application/workflow/recovery/candidate_refresh/mod.rs:171-196, engine preparation invokes hydration (engine/execution/mod.rs:367-372). Hydration rejects replacement ancestry or calls branch-based worktree materialization (engine/context/execution.rs:215-225,301); detached worktrees are omitted by worktree_for_branch (infrastructure/git/worktrees/worktrees.rs:299-312), causing an attempted worktree add at the existing path (service_adapter.rs:145). Recovery request: reconcile the trusted workspace's journal before these ordinary hydration checks and verify both interruption windows through the engine entry path.",
+                  "rule_id": "intent.recoverable_git.replay_resume"
+                }
+              ]
+            },
+            "binding_id": "workflow.governance.enter:default-governance",
+            "evidence": [
+              "Verified clean checkout at b1426cf5fb8dcc6a66a62d56fe8620c8ba513fb5 before and after review; recorded base b47569adb8d4c5d1d7335ba91729a3e486a38fe0 is an ancestor. Pinned git diff --check passed.",
+              "Reviewed the accepted Round 2 plan, implementation report, Quality corrections, exact-candidate Quality proof, actual diff and affected intent contracts.",
+              "Supplied exact-candidate Quality evidence records 206 workflow tests passing with one excluded fixture. No tests were rerun during this observational review.",
+              "The interruption tests in src/application/workflow/tests/candidate_refresh/proven_history.rs:155-157 and 199-202 call refresh directly with constructed contexts, bypassing the failing hydration path. The finding is established by source control flow, not a claimed runtime reproduction.",
+              "No files or Git state were changed; no merge, push or Goal-state mutation was performed."
+            ],
+            "invocation_id": "09ab44ca49b3a80b97eacf0f762d9b0a267993270b303cd4f7d709cbbe0570f9",
+            "outcome": "failure",
+            "role": "governance",
+            "summary": "One recoverability violation: workflow hydration prevents interrupted replay journals from reaching recovery."
+          }
+        ],
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR54BF57DCE017ED8EC68A5EEB-round-2"
+      },
+      "governance_message": "One recoverability violation: workflow hydration prevents interrupted replay journals from reaching recovery.",
+      "governance_recovery_analysis": "Replay-journal recovery runs after workflow context hydration, but hydration rejects states created by the replay itself. After detached replay completes, branch-based worktree discovery cannot find the existing checkout and attempts to recreate it at an occupied path. After replacement attachment but before Goal persistence, hydration rejects the replacement because it does not descend from the recorded original candidate. Both paths prevent the journal recovery code from running. Existing interruption tests construct the context directly and bypass hydration.",
+      "governance_recovery_attempt": 1,
+      "governance_recovery_round_prompt": "Repair replay interruption recovery for candidate b1426cf5fb8dcc6a66a62d56fe8620c8ba513fb5 in a new managed recovery Round. Preserve prior branches, worktrees, journals, plans and evidence. Before ordinary worktree discovery or candidate ancestry rejection, inspect the trusted managed workspace and reconcile its replay journal under current attempt authority and repository coordination. Handle detached replay completion, replacement attachment before Goal persistence, and persisted replacement before acknowledgement. Preserve dirty work and unexpected ref changes; never roll back a durably persisted replacement. Cover Plan/Implement and Quality/Governance resumption. Add regressions through WorkflowEngine preparation and execution, rather than directly constructing WorkflowContext. Verify replacement checks still run against the exact candidate. Proposed checks: cargo test --lib application::workflow::tests::worktree_resume -- --test-threads=1; cargo test --lib application::workflow::tests::candidate_refresh -- --test-threads=1; cargo check --all-targets. Update only affected intent documentation.",
+      "governance_rule_actions": [
+        {
+          "evidence": null,
+          "message": "Normal workflow restart cannot recover journalled replay states, violating the recoverable Git contract and accepted plan P3/P5/P10. src/infrastructure/git/worktrees/replay.rs:79-145 creates detached and attached-but-unpersisted replacement states. Before journal recovery at src/application/workflow/recovery/candidate_refresh/mod.rs:171-196, engine preparation invokes hydration (engine/execution/mod.rs:367-372). Hydration rejects replacement ancestry or calls branch-based worktree materialization (engine/context/execution.rs:215-225,301); detached worktrees are omitted by worktree_for_branch (infrastructure/git/worktrees/worktrees.rs:299-312), causing an attempted worktree add at the existing path (service_adapter.rs:145). Recovery request: reconcile the trusted workspace's journal before these ordinary hydration checks and verify both interruption windows through the engine entry path.",
+          "rule_id": "workflow.governance.enter:default-governance:intent.recoverable_git.replay_resume",
+          "state": "failed"
+        }
+      ],
       "guidance_decision": {
         "applied": [],
         "context_version": 1,
@@ -1458,8 +1538,8 @@
       "implementation_report": "workflow.implement.enter:default-implement: Implemented proven-history candidate replay, recoverable interruption handling, current exact-candidate Skill checks and atomic leased republication. All ten checklist items are complete; verification passed with the explicitly reported baseline test and lint limitations.",
       "implementation_reported_at": "2026-09-10T14:40:11Z",
       "logs": [],
-      "meta_rule_state": null,
-      "product_state": null,
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Recover safely from an old candidate whose recorded base is wrong or whose target has advanced, using the candidate's proven Goal changes.\n\nThe original worktree-creation defect was fixed by 8f6de519: fresh and recreated Round branches use the recorded merge-target base. Current code also refreshes candidates before Quality and integration. Keep those behaviors and focus this Round on remaining lineage and retry gaps. settle_stale_candidate still fails immediately when the target equals the recorded base but the candidate does not descend from it. Round 1 retained extensive unfinished replay and publication work without a candidate or final verification.\n\nValidate actual worktree HEAD, recorded base, target and planning or Skill context before automated edits. Preserve the original base when resuming existing work. Extend the current refresh and recovery path to repair bookkeeping only when retained Round and Git evidence identify the Goal's own change range. A merge base or a conflict-free rebase alone does not prove that every commit on a divergent developer branch belongs to the Goal. Ambiguous or unavailable history must remain recoverable with clear evidence, not import unrelated work.\n\nReplay an unambiguous candidate onto one observed target tip in a managed workspace. Record original and replacement identities, retain the source attempt, and rerun the applicable current Skills and exact-candidate checks for every changed candidate. Respect required, background and context-only behavior and record when no required check Skills apply. Bound retries for target movement, preserve conflict evidence and existing supported conflict recovery, and never treat dirty work, lost authority or a Git error as a successful replay.\n\nPreserve target leases and atomic publication checks against the previously recorded remote candidate SHA. Handle an already-published identical replacement idempotently; preserve unexpected remote changes and interrupted publication evidence.\n\nVerify advanced targets, a wrong recorded base with an unchanged target, divergent branches containing unrelated commits, retries, content conflicts, remote publication races and interruption. Prove fresh Round creation still starts at the declared target and that replacement commits cannot reuse stale check evidence.\n\nThis is a recovery Round following the Skills review on 10 September 2026. Start from current main in a new managed Round worktree. Preserve Round 1, its plans, logs, branches, commits and uncommitted files; inspect and selectively reuse useful work instead of replaying the whole old attempt. Use the current Skills and docs/intent contracts, not archived Governance, Quality or Guidance configuration or the old fixed planning sequence. Refine owns workflow advancement and integration; human approval remains separate. Update only affected documentation and report focused verification with actual results.",
       "quality_agent_report": "workflow.quality.enter:default-quality: Corrected two defects and one stale assertion. Focused verification passed; baseline test and lint limitations are recorded.",
       "quality_candidate_commit": "b1426cf5fb8dcc6a66a62d56fe8620c8ba513fb5",
@@ -1716,8 +1796,8 @@
       ],
       "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "rule_state": null,
-      "updated": "2026-09-10T15:04:49Z",
+      "rule_state": "failed",
+      "updated": "2026-09-10T15:08:46Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T13:43:00Z",
         "round_idx": 1,
@@ -1914,11 +1994,1213 @@
       },
       "workflow_reconciliation": null,
       "workflow_recovery": null
+    },
+    {
+      "agent_context": {
+        "assembled_at": "2026-09-10T15:08:46Z",
+        "current_round": {
+          "assignee": "Refine",
+          "prompt": "Repair replay interruption recovery for candidate b1426cf5fb8dcc6a66a62d56fe8620c8ba513fb5 in a new managed recovery Round. Preserve prior branches, worktrees, journals, plans and evidence. Before ordinary worktree discovery or candidate ancestry rejection, inspect the trusted managed workspace and reconcile its replay journal under current attempt authority and repository coordination. Handle detached replay completion, replacement attachment before Goal persistence, and persisted replacement before acknowledgement. Preserve dirty work and unexpected ref changes; never roll back a durably persisted replacement. Cover Plan/Implement and Quality/Governance resumption. Add regressions through WorkflowEngine preparation and execution, rather than directly constructing WorkflowContext. Verify replacement checks still run against the exact candidate. Proposed checks: cargo test --lib application::workflow::tests::worktree_resume -- --test-threads=1; cargo test --lib application::workflow::tests::candidate_refresh -- --test-threads=1; cargo check --all-targets. Update only affected intent documentation.",
+          "reporter": "Refine",
+          "round": 3
+        },
+        "goal": {
+          "assignee": "Refine",
+          "id": "DR54BF57DCE017ED8EC68A5EEB",
+          "name": "Recover stale candidates with proven Goal history",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "ethan.jacobson@insurity.com"
+        },
+        "governance": {
+          "configured": false,
+          "constitution": "",
+          "product": "",
+          "rules": []
+        },
+        "guidance_candidates": [],
+        "previous_rounds": [
+          {
+            "assignee": "ethan.jacobson@insurity.com",
+            "implementation_plan": {
+              "binding": {
+                "base_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                "context_digest": "92e55ba227cfee5088656b5487e22b9bbe9d09875d81821f90ec426b19bea51e",
+                "context_version": 1,
+                "goal_id": "DR54BF57DCE017ED8EC68A5EEB",
+                "implementation_branch": "refine/DR54BF57DCE017ED8EC68A5EEB/round-1",
+                "round_idx": 0,
+                "target_branch": "main"
+              },
+              "criticism": {
+                "completed_at": "2026-09-10T08:31:29Z",
+                "git_after": {
+                  "branch": "refine/DR54BF57DCE017ED8EC68A5EEB/round-1",
+                  "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/DR54BF57DCE017ED8EC68A5EEB/round-1",
+                  "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "findings": [
+                    {
+                      "checklist_item_ids": [
+                        "P5",
+                        "P6"
+                      ],
+                      "description": "Governance publishes the candidate before integration using an ordinary push (engine/behaviors/mod.rs and git/worktrees/service_adapter.rs); if the target then advances, replay rewrites the already-published branch and the next push fails as non-fast-forward despite a clean replay, which P5-P6 do not address.",
+                      "id": "C1",
+                      "material": true,
+                      "recommendation": "Add replacement publication fenced by the exact previously published remote candidate SHA, preserving concurrent remote changes, so a late-target retry can publish and integrate the replacement after its gates pass."
+                    }
+                  ],
+                  "summary": "The plan needs safe republication of already-published candidates after replay."
+                },
+                "started_at": "2026-09-10T08:28:59Z"
+              },
+              "final_plan": {
+                "completed_at": "2026-09-10T08:33:19Z",
+                "git_after": {
+                  "branch": "refine/DR54BF57DCE017ED8EC68A5EEB/round-1",
+                  "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/DR54BF57DCE017ED8EC68A5EEB/round-1",
+                  "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "checklist": [
+                    {
+                      "description": "Create fresh Round worktrees from one resolved declared target, read their initial HEAD for the Goal base, candidate handoff, and planning binding, and distinguish creation from resumption so reopening existing work preserves its original base.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "Extend the existing Git capability and candidate-refresh workflow to derive the replay range from the candidate and current target merge base and replay it onto that exact target commit, handling mismatched recorded bases even when the target has not moved and preserving merge changes and already-applied work.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "Prepare lineage before Plan and Implement agents launch or resume, expose base, target, and worktree mismatches in their context, and reconcile affected planning bindings and handoff records through existing authority checks while preserving prior artifacts and unfinished work.",
+                      "id": "P3"
+                    },
+                    {
+                      "description": "Re-resolve the declared target for Quality and Governance recovery Rounds, branch from the retained candidate and replay that new branch when needed before implementation, and record its refreshed base and candidate without rewriting the source Round's evidence.",
+                      "id": "P4"
+                    },
+                    {
+                      "description": "Use the shared replay path at the Quality boundary and before integration, replace the strict recorded-base rejection and unmoved-target terminal failure with recoverable refresh routing, and retry late target movement through the existing bounded integration loop.",
+                      "id": "P5"
+                    },
+                    {
+                      "description": "Persist original and replacement base and candidate identities with the actual replay base, invalidate superseded gate projections, and rerun Quality and Governance for each replacement before publication while retaining the existing target lease and commit fences.",
+                      "id": "P6"
+                    },
+                    {
+                      "description": "Extend existing durable handoff evidence to record publication intent before pushing and retain the publication remote, candidate branch, last confirmed published candidate SHA, and pending replacement identity across refreshes and interrupted attempts.",
+                      "id": "P7"
+                    },
+                    {
+                      "description": "Republish the exact passing replacement through the shared Git capability with an atomic comparison against the candidate branch's recorded previously published remote SHA, recognize an already-published identical replacement on retry, and preserve and report any other remote change without adopting it as a new expected SHA or force-updating the target.",
+                      "id": "P8"
+                    },
+                    {
+                      "description": "Keep conflict resolution and abort recovery in the existing managed worktree path, preserve the original candidate on unsuccessful replay, report unresolved conflicting paths, and distinguish unsafe or unavailable history, dirty worktrees, authority loss, publication races, and Git errors from content conflicts.",
+                      "id": "P9"
+                    },
+                    {
+                      "description": "Update only the affected worktree and workflow intent pages to describe actual creation bases, early lineage repair, retry re-anchoring, automatic replay, fenced replacement publication, and recoverable conflict outcomes in their established format.",
+                      "id": "P10"
+                    }
+                  ],
+                  "criticism_resolutions": [
+                    {
+                      "criticism_id": "C1",
+                      "resolution": "P7-P8 retain publication authority across replay and restart and replace ordinary republication with an atomic update fenced by the exact previously published remote candidate SHA; P5-P6 route late target movement through replacement Quality and Governance before this update, while retries recognize an identical published replacement and preserve all other remote changes."
+                    }
+                  ],
+                  "summary": "Make worktree bindings reflect their actual target-based starting commit and extend the existing refresh workflow to replay stale or divergent candidates onto the current target, rerun their gates, and safely republish replacements against the exact previously published candidate so clean work can integrate despite target movement without overwriting concurrent remote changes."
+                },
+                "started_at": "2026-09-10T08:31:29Z"
+              },
+              "governance_precheck": {
+                "attempt": 1,
+                "checked_at": "2026-09-10T08:34:05Z",
+                "message": "No step in the finalized plan necessarily violates the supplied constitution, governance rules, or enabled guidance.",
+                "status": "passed"
+              },
+              "phase": "implement",
+              "phase_started_at": "2026-09-10T08:34:05Z",
+              "proposal": {
+                "completed_at": "2026-09-10T08:28:59Z",
+                "git_after": {
+                  "branch": "refine/DR54BF57DCE017ED8EC68A5EEB/round-1",
+                  "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/DR54BF57DCE017ED8EC68A5EEB/round-1",
+                  "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "checklist": [
+                    {
+                      "description": "Create fresh Round worktrees from one resolved declared target, read their initial HEAD for the Goal base, candidate handoff, and planning binding, and distinguish creation from resumption so reopening existing work never silently replaces its base with its candidate tip.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "Extend the existing Git capability and candidate-refresh workflow to derive the replay range from the candidate and current target merge base and replay it onto that exact target commit, handling mismatched recorded bases even when the target has not moved and preserving merge changes and already-applied work.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "Prepare lineage before Plan and Implement agents launch or resume, expose base, target, and worktree mismatches in their context, and reconcile affected planning bindings and handoff records through existing authority checks while preserving prior artifacts and unfinished work.",
+                      "id": "P3"
+                    },
+                    {
+                      "description": "Re-resolve the declared target for Quality and Governance recovery Rounds, branch from the retained candidate and replay that new branch when needed before implementation, and record its refreshed base and candidate without rewriting the source Round's evidence.",
+                      "id": "P4"
+                    },
+                    {
+                      "description": "Use the shared replay path at the Quality boundary and before integration, replace the strict recorded-base rejection and unmoved-target terminal failure with recoverable refresh routing, and retry late target movement through the existing bounded integration loop.",
+                      "id": "P5"
+                    },
+                    {
+                      "description": "Persist original and replacement base and candidate identities with the actual replay base, invalidate superseded gate projections, and rerun Quality and Governance for the replacement commit before publication while retaining the existing target lease and commit fences.",
+                      "id": "P6"
+                    },
+                    {
+                      "description": "Keep conflict resolution and abort recovery in the existing managed worktree path, preserve the original candidate on unsuccessful replay, report unresolved conflicting paths, and distinguish unsafe or unavailable history, dirty worktrees, authority loss, and Git errors from content conflicts.",
+                      "id": "P7"
+                    },
+                    {
+                      "description": "Update only the affected worktree and workflow intent pages to describe actual creation bases, early lineage repair, retry re-anchoring, automatic replay, and recoverable conflict outcomes in their established format.",
+                      "id": "P8"
+                    }
+                  ],
+                  "summary": "Make new worktree bindings reflect their actual target-based starting commit and extend the existing refresh workflow to replay stale or divergent candidates onto the current target, preserving their work instead of abandoning a Round over mismatched bookkeeping."
+                },
+                "started_at": "2026-09-10T08:26:05Z"
+              },
+              "schema_version": 2,
+              "started_at": "2026-09-10T08:26:05Z",
+              "state": "in_progress",
+              "updated_at": "2026-09-10T08:34:05Z"
+            },
+            "prompt": "From: Ethan Jacobson <ethan.jacobson@insurity.com>\nSubject: Integration must auto-rebase stale candidates instead of hard-failing on a base/target mismatch\n\nBody:\nWhen a candidate's recorded base_commit is not an ancestor of the candidate, Refine's integration gate hard-fails with Candidate … is stale: recorded base … is not its ancestor and abandons the round — even when the candidate is content-correct and replays onto the current target with no conflicts. This wasted a full round on run 8082 (goal 00000T082ZTBZ3N3EDG591G002): the binding recorded base=a8d44a23 on target_branch=insurity-claims, but the worktree was cut from develop (eacc5984), which had diverged from insurity-claims. The candidate diff was a Claims-only, test-file-only change that rebases cleanly onto either branch.\r\n\r\nFixes required (any one of 1–2 prevents it; 3 makes it self-healing):\r\n1. Single source of truth for the base. Record binding.base_commit as git rev-parse HEAD of the worktree at the moment it is created, not from a separate snapshot of the target branch taken at goal-creation time. This makes the ancestor invariant true by construction.\r\n2. Cut the worktree from the declared target. If target_branch=insurity-claims, create the worktree from insurity-claims (or its recorded base) — not from whatever the main repo happens to have checked out (develop). Today these two disagree; they must be reconciled to one branch.\r\n3. Auto-rebase / replay on staleness instead of failing. When the recorded base isn't an ancestor of the candidate (or the target tip advanced since the worktree was cut), the integration step should replay the candidate's own commits onto the current target tip before failing:\r\n   - base = git merge-base <candidate> <target-tip>\r\n   - git rebase --onto <target-tip> <base> <candidate> (equivalently cherry-pick base..candidate)\r\n   - Proceed with the rebased commit if it applies cleanly; only fail integration on a genuine, unresolvable content conflict — never on a bookkeeping divergence.\r\n4. Replace the strict ancestor gate with a merge-base-driven replay. The strict recorded_base ∈ ancestors(candidate) check is the trigger for the false failure; a merge-base + replay is robust to either side advancing.\r\n5. Re-anchor on automatic retries. A quality/governance retry must re-resolve the current target tip and rebase the prior candidate onto it (or branch from the prior candidate), so a retry can't inherit an already-stale base.\r\n6. Detect the divergence early and loudly. Validate the base↔target invariant at plan/implement start — while the agent context is live and can rebase in-context — instead of only at the terminal integration gate where the sole outcome is failure.\r\n\r\nAcceptance: A candidate built on a target tip that has since advanced (or was cut from a divergent-but-clean branch) integrates successfully via auto-rebase; integration fails only on a real merge conflict, with the conflicting paths reported.\r\n\r\n\r\n[cid:insurity-small2_2f81c33c-d951-4e5c-a467-1113541ca22c.jpg]\r\nEthan Jacobson\r\nEthan.Jacobson@insurity.com\r\n\r\n[cid:excellence2026signature(17b0688e-5473-4b74-96eb-a73f633f2c2f)_48407359-d77b-4967-95cd-277a32b50ebc.png]<https://insurity.com/excellence?utm_source=Email-Signature&utm_medium=Email&utm_campaign=Event-Excellence-2026>\r\n\r\n_____________________________________________________________________________________________________\r\n\r\nThe information contained in this e-mail message is intended only for the personal and confidential use of the intended recipient(s). This message may be an attorney-client communication and/or work product and as such is privileged and confidential. If the reader of this message is not the intended recipient or an agent responsible for delivering it to the intended recipient, you are hereby notified that you have received this document in error and that any review, dissemination, distribution, or copying of this message is strictly prohibited. If you have received this communication in error, please notify us immediately by e-mail, and delete the original message.\r\n_____________________________________________________________________________________________________\r\n~~~Insurity~~~",
+            "reporter": "ethan.jacobson@insurity.com",
+            "round": 1
+          },
+          {
+            "assignee": "ethan.jacobson@insurity.com",
+            "constitution_state": "passed",
+            "governance_checked_at": "2026-09-10T15:08:45Z",
+            "governance_details": {
+              "candidate_commit": "b1426cf5fb8dcc6a66a62d56fe8620c8ba513fb5",
+              "configured": true,
+              "failed_actions": [
+                {
+                  "evidence": null,
+                  "message": "Normal workflow restart cannot recover journalled replay states, violating the recoverable Git contract and accepted plan P3/P5/P10. src/infrastructure/git/worktrees/replay.rs:79-145 creates detached and attached-but-unpersisted replacement states. Before journal recovery at src/application/workflow/recovery/candidate_refresh/mod.rs:171-196, engine preparation invokes hydration (engine/execution/mod.rs:367-372). Hydration rejects replacement ancestry or calls branch-based worktree materialization (engine/context/execution.rs:215-225,301); detached worktrees are omitted by worktree_for_branch (infrastructure/git/worktrees/worktrees.rs:299-312), causing an attempted worktree add at the existing path (service_adapter.rs:145). Recovery request: reconcile the trusted workspace's journal before these ordinary hydration checks and verify both interruption windows through the engine entry path.",
+                  "rule_id": "workflow.governance.enter:default-governance:intent.recoverable_git.replay_resume",
+                  "state": "failed"
+                }
+              ],
+              "phase": "post_implementation",
+              "skill_results": [
+                {
+                  "artifacts": {
+                    "recovery_analysis": "Replay-journal recovery runs after workflow context hydration, but hydration rejects states created by the replay itself. After detached replay completes, branch-based worktree discovery cannot find the existing checkout and attempts to recreate it at an occupied path. After replacement attachment but before Goal persistence, hydration rejects the replacement because it does not descend from the recorded original candidate. Both paths prevent the journal recovery code from running. Existing interruption tests construct the context directly and bypass hydration.",
+                    "recovery_round_prompt": "Repair replay interruption recovery for candidate b1426cf5fb8dcc6a66a62d56fe8620c8ba513fb5 in a new managed recovery Round. Preserve prior branches, worktrees, journals, plans and evidence. Before ordinary worktree discovery or candidate ancestry rejection, inspect the trusted managed workspace and reconcile its replay journal under current attempt authority and repository coordination. Handle detached replay completion, replacement attachment before Goal persistence, and persisted replacement before acknowledgement. Preserve dirty work and unexpected ref changes; never roll back a durably persisted replacement. Cover Plan/Implement and Quality/Governance resumption. Add regressions through WorkflowEngine preparation and execution, rather than directly constructing WorkflowContext. Verify replacement checks still run against the exact candidate. Proposed checks: cargo test --lib application::workflow::tests::worktree_resume -- --test-threads=1; cargo test --lib application::workflow::tests::candidate_refresh -- --test-threads=1; cargo check --all-targets. Update only affected intent documentation.",
+                    "violations": [
+                      {
+                        "message": "Normal workflow restart cannot recover journalled replay states, violating the recoverable Git contract and accepted plan P3/P5/P10. src/infrastructure/git/worktrees/replay.rs:79-145 creates detached and attached-but-unpersisted replacement states. Before journal recovery at src/application/workflow/recovery/candidate_refresh/mod.rs:171-196, engine preparation invokes hydration (engine/execution/mod.rs:367-372). Hydration rejects replacement ancestry or calls branch-based worktree materialization (engine/context/execution.rs:215-225,301); detached worktrees are omitted by worktree_for_branch (infrastructure/git/worktrees/worktrees.rs:299-312), causing an attempted worktree add at the existing path (service_adapter.rs:145). Recovery request: reconcile the trusted workspace's journal before these ordinary hydration checks and verify both interruption windows through the engine entry path.",
+                        "rule_id": "intent.recoverable_git.replay_resume"
+                      }
+                    ]
+                  },
+                  "binding_id": "workflow.governance.enter:default-governance",
+                  "evidence": [
+                    "Verified clean checkout at b1426cf5fb8dcc6a66a62d56fe8620c8ba513fb5 before and after review; recorded base b47569adb8d4c5d1d7335ba91729a3e486a38fe0 is an ancestor. Pinned git diff --check passed.",
+                    "Reviewed the accepted Round 2 plan, implementation report, Quality corrections, exact-candidate Quality proof, actual diff and affected intent contracts.",
+                    "Supplied exact-candidate Quality evidence records 206 workflow tests passing with one excluded fixture. No tests were rerun during this observational review.",
+                    "The interruption tests in src/application/workflow/tests/candidate_refresh/proven_history.rs:155-157 and 199-202 call refresh directly with constructed contexts, bypassing the failing hydration path. The finding is established by source control flow, not a claimed runtime reproduction.",
+                    "No files or Git state were changed; no merge, push or Goal-state mutation was performed."
+                  ],
+                  "invocation_id": "09ab44ca49b3a80b97eacf0f762d9b0a267993270b303cd4f7d709cbbe0570f9",
+                  "outcome": "failure",
+                  "role": "governance",
+                  "summary": "One recoverability violation: workflow hydration prevents interrupted replay journals from reaching recovery."
+                }
+              ],
+              "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR54BF57DCE017ED8EC68A5EEB-round-2"
+            },
+            "governance_message": "One recoverability violation: workflow hydration prevents interrupted replay journals from reaching recovery.",
+            "governance_rule_actions": [
+              {
+                "evidence": null,
+                "message": "Normal workflow restart cannot recover journalled replay states, violating the recoverable Git contract and accepted plan P3/P5/P10. src/infrastructure/git/worktrees/replay.rs:79-145 creates detached and attached-but-unpersisted replacement states. Before journal recovery at src/application/workflow/recovery/candidate_refresh/mod.rs:171-196, engine preparation invokes hydration (engine/execution/mod.rs:367-372). Hydration rejects replacement ancestry or calls branch-based worktree materialization (engine/context/execution.rs:215-225,301); detached worktrees are omitted by worktree_for_branch (infrastructure/git/worktrees/worktrees.rs:299-312), causing an attempted worktree add at the existing path (service_adapter.rs:145). Recovery request: reconcile the trusted workspace's journal before these ordinary hydration checks and verify both interruption windows through the engine entry path.",
+                "rule_id": "workflow.governance.enter:default-governance:intent.recoverable_git.replay_resume",
+                "state": "failed"
+              }
+            ],
+            "guidance_decision": {
+              "applied": [],
+              "context_version": 1,
+              "recorded_at": "2026-09-10T14:40:11Z",
+              "skipped": []
+            },
+            "implementation_plan": {
+              "binding": {
+                "base_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+                "context_digest": "82445db0c3923b3ca2aefba20dca4fbb72117bfa8603631dd0d3a267041ee04e",
+                "context_version": 1,
+                "goal_id": "DR54BF57DCE017ED8EC68A5EEB",
+                "implementation_branch": "refine/DR54BF57DCE017ED8EC68A5EEB/round-2",
+                "round_idx": 1,
+                "target_branch": "main"
+              },
+              "completed_at": "2026-09-10T14:40:11Z",
+              "final_plan": {
+                "completed_at": "2026-09-10T13:54:14Z",
+                "git_after": {
+                  "branch": "refine/DR54BF57DCE017ED8EC68A5EEB/round-2",
+                  "head_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/DR54BF57DCE017ED8EC68A5EEB/round-2",
+                  "head_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "checklist": [
+                    {
+                      "description": "Validate worktree, base, target, authority, and planning or Skill context before agent edits; preserve existing-work bases.",
+                      "id": "workflow.plan.enter:default-plan:P1"
+                    },
+                    {
+                      "description": "Establish the Goal-owned replay range from retained Round and Git evidence; preserve ambiguous history for explicit recovery.",
+                      "id": "workflow.plan.enter:default-plan:P2"
+                    },
+                    {
+                      "description": "Replay proven changes onto one observed target SHA in a managed workspace with durable interruption evidence.",
+                      "id": "workflow.plan.enter:default-plan:P3"
+                    },
+                    {
+                      "description": "Route wrong-base, advanced-target, and scoped retry candidates through the shared refresh path with bounded retries.",
+                      "id": "workflow.plan.enter:default-plan:P4"
+                    },
+                    {
+                      "description": "Persist original and replacement identities atomically, retain source attempts, and reconcile superseded planning and candidate evidence.",
+                      "id": "workflow.plan.enter:default-plan:P5"
+                    },
+                    {
+                      "description": "Rerun applicable current Skills and exact-candidate checks for replacements, preserving required, background, and context-only semantics.",
+                      "id": "workflow.plan.enter:default-plan:P6"
+                    },
+                    {
+                      "description": "Journal candidate publication and atomically replace only the previously recorded remote SHA, including idempotent interrupted retries.",
+                      "id": "workflow.plan.enter:default-plan:P7"
+                    },
+                    {
+                      "description": "Preserve supported conflict resolution and distinguish conflicts, ambiguous history, dirty work, authority loss, and Git errors.",
+                      "id": "workflow.plan.enter:default-plan:P8"
+                    },
+                    {
+                      "description": "Keep changed responsibilities in cohesive modules and update only the affected worktree, workflow, and Skills intent contracts.",
+                      "id": "workflow.plan.enter:default-plan:P9"
+                    },
+                    {
+                      "description": "Verify lineage, retries, replacement checks, conflicts, publication races, interruption, and existing Round-creation behavior.",
+                      "id": "workflow.plan.enter:default-plan:P10"
+                    }
+                  ],
+                  "summary": "workflow.plan.enter:default-plan: Recover stale candidates by replaying only proven Goal changes, retaining source evidence, rerunning current Skills, and fencing replacement publication."
+                },
+                "started_at": "2026-09-10T13:43:01Z"
+              },
+              "implementation": {
+                "completed_at": "2026-09-10T14:40:11Z",
+                "execution": {
+                  "checklist": [
+                    {
+                      "evidence": "Added shared pre-agent validation of HEAD, branch, base, target, authority, planning context and current Skills. Agent-lineage tests pass for changed planning context, target advancement, preserved dirty work and original-base resumption.",
+                      "id": "workflow.plan.enter:default-plan:P1",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Replay ownership now uses retained creation, planning or prior-refresh observations plus Git ancestry. Tests prove unrelated developer commits are excluded and ambiguous, unavailable or merged history cannot authorize guessed replay.",
+                      "id": "workflow.plan.enter:default-plan:P2",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Added exact-target detached replay with retained source refs, a durable journal and local branch comparison-and-swap. Interruption tests pass before attachment and after replacement persistence.",
+                      "id": "workflow.plan.enter:default-plan:P3",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Wrong-base and advanced-target candidates use shared refresh. Scoped retries use successor worktrees while preserving source attempts. Existing bounded retry policy remains enforced. Tests cover unchanged targets, successor replay and target movement after publication.",
+                      "id": "workflow.plan.enter:default-plan:P4",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Authority-fenced persistence records original and replacement identities, actual replay base and superseded evidence. Active planning bindings are reconciled while original plans remain archived. Interrupted handoff acknowledgement resumes without rolling back persisted replacements.",
+                      "id": "workflow.plan.enter:default-plan:P5",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Replacement invocations include the candidate SHA, refresh current Skill configuration and invalidate stale gate projections. Three replacement-Skill tests pass, covering exact-candidate proof separation, changed configuration, background execution, context-only attachment and explicit absence of required checks.",
+                      "id": "workflow.plan.enter:default-plan:P6",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Candidate handoffs journal publication intent and retain the previously confirmed remote SHA. Publication uses an atomic exact-SHA lease. Tests pass for replacement publication, identical retries, interrupted successful pushes, unexpected remote changes and a server-side race after advertisement.",
+                      "id": "workflow.plan.enter:default-plan:P7",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Preserved managed conflict resolution and recovery. Tests distinguish content conflicts, ambiguous or unavailable history, dirty work, lost authority, Git command failures and unexpected local ref changes; these cases cannot become successful replay evidence.",
+                      "id": "workflow.plan.enter:default-plan:P8",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Separated workflow admission, lineage, implementation, checks, integration, replay and publication into responsibility-based modules. Updated only seven affected worktree, workflow and Skills intent pages. Architecture tests and scoped formatting checks pass.",
+                      "id": "workflow.plan.enter:default-plan:P9",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Workflow regression run passes 202 selected tests, including fresh declared-target creation, replay, conflicts, retries, publication races and interruption. End-to-end fixtures reach Review after replacement checks and leased republication, including a second target advance.",
+                      "id": "workflow.plan.enter:default-plan:P10",
+                      "outcome": "completed"
+                    }
+                  ],
+                  "verification": [
+                    "cargo test --lib application::workflow -- --test-threads=1 --skip multiple_plan_skills_contribute_separate_namespaced_checklists: 202 passed, 0 failed.",
+                    "Unfiltered workflow run: 199 passed, 1 failed. The unchanged multiple_plan_skills_contribute_separate_namespaced_checklists fixture violates the existing one-trigger-per-Skill validator. It was explicitly excluded from the final workflow run.",
+                    "cargo test --lib replacement_skills -- --test-threads=1: 3 passed after final evidence-wording adjustments.",
+                    "cargo test --lib application::events::tests -- --test-threads=1: 20 passed.",
+                    "cargo test --lib infrastructure::git::worktrees -- --test-threads=1: 31 passed.",
+                    "cargo test --lib architecture_tests -- --test-threads=1: 5 passed.",
+                    "cargo check --all-targets: passed.",
+                    "cargo clippy --lib --tests -- -D warnings: blocked by five existing diagnostics: two needless_pub_self, one collapsible_if, one module_inception and one unnecessary_sort_by.",
+                    "cargo clippy --lib --tests -- -D warnings -A clippy::needless_pub_self -A clippy::collapsible_if -A clippy::module_inception -A clippy::unnecessary_sort_by: passed.",
+                    "Scoped rustfmt --check on all 38 changed Rust files and git diff --check: passed."
+                  ]
+                },
+                "report": "workflow.implement.enter:default-implement: Implemented proven-history candidate replay, recoverable interruption handling, current exact-candidate Skill checks and atomic leased republication. All ten checklist items are complete; verification passed with the explicitly reported baseline test and lint limitations.",
+                "started_at": "2026-09-10T13:54:14Z"
+              },
+              "phase": "implement",
+              "phase_started_at": "2026-09-10T13:54:14Z",
+              "proposal": {
+                "completed_at": "2026-09-10T13:54:14Z",
+                "git_after": {
+                  "branch": "refine/DR54BF57DCE017ED8EC68A5EEB/round-2",
+                  "head_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/DR54BF57DCE017ED8EC68A5EEB/round-2",
+                  "head_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "checklist": [
+                    {
+                      "description": "Validate worktree, base, target, authority, and planning or Skill context before agent edits; preserve existing-work bases.",
+                      "id": "workflow.plan.enter:default-plan:P1"
+                    },
+                    {
+                      "description": "Establish the Goal-owned replay range from retained Round and Git evidence; preserve ambiguous history for explicit recovery.",
+                      "id": "workflow.plan.enter:default-plan:P2"
+                    },
+                    {
+                      "description": "Replay proven changes onto one observed target SHA in a managed workspace with durable interruption evidence.",
+                      "id": "workflow.plan.enter:default-plan:P3"
+                    },
+                    {
+                      "description": "Route wrong-base, advanced-target, and scoped retry candidates through the shared refresh path with bounded retries.",
+                      "id": "workflow.plan.enter:default-plan:P4"
+                    },
+                    {
+                      "description": "Persist original and replacement identities atomically, retain source attempts, and reconcile superseded planning and candidate evidence.",
+                      "id": "workflow.plan.enter:default-plan:P5"
+                    },
+                    {
+                      "description": "Rerun applicable current Skills and exact-candidate checks for replacements, preserving required, background, and context-only semantics.",
+                      "id": "workflow.plan.enter:default-plan:P6"
+                    },
+                    {
+                      "description": "Journal candidate publication and atomically replace only the previously recorded remote SHA, including idempotent interrupted retries.",
+                      "id": "workflow.plan.enter:default-plan:P7"
+                    },
+                    {
+                      "description": "Preserve supported conflict resolution and distinguish conflicts, ambiguous history, dirty work, authority loss, and Git errors.",
+                      "id": "workflow.plan.enter:default-plan:P8"
+                    },
+                    {
+                      "description": "Keep changed responsibilities in cohesive modules and update only the affected worktree, workflow, and Skills intent contracts.",
+                      "id": "workflow.plan.enter:default-plan:P9"
+                    },
+                    {
+                      "description": "Verify lineage, retries, replacement checks, conflicts, publication races, interruption, and existing Round-creation behavior.",
+                      "id": "workflow.plan.enter:default-plan:P10"
+                    }
+                  ],
+                  "summary": "workflow.plan.enter:default-plan: Recover stale candidates by replaying only proven Goal changes, retaining source evidence, rerunning current Skills, and fencing replacement publication."
+                },
+                "started_at": "2026-09-10T13:43:01Z"
+              },
+              "schema_version": 2,
+              "started_at": "2026-09-10T13:43:01Z",
+              "state": "completed",
+              "updated_at": "2026-09-10T14:40:11Z"
+            },
+            "implementation_report": "workflow.implement.enter:default-implement: Implemented proven-history candidate replay, recoverable interruption handling, current exact-candidate Skill checks and atomic leased republication. All ten checklist items are complete; verification passed with the explicitly reported baseline test and lint limitations.",
+            "implementation_reported_at": "2026-09-10T14:40:11Z",
+            "meta_rule_state": "passed",
+            "product_state": "passed",
+            "prompt": "Recover safely from an old candidate whose recorded base is wrong or whose target has advanced, using the candidate's proven Goal changes.\n\nThe original worktree-creation defect was fixed by 8f6de519: fresh and recreated Round branches use the recorded merge-target base. Current code also refreshes candidates before Quality and integration. Keep those behaviors and focus this Round on remaining lineage and retry gaps. settle_stale_candidate still fails immediately when the target equals the recorded base but the candidate does not descend from it. Round 1 retained extensive unfinished replay and publication work without a candidate or final verification.\n\nValidate actual worktree HEAD, recorded base, target and planning or Skill context before automated edits. Preserve the original base when resuming existing work. Extend the current refresh and recovery path to repair bookkeeping only when retained Round and Git evidence identify the Goal's own change range. A merge base or a conflict-free rebase alone does not prove that every commit on a divergent developer branch belongs to the Goal. Ambiguous or unavailable history must remain recoverable with clear evidence, not import unrelated work.\n\nReplay an unambiguous candidate onto one observed target tip in a managed workspace. Record original and replacement identities, retain the source attempt, and rerun the applicable current Skills and exact-candidate checks for every changed candidate. Respect required, background and context-only behavior and record when no required check Skills apply. Bound retries for target movement, preserve conflict evidence and existing supported conflict recovery, and never treat dirty work, lost authority or a Git error as a successful replay.\n\nPreserve target leases and atomic publication checks against the previously recorded remote candidate SHA. Handle an already-published identical replacement idempotently; preserve unexpected remote changes and interrupted publication evidence.\n\nVerify advanced targets, a wrong recorded base with an unchanged target, divergent branches containing unrelated commits, retries, content conflicts, remote publication races and interruption. Prove fresh Round creation still starts at the declared target and that replacement commits cannot reuse stale check evidence.\n\nThis is a recovery Round following the Skills review on 10 September 2026. Start from current main in a new managed Round worktree. Preserve Round 1, its plans, logs, branches, commits and uncommitted files; inspect and selectively reuse useful work instead of replaying the whole old attempt. Use the current Skills and docs/intent contracts, not archived Governance, Quality or Guidance configuration or the old fixed planning sequence. Refine owns workflow advancement and integration; human approval remains separate. Update only affected documentation and report focused verification with actual results.",
+            "quality_checked_at": "2026-09-10T15:04:49Z",
+            "quality_details": {
+              "candidate_commit": "b1426cf5fb8dcc6a66a62d56fe8620c8ba513fb5",
+              "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR54BF57DCE017ED8EC68A5EEB-round-2",
+              "diagnostics": [
+                "Event invocation 5dd7f85c9a35de5fc2fe73f2487eac2197944e4ebd3180c893589e5eaf0578d9: automation/invocations/5dd7f85c9a35de5fc2fe73f2487eac2197944e4ebd3180c893589e5eaf0578d9.json",
+                "Observed supervised process proc-1789052556023-1129590-611 exited 0.",
+                "Observed supervised process proc-1789052556149-1129590-614 exited 0.",
+                "Observed supervised process proc-1789052556273-1129590-617 exited 0.",
+                "Observed supervised process proc-1789052556533-1129590-620 exited 0. stdout: cation::workflow::tests::round_base::a_stale_candidate_whose_target_never_moved_queues_recoverable_evidence ... ok\ntest application::workflow::tests::round_base::a_stale_local_target_fast_forwards_from_its_remote_before_the_base_is_pinned ... ok\ntest application::workflow::tests::round_base::agent_lineage::invalid_planning_context_fails_before_candidate_or_worktree_mutation ... ok\ntest application::workflow::tests::round_base::agent_lineage::pre_agent_refresh_anchors_to_the_observed_target_before_plan_edits ... ok\ntest application::workflow::tests::round_base::agent_lineage::pre_agent_refresh_reconciles_the_binding_and_retains_the_original_plan ... ok\ntest application::workflow::tests::round_base::agent_lineage::resume_keeps_the_original_base_and_unfinished_implementation_files ... ok\ntest application::workflow::tests::round_base::agent_lineage::scoped_retry_replays_in_a_successor_worktree_and_preserves_the_source ... ok\ntest application::workflow::tests::round_base::an_unreachable_remote_leaves_the_round_to_start_from_the_local_ref ... ok\ntest application::workflow::tests::round_base::resumption_recreates_a_missing_round_branch_at_the_recorded_base ... ok\ntest application::workflow::tests::round_base::resumption_reuses_an_existing_round_branch_exactly_as_it_stands ... ok\ntest application::workflow::tests::round_base::round_branch_is_born_at_the_merge_target_not_at_the_shared_checkout_head ... ok\ntest application::workflow::tests::workflow_pass_reports_only_projection_mutations ... ok\ntest application::workflow::tests::worktree_resume::resume_fails_closed_when_the_round_branch_no_longer_contains_the_candidate ... ok\ntest application::workflow::tests::worktree_resume::resume_rebuilds_a_pruned_candidate_worktree_and_finishes_the_round ... ok\ntest application::workflow::tests::worktree_resume::resume_reuses_a_durable_quality_proof_and_skips_straight_to_governance ... ok\n\ntest result: ok. 206 passed; 0 failed; 0 ignored; 0 measured; 982 filtered out; finished in 113.43s stderr: Compiling refine v4.2.0 (/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR54BF57DCE017ED8EC68A5EEB-round-2)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.21s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\nPreparing worktree (detached HEAD e165312)\nPreparing worktree (detached HEAD e165312)\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')",
+                "Observed supervised process proc-1789052677339-1129590-623 exited 0. stdout: nc_merges_disjoint_edits_fences_both_editors_and_rejects_broken_references ... ok\ntest application::events::tests::default_skills_complete_a_real_workflow_with_observed_quality_and_candidate_evidence ... ok\ntest application::events::tests::disabled_node_override_masks_only_its_project_binding ... ok\ntest application::events::tests::goal_and_system_paths_resolve_arrays_and_missing_shared_parameters_keep_requiredness ... ok\ntest application::events::tests::interrupted_index_updates_recover_without_replaying_completed_work ... ok\ntest application::events::tests::manual_request_identity_and_success_action_receipts_survive_replay ... ok\ntest application::events::tests::manual_skills_select_one_skill_validate_inputs_and_pin_replay_without_a_goal ... ok\ntest application::events::tests::manual_transition_waits_for_exit_evidence_and_cancellation_can_supersede_it ... ok\ntest application::events::tests::migration_preserves_content_is_idempotent_and_stale_writes_cannot_erase_edits ... ok\ntest application::events::tests::missing_automatic_input_settles_as_visible_error_instead_of_waiting_forever ... ok\ntest application::events::tests::ordered_independent_runs_collect_failure_preserve_evidence_and_do_not_replay ... ok\ntest application::events::tests::oversized_configuration_is_rejected_before_replacing_the_readable_document ... ok\ntest application::events::tests::single_trigger_save_rejects_multiple_and_derives_the_workflow_result_contract ... ok\ntest application::events::tests::skill_event_assignments_save_atomically_and_preserve_other_skills ... ok\ntest application::events::tests::startup_occurrences_are_idempotent_and_new_boots_get_new_invocations ... ok\ntest application::events::tests::typed_parameters_resolve_explicit_then_context_then_default_and_fail_on_missing ... ok\ntest application::events::tests::v2_migration_splits_assignments_preserves_overrides_and_is_idempotent ... ok\n\ntest result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 1168 filtered out; finished in 3.30s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.11s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+                "Observed supervised process proc-1789052680911-1129590-626 exited 0. stdout: ests::worktrees::ensure_worktree_recreates_checkout_after_its_directory_was_removed ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_accepts_clean_branch_commit_since_base ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_bootstraps_unborn_repo_for_worktree ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_branches_worktrees_diffs_commits_pathspecs_and_pushes ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_does_not_track_read_only_git_probes ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_hard_reset_preserves_runtime_and_removes_other_noise ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_hard_resets_tracked_changes ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_lists_status_and_reverts_commits ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_rejects_invalid_names_and_reports_git_failures ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_reports_literal_paths_for_renames_and_special_names ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_reports_primary_worktree_refine_state_as_untracked ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_splits_tracked_dirt_from_untracked_files ... ok\ntest infrastructure::git::worktrees::tests::worktrees::locked_candidate_worktree_registration_survives_repo_wide_prune ... ok\ntest infrastructure::git::worktrees::tests::worktrees::quarantine_handles_renames_and_preserves_untracked_special_names ... ok\ntest infrastructure::git::worktrees::tests::worktrees::remove_worktree_unlocks_a_locked_candidate_worktree_first ... ok\n\ntest result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 1157 filtered out; finished in 1.39s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.11s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+                "Observed supervised process proc-1789052682577-1129590-629 exited 0. stdout: running 10 tests\ntest infrastructure::process::supervisor::operations::tests::capability_restart_recovery_adopts_one_correlated_process_or_interrupts_absence ... ok\ntest infrastructure::process::supervisor::operations::tests::deferred_cancellation_can_settle_as_a_durable_partial_failure ... ok\ntest infrastructure::process::supervisor::operations::tests::exclusive_operation_registration_serializes_one_owner ... ok\ntest infrastructure::process::supervisor::operations::tests::file_operation_registry_atomically_finds_or_registers_one_durable_replacement ... ok\ntest infrastructure::process::supervisor::operations::tests::file_operation_registry_registers_recovers_and_cancels_operations ... ok\ntest infrastructure::process::supervisor::operations::tests::file_operation_registry_state_replacement_never_exposes_partial_json ... ok\ntest infrastructure::process::supervisor::operations::tests::file_operation_registry_supervised_cancel_persists_capability_failures ... ok\ntest infrastructure::process::supervisor::operations::tests::file_operation_registry_supervised_cancel_terminates_process_and_refreshes_projection ... ok\ntest infrastructure::process::supervisor::operations::tests::operation_launch_guard_serializes_cancel_and_rejects_late_launch ... ok\ntest infrastructure::process::supervisor::operations::tests::operation_schema_defaults_and_revision_compare_and_set_are_fenced ... ok\n\ntest result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 1178 filtered out; finished in 0.12s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+                "Observed supervised process proc-1789052682956-1129590-632 exited 0. stdout: running 5 tests\ntest architecture_tests::crate_exports_only_the_semantic_roots_and_error_boundary ... ok\ntest architecture_tests::model_has_no_runtime_or_adapter_dependencies ... ok\ntest architecture_tests::non_surface_code_does_not_import_surfaces ... ok\ntest architecture_tests::planned_capability_directories_exist ... ok\ntest architecture_tests::retired_and_generic_root_namespaces_are_absent ... ok\n\ntest result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 1183 filtered out; finished in 0.25s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+                "Observed supervised process proc-1789052683469-1129590-635 exited 0. stderr: Checking refine v4.2.0 (/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR54BF57DCE017ED8EC68A5EEB-round-2)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.24s"
+              ],
+              "evaluation_scope": "isolated_candidate",
+              "operation_id": "1a08bd390b8113c7639",
+              "provider_attempts": [],
+              "quality_proof": {
+                "checked_at": "2026-09-10T15:04:49Z",
+                "checked_candidate_commit": "b1426cf5fb8dcc6a66a62d56fe8620c8ba513fb5",
+                "evaluation_scope": "isolated_candidate",
+                "goal_id": "DR54BF57DCE017ED8EC68A5EEB",
+                "operation_id": "1a08bd390b8113c7639",
+                "results": [
+                  {
+                    "command": "test \"$(git rev-parse HEAD)\" = b1426cf5fb8dcc6a66a62d56fe8620c8ba513fb5 && test \"$(git branch --show-current)\" = refine/DR54BF57DCE017ED8EC68A5EEB/round-2 && test -z \"$(git --no-optional-locks status --porcelain=v1)\" && git merge-base --is-ancestor b47569adb8d4c5d1d7335ba91729a3e486a38fe0 b1426cf5fb8dcc6a66a62d56fe8620c8ba513fb5",
+                    "evidence": "Observed supervised process proc-1789052556023-1129590-611 exited 0.",
+                    "exit_code": 0,
+                    "process_id": "proc-1789052556023-1129590-611",
+                    "status": "passed",
+                    "test": "workflow.quality.enter:default-quality: Pinned candidate identity, clean checkout and base ancestry"
+                  },
+                  {
+                    "command": "git diff --check b47569adb8d4c5d1d7335ba91729a3e486a38fe0 b1426cf5fb8dcc6a66a62d56fe8620c8ba513fb5",
+                    "evidence": "Observed supervised process proc-1789052556149-1129590-614 exited 0.",
+                    "exit_code": 0,
+                    "process_id": "proc-1789052556149-1129590-614",
+                    "status": "passed",
+                    "test": "workflow.quality.enter:default-quality: Candidate diff whitespace"
+                  },
+                  {
+                    "command": "git diff --name-only --diff-filter=ACMR b47569adb8d4c5d1d7335ba91729a3e486a38fe0 b1426cf5fb8dcc6a66a62d56fe8620c8ba513fb5 -- '*.rs' | xargs rustfmt --check --edition 2024 --config skip_children=true",
+                    "evidence": "Observed supervised process proc-1789052556273-1129590-617 exited 0.",
+                    "exit_code": 0,
+                    "process_id": "proc-1789052556273-1129590-617",
+                    "status": "passed",
+                    "test": "workflow.quality.enter:default-quality: Formatting of changed Rust files"
+                  },
+                  {
+                    "command": "cargo test --lib application::workflow -- --test-threads=1 --skip multiple_plan_skills_contribute_separate_namespaced_checklists",
+                    "evidence": "Observed supervised process proc-1789052556533-1129590-620 exited 0. stdout: cation::workflow::tests::round_base::a_stale_candidate_whose_target_never_moved_queues_recoverable_evidence ... ok\ntest application::workflow::tests::round_base::a_stale_local_target_fast_forwards_from_its_remote_before_the_base_is_pinned ... ok\ntest application::workflow::tests::round_base::agent_lineage::invalid_planning_context_fails_before_candidate_or_worktree_mutation ... ok\ntest application::workflow::tests::round_base::agent_lineage::pre_agent_refresh_anchors_to_the_observed_target_before_plan_edits ... ok\ntest application::workflow::tests::round_base::agent_lineage::pre_agent_refresh_reconciles_the_binding_and_retains_the_original_plan ... ok\ntest application::workflow::tests::round_base::agent_lineage::resume_keeps_the_original_base_and_unfinished_implementation_files ... ok\ntest application::workflow::tests::round_base::agent_lineage::scoped_retry_replays_in_a_successor_worktree_and_preserves_the_source ... ok\ntest application::workflow::tests::round_base::an_unreachable_remote_leaves_the_round_to_start_from_the_local_ref ... ok\ntest application::workflow::tests::round_base::resumption_recreates_a_missing_round_branch_at_the_recorded_base ... ok\ntest application::workflow::tests::round_base::resumption_reuses_an_existing_round_branch_exactly_as_it_stands ... ok\ntest application::workflow::tests::round_base::round_branch_is_born_at_the_merge_target_not_at_the_shared_checkout_head ... ok\ntest application::workflow::tests::workflow_pass_reports_only_projection_mutations ... ok\ntest application::workflow::tests::worktree_resume::resume_fails_closed_when_the_round_branch_no_longer_contains_the_candidate ... ok\ntest application::workflow::tests::worktree_resume::resume_rebuilds_a_pruned_candidate_worktree_and_finishes_the_round ... ok\ntest application::workflow::tests::worktree_resume::resume_reuses_a_durable_quality_proof_and_skips_straight_to_governance ... ok\n\ntest result: ok. 206 passed; 0 failed; 0 ignored; 0 measured; 982 filtered out; finished in 113.43s stderr: Compiling refine v4.2.0 (/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR54BF57DCE017ED8EC68A5EEB-round-2)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.21s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\nPreparing worktree (detached HEAD e165312)\nPreparing worktree (detached HEAD e165312)\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')",
+                    "exit_code": 0,
+                    "process_id": "proc-1789052556533-1129590-620",
+                    "status": "passed",
+                    "test": "workflow.quality.enter:default-quality: Workflow lineage, replay, retries, replacement gates, conflicts, publication races and interruption"
+                  },
+                  {
+                    "command": "cargo test --lib application::events::tests -- --test-threads=1",
+                    "evidence": "Observed supervised process proc-1789052677339-1129590-623 exited 0. stdout: nc_merges_disjoint_edits_fences_both_editors_and_rejects_broken_references ... ok\ntest application::events::tests::default_skills_complete_a_real_workflow_with_observed_quality_and_candidate_evidence ... ok\ntest application::events::tests::disabled_node_override_masks_only_its_project_binding ... ok\ntest application::events::tests::goal_and_system_paths_resolve_arrays_and_missing_shared_parameters_keep_requiredness ... ok\ntest application::events::tests::interrupted_index_updates_recover_without_replaying_completed_work ... ok\ntest application::events::tests::manual_request_identity_and_success_action_receipts_survive_replay ... ok\ntest application::events::tests::manual_skills_select_one_skill_validate_inputs_and_pin_replay_without_a_goal ... ok\ntest application::events::tests::manual_transition_waits_for_exit_evidence_and_cancellation_can_supersede_it ... ok\ntest application::events::tests::migration_preserves_content_is_idempotent_and_stale_writes_cannot_erase_edits ... ok\ntest application::events::tests::missing_automatic_input_settles_as_visible_error_instead_of_waiting_forever ... ok\ntest application::events::tests::ordered_independent_runs_collect_failure_preserve_evidence_and_do_not_replay ... ok\ntest application::events::tests::oversized_configuration_is_rejected_before_replacing_the_readable_document ... ok\ntest application::events::tests::single_trigger_save_rejects_multiple_and_derives_the_workflow_result_contract ... ok\ntest application::events::tests::skill_event_assignments_save_atomically_and_preserve_other_skills ... ok\ntest application::events::tests::startup_occurrences_are_idempotent_and_new_boots_get_new_invocations ... ok\ntest application::events::tests::typed_parameters_resolve_explicit_then_context_then_default_and_fail_on_missing ... ok\ntest application::events::tests::v2_migration_splits_assignments_preserves_overrides_and_is_idempotent ... ok\n\ntest result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 1168 filtered out; finished in 3.30s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.11s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+                    "exit_code": 0,
+                    "process_id": "proc-1789052677339-1129590-623",
+                    "status": "passed",
+                    "test": "workflow.quality.enter:default-quality: Current Skill invocation and execution contracts"
+                  },
+                  {
+                    "command": "cargo test --lib infrastructure::git::worktrees -- --test-threads=1",
+                    "evidence": "Observed supervised process proc-1789052680911-1129590-626 exited 0. stdout: ests::worktrees::ensure_worktree_recreates_checkout_after_its_directory_was_removed ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_accepts_clean_branch_commit_since_base ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_bootstraps_unborn_repo_for_worktree ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_branches_worktrees_diffs_commits_pathspecs_and_pushes ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_does_not_track_read_only_git_probes ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_hard_reset_preserves_runtime_and_removes_other_noise ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_hard_resets_tracked_changes ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_lists_status_and_reverts_commits ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_rejects_invalid_names_and_reports_git_failures ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_reports_literal_paths_for_renames_and_special_names ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_reports_primary_worktree_refine_state_as_untracked ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_splits_tracked_dirt_from_untracked_files ... ok\ntest infrastructure::git::worktrees::tests::worktrees::locked_candidate_worktree_registration_survives_repo_wide_prune ... ok\ntest infrastructure::git::worktrees::tests::worktrees::quarantine_handles_renames_and_preserves_untracked_special_names ... ok\ntest infrastructure::git::worktrees::tests::worktrees::remove_worktree_unlocks_a_locked_candidate_worktree_first ... ok\n\ntest result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 1157 filtered out; finished in 1.39s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.11s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+                    "exit_code": 0,
+                    "process_id": "proc-1789052680911-1129590-626",
+                    "status": "passed",
+                    "test": "workflow.quality.enter:default-quality: Shared Git worktree creation and recovery"
+                  },
+                  {
+                    "command": "cargo test --lib infrastructure::process::supervisor::operations -- --test-threads=1",
+                    "evidence": "Observed supervised process proc-1789052682577-1129590-629 exited 0. stdout: running 10 tests\ntest infrastructure::process::supervisor::operations::tests::capability_restart_recovery_adopts_one_correlated_process_or_interrupts_absence ... ok\ntest infrastructure::process::supervisor::operations::tests::deferred_cancellation_can_settle_as_a_durable_partial_failure ... ok\ntest infrastructure::process::supervisor::operations::tests::exclusive_operation_registration_serializes_one_owner ... ok\ntest infrastructure::process::supervisor::operations::tests::file_operation_registry_atomically_finds_or_registers_one_durable_replacement ... ok\ntest infrastructure::process::supervisor::operations::tests::file_operation_registry_registers_recovers_and_cancels_operations ... ok\ntest infrastructure::process::supervisor::operations::tests::file_operation_registry_state_replacement_never_exposes_partial_json ... ok\ntest infrastructure::process::supervisor::operations::tests::file_operation_registry_supervised_cancel_persists_capability_failures ... ok\ntest infrastructure::process::supervisor::operations::tests::file_operation_registry_supervised_cancel_terminates_process_and_refreshes_projection ... ok\ntest infrastructure::process::supervisor::operations::tests::operation_launch_guard_serializes_cancel_and_rejects_late_launch ... ok\ntest infrastructure::process::supervisor::operations::tests::operation_schema_defaults_and_revision_compare_and_set_are_fenced ... ok\n\ntest result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 1178 filtered out; finished in 0.12s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+                    "exit_code": 0,
+                    "process_id": "proc-1789052682577-1129590-629",
+                    "status": "passed",
+                    "test": "workflow.quality.enter:default-quality: Durable operation coordination and recovery"
+                  },
+                  {
+                    "command": "cargo test --lib architecture_tests -- --test-threads=1",
+                    "evidence": "Observed supervised process proc-1789052682956-1129590-632 exited 0. stdout: running 5 tests\ntest architecture_tests::crate_exports_only_the_semantic_roots_and_error_boundary ... ok\ntest architecture_tests::model_has_no_runtime_or_adapter_dependencies ... ok\ntest architecture_tests::non_surface_code_does_not_import_surfaces ... ok\ntest architecture_tests::planned_capability_directories_exist ... ok\ntest architecture_tests::retired_and_generic_root_namespaces_are_absent ... ok\n\ntest result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 1183 filtered out; finished in 0.25s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+                    "exit_code": 0,
+                    "process_id": "proc-1789052682956-1129590-632",
+                    "status": "passed",
+                    "test": "workflow.quality.enter:default-quality: Semantic architecture boundaries"
+                  },
+                  {
+                    "command": "cargo check --all-targets",
+                    "evidence": "Observed supervised process proc-1789052683469-1129590-635 exited 0. stderr: Checking refine v4.2.0 (/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR54BF57DCE017ED8EC68A5EEB-round-2)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.24s",
+                    "exit_code": 0,
+                    "process_id": "proc-1789052683469-1129590-635",
+                    "status": "passed",
+                    "test": "workflow.quality.enter:default-quality: All-target compilation"
+                  }
+                ],
+                "round_idx": 1,
+                "schema_version": 1,
+                "source_candidate_commit": "b1426cf5fb8dcc6a66a62d56fe8620c8ba513fb5",
+                "state": "passed"
+              },
+              "results": [
+                {
+                  "command": "test \"$(git rev-parse HEAD)\" = b1426cf5fb8dcc6a66a62d56fe8620c8ba513fb5 && test \"$(git branch --show-current)\" = refine/DR54BF57DCE017ED8EC68A5EEB/round-2 && test -z \"$(git --no-optional-locks status --porcelain=v1)\" && git merge-base --is-ancestor b47569adb8d4c5d1d7335ba91729a3e486a38fe0 b1426cf5fb8dcc6a66a62d56fe8620c8ba513fb5",
+                  "evidence": "Observed supervised process proc-1789052556023-1129590-611 exited 0.",
+                  "exit_code": 0,
+                  "process_id": "proc-1789052556023-1129590-611",
+                  "status": "passed",
+                  "test": "workflow.quality.enter:default-quality: Pinned candidate identity, clean checkout and base ancestry"
+                },
+                {
+                  "command": "git diff --check b47569adb8d4c5d1d7335ba91729a3e486a38fe0 b1426cf5fb8dcc6a66a62d56fe8620c8ba513fb5",
+                  "evidence": "Observed supervised process proc-1789052556149-1129590-614 exited 0.",
+                  "exit_code": 0,
+                  "process_id": "proc-1789052556149-1129590-614",
+                  "status": "passed",
+                  "test": "workflow.quality.enter:default-quality: Candidate diff whitespace"
+                },
+                {
+                  "command": "git diff --name-only --diff-filter=ACMR b47569adb8d4c5d1d7335ba91729a3e486a38fe0 b1426cf5fb8dcc6a66a62d56fe8620c8ba513fb5 -- '*.rs' | xargs rustfmt --check --edition 2024 --config skip_children=true",
+                  "evidence": "Observed supervised process proc-1789052556273-1129590-617 exited 0.",
+                  "exit_code": 0,
+                  "process_id": "proc-1789052556273-1129590-617",
+                  "status": "passed",
+                  "test": "workflow.quality.enter:default-quality: Formatting of changed Rust files"
+                },
+                {
+                  "command": "cargo test --lib application::workflow -- --test-threads=1 --skip multiple_plan_skills_contribute_separate_namespaced_checklists",
+                  "evidence": "Observed supervised process proc-1789052556533-1129590-620 exited 0. stdout: cation::workflow::tests::round_base::a_stale_candidate_whose_target_never_moved_queues_recoverable_evidence ... ok\ntest application::workflow::tests::round_base::a_stale_local_target_fast_forwards_from_its_remote_before_the_base_is_pinned ... ok\ntest application::workflow::tests::round_base::agent_lineage::invalid_planning_context_fails_before_candidate_or_worktree_mutation ... ok\ntest application::workflow::tests::round_base::agent_lineage::pre_agent_refresh_anchors_to_the_observed_target_before_plan_edits ... ok\ntest application::workflow::tests::round_base::agent_lineage::pre_agent_refresh_reconciles_the_binding_and_retains_the_original_plan ... ok\ntest application::workflow::tests::round_base::agent_lineage::resume_keeps_the_original_base_and_unfinished_implementation_files ... ok\ntest application::workflow::tests::round_base::agent_lineage::scoped_retry_replays_in_a_successor_worktree_and_preserves_the_source ... ok\ntest application::workflow::tests::round_base::an_unreachable_remote_leaves_the_round_to_start_from_the_local_ref ... ok\ntest application::workflow::tests::round_base::resumption_recreates_a_missing_round_branch_at_the_recorded_base ... ok\ntest application::workflow::tests::round_base::resumption_reuses_an_existing_round_branch_exactly_as_it_stands ... ok\ntest application::workflow::tests::round_base::round_branch_is_born_at_the_merge_target_not_at_the_shared_checkout_head ... ok\ntest application::workflow::tests::workflow_pass_reports_only_projection_mutations ... ok\ntest application::workflow::tests::worktree_resume::resume_fails_closed_when_the_round_branch_no_longer_contains_the_candidate ... ok\ntest application::workflow::tests::worktree_resume::resume_rebuilds_a_pruned_candidate_worktree_and_finishes_the_round ... ok\ntest application::workflow::tests::worktree_resume::resume_reuses_a_durable_quality_proof_and_skips_straight_to_governance ... ok\n\ntest result: ok. 206 passed; 0 failed; 0 ignored; 0 measured; 982 filtered out; finished in 113.43s stderr: Compiling refine v4.2.0 (/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR54BF57DCE017ED8EC68A5EEB-round-2)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.21s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\nPreparing worktree (detached HEAD e165312)\nPreparing worktree (detached HEAD e165312)\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')",
+                  "exit_code": 0,
+                  "process_id": "proc-1789052556533-1129590-620",
+                  "status": "passed",
+                  "test": "workflow.quality.enter:default-quality: Workflow lineage, replay, retries, replacement gates, conflicts, publication races and interruption"
+                },
+                {
+                  "command": "cargo test --lib application::events::tests -- --test-threads=1",
+                  "evidence": "Observed supervised process proc-1789052677339-1129590-623 exited 0. stdout: nc_merges_disjoint_edits_fences_both_editors_and_rejects_broken_references ... ok\ntest application::events::tests::default_skills_complete_a_real_workflow_with_observed_quality_and_candidate_evidence ... ok\ntest application::events::tests::disabled_node_override_masks_only_its_project_binding ... ok\ntest application::events::tests::goal_and_system_paths_resolve_arrays_and_missing_shared_parameters_keep_requiredness ... ok\ntest application::events::tests::interrupted_index_updates_recover_without_replaying_completed_work ... ok\ntest application::events::tests::manual_request_identity_and_success_action_receipts_survive_replay ... ok\ntest application::events::tests::manual_skills_select_one_skill_validate_inputs_and_pin_replay_without_a_goal ... ok\ntest application::events::tests::manual_transition_waits_for_exit_evidence_and_cancellation_can_supersede_it ... ok\ntest application::events::tests::migration_preserves_content_is_idempotent_and_stale_writes_cannot_erase_edits ... ok\ntest application::events::tests::missing_automatic_input_settles_as_visible_error_instead_of_waiting_forever ... ok\ntest application::events::tests::ordered_independent_runs_collect_failure_preserve_evidence_and_do_not_replay ... ok\ntest application::events::tests::oversized_configuration_is_rejected_before_replacing_the_readable_document ... ok\ntest application::events::tests::single_trigger_save_rejects_multiple_and_derives_the_workflow_result_contract ... ok\ntest application::events::tests::skill_event_assignments_save_atomically_and_preserve_other_skills ... ok\ntest application::events::tests::startup_occurrences_are_idempotent_and_new_boots_get_new_invocations ... ok\ntest application::events::tests::typed_parameters_resolve_explicit_then_context_then_default_and_fail_on_missing ... ok\ntest application::events::tests::v2_migration_splits_assignments_preserves_overrides_and_is_idempotent ... ok\n\ntest result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 1168 filtered out; finished in 3.30s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.11s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+                  "exit_code": 0,
+                  "process_id": "proc-1789052677339-1129590-623",
+                  "status": "passed",
+                  "test": "workflow.quality.enter:default-quality: Current Skill invocation and execution contracts"
+                },
+                {
+                  "command": "cargo test --lib infrastructure::git::worktrees -- --test-threads=1",
+                  "evidence": "Observed supervised process proc-1789052680911-1129590-626 exited 0. stdout: ests::worktrees::ensure_worktree_recreates_checkout_after_its_directory_was_removed ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_accepts_clean_branch_commit_since_base ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_bootstraps_unborn_repo_for_worktree ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_branches_worktrees_diffs_commits_pathspecs_and_pushes ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_does_not_track_read_only_git_probes ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_hard_reset_preserves_runtime_and_removes_other_noise ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_hard_resets_tracked_changes ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_lists_status_and_reverts_commits ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_rejects_invalid_names_and_reports_git_failures ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_reports_literal_paths_for_renames_and_special_names ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_reports_primary_worktree_refine_state_as_untracked ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_splits_tracked_dirt_from_untracked_files ... ok\ntest infrastructure::git::worktrees::tests::worktrees::locked_candidate_worktree_registration_survives_repo_wide_prune ... ok\ntest infrastructure::git::worktrees::tests::worktrees::quarantine_handles_renames_and_preserves_untracked_special_names ... ok\ntest infrastructure::git::worktrees::tests::worktrees::remove_worktree_unlocks_a_locked_candidate_worktree_first ... ok\n\ntest result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 1157 filtered out; finished in 1.39s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.11s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+                  "exit_code": 0,
+                  "process_id": "proc-1789052680911-1129590-626",
+                  "status": "passed",
+                  "test": "workflow.quality.enter:default-quality: Shared Git worktree creation and recovery"
+                },
+                {
+                  "command": "cargo test --lib infrastructure::process::supervisor::operations -- --test-threads=1",
+                  "evidence": "Observed supervised process proc-1789052682577-1129590-629 exited 0. stdout: running 10 tests\ntest infrastructure::process::supervisor::operations::tests::capability_restart_recovery_adopts_one_correlated_process_or_interrupts_absence ... ok\ntest infrastructure::process::supervisor::operations::tests::deferred_cancellation_can_settle_as_a_durable_partial_failure ... ok\ntest infrastructure::process::supervisor::operations::tests::exclusive_operation_registration_serializes_one_owner ... ok\ntest infrastructure::process::supervisor::operations::tests::file_operation_registry_atomically_finds_or_registers_one_durable_replacement ... ok\ntest infrastructure::process::supervisor::operations::tests::file_operation_registry_registers_recovers_and_cancels_operations ... ok\ntest infrastructure::process::supervisor::operations::tests::file_operation_registry_state_replacement_never_exposes_partial_json ... ok\ntest infrastructure::process::supervisor::operations::tests::file_operation_registry_supervised_cancel_persists_capability_failures ... ok\ntest infrastructure::process::supervisor::operations::tests::file_operation_registry_supervised_cancel_terminates_process_and_refreshes_projection ... ok\ntest infrastructure::process::supervisor::operations::tests::operation_launch_guard_serializes_cancel_and_rejects_late_launch ... ok\ntest infrastructure::process::supervisor::operations::tests::operation_schema_defaults_and_revision_compare_and_set_are_fenced ... ok\n\ntest result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 1178 filtered out; finished in 0.12s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+                  "exit_code": 0,
+                  "process_id": "proc-1789052682577-1129590-629",
+                  "status": "passed",
+                  "test": "workflow.quality.enter:default-quality: Durable operation coordination and recovery"
+                },
+                {
+                  "command": "cargo test --lib architecture_tests -- --test-threads=1",
+                  "evidence": "Observed supervised process proc-1789052682956-1129590-632 exited 0. stdout: running 5 tests\ntest architecture_tests::crate_exports_only_the_semantic_roots_and_error_boundary ... ok\ntest architecture_tests::model_has_no_runtime_or_adapter_dependencies ... ok\ntest architecture_tests::non_surface_code_does_not_import_surfaces ... ok\ntest architecture_tests::planned_capability_directories_exist ... ok\ntest architecture_tests::retired_and_generic_root_namespaces_are_absent ... ok\n\ntest result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 1183 filtered out; finished in 0.25s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+                  "exit_code": 0,
+                  "process_id": "proc-1789052682956-1129590-632",
+                  "status": "passed",
+                  "test": "workflow.quality.enter:default-quality: Semantic architecture boundaries"
+                },
+                {
+                  "command": "cargo check --all-targets",
+                  "evidence": "Observed supervised process proc-1789052683469-1129590-635 exited 0. stderr: Checking refine v4.2.0 (/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR54BF57DCE017ED8EC68A5EEB-round-2)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.24s",
+                  "exit_code": 0,
+                  "process_id": "proc-1789052683469-1129590-635",
+                  "status": "passed",
+                  "test": "workflow.quality.enter:default-quality: All-target compilation"
+                }
+              ],
+              "source_candidate_commit": "b1426cf5fb8dcc6a66a62d56fe8620c8ba513fb5"
+            },
+            "quality_message": "All Quality Skills passed with supervised evidence.",
+            "quality_state": "passed",
+            "reporter": "Buddy Williams",
+            "round": 2,
+            "rule_state": "failed"
+          }
+        ],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
+      },
+      "assignee": "Refine",
+      "automatic_retry": {
+        "attempt": 1,
+        "generated_at": "2026-09-10T15:08:46Z",
+        "kind": "governance",
+        "source_round": 2
+      },
+      "constitution_state": "unclassified",
+      "created": "2026-09-10T15:08:46Z",
+      "event_configuration": {
+        "events": {
+          "custom": {
+            "bindings": [
+              {
+                "enabled": true,
+                "id": "trigger-38405586-05d4-4db4-a7b8-e5efa58b45c9",
+                "inputs": {},
+                "mode": "blocking",
+                "order": 0,
+                "overrides": null,
+                "scope": {
+                  "node_id": null
+                },
+                "skill_id": "release"
+              },
+              {
+                "enabled": true,
+                "id": "trigger-2748a40c-20f1-4533-851a-d3d752e56013",
+                "inputs": {},
+                "mode": "blocking",
+                "order": 0,
+                "overrides": null,
+                "scope": {
+                  "node_id": "default"
+                },
+                "skill_id": "fetch-goals-from-email"
+              }
+            ],
+            "enabled": true,
+            "id": "custom",
+            "kind": "custom",
+            "name": "Custom",
+            "on_success": null,
+            "parameters": [],
+            "scope": {
+              "node_id": null
+            },
+            "source": null
+          },
+          "node.startup.ready": {
+            "bindings": [
+              {
+                "enabled": true,
+                "id": "trigger-2124c51c-8d1f-44b7-8a07-7a989a68227f",
+                "inputs": {},
+                "mode": "background",
+                "order": 0,
+                "overrides": null,
+                "scope": {
+                  "node_id": "default"
+                },
+                "skill_id": "fetch-goals-from-email-on-startup"
+              }
+            ],
+            "enabled": true,
+            "id": "node.startup.ready",
+            "kind": "system",
+            "name": "Node Startup Ready",
+            "on_success": null,
+            "parameters": [],
+            "scope": {
+              "node_id": null
+            },
+            "source": "node.startup.ready"
+          },
+          "workflow.backlog.enter": {
+            "bindings": [],
+            "enabled": true,
+            "id": "workflow.backlog.enter",
+            "kind": "system",
+            "name": "Workflow Backlog Enter",
+            "on_success": null,
+            "parameters": [],
+            "scope": {
+              "node_id": null
+            },
+            "source": "workflow.backlog.enter"
+          },
+          "workflow.backlog.exit": {
+            "bindings": [],
+            "enabled": true,
+            "id": "workflow.backlog.exit",
+            "kind": "system",
+            "name": "Workflow Backlog Exit",
+            "on_success": null,
+            "parameters": [],
+            "scope": {
+              "node_id": null
+            },
+            "source": "workflow.backlog.exit"
+          },
+          "workflow.cancelled.enter": {
+            "bindings": [],
+            "enabled": true,
+            "id": "workflow.cancelled.enter",
+            "kind": "system",
+            "name": "Workflow Cancelled Enter",
+            "on_success": null,
+            "parameters": [],
+            "scope": {
+              "node_id": null
+            },
+            "source": "workflow.cancelled.enter"
+          },
+          "workflow.cancelled.exit": {
+            "bindings": [],
+            "enabled": true,
+            "id": "workflow.cancelled.exit",
+            "kind": "system",
+            "name": "Workflow Cancelled Exit",
+            "on_success": null,
+            "parameters": [],
+            "scope": {
+              "node_id": null
+            },
+            "source": "workflow.cancelled.exit"
+          },
+          "workflow.done.enter": {
+            "bindings": [],
+            "enabled": true,
+            "id": "workflow.done.enter",
+            "kind": "system",
+            "name": "Workflow Done Enter",
+            "on_success": null,
+            "parameters": [],
+            "scope": {
+              "node_id": null
+            },
+            "source": "workflow.done.enter"
+          },
+          "workflow.done.exit": {
+            "bindings": [],
+            "enabled": true,
+            "id": "workflow.done.exit",
+            "kind": "system",
+            "name": "Workflow Done Exit",
+            "on_success": null,
+            "parameters": [],
+            "scope": {
+              "node_id": null
+            },
+            "source": "workflow.done.exit"
+          },
+          "workflow.failed.enter": {
+            "bindings": [],
+            "enabled": true,
+            "id": "workflow.failed.enter",
+            "kind": "system",
+            "name": "Workflow Failed Enter",
+            "on_success": null,
+            "parameters": [],
+            "scope": {
+              "node_id": null
+            },
+            "source": "workflow.failed.enter"
+          },
+          "workflow.failed.exit": {
+            "bindings": [],
+            "enabled": true,
+            "id": "workflow.failed.exit",
+            "kind": "system",
+            "name": "Workflow Failed Exit",
+            "on_success": null,
+            "parameters": [],
+            "scope": {
+              "node_id": null
+            },
+            "source": "workflow.failed.exit"
+          },
+          "workflow.governance.enter": {
+            "bindings": [
+              {
+                "enabled": true,
+                "id": "default-governance",
+                "inputs": {},
+                "mode": "blocking",
+                "order": 0,
+                "overrides": null,
+                "scope": {
+                  "node_id": null
+                },
+                "skill_id": "default-governance"
+              }
+            ],
+            "enabled": true,
+            "id": "workflow.governance.enter",
+            "kind": "system",
+            "name": "Workflow Governance Enter",
+            "on_success": null,
+            "parameters": [],
+            "scope": {
+              "node_id": null
+            },
+            "source": "workflow.governance.enter"
+          },
+          "workflow.governance.exit": {
+            "bindings": [],
+            "enabled": true,
+            "id": "workflow.governance.exit",
+            "kind": "system",
+            "name": "Workflow Governance Exit",
+            "on_success": null,
+            "parameters": [],
+            "scope": {
+              "node_id": null
+            },
+            "source": "workflow.governance.exit"
+          },
+          "workflow.implement.enter": {
+            "bindings": [
+              {
+                "enabled": true,
+                "id": "default-implement",
+                "inputs": {},
+                "mode": "blocking",
+                "order": 0,
+                "overrides": null,
+                "scope": {
+                  "node_id": null
+                },
+                "skill_id": "default-implement"
+              }
+            ],
+            "enabled": true,
+            "id": "workflow.implement.enter",
+            "kind": "system",
+            "name": "Workflow Implement Enter",
+            "on_success": null,
+            "parameters": [],
+            "scope": {
+              "node_id": null
+            },
+            "source": "workflow.implement.enter"
+          },
+          "workflow.implement.exit": {
+            "bindings": [],
+            "enabled": true,
+            "id": "workflow.implement.exit",
+            "kind": "system",
+            "name": "Workflow Implement Exit",
+            "on_success": null,
+            "parameters": [],
+            "scope": {
+              "node_id": null
+            },
+            "source": "workflow.implement.exit"
+          },
+          "workflow.plan.enter": {
+            "bindings": [
+              {
+                "enabled": true,
+                "id": "default-plan",
+                "inputs": {},
+                "mode": "blocking",
+                "order": 0,
+                "overrides": null,
+                "scope": {
+                  "node_id": null
+                },
+                "skill_id": "default-plan"
+              }
+            ],
+            "enabled": true,
+            "id": "workflow.plan.enter",
+            "kind": "system",
+            "name": "Workflow Plan Enter",
+            "on_success": null,
+            "parameters": [],
+            "scope": {
+              "node_id": null
+            },
+            "source": "workflow.plan.enter"
+          },
+          "workflow.plan.exit": {
+            "bindings": [],
+            "enabled": true,
+            "id": "workflow.plan.exit",
+            "kind": "system",
+            "name": "Workflow Plan Exit",
+            "on_success": null,
+            "parameters": [],
+            "scope": {
+              "node_id": null
+            },
+            "source": "workflow.plan.exit"
+          },
+          "workflow.quality.enter": {
+            "bindings": [
+              {
+                "enabled": true,
+                "id": "default-quality",
+                "inputs": {},
+                "mode": "blocking",
+                "order": 0,
+                "overrides": null,
+                "scope": {
+                  "node_id": null
+                },
+                "skill_id": "default-quality"
+              }
+            ],
+            "enabled": true,
+            "id": "workflow.quality.enter",
+            "kind": "system",
+            "name": "Workflow Quality Enter",
+            "on_success": null,
+            "parameters": [],
+            "scope": {
+              "node_id": null
+            },
+            "source": "workflow.quality.enter"
+          },
+          "workflow.quality.exit": {
+            "bindings": [],
+            "enabled": true,
+            "id": "workflow.quality.exit",
+            "kind": "system",
+            "name": "Workflow Quality Exit",
+            "on_success": null,
+            "parameters": [],
+            "scope": {
+              "node_id": null
+            },
+            "source": "workflow.quality.exit"
+          },
+          "workflow.review.enter": {
+            "bindings": [],
+            "enabled": true,
+            "id": "workflow.review.enter",
+            "kind": "system",
+            "name": "Workflow Review Enter",
+            "on_success": null,
+            "parameters": [],
+            "scope": {
+              "node_id": null
+            },
+            "source": "workflow.review.enter"
+          },
+          "workflow.review.exit": {
+            "bindings": [],
+            "enabled": true,
+            "id": "workflow.review.exit",
+            "kind": "system",
+            "name": "Workflow Review Exit",
+            "on_success": null,
+            "parameters": [],
+            "scope": {
+              "node_id": null
+            },
+            "source": "workflow.review.exit"
+          },
+          "workflow.todo.enter": {
+            "bindings": [],
+            "enabled": true,
+            "id": "workflow.todo.enter",
+            "kind": "system",
+            "name": "Workflow Todo Enter",
+            "on_success": null,
+            "parameters": [],
+            "scope": {
+              "node_id": null
+            },
+            "source": "workflow.todo.enter"
+          },
+          "workflow.todo.exit": {
+            "bindings": [],
+            "enabled": true,
+            "id": "workflow.todo.exit",
+            "kind": "system",
+            "name": "Workflow Todo Exit",
+            "on_success": null,
+            "parameters": [],
+            "scope": {
+              "node_id": null
+            },
+            "source": "workflow.todo.exit"
+          }
+        },
+        "revision": 22,
+        "schema_version": 2,
+        "skills": {
+          "default-governance": {
+            "enabled": true,
+            "id": "default-governance",
+            "name": "Governance",
+            "parameters": [],
+            "prompt": "## Governance review\n\nReview the exact candidate against the project's stated intent and attached Skills. Read the accepted plans, implementation and Quality evidence and actual diff. Report actual violations with evidence, not hypothetical risks or preferences. Do not edit files, merge, push or change Goal state. A finding must include an actionable recovery request.\n\n## Product intent\n\nRefine is a local-first, agent-first operating layer for software delivery. It moves user-defined Goals through a workflow to ensure parallel implementation across Nodes, quality, and governance.\n\n## Project rules\n\n- Keep domain concepts, invariants, and pure policy in `src/model`; shared behavior and orchestration in `src/application`; Git, process, host, storage, provider, and telemetry mechanisms in `src/infrastructure`; and adapters for people and machines in `src/surfaces`. Keep `error.rs` as a neutral shared boundary. Model remains independent of the other areas, and code outside Surfaces does not depend on surface adapters.\n- Maintain a consistent architecture by extending the existing semantic responsibilities and dependency boundaries described in `docs/intent/01-design.md`. Do not invent new architectural concepts.\n- Preserve Rust-based flat-file persistence, file indexes, and in-memory caching. Keep CLI and API work under 50 ms, excluding time spent waiting on LLMs or outside tools.\n- Maintain affected documentation, especially `docs/intent/*`, and preserve its established format. Apply the scope limits in the intent guidance below.\n- Keep Refine agent-first by using installed coding-agent CLIs. Do not duplicate or reimplement coding-agent functionality.\n\n## Intent and architecture\n\nApplicability: Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract.\n\nUse the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Model, Application, Infrastructure, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.\n\nFor this project on the current Default node, /home/buddy/projects/refine-next is the target development checkout and /home/buddy/projects/refine is the serving Refine installation. Use the invocation's pinned workspace (the managed Goal Round worktree when supplied) for code changes and verification, and read the relevant intent from that candidate. Verify paths from the current invocation and runtime before operating on another node. Source promotion and restarting the serving installation are separate operator actions; an ordinary implementation or Quality run should not deploy its candidate or restart the daemon that is supervising it.\n\n## Cohesive code files\n\nApplicability: Apply whenever an agent adds or changes code files in any language.\n\nKeep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.\n",
+            "provenance": "refine-default-v1",
+            "role": "task",
+            "scope": {
+              "node_id": null
+            }
+          },
+          "default-implement": {
+            "enabled": true,
+            "id": "default-implement",
+            "name": "Implement",
+            "parameters": [],
+            "prompt": "## Implement\n\nImplement the current Goal Round using every accepted plan and attached Skill. Inspect existing code, make the complete change, run appropriate verification, and report evidence for each checklist item. Preserve unrelated changes and historical evidence. Refine owns candidate commits, workflow advancement, Quality, Governance and integration.\n\n## Intent and architecture\n\nApplicability: Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract.\n\nUse the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Model, Application, Infrastructure, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.\n\nFor this project on the current Default node, /home/buddy/projects/refine-next is the target development checkout and /home/buddy/projects/refine is the serving Refine installation. Use the invocation's pinned workspace (the managed Goal Round worktree when supplied) for code changes and verification, and read the relevant intent from that candidate. Verify paths from the current invocation and runtime before operating on another node. Source promotion and restarting the serving installation are separate operator actions; an ordinary implementation or Quality run should not deploy its candidate or restart the daemon that is supervising it.\n\n## Cohesive code files\n\nApplicability: Apply whenever an agent adds or changes code files in any language.\n\nKeep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.\n",
+            "provenance": "refine-default-v1",
+            "role": "implement",
+            "scope": {
+              "node_id": null
+            }
+          },
+          "default-plan": {
+            "enabled": true,
+            "id": "default-plan",
+            "name": "Plan",
+            "parameters": [],
+            "prompt": "## Plan\n\nProduce a complete, concise implementation plan for the current Goal Round. Inspect the repository and applicable context, resolve assumptions, consider alternatives and critique your proposed solution before finalizing it. Choose the planning method appropriate to the work. For a scoped finding recovery Round, focus the plan on the requested correction against the retained candidate. Do not change repository files. Return an actionable plan with stable checklist IDs and meaningful verification.\n\n## Intent and architecture\n\nApplicability: Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract.\n\nUse the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Model, Application, Infrastructure, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.\n\nFor this project on the current Default node, /home/buddy/projects/refine-next is the target development checkout and /home/buddy/projects/refine is the serving Refine installation. Use the invocation's pinned workspace (the managed Goal Round worktree when supplied) for code changes and verification, and read the relevant intent from that candidate. Verify paths from the current invocation and runtime before operating on another node. Source promotion and restarting the serving installation are separate operator actions; an ordinary implementation or Quality run should not deploy its candidate or restart the daemon that is supervising it.\n\n## Cohesive code files\n\nApplicability: Apply whenever an agent adds or changes code files in any language.\n\nKeep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.\n",
+            "provenance": "refine-default-v1",
+            "role": "plan",
+            "scope": {
+              "node_id": null
+            }
+          },
+          "default-quality": {
+            "enabled": true,
+            "id": "default-quality",
+            "name": "Quality",
+            "parameters": [],
+            "prompt": "## Quality review\n\nIndependently review the finalized plans and candidate implementation. Select or add meaningful tests, correct defects when needed, and run the relevant checks. Report actual commands, results and findings. Refine verifies the exact candidate and supervises evaluation commands.\n\n## Required behavior\n\nPreserve the relevant Goal and docs/intent product behavior. Keep Model, Application, Infrastructure, and Surfaces coherent; shared capabilities authoritative; local state and evidence inspectable and recoverable; and affected surfaces semantically consistent.\n\n## Review and verification\n\nJudge the candidate against the Goal and only the relevant docs/intent pages. Use the smallest deterministic checks that cover the affected behavior, adding or adjusting behavior-focused tests only when evidence is missing. Scale integration and failure-path checks to actual risk. Report exact commands, results, and remaining uncertainty. Do not require unrelated tests, documentation, refactors, or cleanup; documentation is relevant only when product intent or an architectural contract changes.\n\n## Acceptance checks\n\n- The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks.\n\n## Intent and architecture\n\nApplicability: Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract.\n\nUse the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Model, Application, Infrastructure, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.\n\nFor this project on the current Default node, /home/buddy/projects/refine-next is the target development checkout and /home/buddy/projects/refine is the serving Refine installation. Use the invocation's pinned workspace (the managed Goal Round worktree when supplied) for code changes and verification, and read the relevant intent from that candidate. Verify paths from the current invocation and runtime before operating on another node. Source promotion and restarting the serving installation are separate operator actions; an ordinary implementation or Quality run should not deploy its candidate or restart the daemon that is supervising it.\n\n## Cohesive code files\n\nApplicability: Apply whenever an agent adds or changes code files in any language.\n\nKeep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.\n",
+            "provenance": "refine-default-v1",
+            "role": "quality",
+            "scope": {
+              "node_id": null
+            }
+          },
+          "fetch-goals-from-email": {
+            "enabled": true,
+            "id": "fetch-goals-from-email",
+            "name": "Fetch Goals from Email",
+            "parameters": [],
+            "prompt": "Fetch new email requests into the selected project's Backlog. This Skill authorizes creation of ordinary Goals from the configured mailbox. Use system.refine_executable to run `system fetch-email-goals --runtime-root <system.runtime_root> --target-root <system.project_root>`, passing each value as a separate, safely quoted argument. This one-shot capability owns secret access, the target-bound sender allowlist, MIME extraction, remote acknowledgement, deterministic Goal IDs, and durable retry records. Do not read or print the mail token, author duplicate Goals yourself, rewrite email source, or modify the request ledger. Inspect the JSON result and report the imported or recovered Goal IDs and any errors. A batch is limited to 25 remote messages; if fetched_count equals batch_limit, fetch another batch, up to ten batches per invocation, then report whether more mail may remain. Stop on a failed command and report the retained retry evidence. Fetching does not approve Goals, change Review decisions, or send email replies. Follow docs/runbooks/development-request-email.md for connection errors.",
+            "provenance": null,
+            "role": "task",
+            "scope": {
+              "node_id": "default"
+            }
+          },
+          "fetch-goals-from-email-on-startup": {
+            "enabled": true,
+            "id": "fetch-goals-from-email-on-startup",
+            "name": "Fetch Goals from Email on startup",
+            "parameters": [
+              {
+                "choices": [],
+                "default": 8082,
+                "description": "",
+                "kind": "number",
+                "name": "daemon_port",
+                "required": true
+              }
+            ],
+            "prompt": "Queue the Custom Skill `fetch-goals-from-email` once for this startup occurrence. Run system.refine_executable with arguments `skills trigger fetch-goals-from-email --request-id startup-email-<invocation_id>`, copying invocation_id exactly from this invocation's completion contract. Set REFINE_DAEMON_PORT to the daemon_port parameter for that command. Use safely quoted arguments. Report the queued invocation ID, then complete this startup Skill immediately. Do not wait for the child Skill: releasing this agent slot lets it run even when concurrency is limited to one. Reuse the same request ID if the command needs a retry; do not create a polling loop or fetch email directly. If the target Skill is missing or disabled, report that error without changing its configuration.",
+            "provenance": null,
+            "role": "task",
+            "scope": {
+              "node_id": "default"
+            }
+          },
+          "release": {
+            "enabled": true,
+            "id": "release",
+            "name": "Release",
+            "parameters": [
+              {
+                "choices": [],
+                "default": null,
+                "description": "",
+                "kind": "text",
+                "name": "request",
+                "required": true
+              }
+            ],
+            "prompt": "Carry out the release request in the request parameter for the selected project. Use system.project_root as the release repository, system.runtime_root for durable operation state, and system.refine_executable for Refine commands. Read docs/runbooks/semantic-release.md in the project before acting. Use the existing system release-plan, release-prepare, and release-publish capabilities; do not reimplement version selection, candidate integration, tagging, or publication. Always pass the explicit --repo-root and --runtime-root values. Preview the requested semantic increment and report the proposed version and relevant changes. Preparation creates a normal reviewable Goal; retain its operation ID and inspect real Goal and operation evidence. Use the daemon API for asynchronous preparation when useful. Publishing requires the user's explicit publication authorization and an approved preparation; pass --confirm only when that authorization is present. Preserve review and exact-candidate checks. Reuse existing operation IDs for retries and report actual remote tag, release URL, and deployment evidence. Never infer publication success merely from a successful command or local tag.",
+            "provenance": null,
+            "role": "task",
+            "scope": {
+              "node_id": null
+            }
+          }
+        }
+      },
+      "failure_at": "",
+      "failure_category": "",
+      "failure_message": "",
+      "governance_candidate_commit": "",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "guidance_decision": null,
+      "implementation_plan": {
+        "binding": {
+          "base_commit": "b47569adb8d4c5d1d7335ba91729a3e486a38fe0",
+          "context_digest": "3d5df82adea0aea8791fd13a137655692ba59c4e9b2607501aa3d051ac5759cf",
+          "context_version": 1,
+          "goal_id": "DR54BF57DCE017ED8EC68A5EEB",
+          "implementation_branch": "refine/DR54BF57DCE017ED8EC68A5EEB/round-3",
+          "round_idx": 2,
+          "target_branch": "main"
+        },
+        "phase": "plan",
+        "phase_started_at": "2026-09-10T15:08:46Z",
+        "schema_version": 2,
+        "started_at": "2026-09-10T15:08:46Z",
+        "state": "in_progress",
+        "updated_at": "2026-09-10T15:08:46Z"
+      },
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Repair replay interruption recovery for candidate b1426cf5fb8dcc6a66a62d56fe8620c8ba513fb5 in a new managed recovery Round. Preserve prior branches, worktrees, journals, plans and evidence. Before ordinary worktree discovery or candidate ancestry rejection, inspect the trusted managed workspace and reconcile its replay journal under current attempt authority and repository coordination. Handle detached replay completion, replacement attachment before Goal persistence, and persisted replacement before acknowledgement. Preserve dirty work and unexpected ref changes; never roll back a durably persisted replacement. Cover Plan/Implement and Quality/Governance resumption. Add regressions through WorkflowEngine preparation and execution, rather than directly constructing WorkflowContext. Verify replacement checks still run against the exact candidate. Proposed checks: cargo test --lib application::workflow::tests::worktree_resume -- --test-threads=1; cargo test --lib application::workflow::tests::candidate_refresh -- --test-threads=1; cargo check --all-targets. Update only affected intent documentation.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Refine",
+      "rule_state": "unclassified",
+      "updated": "2026-09-10T15:08:46Z",
+      "workflow_attempt_authority": {
+        "claimed_at": "2026-09-10T15:08:46Z",
+        "round_idx": 2,
+        "workflow_revision": 54
+      },
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
     }
   ],
-  "status": "governance",
+  "status": "plan",
   "target_branch": "main",
-  "updated": "2026-09-10T15:04:49Z",
+  "updated": "2026-09-10T15:08:46Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:06:36.990956802+00:00",
@@ -1964,7 +3246,25 @@
       "node_id": "default",
       "round_idx": 1,
       "to": "governance"
+    },
+    {
+      "at": "2026-09-10T15:08:46.061564658+00:00",
+      "forced": false,
+      "from": "governance",
+      "generation": 6,
+      "node_id": "default",
+      "round_idx": 2,
+      "to": "todo"
+    },
+    {
+      "at": "2026-09-10T15:08:46.444506262+00:00",
+      "forced": false,
+      "from": "todo",
+      "generation": 7,
+      "node_id": "default",
+      "round_idx": 2,
+      "to": "plan"
     }
   ],
-  "workflow_revision": 51
+  "workflow_revision": 62
 }
