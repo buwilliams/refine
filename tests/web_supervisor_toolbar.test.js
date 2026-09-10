@@ -217,6 +217,7 @@ function browserRuntime(storage = new Map(), persistentStorage = new Map()) {
   });
   const staticRoot = path.join(__dirname, "../src/surfaces/web/static/js");
   vm.runInContext(fs.readFileSync(path.join(staticRoot, "common.js"), "utf8"), context);
+  vm.runInContext(fs.readFileSync(path.join(staticRoot, "features/terminal-clipboard.js"), "utf8"), context);
   vm.runInContext(fs.readFileSync(path.join(staticRoot, "features/toolbar.js"), "utf8"), context);
   vm.runInContext(fs.readFileSync(path.join(staticRoot, "features/toolbar-todo.js"), "utf8"), context);
   vm.runInContext(`

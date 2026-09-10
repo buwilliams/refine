@@ -21,9 +21,23 @@ Current implementation details that matter to intent:
 
 - terminal is a toolbar tab;
 - backend routes create terminal sessions, send input, resize, stop, and stream events;
-- browser copy and paste shortcuts are scoped to the focused shared terminal
-  surface: copying an active selection does not interrupt the PTY, while
-  control-C without a selection retains normal terminal semantics;
+- all Agent, Custom Skill, and shell terminal tabs expose a selection hint: Shift-drag on
+  Windows/Linux and Option-drag on macOS select text even when the application
+  captures mouse input; ordinary mouse gestures still reach the application;
+- a keyboard-accessible Copy selection control follows the current selection;
+  it and native Copy work with retained output after exit or disconnection,
+  preserving the originating tab, selection, and renderer;
+- returning to a tab with selected output or an unfinished copy preserves that
+  context without forced scrolling, including selection made while reattaching;
+  restarting remains an explicit header action while copying;
+- browser copy and paste shortcuts are scoped to the focused shared terminal:
+  Ctrl+C, Ctrl+Shift+C, and Cmd+C copy selected text without interrupting the PTY,
+  while Ctrl+C without a selection retains normal terminal semantics; controls
+  outside the terminal, including the manual copy field, keep browser shortcuts;
+- copying reports success only after a supported copy method succeeds; if
+  automatic copying is blocked, the originating tab offers the captured text in
+  a standard selectable field with instructions for manual copying, without
+  stealing focus from another tab;
 - control-Enter inserts an editable line break in native agent TUI prompts;
 - control-Z is consumed by Agent terminal profiles so it cannot suspend the
   attached agent TUI, while ordinary shell terminals retain job control;
@@ -34,6 +48,9 @@ Current implementation details that matter to intent:
 - output is retained up to a bounded size in the UI;
 - terminal sessions run through the local daemon rather than raw browser execution;
 - worktree-aware terminal behavior supports merge and standalone workflows.
+
+Clipboard attempts and recovery text are transient browser state owned by their
+originating tab. They do not change process or workflow authority.
 
 Terminal should remain an operational tool. Product workflow state should still be changed through shared Application behavior, not by undocumented shell side effects.
 

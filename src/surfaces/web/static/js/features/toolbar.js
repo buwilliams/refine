@@ -477,7 +477,10 @@ async function activateToolbarTab(tabId, { toggleIfActive = false } = {}) {
   const wasActive = previousTabId === tabId;
   const switchedTabs = !!previousTabId && !wasActive;
   const terminal = toolbarTabUsesTerminal(tab) ? terminalStateFor(tabId) : null;
-  let shouldStart = !!terminal && !terminal.loading && !terminal.stopping &&
+  // Returning to selected output or an unfinished copy must not restart an
+  // exited process and discard the text. The explicit Restart remains usable.
+  const preserveCopy = terminalPreservesCopy(terminal);
+  let shouldStart = !!terminal && !preserveCopy && !terminal.loading && !terminal.stopping &&
     (!terminal.sessionId || (terminal.statusChecked && terminal.exited));
 
   if (toggleIfActive && wasActive && chatState.open && !shouldStart && terminal?.statusChecked !== false) {
@@ -489,12 +492,15 @@ async function activateToolbarTab(tabId, { toggleIfActive = false } = {}) {
   chatState.open = true;
   saveChatStateToStorage();
   drawToolbar();
-  if (switchedTabs && toolbarTabUsesAgentTerminal(tab)) {
+  if (switchedTabs && !preserveCopy && toolbarTabUsesAgentTerminal(tab)) {
     terminal?.term?.scrollToBottom?.();
   }
   if (terminal?.sessionId && !terminal.statusChecked) {
     await reattachTerminalSession(tab, terminal);
-    shouldStart = !terminal.connected && !terminal.loading && terminal.statusChecked && terminal.exited;
+    if (chatState.tabs[tabId] !== tab || terminalStates.get(tabId) !== terminal
+        || chatState.activeTabId !== tabId || !chatState.open) return;
+    shouldStart = !terminalPreservesCopy(terminal) && !terminal.connected
+      && !terminal.loading && !terminal.stopping && terminal.statusChecked && terminal.exited;
   }
   if (shouldStart) await startTerminalSession(tab);
 }
@@ -1204,8 +1210,10 @@ function renderTerminalPanel(tab) {
         <span class="muted small" data-testid="terminal-profile">${htmlEscape(tab.label)}${provider}</span>
         ${worktree}
         <span class="spacer"></span>
+        ${renderTerminalCopyControl(terminal)}
         ${action}
       </div>
+      ${renderTerminalCopyFeedback(terminal)}
       <div class="terminal-output"
            data-testid="terminal-output"
            tabindex="0"
@@ -1222,6 +1230,7 @@ function bindTerminalPanel(root, boundTab) {
   bindOnce(output, "focus", () => output.classList.add("focused"));
   bindOnce(output, "blur", () => output.classList.remove("focused"));
   ensureTerminalRenderer(output, liveTab());
+  bindTerminalClipboardControls(root);
   observeTerminalOutputSize(output, liveTab());
   const actionButton = root.querySelector("[data-terminal-action]");
   bindOnce(
@@ -1244,6 +1253,7 @@ async function startTerminalSession(tab = currentToolbarTab()) {
   const terminal = terminalStateFor(tabId);
   if (!terminal || terminal.loading || terminal.stopping || terminal.connected) return;
   terminal.loading = true;
+  terminal.clipboard = null;
   terminal.error = "";
   drawToolbar();
   try {
@@ -1267,7 +1277,9 @@ async function startTerminalSession(tab = currentToolbarTab()) {
     terminal.eventSource?.close();
     terminal.term?.dispose();
     terminal.term = null;
+    terminal.clipboard = null;
     terminal.display = "";
+    terminal.historyReplayPending = false;
     terminal.sessionId = result.id || "";
     terminal.processId = result.process_id || "";
     terminal.cwd = result.cwd || "";
@@ -1554,28 +1566,12 @@ function handleTerminalEvent(event, terminal = terminalStateFor()) {
 }
 
 function handleTerminalKeydown(e, terminal = terminalStateFor()) {
-  if (!terminal?.sessionId || terminal.exited) return;
   if (handleTerminalClipboardKeydown(e, terminal)) return;
+  if (!terminal?.sessionId || terminal.exited) return;
   const data = terminalKeyData(e);
   if (data == null) return;
   e.preventDefault();
   queueTerminalInput(data, terminal);
-}
-
-function handleTerminalClipboardKeydown(e, terminal = terminalStateFor()) {
-  if (!terminal?.sessionId || terminal.exited || e.altKey) return false;
-  if (e.type && e.type !== "keydown") return false;
-  if (!e.ctrlKey && !e.metaKey) return false;
-  const key = String(e.key || "").toLowerCase();
-  if (key === "c") {
-    const selection = terminalSelection(terminal);
-    if (!selection) return false;
-    if (writeTerminalClipboard(selection, terminal)) e.preventDefault();
-    return true;
-  }
-  if (key !== "v") return false;
-  if (readTerminalClipboard(terminal)) e.preventDefault();
-  return true;
 }
 
 function handleTerminalNewlineKeydown(e, terminal = terminalStateFor()) {
@@ -1613,143 +1609,6 @@ function handleAgentTerminalSuspendKeydown(
   // ordinary Terminal tabs keep standard shell job-control behavior.
   e.preventDefault();
   return true;
-}
-
-function terminalSelection(terminal) {
-  if (!terminal?.term?.hasSelection?.()) return "";
-  return terminal.term.getSelection?.() || "";
-}
-
-function handleTerminalCopy(e, terminal = terminalStateFor()) {
-  if (!terminal?.sessionId || terminal.exited) return false;
-  const selection = terminalSelection(terminal);
-  if (!selection) return false;
-  const setData = e.clipboardData?.setData;
-  if (typeof setData !== "function") {
-    showTerminalClipboardError(
-      "copy",
-      new Error("Browser copy data is unavailable."),
-      terminal,
-    );
-    return false;
-  }
-  try {
-    setData.call(e.clipboardData, "text/plain", selection);
-  } catch (error) {
-    showTerminalClipboardError("copy", error, terminal);
-    return false;
-  }
-  e.preventDefault();
-  return true;
-}
-
-function handleTerminalPaste(e, terminal = terminalStateFor()) {
-  if (!terminal?.sessionId || terminal.exited) return false;
-  let text;
-  try {
-    text = e.clipboardData?.getData("text/plain");
-  } catch (error) {
-    showTerminalClipboardError("paste", error, terminal);
-    return false;
-  }
-  if (typeof text !== "string") {
-    showTerminalClipboardError(
-      "paste",
-      new Error("Browser paste data is unavailable."),
-      terminal,
-    );
-    return false;
-  }
-  if (!text) return false;
-  if (!pasteTerminalText(text, terminal)) return false;
-  e.preventDefault();
-  // This listener runs during capture above xterm's textarea. Once the shared
-  // terminal path accepts the paste, keep xterm from processing the same event
-  // a second time after Terminal.paste has emitted its terminal-native input.
-  e.stopPropagation();
-  return true;
-}
-
-function pasteTerminalText(
-  text,
-  terminal = terminalStateFor(),
-  sessionId = terminal?.sessionId,
-) {
-  if (
-    typeof text !== "string"
-    || !text
-    || !terminal
-    || terminal.exited
-    || !sessionId
-    || terminal.sessionId !== sessionId
-    || typeof terminal.term?.paste !== "function"
-  ) return false;
-  // Let xterm normalize line endings and honor the PTY application's
-  // bracketed-paste mode. Agent TUIs use that framing to preserve multiline
-  // content as one editable prompt rather than submitting embedded lines.
-  terminal.term.paste(text);
-  return true;
-}
-
-function writeTerminalClipboard(text, terminal) {
-  const writeText = typeof navigator !== "undefined"
-    ? navigator.clipboard?.writeText
-    : null;
-  if (typeof writeText !== "function") {
-    showTerminalClipboardError(
-      "copy",
-      new Error("Browser clipboard write access is unavailable."),
-      terminal,
-    );
-    return false;
-  }
-  try {
-    Promise.resolve(writeText.call(navigator.clipboard, text))
-      .catch((error) => showTerminalClipboardError("copy", error, terminal));
-  } catch (error) {
-    showTerminalClipboardError("copy", error, terminal);
-    return false;
-  }
-  return true;
-}
-
-function readTerminalClipboard(terminal) {
-  const readText = typeof navigator !== "undefined"
-    ? navigator.clipboard?.readText
-    : null;
-  if (typeof readText !== "function") {
-    showTerminalClipboardError(
-      "paste",
-      new Error("Browser clipboard read access is unavailable."),
-      terminal,
-    );
-    return false;
-  }
-  const sessionId = terminal.sessionId;
-  try {
-    Promise.resolve(readText.call(navigator.clipboard))
-      .then((text) => {
-        if (
-          typeof text === "string"
-          && text
-          && terminal.sessionId === sessionId
-          && !terminal.exited
-        ) {
-          pasteTerminalText(text, terminal, sessionId);
-        }
-      })
-      .catch((error) => showTerminalClipboardError("paste", error, terminal));
-  } catch (error) {
-    showTerminalClipboardError("paste", error, terminal);
-    return false;
-  }
-  return true;
-}
-
-function showTerminalClipboardError(action, error, terminal) {
-  const detail = error?.message || String(error || "Clipboard access failed.");
-  terminal.error = `Unable to ${action} terminal text: ${detail}`;
-  if (chatState.activeTabId === terminal.tabId) drawToolbar();
 }
 
 function terminalKeyData(e) {
@@ -1851,10 +1710,20 @@ function terminalPrependOutput(text, terminal = terminalStateFor()) {
   if (terminal.display.length > TERMINAL_OUTPUT_MAX_CHARS) {
     terminal.display = terminal.display.slice(-TERMINAL_OUTPUT_MAX_CHARS);
   }
-  if (typeof terminal.term?.reset !== "function") return;
+  terminal.historyReplayPending = true;
+  flushTerminalHistoryReplay(terminal);
+}
+
+function flushTerminalHistoryReplay(terminal) {
+  if (!terminal?.historyReplayPending || terminalPreservesCopy(terminal)
+      || typeof terminal.term?.reset !== "function") return;
+  terminal.historyReplayPending = false;
+  const term = terminal.term;
   const replay = terminal.display;
-  terminal.term.reset();
-  terminal.term.write(replay, () => terminal.term?.scrollToBottom?.());
+  term.reset();
+  term.write(replay, () => {
+    if (terminal.term === term && !terminalPreservesCopy(terminal)) term.scrollToBottom?.();
+  });
 }
 
 function terminalColorTheme() {
@@ -1931,6 +1800,7 @@ function ensureTerminalRenderer(output, tab = currentToolbarTab()) {
   if (terminal.term) {
     terminal.term.dispose();
     terminal.term = null;
+    terminal.clipboard = null;
   }
   const size = terminalSize(output, terminal);
   // Opening xterm against a hidden host bakes transient minimum dimensions
@@ -1940,6 +1810,7 @@ function ensureTerminalRenderer(output, tab = currentToolbarTab()) {
     cols: size.cols,
     rows: size.rows,
     cursorBlink: true,
+    macOptionClickForcesSelection: true,
     convertEol: true,
     fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace',
     fontSize: TERMINAL_FONT_SIZE,
@@ -1953,23 +1824,16 @@ function ensureTerminalRenderer(output, tab = currentToolbarTab()) {
   output.replaceChildren();
   term.open(output);
   if (terminal.display) term.write(terminal.display);
+  // A new renderer already receives the full retained history above.
+  terminal.historyReplayPending = false;
   term.onData((data) => queueTerminalInput(data, terminal));
   term.attachCustomKeyEventHandler?.(
-    (event) => !handleTerminalClipboardKeydown(event, terminal)
+    (event) => terminal.term === term && !handleTerminalClipboardKeydown(event, terminal)
       && !handleTerminalNewlineKeydown(event, terminal)
       && !handleAgentTerminalSuspendKeydown(event, tab, terminal),
   );
-  term.element?.addEventListener?.(
-    "copy",
-    (event) => handleTerminalCopy(event, terminal),
-    true,
-  );
-  term.element?.addEventListener?.(
-    "paste",
-    (event) => handleTerminalPaste(event, terminal),
-    true,
-  );
   terminal.term = term;
+  bindTerminalClipboardEvents(terminal);
   resizeTerminalRenderer(output, terminal);
 }
 
@@ -2105,8 +1969,14 @@ function scheduleActiveTerminalFit() {
 function focusTerminalSoon(tab = currentToolbarTab()) {
   const tabId = Object.keys(chatState.tabs).find((id) => chatState.tabs[id] === tab) || chatState.activeTabId;
   const terminal = terminalStateFor(tabId);
+  const focus = document.activeElement;
   const schedule = globalThis.requestAnimationFrame || ((callback) => callback());
   schedule(() => {
+    if (!chatState.open || chatState.activeTabId !== tabId) return;
+    if (document.activeElement !== focus) return;
+    if (focus && focus !== document.body && !document.querySelector("#toolbar-dock")?.contains(focus)) return;
+    if (focus?.matches?.("input, select, textarea") && focus !== terminal?.term?.textarea) return;
+    if (document.activeElement?.closest?.(".terminal-copy-feedback, [data-terminal-copy]")) return;
     const output = document.querySelector(".terminal-output");
     if (terminal?.term) {
       terminal.term.focus();
