@@ -629,6 +629,22 @@ button.toolbar-tab:hover:not(:disabled),
   color: var(--muted);
   white-space: nowrap;
 }
+.terminal-copy-feedback {
+  padding-inline: 12px;
+  max-height: 45%;
+  overflow: auto;
+  flex-shrink: 0;
+}
+.terminal-copy-feedback:has([data-terminal-copy-status]:empty):has([hidden]) {
+  display: none;
+}
+.terminal-copy-recovery textarea {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin-block: 4px;
+  user-select: text;
+}
 .terminal-output {
   flex: 1;
   min-height: 0;

@@ -61,7 +61,10 @@ Each selection creates or opens only the requested surface. Repeated Agent selec
 - an interrupted browser event stream is not evidence that the managed process exited;
 - terminal state remains tab-specific, including process identifier, provider, current directory, output, and worktree identity;
 - reselecting an Agent, Planing Agent, Goal, or Standalone terminal preserves
-  its session and scrollback while presenting its latest output at the bottom;
+  its session and scrollback while presenting its latest output at the bottom,
+  except while a selection, pending copy, or manual copy recovery is retained;
+  that context defers automatic restart and forced scrolling, including after
+  asynchronous reattachment, while explicit Restart remains available;
 - every Agent terminal receives the resolved active Refine executable and checkout so it can reliably use the correct CLI;
 - normal Agent and Planing Agent toolbar sessions begin with the existing Refine
   Node, prioritizing investigation, current-Node management, and direct answers;
