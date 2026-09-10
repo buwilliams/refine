@@ -1506,11 +1506,108 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "succeeded",
+  "results": {
+    "default-quality": {
+      "invocation_id": "07504c434eb70160153bd6b21b21bbc081ceb258cf12160dca8b327cfde0ba4b",
+      "binding_id": "default-quality",
+      "role": "quality",
+      "outcome": "success",
+      "summary": "Observational review found no actionable defects. Read-only checks passed; focused Rust commands are proposed for supervised execution.",
+      "evidence": [
+        "Reviewed candidate 59af87d23c3c14881f3969ef316146e7aa2e3273 against the finalized plans and relevant Skills, integration, Governance, Review, CLI, API and browser intent.",
+        "Confirmed Q1 now retains the originating attempt's proven local integration before returning for incomplete publication. Original identity and diagnostics remain preserved; publication attribution and replay deduplication distinguish attempts and completion phases.",
+        "Reviewed regression coverage for publication rejection and retry, stale authority, malformed or unproved intents, exact ancestry, Skill receipts, strict approval and shared surface eligibility.",
+        "Independently ran JavaScript tests, changed-Rust formatting and patch whitespace checks. All passed.",
+        "Read retained Rust execution logs under /tmp/refine-quality-f65f7678. These record passing prior runs; they are not new executions by this invocation.",
+        "Final HEAD remains the pinned candidate with a clean checkout. All 59 files match the retained candidate hash manifest. No files or Git state were changed.",
+        "Rust behavioral checks below await Refine supervision. Full-suite and live-environment recovery were not exercised."
+      ],
+      "artifacts": {
+        "tests": [
+          {
+            "command": "cargo test --lib crash_after_ref_motion_with_pending_publication_preserves_attempt_effects -- --test-threads=1",
+            "evidence": "Proposed for supervision; retained prior log records 1 passed.",
+            "status": "pending",
+            "test": "Originating local effect and replacement publication remain distinct"
+          },
+          {
+            "command": "cargo test --lib governance -- --test-threads=1",
+            "evidence": "Proposed for supervision; retained prior log records 86 passed.",
+            "status": "pending",
+            "test": "Governance recovery, settlement, identity and authority fencing"
+          },
+          {
+            "command": "cargo test --lib application::events:: -- --test-threads=1",
+            "evidence": "Proposed for supervision; retained prior log records 24 passed.",
+            "status": "pending",
+            "test": "Pinned Skill evidence and event execution"
+          },
+          {
+            "command": "cargo test --lib application::workflow::engine::behaviors::tests::quality_resume -- --test-threads=1",
+            "evidence": "Proposed for supervision; retained prior log records 6 passed.",
+            "status": "pending",
+            "test": "Quality proof and configuration-preserving replay"
+          },
+          {
+            "command": "cargo test --lib candidate_refresh -- --test-threads=1",
+            "evidence": "Proposed for supervision; retained prior log records 16 passed.",
+            "status": "pending",
+            "test": "Candidate refresh and bounded recovery"
+          },
+          {
+            "command": "cargo test --lib application::work_items::tests::workflow -- --test-threads=1",
+            "evidence": "Proposed for supervision; retained prior log records 12 passed.",
+            "status": "pending",
+            "test": "Shared workflow transitions"
+          },
+          {
+            "command": "cargo test --lib surfaces::cli::tests::goals::lifecycle -- --test-threads=1",
+            "evidence": "Proposed for supervision; retained prior log records 5 passed.",
+            "status": "pending",
+            "test": "CLI recovery and strict acceptance"
+          },
+          {
+            "command": "cargo test --lib web_server_governance_retry_from_review -- --test-threads=1",
+            "evidence": "Proposed for supervision; retained prior log records 1 passed.",
+            "status": "pending",
+            "test": "API uses shared Review recovery eligibility"
+          },
+          {
+            "command": "node --test tests/web_goal_detail_diagnostics.test.js tests/web_javascript_syntax.test.js",
+            "evidence": "Executed in this invocation: exit 0; 6 passed, 0 failed, 0 skipped.",
+            "status": "passed",
+            "test": "Browser recovery controls, diagnostics and JavaScript syntax"
+          },
+          {
+            "command": "set -o pipefail\ngit diff --name-only b47569adb8d4c5d1d7335ba91729a3e486a38fe0 HEAD -- '*.rs' | xargs -r rustfmt --check --edition 2024 --config skip_children=true",
+            "evidence": "Executed in this invocation: exit 0; no formatting diagnostics.",
+            "status": "passed",
+            "test": "Changed Rust formatting"
+          },
+          {
+            "command": "git diff --check b47569adb8d4c5d1d7335ba91729a3e486a38fe0 HEAD",
+            "evidence": "Executed in this invocation: exit 0; no whitespace diagnostics. Working-tree git diff --check also passed.",
+            "status": "passed",
+            "test": "Candidate patch whitespace"
+          }
+        ]
+      }
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "default-quality",
+      "diagnostic": null,
+      "operation_id": "1a08be23d13113c7644",
+      "process_id": "proc-1789053255658-1129590-671",
+      "raw_output": "{\n  \"binding_id\": \"default-quality\",\n  \"invocation_id\": \"07504c434eb70160153bd6b21b21bbc081ceb258cf12160dca8b327cfde0ba4b\",\n  \"outcome\": \"success\",\n  \"role\": \"quality\",\n  \"summary\": \"Observational review found no actionable defects. Read-only checks passed; focused Rust commands are proposed for supervised execution.\",\n  \"evidence\": [\n    \"Reviewed candidate 59af87d23c3c14881f3969ef316146e7aa2e3273 against the finalized plans and relevant Skills, integration, Governance, Review, CLI, API and browser intent.\",\n    \"Confirmed Q1 now retains the originating attempt's proven local integration before returning for incomplete publication. Original identity and diagnostics remain preserved; publication attribution and replay deduplication distinguish attempts and completion phases.\",\n    \"Reviewed regression coverage for publication rejection and retry, stale authority, malformed or unproved intents, exact ancestry, Skill receipts, strict approval and shared surface eligibility.\",\n    \"Independently ran JavaScript tests, changed-Rust formatting and patch whitespace checks. All passed.\",\n    \"Read retained Rust execution logs under /tmp/refine-quality-f65f7678. These record passing prior runs; they are not new executions by this invocation.\",\n    \"Final HEAD remains the pinned candidate with a clean checkout. All 59 files match the retained candidate hash manifest. No files or Git state were changed.\",\n    \"Rust behavioral checks below await Refine supervision. Full-suite and live-environment recovery were not exercised.\"\n  ],\n  \"artifacts\": {\n    \"tests\": [\n      {\n        \"test\": \"Originating local effect and replacement publication remain distinct\",\n        \"command\": \"cargo test --lib crash_after_ref_motion_with_pending_publication_preserves_attempt_effects -- --test-threads=1\",\n        \"status\": \"pending\",\n        \"evidence\": \"Proposed for supervision; retained prior log records 1 passed.\"\n      },\n      {\n        \"test\": \"Governance recovery, settlement, identity and authority fencing\",\n        \"command\": \"cargo test --lib governance -- --test-threads=1\",\n        \"status\": \"pending\",\n        \"evidence\": \"Proposed for supervision; retained prior log records 86 passed.\"\n      },\n      {\n        \"test\": \"Pinned Skill evidence and event execution\",\n        \"command\": \"cargo test --lib application::events:: -- --test-threads=1\",\n        \"status\": \"pending\",\n        \"evidence\": \"Proposed for supervision; retained prior log records 24 passed.\"\n      },\n      {\n        \"test\": \"Quality proof and configuration-preserving replay\",\n        \"command\": \"cargo test --lib application::workflow::engine::behaviors::tests::quality_resume -- --test-threads=1\",\n        \"status\": \"pending\",\n        \"evidence\": \"Proposed for supervision; retained prior log records 6 passed.\"\n      },\n      {\n        \"test\": \"Candidate refresh and bounded recovery\",\n        \"command\": \"cargo test --lib candidate_refresh -- --test-threads=1\",\n        \"status\": \"pending\",\n        \"evidence\": \"Proposed for supervision; retained prior log records 16 passed.\"\n      },\n      {\n        \"test\": \"Shared workflow transitions\",\n        \"command\": \"cargo test --lib application::work_items::tests::workflow -- --test-threads=1\",\n        \"status\": \"pending\",\n        \"evidence\": \"Proposed for supervision; retained prior log records 12 passed.\"\n      },\n      {\n        \"test\": \"CLI recovery and strict acceptance\",\n        \"command\": \"cargo test --lib surfaces::cli::tests::goals::lifecycle -- --test-threads=1\",\n        \"status\": \"pending\",\n        \"evidence\": \"Proposed for supervision; retained prior log records 5 passed.\"\n      },\n      {\n        \"test\": \"API uses shared Review recovery eligibility\",\n        \"command\": \"cargo test --lib web_server_governance_retry_from_review -- --test-threads=1\",\n        \"status\": \"pending\",\n        \"evidence\": \"Proposed for supervision; retained prior log records 1 passed.\"\n      },\n      {\n        \"test\": \"Browser recovery controls, diagnostics and JavaScript syntax\",\n        \"command\": \"node --test tests/web_goal_detail_diagnostics.test.js tests/web_javascript_syntax.test.js\",\n        \"status\": \"passed\",\n        \"evidence\": \"Executed in this invocation: exit 0; 6 passed, 0 failed, 0 skipped.\"\n      },\n      {\n        \"test\": \"Changed Rust formatting\",\n        \"command\": \"set -o pipefail\\ngit diff --name-only b47569adb8d4c5d1d7335ba91729a3e486a38fe0 HEAD -- '*.rs' | xargs -r rustfmt --check --edition 2024 --config skip_children=true\",\n        \"status\": \"passed\",\n        \"evidence\": \"Executed in this invocation: exit 0; no formatting diagnostics.\"\n      },\n      {\n        \"test\": \"Candidate patch whitespace\",\n        \"command\": \"git diff --check b47569adb8d4c5d1d7335ba91729a3e486a38fe0 HEAD\",\n        \"status\": \"passed\",\n        \"evidence\": \"Executed in this invocation: exit 0; no whitespace diagnostics. Working-tree git diff --check also passed.\"\n      }\n    ]\n  }\n}\n",
+      "workflow_revision": 48
+    }
+  ],
   "created_at": "2026-09-10T15:14:15.329769960+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-10T15:18:20.273264971+00:00",
   "error": null,
   "action_applied": false
 }
