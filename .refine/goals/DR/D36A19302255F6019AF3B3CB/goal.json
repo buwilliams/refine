@@ -106,12 +106,51 @@
           "round_idx": 0,
           "target_branch": "main"
         },
-        "phase": "plan",
-        "phase_started_at": "2026-09-10T08:26:11Z",
+        "phase": "criticize",
+        "phase_started_at": "2026-09-10T08:28:14Z",
+        "proposal": {
+          "completed_at": "2026-09-10T08:28:14Z",
+          "git_after": {
+            "branch": "refine/DRD36A19302255F6019AF3B3CB/round-1",
+            "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DRD36A19302255F6019AF3B3CB/round-1",
+            "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Add an accessible Edit name control beside the Goal title and route it and the existing Rename menu action through one focused browser module for Goal name editing.",
+                "id": "P1"
+              },
+              {
+                "description": "Prefill the editor with the current name and provide Save, Enter, Cancel, and Escape behavior that keeps the Goal modal open, trims surrounding whitespace, reports blank names, and avoids saving an unchanged name.",
+                "id": "P2"
+              },
+              {
+                "description": "Save only the name through the existing Goal PATCH endpoint for the captured Goal and node context, preserving the shared metadata restrictions during Plan, Implement, Quality, and Governance and preventing navigation from redirecting a pending edit.",
+                "id": "P3"
+              },
+              {
+                "description": "Preserve the name draft and focus across live detail refreshes, prevent duplicate submissions while saving, retain failed edits with a visible retryable error, and refresh the authoritative title after success while preserving the surrounding modal context.",
+                "id": "P4"
+              },
+              {
+                "description": "Update docs/intent/05-surfaces/03-browser/08-goal.md in its existing format to describe discoverable name editing and its shared metadata restrictions.",
+                "id": "P5"
+              }
+            ],
+            "summary": "Make the individual Goal modal's name easy to edit from its title area so users can correct inaccurate or vague names through the existing metadata update capability."
+          },
+          "started_at": "2026-09-10T08:26:11Z"
+        },
         "schema_version": 2,
         "started_at": "2026-09-10T08:26:11Z",
         "state": "in_progress",
-        "updated_at": "2026-09-10T08:26:11Z"
+        "updated_at": "2026-09-10T08:28:14Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -125,7 +164,7 @@
       "quality_state": "unclassified",
       "reporter": "ethan.jacobson@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T08:26:11Z",
+      "updated": "2026-09-10T08:28:14Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T08:26:10Z",
         "round_idx": 0,
@@ -137,6 +176,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-09-10T08:26:11Z",
-  "workflow_revision": 7
+  "updated": "2026-09-10T08:28:14Z",
+  "workflow_revision": 9
 }
