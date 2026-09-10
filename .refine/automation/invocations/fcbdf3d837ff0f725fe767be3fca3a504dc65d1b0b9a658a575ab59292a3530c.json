@@ -507,11 +507,65 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "succeeded",
+  "results": {
+    "default-quality": {
+      "invocation_id": "fcbdf3d837ff0f725fe767be3fca3a504dc65d1b0b9a658a575ab59292a3530c",
+      "binding_id": "default-quality",
+      "role": "quality",
+      "outcome": "success",
+      "summary": "Observational review found no unresolved defects. All 82 focused tests passed with zero skips; syntax and candidate whitespace checks passed.",
+      "evidence": [
+        "Reviewed the finalized plan and candidate b831779bd97a2d4356020319f6cb600ec2f55928 against the Goal and relevant Terminal, Toolbar, Command Palette, and Surface Principles intent. No unresolved product defects or necessary additional tests identified.",
+        "The cohesive clipboard module is shared across providers and profiles. Paste preserves Terminal.paste → onData → the existing managed-session input queue. No Model, Application, Infrastructure, or durable-state behavior changes were introduced.",
+        "The pinned worktree was clean before and after verification, and HEAD remained b831779bd97a2d4356020319f6cb600ec2f55928. No candidate files, Git state, Goal state, or serving processes were changed.",
+        "Inspected prior evidence at /tmp/refine-clipboard-round1-fqes06ao/quality-64d53005-claude/claude-smoke.json. It records Claude 2.1.267 receiving bracketed Unicode multiline paste and copying selected text through trusted browser events without interruption or page errors. This invocation did not rerun the provider smoke.",
+        "Verification used Linux Chromium. Windows/macOS selection behavior was simulated; native macOS, Safari, and Firefox clipboard integration remain unverified. Context-menu coverage invokes Chromium's native editing commands rather than clicking an OS menu.",
+        "Proposed supervised checks are the commands listed in artifacts.tests. An optional fresh provider smoke, which creates scratch evidence and was not executed during this observational invocation, is: NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules:/home/linuxbrew/.linuxbrew/lib/node_modules/openclaw/node_modules node tests/support/claude-clipboard-smoke.js /tmp/refine-clipboard-round1-fqes06ao/verification-fcbdf3d8-claude"
+      ],
+      "artifacts": {
+        "tests": [
+          {
+            "command": "NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules node --test tests/web_terminal_clipboard.test.js tests/web_terminal_clipboard_browser.test.js tests/web_supervisor_toolbar.test.js tests/web_command_palette.test.js tests/web_javascript_syntax.test.js",
+            "evidence": "Exit 0; 75 passed, 0 failed, 0 skipped, including 15 executed Chromium tests.",
+            "status": "passed",
+            "test": "Clipboard behavior, selection during mouse capture, session fencing, terminal controls, toolbar lifecycle, command-palette precedence, and shipped JavaScript syntax"
+          },
+          {
+            "command": "node --test tests/web_goal_log_tail.test.js",
+            "evidence": "Exit 0; 7 passed, 0 failed, 0 skipped.",
+            "status": "passed",
+            "test": "Affected Goal-log loader and retained log behavior"
+          },
+          {
+            "command": "node --check tests/support/claude-clipboard-smoke.js",
+            "evidence": "Exit 0.",
+            "status": "passed",
+            "test": "Claude smoke-helper syntax"
+          },
+          {
+            "command": "git diff --check f880b7767149e4de43d5bc4d4786247d1e536a8c..b831779bd97a2d4356020319f6cb600ec2f55928",
+            "evidence": "Exit 0; no whitespace errors in the candidate changes.",
+            "status": "passed",
+            "test": "Candidate diff integrity"
+          }
+        ]
+      }
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "default-quality",
+      "diagnostic": null,
+      "operation_id": "1a08bad36a4113c761e",
+      "process_id": "proc-1789049780654-1129590-196",
+      "raw_output": "{\n  \"artifacts\": {\n    \"tests\": [\n      {\n        \"command\": \"NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules node --test tests/web_terminal_clipboard.test.js tests/web_terminal_clipboard_browser.test.js tests/web_supervisor_toolbar.test.js tests/web_command_palette.test.js tests/web_javascript_syntax.test.js\",\n        \"evidence\": \"Exit 0; 75 passed, 0 failed, 0 skipped, including 15 executed Chromium tests.\",\n        \"status\": \"passed\",\n        \"test\": \"Clipboard behavior, selection during mouse capture, session fencing, terminal controls, toolbar lifecycle, command-palette precedence, and shipped JavaScript syntax\"\n      },\n      {\n        \"command\": \"node --test tests/web_goal_log_tail.test.js\",\n        \"evidence\": \"Exit 0; 7 passed, 0 failed, 0 skipped.\",\n        \"status\": \"passed\",\n        \"test\": \"Affected Goal-log loader and retained log behavior\"\n      },\n      {\n        \"command\": \"node --check tests/support/claude-clipboard-smoke.js\",\n        \"evidence\": \"Exit 0.\",\n        \"status\": \"passed\",\n        \"test\": \"Claude smoke-helper syntax\"\n      },\n      {\n        \"command\": \"git diff --check f880b7767149e4de43d5bc4d4786247d1e536a8c..b831779bd97a2d4356020319f6cb600ec2f55928\",\n        \"evidence\": \"Exit 0; no whitespace errors in the candidate changes.\",\n        \"status\": \"passed\",\n        \"test\": \"Candidate diff integrity\"\n      }\n    ]\n  },\n  \"binding_id\": \"default-quality\",\n  \"evidence\": [\n    \"Reviewed the finalized plan and candidate b831779bd97a2d4356020319f6cb600ec2f55928 against the Goal and relevant Terminal, Toolbar, Command Palette, and Surface Principles intent. No unresolved product defects or necessary additional tests identified.\",\n    \"The cohesive clipboard module is shared across providers and profiles. Paste preserves Terminal.paste → onData → the existing managed-session input queue. No Model, Application, Infrastructure, or durable-state behavior changes were introduced.\",\n    \"The pinned worktree was clean before and after verification, and HEAD remained b831779bd97a2d4356020319f6cb600ec2f55928. No candidate files, Git state, Goal state, or serving processes were changed.\",\n    \"Inspected prior evidence at /tmp/refine-clipboard-round1-fqes06ao/quality-64d53005-claude/claude-smoke.json. It records Claude 2.1.267 receiving bracketed Unicode multiline paste and copying selected text through trusted browser events without interruption or page errors. This invocation did not rerun the provider smoke.\",\n    \"Verification used Linux Chromium. Windows/macOS selection behavior was simulated; native macOS, Safari, and Firefox clipboard integration remain unverified. Context-menu coverage invokes Chromium's native editing commands rather than clicking an OS menu.\",\n    \"Proposed supervised checks are the commands listed in artifacts.tests. An optional fresh provider smoke, which creates scratch evidence and was not executed during this observational invocation, is: NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules:/home/linuxbrew/.linuxbrew/lib/node_modules/openclaw/node_modules node tests/support/claude-clipboard-smoke.js /tmp/refine-clipboard-round1-fqes06ao/verification-fcbdf3d8-claude\"\n  ],\n  \"invocation_id\": \"fcbdf3d837ff0f725fe767be3fca3a504dc65d1b0b9a658a575ab59292a3530c\",\n  \"outcome\": \"success\",\n  \"role\": \"quality\",\n  \"summary\": \"Observational review found no unresolved defects. All 82 focused tests passed with zero skips; syntax and candidate whitespace checks passed.\"\n}",
+      "workflow_revision": 2
+    }
+  ],
   "created_at": "2026-09-10T14:16:20.293165699+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-10T14:19:27.988788702+00:00",
   "error": null,
   "action_applied": false
 }
