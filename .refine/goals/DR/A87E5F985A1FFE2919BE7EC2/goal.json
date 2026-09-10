@@ -3,7 +3,7 @@
   "branch_name": "refine/DRA87E5F985A1FFE2919BE7EC2/round-4",
   "candidate_commit": "59af87d23c3c14881f3969ef316146e7aa2e3273",
   "created": "2026-09-10T08:26:05Z",
-  "event_generation": 11,
+  "event_generation": 12,
   "feature_id": null,
   "feature_order": null,
   "id": "DRA87E5F985A1FFE2919BE7EC2",
@@ -4766,6 +4766,78 @@
           }
         }
       },
+      "event_results": {
+        "a89b53d559e1fed6aa0292a860e192bcd93333bf90aa2473904c31ab6b09cefe": {
+          "candidate_commit": null,
+          "results": {
+            "default-plan": {
+              "artifacts": {
+                "plan": {
+                  "checklist": [
+                    {
+                      "description": "Continue in the invocation-pinned worktree on refine/DRA87E5F985A1FFE2919BE7EC2/round-4. Record the starting HEAD and worktree status; preserve the retained candidate, prior branches, artifacts and unrelated files. Limit changes to the policy extraction, Application adapters and corresponding tests.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "Add src/model/automation/gate_evidence.rs under the existing automation module. Move required_bindings and the complete pure receipt-validation policy there, reusing AutomationConfig::bindings and existing Model types. Return Model-native Result values without Application, Infrastructure, filesystem, process or clock dependencies.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "Update Application receipt construction and quality/service/skill_checks.rs to use Model required_bindings. Retain evidence::validate only as a thin adapter mapping Model validation errors to the existing RefineError::Conflict diagnostics used by Governance evidence and settlement callers. Keep invocation configuration matching, orchestration, receipt construction, timestamp acquisition and configuration persistence in Application.",
+                      "id": "P3"
+                    },
+                    {
+                      "description": "Relocate the three selection and receipt-policy tests from application/events/evidence/tests.rs to model/automation/gate_evidence/tests.rs using fixed receipt fixtures without Application helpers or clock access. Keep the agent-context projection test in Application. Preserve exact Goal/Round/node/candidate/role checks, required-result uniqueness and success, explicit no-required-Skills evidence, disabled Skills and node overrides. Cover compatibility for schema version 1, absent legacy state and additional receipt metadata, while retaining rejection of pending receipts, mismatched selections and missing results.",
+                      "id": "P4"
+                    },
+                    {
+                      "description": "Run cargo test --lib model::automation::gate_evidence -- --test-threads=1; cargo test --lib governance -- --test-threads=1; cargo test --lib application::events:: -- --test-threads=1; cargo test --lib application::workflow::engine::behaviors::tests::quality_resume -- --test-threads=1; cargo test --lib candidate_refresh -- --test-threads=1; and cargo test --lib application::work_items::tests::workflow -- --test-threads=1. Confirm the Governance run includes crash_after_ref_motion_with_pending_publication_preserves_attempt_effects and malformed/unproved-intent coverage, preserving Q1 attribution, replay deduplication, lifecycle gates and strict approval.",
+                      "id": "P5"
+                    },
+                    {
+                      "description": "Run cargo test --lib surfaces::cli::tests::goals::lifecycle -- --test-threads=1; cargo test --lib web_server_governance_retry_from_review -- --test-threads=1; and node --test tests/web_goal_detail_diagnostics.test.js tests/web_javascript_syntax.test.js. Run rustfmt --check --edition 2024 --config skip_children=true on every changed or new Rust file. Run git diff --check against retained candidate 59af87d23c3c14881f3969ef316146e7aa2e3273 and inspect new files for whitespace errors.",
+                      "id": "P6"
+                    },
+                    {
+                      "description": "Review the final diff for unchanged receipt serialization, validation decisions and diagnostics, one Model policy implementation, and preserved Application ownership of effects. Existing intent already assigns pure policy to Model, so no documentation change is expected; update only an affected page if its contract changes. Report actual commands, exit codes, selected counts, failures, ignored/skipped tests and unexecuted checks against the resulting candidate. Leave Goal advancement, approval, integration, publication, deployment and serving-daemon restart to their authorized workflow or operator.",
+                      "id": "P7"
+                    }
+                  ],
+                  "criticism_resolutions": [
+                    {
+                      "criticism_id": "ARCH-MODEL-PURE-POLICY",
+                      "resolution": "Move both pure policies and their tests into a cohesive automation child module. This extends existing Model semantics without expanding the 507-line automation.rs with another responsibility or restructuring unrelated code."
+                    },
+                    {
+                      "criticism_id": "C1",
+                      "resolution": "Moving the entire Application evidence module would also move invocation-specific dependencies and clock access. Extract only the requested policy and retain a thin Application error adapter to preserve caller behavior and diagnostics."
+                    },
+                    {
+                      "criticism_id": "C2",
+                      "resolution": "A relocation could accidentally tighten historical receipt acceptance or create Model tests that depend on Application. Preserve current acceptance rules explicitly, use fixed Model-only fixtures, retain the Application projection test, and rerun existing recovery and replay checks."
+                    }
+                  ],
+                  "summary": "Resolve ARCH-MODEL-PURE-POLICY on retained candidate 59af87d23c3c14881f3969ef316146e7aa2e3273 by moving required Skill selection and receipt validation into Model automation while preserving existing recovery behavior."
+                }
+              },
+              "binding_id": "default-plan",
+              "evidence": [
+                "Verified the required CriticismResolution shape in src/model/goal/implementation_plan.rs: each entry requires criticism_id and resolution. The planning validator requires compact, unique checklist id/description pairs.",
+                "Read-only Git observations confirmed clean HEAD 59af87d23c3c14881f3969ef316146e7aa2e3273 on refine/DRA87E5F985A1FFE2919BE7EC2/round-4 in the invocation-pinned worktree.",
+                "Inspected Application evidence policy, its four tests, Model automation semantics, Quality selection, and Governance evidence/settlement callers. Three tests concern pure policy; the fourth concerns Application context projection.",
+                "Inspected the candidate's Design and Skills intent, which assign pure derivations to Model and require pinned, candidate-bound receipts with preserved replay provenance.",
+                "git diff --check b47569adb8d4c5d1d7335ba91729a3e486a38fe0 HEAD completed with exit 0. Final worktree status remained clean. No files or Git state were changed; implementation tests listed in the plan are proposed commands and were not run during this observational repair."
+              ],
+              "invocation_id": "a89b53d559e1fed6aa0292a860e192bcd93333bf90aa2473904c31ab6b09cefe",
+              "outcome": "success",
+              "role": "plan",
+              "summary": "Corrected the plan contract by supplying structured criticism resolutions and finalized the scoped Model policy extraction plan."
+            }
+          },
+          "source": "workflow.plan.enter",
+          "state": "succeeded"
+        }
+      },
       "failure_at": "",
       "failure_category": "",
       "failure_message": "",
@@ -4785,12 +4857,106 @@
           "round_idx": 3,
           "target_branch": "main"
         },
-        "phase": "plan",
-        "phase_started_at": "2026-09-10T15:24:12Z",
+        "final_plan": {
+          "completed_at": "2026-09-10T15:29:27Z",
+          "git_after": {
+            "branch": "refine/DRA87E5F985A1FFE2919BE7EC2/round-4",
+            "head_commit": "59af87d23c3c14881f3969ef316146e7aa2e3273",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DRA87E5F985A1FFE2919BE7EC2/round-4",
+            "head_commit": "59af87d23c3c14881f3969ef316146e7aa2e3273",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Continue in the invocation-pinned worktree on refine/DRA87E5F985A1FFE2919BE7EC2/round-4. Record the starting HEAD and worktree status; preserve the retained candidate, prior branches, artifacts and unrelated files. Limit changes to the policy extraction, Application adapters and corresponding tests.",
+                "id": "workflow.plan.enter:default-plan:P1"
+              },
+              {
+                "description": "Add src/model/automation/gate_evidence.rs under the existing automation module. Move required_bindings and the complete pure receipt-validation policy there, reusing AutomationConfig::bindings and existing Model types. Return Model-native Result values without Application, Infrastructure, filesystem, process or clock dependencies.",
+                "id": "workflow.plan.enter:default-plan:P2"
+              },
+              {
+                "description": "Update Application receipt construction and quality/service/skill_checks.rs to use Model required_bindings. Retain evidence::validate only as a thin adapter mapping Model validation errors to the existing RefineError::Conflict diagnostics used by Governance evidence and settlement callers. Keep invocation configuration matching, orchestration, receipt construction, timestamp acquisition and configuration persistence in Application.",
+                "id": "workflow.plan.enter:default-plan:P3"
+              },
+              {
+                "description": "Relocate the three selection and receipt-policy tests from application/events/evidence/tests.rs to model/automation/gate_evidence/tests.rs using fixed receipt fixtures without Application helpers or clock access. Keep the agent-context projection test in Application. Preserve exact Goal/Round/node/candidate/role checks, required-result uniqueness and success, explicit no-required-Skills evidence, disabled Skills and node overrides. Cover compatibility for schema version 1, absent legacy state and additional receipt metadata, while retaining rejection of pending receipts, mismatched selections and missing results.",
+                "id": "workflow.plan.enter:default-plan:P4"
+              },
+              {
+                "description": "Run cargo test --lib model::automation::gate_evidence -- --test-threads=1; cargo test --lib governance -- --test-threads=1; cargo test --lib application::events:: -- --test-threads=1; cargo test --lib application::workflow::engine::behaviors::tests::quality_resume -- --test-threads=1; cargo test --lib candidate_refresh -- --test-threads=1; and cargo test --lib application::work_items::tests::workflow -- --test-threads=1. Confirm the Governance run includes crash_after_ref_motion_with_pending_publication_preserves_attempt_effects and malformed/unproved-intent coverage, preserving Q1 attribution, replay deduplication, lifecycle gates and strict approval.",
+                "id": "workflow.plan.enter:default-plan:P5"
+              },
+              {
+                "description": "Run cargo test --lib surfaces::cli::tests::goals::lifecycle -- --test-threads=1; cargo test --lib web_server_governance_retry_from_review -- --test-threads=1; and node --test tests/web_goal_detail_diagnostics.test.js tests/web_javascript_syntax.test.js. Run rustfmt --check --edition 2024 --config skip_children=true on every changed or new Rust file. Run git diff --check against retained candidate 59af87d23c3c14881f3969ef316146e7aa2e3273 and inspect new files for whitespace errors.",
+                "id": "workflow.plan.enter:default-plan:P6"
+              },
+              {
+                "description": "Review the final diff for unchanged receipt serialization, validation decisions and diagnostics, one Model policy implementation, and preserved Application ownership of effects. Existing intent already assigns pure policy to Model, so no documentation change is expected; update only an affected page if its contract changes. Report actual commands, exit codes, selected counts, failures, ignored/skipped tests and unexecuted checks against the resulting candidate. Leave Goal advancement, approval, integration, publication, deployment and serving-daemon restart to their authorized workflow or operator.",
+                "id": "workflow.plan.enter:default-plan:P7"
+              }
+            ],
+            "summary": "workflow.plan.enter:default-plan: Resolve ARCH-MODEL-PURE-POLICY on retained candidate 59af87d23c3c14881f3969ef316146e7aa2e3273 by moving required Skill selection and receipt validation into Model automation while preserving existing recovery behavior."
+          },
+          "started_at": "2026-09-10T15:24:12Z"
+        },
+        "phase": "implement",
+        "phase_started_at": "2026-09-10T15:29:28Z",
+        "proposal": {
+          "completed_at": "2026-09-10T15:29:27Z",
+          "git_after": {
+            "branch": "refine/DRA87E5F985A1FFE2919BE7EC2/round-4",
+            "head_commit": "59af87d23c3c14881f3969ef316146e7aa2e3273",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DRA87E5F985A1FFE2919BE7EC2/round-4",
+            "head_commit": "59af87d23c3c14881f3969ef316146e7aa2e3273",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Continue in the invocation-pinned worktree on refine/DRA87E5F985A1FFE2919BE7EC2/round-4. Record the starting HEAD and worktree status; preserve the retained candidate, prior branches, artifacts and unrelated files. Limit changes to the policy extraction, Application adapters and corresponding tests.",
+                "id": "workflow.plan.enter:default-plan:P1"
+              },
+              {
+                "description": "Add src/model/automation/gate_evidence.rs under the existing automation module. Move required_bindings and the complete pure receipt-validation policy there, reusing AutomationConfig::bindings and existing Model types. Return Model-native Result values without Application, Infrastructure, filesystem, process or clock dependencies.",
+                "id": "workflow.plan.enter:default-plan:P2"
+              },
+              {
+                "description": "Update Application receipt construction and quality/service/skill_checks.rs to use Model required_bindings. Retain evidence::validate only as a thin adapter mapping Model validation errors to the existing RefineError::Conflict diagnostics used by Governance evidence and settlement callers. Keep invocation configuration matching, orchestration, receipt construction, timestamp acquisition and configuration persistence in Application.",
+                "id": "workflow.plan.enter:default-plan:P3"
+              },
+              {
+                "description": "Relocate the three selection and receipt-policy tests from application/events/evidence/tests.rs to model/automation/gate_evidence/tests.rs using fixed receipt fixtures without Application helpers or clock access. Keep the agent-context projection test in Application. Preserve exact Goal/Round/node/candidate/role checks, required-result uniqueness and success, explicit no-required-Skills evidence, disabled Skills and node overrides. Cover compatibility for schema version 1, absent legacy state and additional receipt metadata, while retaining rejection of pending receipts, mismatched selections and missing results.",
+                "id": "workflow.plan.enter:default-plan:P4"
+              },
+              {
+                "description": "Run cargo test --lib model::automation::gate_evidence -- --test-threads=1; cargo test --lib governance -- --test-threads=1; cargo test --lib application::events:: -- --test-threads=1; cargo test --lib application::workflow::engine::behaviors::tests::quality_resume -- --test-threads=1; cargo test --lib candidate_refresh -- --test-threads=1; and cargo test --lib application::work_items::tests::workflow -- --test-threads=1. Confirm the Governance run includes crash_after_ref_motion_with_pending_publication_preserves_attempt_effects and malformed/unproved-intent coverage, preserving Q1 attribution, replay deduplication, lifecycle gates and strict approval.",
+                "id": "workflow.plan.enter:default-plan:P5"
+              },
+              {
+                "description": "Run cargo test --lib surfaces::cli::tests::goals::lifecycle -- --test-threads=1; cargo test --lib web_server_governance_retry_from_review -- --test-threads=1; and node --test tests/web_goal_detail_diagnostics.test.js tests/web_javascript_syntax.test.js. Run rustfmt --check --edition 2024 --config skip_children=true on every changed or new Rust file. Run git diff --check against retained candidate 59af87d23c3c14881f3969ef316146e7aa2e3273 and inspect new files for whitespace errors.",
+                "id": "workflow.plan.enter:default-plan:P6"
+              },
+              {
+                "description": "Review the final diff for unchanged receipt serialization, validation decisions and diagnostics, one Model policy implementation, and preserved Application ownership of effects. Existing intent already assigns pure policy to Model, so no documentation change is expected; update only an affected page if its contract changes. Report actual commands, exit codes, selected counts, failures, ignored/skipped tests and unexecuted checks against the resulting candidate. Leave Goal advancement, approval, integration, publication, deployment and serving-daemon restart to their authorized workflow or operator.",
+                "id": "workflow.plan.enter:default-plan:P7"
+              }
+            ],
+            "summary": "workflow.plan.enter:default-plan: Resolve ARCH-MODEL-PURE-POLICY on retained candidate 59af87d23c3c14881f3969ef316146e7aa2e3273 by moving required Skill selection and receipt validation into Model automation while preserving existing recovery behavior."
+          },
+          "started_at": "2026-09-10T15:24:12Z"
+        },
         "schema_version": 2,
         "started_at": "2026-09-10T15:24:12Z",
         "state": "in_progress",
-        "updated_at": "2026-09-10T15:24:12Z"
+        "updated_at": "2026-09-10T15:29:28Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -4804,7 +4970,7 @@
       "quality_state": "unclassified",
       "reporter": "Refine",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T15:24:12Z",
+      "updated": "2026-09-10T15:29:28Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T15:24:12Z",
         "round_idx": 3,
@@ -4814,9 +4980,9 @@
       "workflow_recovery": null
     }
   ],
-  "status": "plan",
+  "status": "implement",
   "target_branch": "main",
-  "updated": "2026-09-10T15:24:12Z",
+  "updated": "2026-09-10T15:29:28Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:06:37.079960889+00:00",
@@ -4916,7 +5082,16 @@
       "node_id": "default",
       "round_idx": 3,
       "to": "plan"
+    },
+    {
+      "at": "2026-09-10T15:29:28.028787255+00:00",
+      "forced": false,
+      "from": "plan",
+      "generation": 12,
+      "node_id": "default",
+      "round_idx": 3,
+      "to": "implement"
     }
   ],
-  "workflow_revision": 90
+  "workflow_revision": 96
 }
