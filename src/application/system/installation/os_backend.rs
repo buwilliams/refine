@@ -490,6 +490,9 @@ impl FileInstallationService {
                     metadata: Default::default(),
                 })
                 .map_err(|error| error.to_string())?;
+            output
+                .require_complete_capture()
+                .map_err(|error| error.to_string())?;
             Ok(ServiceCommandOutput {
                 exit_code: output.process.exit_code,
                 stdout: output.stdout,

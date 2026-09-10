@@ -1,10 +1,12 @@
+pub mod owned_groups;
+pub mod scheduler_observation;
 use std::collections::BTreeSet;
 use std::fs::{self, OpenOptions};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, mpsc};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use fs2::FileExt;
@@ -169,8 +171,29 @@ pub(crate) struct ConfirmedProcessCleanupFailure {
 }
 
 impl ManagedProcessOutput {
+    /// Machine-readable consumers must reject partial output before parsing it.
+    pub fn require_complete_capture(&self) -> RefineResult<()> {
+        if self.capture_complete() {
+            return Ok(());
+        }
+        Err(RefineError::Degraded(format!(
+            "managed process {} returned incomplete output capture: {}",
+            self.process.id,
+            self.process.details.as_deref().unwrap_or("unavailable")
+        )))
+    }
+
+    pub fn capture_complete(&self) -> bool {
+        self.process
+            .details
+            .as_deref()
+            .and_then(|s| serde_json::from_str::<Value>(s).ok())
+            .and_then(|v| v["output_capture"]["complete"].as_bool())
+            .unwrap_or(true)
+    }
+
     pub fn success(&self) -> bool {
-        self.process.exit_code == Some(0)
+        self.process.exit_code == Some(0) && self.capture_complete()
     }
 }
 
@@ -335,10 +358,12 @@ use os_signals::*;
 pub(crate) use test_hooks::install_after_process_enumeration_hook;
 use test_hooks::*;
 pub use workflow_registration::managed_pid_is_alive;
-use workflow_registration::*;
 
+mod artifact_retirement;
+mod capture;
 mod execution;
 mod output;
+mod registration_identity;
 mod registry;
 mod supervision;
 mod termination;

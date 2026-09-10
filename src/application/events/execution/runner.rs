@@ -175,6 +175,14 @@ impl FileEventService {
                 }
                 invocation.context.process_workspace(&mut metadata);
                 metadata.insert("event_invocation_id".into(), json!(id));
+                metadata.insert(
+                    "agent_hard_cap_millis".into(),
+                    json!(seconds("agent_hard_cap_seconds", 7200).saturating_mul(1000)),
+                );
+                metadata.insert(
+                    "agent_idle_timeout_millis".into(),
+                    json!(seconds("agent_idle_timeout_seconds", 900).saturating_mul(1000)),
+                );
                 if let Some(goal_id) = &invocation.context.goal_id {
                     metadata.insert("goal_id".into(), json!(goal_id));
                 }

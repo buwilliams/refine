@@ -248,6 +248,7 @@ impl FileProjectRegistryService {
                 metadata: Default::default(),
             },
         )?;
+        output.require_complete_capture()?;
         if !output.success() {
             let stderr = output.stderr.trim().to_string();
             return Err(RefineError::Conflict(format!(
@@ -440,6 +441,7 @@ impl FileProjectRegistryService {
                 metadata: Default::default(),
             },
         )?;
+        output.require_complete_capture()?;
         if output.success() {
             Ok(())
         } else {

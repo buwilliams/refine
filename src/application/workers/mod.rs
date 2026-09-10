@@ -81,6 +81,7 @@ mod dispatch;
 mod git_sync;
 mod git_sync_backoff;
 mod jira_export;
+pub mod maintenance;
 mod project_sync;
 mod schedule;
 mod state_sync_health;
@@ -88,6 +89,7 @@ mod state_sync_health;
 mod test_hooks;
 mod worker_specs;
 mod workflow;
+mod workflow_recovery;
 mod worktree_cleanup;
 
 pub use dispatch::run_worker;
@@ -124,6 +126,9 @@ impl FileRunnerWorkerService {
         worker_kind: &str,
     ) -> RefineResult<BackgroundWorkerEnsure> {
         validate_worker_kind(worker_kind, false)?;
+        if worker_kind == WORKFLOW_RUNNER {
+            return self.ensure_workflow_worker();
+        }
         let supervisor = FileProcessSupervisor::new(&self.runtime_root);
         if supervisor
             .pause_state()?

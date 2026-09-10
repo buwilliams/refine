@@ -40,12 +40,11 @@ impl FileOperationRegistry {
                     path.display()
                 ))
             })?;
-        file.lock_exclusive().map_err(|error| {
-            RefineError::Io(format!(
-                "failed to lock operation registry {}: {error}",
-                path.display()
-            ))
-        })?;
+        crate::infrastructure::process::supervisor::coordination::lock_exclusive_before(
+            &file,
+            &path,
+            Duration::from_secs(60),
+        )?;
         Ok(file)
     }
 
@@ -174,8 +173,13 @@ impl FileOperationRegistry {
     /// retryable. If termination cannot be confirmed, the operation becomes a durable Failed
     /// attention state while retaining its request, progress, result, and existing logs.
     pub fn recover_active_supervised(&self) -> RefineResult<Vec<OperationHandle>> {
-        let supervisor = FileProcessSupervisor::new(&self.runtime_root);
-        let processes = supervisor.list()?;
+        let mut processes = Vec::new();
+        for root in [self.runtime_root.clone(), self.runtime_root.join("agents")] {
+            let supervisor = FileProcessSupervisor::new(root);
+            for process in supervisor.capacity_processes()? {
+                processes.push((supervisor.clone(), process));
+            }
+        }
         let mut recovered = Vec::new();
 
         for operation in self.recover()? {
@@ -190,7 +194,7 @@ impl FileOperationRegistry {
             if capability_reconciles_restart {
                 let associated = processes
                     .iter()
-                    .filter(|process| process_belongs_to_operation(process, &operation.id))
+                    .filter(|(_, process)| process_belongs_to_operation(process, &operation.id))
                     .collect::<Vec<_>>();
                 let capability_attempt = operation
                     .external_attempt
@@ -211,7 +215,7 @@ impl FileOperationRegistry {
                                 "process_id".to_string(),
                                 associated
                                     .first()
-                                    .map(|process| json!(process.id))
+                                    .map(|(_, process)| json!(process.id))
                                     .unwrap_or(Value::Null),
                             )])),
                         ),
@@ -226,22 +230,22 @@ impl FileOperationRegistry {
             }
             let deferred_cancellation = matches!(operation.state, OperationState::Cancelling)
                 && cancellation_terminal_is_deferred(&operation);
-            let Some(operation) = self.begin_recovery(&operation.id)? else {
+            let Some(operation) = self.begin_recovery(&operation)? else {
                 continue;
             };
             let associated = processes
                 .iter()
-                .filter(|process| process_belongs_to_operation(process, &operation.id))
+                .filter(|(_, process)| process_belongs_to_operation(process, &operation.id))
                 .cloned()
                 .collect::<Vec<_>>();
-            match self.terminate_recovery_processes(&supervisor, &operation, &associated) {
+            match self.terminate_recovery_processes(&operation, &associated) {
                 Ok(()) => {
                     if deferred_cancellation {
                         // The owning capability must durably persist its cancellation evidence
                         // before this operation becomes terminal. Keep the launch-blocking state
                         // recoverable for that capability's startup reconciliation.
                         recovered.push(self.status(&operation.id)?);
-                    } else if let Some(interrupted) = self.interrupt_if_active(&operation.id)? {
+                    } else if let Some(interrupted) = self.interrupt_if_active(&operation)? {
                         recovered.push(interrupted);
                     }
                 }

@@ -9,10 +9,23 @@ pub(super) fn process_command_line(spec: &ManagedProcessSpec) -> String {
 
 pub(super) fn process_details(spec: &ManagedProcessSpec) -> String {
     if spec.sensitive {
-        return "redacted".to_string();
+        return match std::env::var("REFINE_WORKFLOW_INCARNATION") {
+            Ok(token) => json!({"workflow_incarnation": token, "isolated_process_group": true,
+                "command": "redacted"})
+            .to_string(),
+            Err(_) => "redacted".to_string(),
+        };
     }
-    if !spec.metadata.is_empty() {
+    if !spec.metadata.is_empty() || std::env::var_os("REFINE_WORKFLOW_INCARNATION").is_some() {
         let mut details = spec.metadata.clone();
+        if let Ok(token) = std::env::var("REFINE_WORKFLOW_INCARNATION") {
+            details
+                .entry("workflow_incarnation")
+                .or_insert(json!(token));
+            details
+                .entry("isolated_process_group")
+                .or_insert(json!(true));
+        }
         details.entry("command".to_string()).or_insert_with(|| {
             json!(if spec.metadata.contains_key("prompt_transport") {
                 spec.authorization_command
@@ -72,7 +85,13 @@ pub(super) fn configure_process_lifecycle(command: &mut Command, spec: &ManagedP
         .metadata
         .get("isolated_process_group")
         .and_then(Value::as_bool)
-        .unwrap_or(false);
+        .unwrap_or_else(|| {
+            std::env::var_os("REFINE_WORKFLOW_INCARNATION").is_some()
+                || spec
+                    .metadata
+                    .get("agent_hard_cap_millis")
+                    .is_some_and(Value::is_number)
+        });
     let kill_on_parent_exit = spec
         .limits
         .as_ref()
@@ -128,6 +147,14 @@ pub(super) fn process_actions(state: &str) -> Vec<&'static str> {
 }
 
 pub(super) fn append_detail(existing: Option<String>, message: &str) -> String {
+    if let Some(mut value) = existing
+        .as_deref()
+        .and_then(|s| serde_json::from_str::<Value>(s).ok())
+        && let Some(object) = value.as_object_mut()
+    {
+        object.insert("supervision_note".into(), json!(message));
+        return value.to_string();
+    }
     match existing {
         Some(existing) if !existing.trim().is_empty() => format!("{existing}; {message}"),
         _ => message.to_string(),

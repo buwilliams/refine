@@ -131,6 +131,8 @@ pub fn process_summary_value_with_chat_sessions(
     let background_workers = background_worker_values(&process_values, &pause_state);
     Ok(json!({
         "runner_reachable": runner_reachable,
+        "workflow_health": crate::application::workflow::health::assess_workflow_health(runtime_root),
+        "daemon_maintenance": crate::application::workers::maintenance::inspect_health(runtime_root),
         "paused": pause_state.workflow_paused,
         "workflow_paused": pause_state.workflow_paused,
         "disabled_background_workers": pause_state.disabled_background_workers,

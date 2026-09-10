@@ -406,7 +406,7 @@ fn lifecycle_shutdown(lifecycle: FileDaemonLifecycleService, port: u16) -> AxumS
         loop {
             thread::sleep(Duration::from_millis(500));
             match lifecycle.status(port) {
-                Ok(status) if status.daemon_healthy => {}
+                Ok(status) if status.web_available => {}
                 _ => break,
             }
         }

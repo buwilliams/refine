@@ -891,7 +891,13 @@ impl InProcessWebServer {
         }
 
         match (request.method.as_str(), request.path.as_str()) {
-            ("GET", "/system/status") => ApiResponse::json(200, json!(self.status)),
+            ("GET", "/system/status") => {
+                let mut status = json!(self.status);
+                if let Some(root) = &self.runtime_root {
+                    crate::application::workflow::health::enrich_status(root, &mut status);
+                }
+                ApiResponse::json(200, status)
+            }
             ("GET", "/system/api-groups") => {
                 let groups: Vec<_> = API_GROUPS
                     .iter()

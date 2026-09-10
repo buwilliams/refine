@@ -1,6 +1,20 @@
 use super::*;
 
 impl FileProcessSupervisor {
+    pub fn owned_process_is_alive(&self, process: &ManagedProcess) -> RefineResult<bool> {
+        let identity = self.load_process_identity(process)?;
+        self.ensure_expected_registration(process, &identity)?;
+        match self.owned_process_state(process, &identity)? {
+            OwnedProcessState::Alive => Ok(true),
+            OwnedProcessState::Exited => Ok(false),
+            OwnedProcessState::IdentityMismatch(actual) => Err(process_identity_mismatch(
+                process,
+                &identity,
+                actual.as_deref(),
+            )),
+        }
+    }
+
     /// Requests termination without removing the managed-process record. The process runner owns
     /// final reaping and artifact cleanup, so callers can keep capacity reserved until the real
     /// child has exited.
@@ -41,6 +55,11 @@ impl FileProcessSupervisor {
         process: &ManagedProcess,
         timeout: Duration,
     ) -> RefineResult<()> {
+        if Self::requires_group_ownership(process) || self.group_path(&process.id).exists() {
+            let group = self.owned_group_for_process(process)?;
+            self.stop_owned_group(&group, timeout)?;
+            return Ok(());
+        }
         if !Self::process_is_alive(process)? {
             return Ok(());
         }
@@ -86,6 +105,11 @@ impl FileProcessSupervisor {
         let started = Instant::now();
         let identity = self.load_process_identity(expected)?;
         self.ensure_expected_registration(expected, &identity)?;
+        if Self::requires_group_ownership(expected) || self.group_path(&expected.id).exists() {
+            let group = self.owned_group_for_process(expected)?;
+            self.stop_owned_group(&group, timeout)?;
+            return Ok(confirmed_process_exit(expected, signal, &identity, started));
+        }
         match self.owned_process_state(expected, &identity)? {
             OwnedProcessState::Exited => {
                 return Ok(confirmed_process_exit(expected, signal, &identity, started));
@@ -144,110 +168,5 @@ impl FileProcessSupervisor {
                 OwnedProcessState::Alive => std::thread::sleep(Duration::from_millis(10)),
             }
         }
-    }
-
-    #[cfg_attr(test, allow(dead_code))]
-    // Cleanup failure deliberately carries the confirmed exit evidence inline
-    // so callers cannot lose it while settling a process.
-    #[allow(clippy::result_large_err)]
-    pub(crate) fn cleanup_confirmed_exit(
-        &self,
-        expected: &ManagedProcess,
-        outcome: ConfirmedProcessExit,
-    ) -> Result<ConfirmedProcessExit, ConfirmedProcessCleanupFailure> {
-        self.cleanup_confirmed_exit_with(expected, outcome, |_| Ok(()))
-    }
-
-    #[allow(clippy::result_large_err)]
-    pub(crate) fn cleanup_confirmed_exit_with<F>(
-        &self,
-        expected: &ManagedProcess,
-        mut outcome: ConfirmedProcessExit,
-        mut before_stage: F,
-    ) -> Result<ConfirmedProcessExit, ConfirmedProcessCleanupFailure>
-    where
-        F: FnMut(ProcessCleanupStage) -> RefineResult<()>,
-    {
-        // Serialize against the launcher's reaper (see `cleanup_lock`): without
-        // this, an archive racing the removal below could resurrect records
-        // for a process this cleanup deliberately retired. Held until return;
-        // the flock releases when the file handle drops.
-        let _cleanup_lock = match self.cleanup_lock(&expected.id) {
-            Ok(lock) => lock,
-            Err(error) => return Err(ConfirmedProcessCleanupFailure { outcome, error }),
-        };
-        let handoff_path = self.artifact_handoff_path(&expected.id);
-        let handoff = match OpenOptions::new()
-            .read(true)
-            .write(true)
-            .open(&handoff_path)
-        {
-            Ok(file) => match file.try_lock_exclusive() {
-                Ok(()) => Some(file),
-                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => None,
-                Err(error) => {
-                    return Err(ConfirmedProcessCleanupFailure {
-                        outcome,
-                        error: RefineError::Io(format!(
-                            "failed to inspect process artifact handoff {}: {error}",
-                            handoff_path.display()
-                        )),
-                    });
-                }
-            },
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
-            Err(error) => {
-                return Err(ConfirmedProcessCleanupFailure {
-                    outcome,
-                    error: RefineError::Io(format!(
-                        "failed to open process artifact handoff {}: {error}",
-                        handoff_path.display()
-                    )),
-                });
-            }
-        };
-        let artifacts_deferred = handoff.is_none() && handoff_path.exists();
-        if !artifacts_deferred {
-            for path in [
-                expected.stdout_path.as_deref(),
-                expected.stderr_path.as_deref(),
-                expected.stdin_path.as_deref(),
-            ]
-            .into_iter()
-            .flatten()
-            {
-                if let Err(error) = remove_file_if_present(Path::new(path), "process artifact") {
-                    return Err(ConfirmedProcessCleanupFailure { outcome, error });
-                }
-            }
-        }
-
-        if let Err(error) = before_stage(ProcessCleanupStage::Registry).and_then(|()| {
-            remove_file_if_present(
-                &self.processes_dir().join(format!("{}.json", expected.id)),
-                "process registry",
-            )
-        }) {
-            return Err(ConfirmedProcessCleanupFailure { outcome, error });
-        }
-        outcome.registry_cleanup_completed = true;
-
-        if let Err(error) = before_stage(ProcessCleanupStage::Identity).and_then(|()| {
-            remove_file_if_present(
-                &self.process_identity_path(&expected.id),
-                "process identity",
-            )
-        }) {
-            return Err(ConfirmedProcessCleanupFailure { outcome, error });
-        }
-        outcome.identity_cleanup_completed = true;
-        drop(handoff);
-        if !artifacts_deferred
-            && let Err(error) = remove_file_if_present(&handoff_path, "process artifact handoff")
-        {
-            return Err(ConfirmedProcessCleanupFailure { outcome, error });
-        }
-        let _ = fs::remove_file(self.cleanup_lock_path(&expected.id));
-        Ok(outcome)
     }
 }

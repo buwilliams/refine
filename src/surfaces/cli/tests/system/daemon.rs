@@ -693,7 +693,18 @@ fn system_status_reports_current_version_and_running_ports() {
     assert_eq!(status["ports"][0]["port"], live_port);
     assert!(status["ports"][0]["launch_mode"].is_string());
     assert!(status["ports"][0]["executable_path"].is_string());
-    assert!(status["ports"][0]["daemon_healthy"].as_bool().unwrap());
+    // HTTP reachability preserves discovery, but cannot prove scheduler health.
+    assert!(!status["ports"][0]["daemon_healthy"].as_bool().unwrap());
+    assert_eq!(
+        status["ports"][0]["workflow_health"]["state"],
+        "unavailable"
+    );
+    assert!(
+        status["ports"][0]["workflow_health"]["reason"]
+            .as_str()
+            .unwrap()
+            .contains("observed 0")
+    );
     assert_eq!(status["ports"][0]["process_count"], 1);
     let process = status["ports"][0]["processes"][0].as_object().unwrap();
     assert_eq!(process.len(), 3);

@@ -137,6 +137,7 @@ impl FileGitRepository {
                 .unwrap_or_default(),
             },
         )?;
+        output.require_complete_capture()?;
         Ok(GitCommandOutput {
             success: output.success(),
             stdout: output.stdout.into_bytes(),

@@ -8,6 +8,7 @@ mod planning_repair;
 mod quality_base_refresh;
 mod quality_recovery;
 mod round_base;
+mod worker_liveness;
 mod worktree_resume;
 
 use super::*;

@@ -136,8 +136,12 @@ fn run_planning(
         let workflow = WorkflowEngine::with_target_root(&runtime_root, &target_root);
         assert_eq!(
             workflow.settle_goal_failure("GOAL1", authority, "plan", &error),
-            Some(true)
+            crate::application::work_items::FailureSettlement::AuthoritativeFailure
         );
+        let settled = work_items.show_goal_detail("GOAL1").unwrap();
+        assert_eq!(settled["status"], "failed");
+        assert_eq!(settled["rounds"][0]["failure_category"], "plan");
+        assert_eq!(settled["rounds"][0]["failure_message"], error.to_string());
         work_items
             .transition_goal_status("GOAL1", GoalStatus::Todo)
             .unwrap();

@@ -54,12 +54,7 @@ fn run_checked(
         .collect::<Vec<_>>();
     let requires_role = edge == "enter" && ["plan", "implement"].contains(&status.as_str());
     if requires_role
-        && !events.iter().any(|e| {
-            config
-                .bindings(e, &ctx.node_id)
-                .iter()
-                .any(|(b, _)| b.mode == BindingMode::Blocking)
-        })
+        && !super::gate_configuration::has_blocking_workflow_skill(&config, &ctx.node_id, &source)
     {
         return Err(RefineError::InvalidInput(format!(
             "{} requires an enabled blocking {} Skill",

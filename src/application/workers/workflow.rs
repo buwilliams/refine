@@ -7,6 +7,13 @@ pub(super) fn run_workflow_worker(
     let mut recovered_root = None;
     let mut retired_supervisor_root = None;
     loop {
+        crate::application::workflow::health::scheduler_tick(
+            runtime_root,
+            recovered_root.as_deref(),
+            &Default::default(),
+            false,
+            None,
+        );
         // Every step here is retried on the next interval rather than propagated.
         // A transient failure — the app detaching, a registry read losing a race,
         // a lock held for a moment — must not end the tick loop: nothing restarts
@@ -20,6 +27,16 @@ pub(super) fn run_workflow_worker(
                 continue;
             }
         };
+        if target_root.is_none() {
+            recovered_root = None;
+            crate::application::workflow::health::scheduler_tick(
+                runtime_root,
+                None,
+                &Default::default(),
+                true,
+                None,
+            );
+        }
         if let Some(target_root) = target_root {
             let root = target_root
                 .canonicalize()
@@ -51,7 +68,16 @@ pub(super) fn run_workflow_worker(
                 }
                 recovered_root = Some(root);
             }
-            match workflow.evaluate_workflow() {
+            if workflow.workflow_paused().unwrap_or(false) {
+                crate::application::workflow::health::scheduler_tick(
+                    runtime_root,
+                    Some(&target_root),
+                    &Default::default(),
+                    true,
+                    None,
+                );
+            }
+            match workflow.evaluate_worker_workflow(project_registry_root.unwrap_or(runtime_root)) {
                 Ok(result) if result.changed_projection() => {
                     let _ = refresh_projection(runtime_root, &target_root);
                 }

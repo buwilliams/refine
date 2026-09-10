@@ -175,6 +175,7 @@ impl FileQualityService {
             sensitive: false,
             metadata,
         })?;
+        output.require_complete_capture()?;
         Ok(ObservedExecution {
             process_id: output.process.id,
             shell: observed_shell,

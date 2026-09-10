@@ -290,3 +290,29 @@ fn local_http_daemon_recovers_stale_chat_turns_before_serving() {
 
     remove_temp_dir(&temp_root);
 }
+
+#[test]
+fn unhealthy_workflow_status_remains_reachable_over_http() {
+    let root = unique_temp_dir("workflow-health-http");
+    std::fs::create_dir_all(&root).unwrap();
+    let mut server = server_with_projection();
+    server.runtime_root = Some(root.clone());
+    let daemon = LocalHttpDaemon::new(server, None);
+    let listener = LocalHttpDaemon::bind_loopback(0).unwrap();
+    let addr = LocalHttpDaemon::local_addr(&listener).unwrap();
+    let handle = thread::spawn(move || daemon.serve_once(listener).unwrap());
+    let mut stream = TcpStream::connect(addr).unwrap();
+    stream
+        .write_all(b"GET /system/status HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n")
+        .unwrap();
+    let mut response = String::new();
+    stream.read_to_string(&mut response).unwrap();
+    handle.join().unwrap();
+    assert!(response.starts_with("HTTP/1.1 200 OK"));
+    let body: serde_json::Value =
+        serde_json::from_str(response.split_once("\r\n\r\n").unwrap().1).unwrap();
+    assert_eq!(body["daemon_healthy"], false);
+    assert_eq!(body["web_available"], true);
+    assert_eq!(body["workflow_health"]["state"], "unavailable");
+    std::fs::remove_dir_all(root).unwrap();
+}

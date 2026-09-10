@@ -247,7 +247,8 @@ fn file_process_supervisor_cleans_deferred_artifacts_after_handoff_release() {
     assert!(!stdout_path.exists());
     assert!(!stdin_path.exists());
     assert!(!process_path.exists());
-    assert!(!supervisor.artifact_handoff_path(process_id).exists());
+    let released = supervisor.begin_artifact_handoff(process_id).unwrap();
+    supervisor.finish_artifact_handoff(released).unwrap();
 
     fs::remove_dir_all(temp_root).unwrap();
 }

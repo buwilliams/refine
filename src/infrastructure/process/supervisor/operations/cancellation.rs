@@ -32,13 +32,8 @@ impl FileOperationRegistry {
     }
 
     pub(super) fn terminate_associated_processes(&self, operation_id: &str) -> RefineResult<()> {
-        let supervisor = FileProcessSupervisor::new(&self.runtime_root);
-        for process in supervisor
-            .list()?
-            .iter()
-            .filter(|process| process_belongs_to_operation(process, operation_id))
-        {
-            supervisor.request_termination(&process.id, "terminate")?;
+        for (supervisor, process) in self.associated_processes(operation_id)? {
+            supervisor.terminate_and_confirm_exit(&process, RECOVERY_PROCESS_EXIT_TIMEOUT)?;
         }
         Ok(())
     }
@@ -189,17 +184,28 @@ impl FileOperationRegistry {
     }
 
     pub(super) fn live_owned_processes(&self, operation_id: &str) -> RefineResult<Vec<Value>> {
-        let supervisor = FileProcessSupervisor::new(&self.runtime_root);
         let mut live = Vec::new();
-        for process in supervisor
-            .list()?
-            .into_iter()
-            .filter(|process| process_belongs_to_operation(process, operation_id))
-        {
-            if FileProcessSupervisor::process_is_alive(&process)? {
+        for (supervisor, process) in self.associated_processes(operation_id)? {
+            if supervisor.group_pending(&process)? {
                 live.push(json!({"id": process.id, "pid": process.pid}));
             }
         }
         Ok(live)
+    }
+
+    fn associated_processes(
+        &self,
+        operation_id: &str,
+    ) -> RefineResult<Vec<(FileProcessSupervisor, ManagedProcess)>> {
+        let mut processes = Vec::new();
+        for root in [self.runtime_root.clone(), self.runtime_root.join("agents")] {
+            let supervisor = FileProcessSupervisor::new(root);
+            for process in supervisor.capacity_processes()? {
+                if process_belongs_to_operation(&process, operation_id) {
+                    processes.push((supervisor.clone(), process));
+                }
+            }
+        }
+        Ok(processes)
     }
 }

@@ -8,34 +8,60 @@ impl LocalHttpDaemon {
         let runtime_root = self.server.runtime_root.clone();
         let project_registry_root = self.server.app_registry_runtime_root();
         let interval = interval.max(Duration::from_millis(100));
-        let handle = thread::spawn(move || {
-            let mut last_reported_failure: Option<String> = None;
-            while !thread_stop.load(Ordering::Relaxed) {
-                if let Some(runtime_root) = &runtime_root {
-                    let mut workers = FileRunnerWorkerService::new(runtime_root);
-                    if let Some(project_registry_root) = &project_registry_root {
-                        workers = workers.with_project_registry_root(project_registry_root);
+        let mut workers = runtime_root.as_ref().map(FileRunnerWorkerService::new);
+        if let (Some(workers), Some(registry)) = (&mut workers, project_registry_root) {
+            *workers = workers.clone().with_project_registry_root(registry);
+        }
+        if let Some(workers) = workers.clone() {
+            let stop = Arc::clone(&stop);
+            thread::spawn(move || {
+                while !stop.load(Ordering::Relaxed) {
+                    if let Err(error) =
+                        crate::application::workflow::health::admission::observe_admission(
+                            &workers.runtime_root,
+                            workers.project_registry_root.as_deref(),
+                        )
+                    {
+                        eprintln!("refine admission observation: {error}");
                     }
-                    // Supervise these independently: cleanup must keep running
-                    // even if workflow execution itself cannot be launched.
-                    let workflow_error = ensure_worker_failure(&workers, WORKFLOW_RUNNER);
-                    let cleanup_error = ensure_worker_failure(&workers, WORKTREE_CLEANUP_RUNNER);
-                    let failures = [workflow_error, cleanup_error]
-                        .into_iter()
-                        .flatten()
-                        .collect::<Vec<_>>();
-                    let error = (!failures.is_empty()).then(|| failures.join("; "));
-                    if let Some(error) = error {
-                        // A stall otherwise looks exactly like an idle queue.
-                        // Report it only when it changes: this loop runs every second.
-                        if last_reported_failure.as_deref() != Some(error.as_str()) {
-                            eprintln!(
-                                "refine runner supervision: could not ensure a background runner is running: {error}"
-                            );
-                            last_reported_failure = Some(error);
+                    sleep_until_stopped(&stop, interval);
+                }
+            });
+        }
+        if let Some(workers) = workers.clone() {
+            {
+                let kind = WORKTREE_CLEANUP_RUNNER;
+                let workers = workers.clone();
+                let stop = Arc::clone(&stop);
+                thread::spawn(move || {
+                    while !stop.load(Ordering::Relaxed) {
+                        if let Some(error) = ensure_worker_failure(&workers, kind) {
+                            eprintln!("refine cleanup supervision: {error}");
                         }
-                    } else {
-                        last_reported_failure = None;
+                        sleep_until_stopped(&stop, interval);
+                    }
+                });
+            }
+            let stop = Arc::clone(&stop);
+            thread::spawn(move || {
+                while !stop.load(Ordering::Relaxed) {
+                    crate::application::workers::maintenance::maintain_daemon(
+                        &workers.runtime_root,
+                    );
+                    sleep_until_stopped(&stop, interval);
+                }
+            });
+        }
+        let handle = thread::spawn(move || {
+            let mut last_failure = None;
+            while !thread_stop.load(Ordering::Relaxed) {
+                if let Some(workers) = &workers {
+                    let failure = ensure_worker_failure(workers, WORKFLOW_RUNNER);
+                    if failure != last_failure {
+                        if let Some(error) = &failure {
+                            eprintln!("refine workflow supervision: {error}");
+                        }
+                        last_failure = failure;
                     }
                 }
                 sleep_until_stopped(&thread_stop, interval);
@@ -155,39 +181,11 @@ fn remove_files_older_than(dir: &Path, retention: Duration) {
     }
 }
 
-/// Output logs and stdin captures whose process registration is gone are
-/// orphans: the exit path archives history but leaves them behind, so any
-/// process that ended on its own left its full output on disk forever.
+/// Retention is a shared ownership decision, including absent primary records.
 fn sweep_orphan_process_logs(processes_dir: &Path, retention: Duration) {
-    let cutoff = std::time::SystemTime::now()
-        .checked_sub(retention)
-        .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
-    let Ok(entries) = std::fs::read_dir(processes_dir) else {
-        return;
-    };
-    for entry in entries.flatten() {
-        let path = entry.path();
-        let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
-            continue;
-        };
-        let Some(process_id) = name
-            .strip_suffix(".stdout.log")
-            .or_else(|| name.strip_suffix(".stderr.log"))
-            .or_else(|| name.strip_suffix(".stdin.txt"))
-        else {
-            continue;
-        };
-        if processes_dir.join(format!("{process_id}.json")).exists() {
-            continue;
-        }
-        let is_old = entry
-            .metadata()
-            .ok()
-            .and_then(|metadata| metadata.modified().ok())
-            .is_some_and(|modified| modified < cutoff);
-        if is_old {
-            let _ = std::fs::remove_file(path);
-        }
+    if let Some(runtime) = processes_dir.parent() {
+        crate::infrastructure::process::subprocess::FileProcessSupervisor::new(runtime)
+            .retire_aged_process_logs(retention);
     }
 }
 
@@ -255,3 +253,53 @@ mod tests {
         std::fs::remove_dir_all(runtime_root).unwrap();
     }
 }
+
+#[cfg(test)]
+mod workflow_shutdown_tests {
+    use super::*;
+    #[test]
+    fn workflow_degradation_does_not_trigger_lifecycle_shutdown() {
+        let root =
+            std::env::temp_dir().join(format!("refine-workflow-shutdown-{}", uuid::Uuid::new_v4()));
+        let port = 4599;
+        let runtime =
+            crate::infrastructure::process::supervisor::runtime::RuntimeRoot { root: root.clone() };
+        let lifecycle =
+            crate::infrastructure::process::supervisor::lifecycle::FileDaemonLifecycleService::new(
+                runtime.clone(),
+            );
+        let status = lifecycle.prepare_start(port).unwrap();
+        let mut ready = lifecycle.mark_ready(status).unwrap();
+        ready.daemon_healthy = false;
+        std::fs::write(
+            runtime.port_root(port).join("daemon-status.json"),
+            serde_json::to_vec(&ready).unwrap(),
+        )
+        .unwrap();
+        let mut shutdown = lifecycle_shutdown(lifecycle.clone(), port);
+        thread::sleep(Duration::from_millis(650));
+        assert!(matches!(
+            shutdown.receiver.try_recv(),
+            Err(tokio::sync::oneshot::error::TryRecvError::Empty)
+        ));
+        lifecycle
+            .mark_start_failed(port, &RefineError::Degraded("test shutdown".into()))
+            .unwrap();
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(async {
+                tokio::time::timeout(Duration::from_secs(2), shutdown.receiver)
+                    .await
+                    .unwrap()
+                    .unwrap();
+            });
+        DAEMON_SHUTTING_DOWN.store(false, Ordering::SeqCst);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+}
+
+#[cfg(all(test, target_os = "linux"))]
+#[path = "background_loops_retention_tests.rs"]
+mod retention_tests;

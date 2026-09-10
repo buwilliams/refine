@@ -157,15 +157,61 @@ impl FileWorkItemService {
         failure_category: &str,
         failure_message: &str,
         failure_at: &str,
-    ) -> RefineResult<bool> {
+    ) -> RefineResult<crate::application::work_items::FailureSettlement> {
         let _goal_lock = self.acquire_goal_mutation_lock(goal_id)?;
         let current = self.show_goal_summary(goal_id)?;
-        self.ensure_goal_owned(&current)?;
+        use crate::application::work_items::FailureSettlement;
+        match self.ensure_goal_owned(&current) {
+            Ok(()) => {}
+            Err(RefineError::Conflict(message)) if message.contains("is owned by node") => {
+                return Ok(FailureSettlement::SupersededAttempt);
+            }
+            Err(error) => return Err(error),
+        }
         let (goal_path, mut value) = self.read_goal_value_unchecked_locked(&current)?;
         let object = value.as_object_mut().ok_or_else(|| {
             RefineError::Serialization(format!("Goal {} is not a JSON object", goal_path.display()))
         })?;
         let observed_status = goal_status(object);
+        if object
+            .get("pending_event_transition")
+            .is_some_and(|pending| pending["state"] == "pending")
+        {
+            return Ok(FailureSettlement::SupersededAttempt);
+        }
+        let recovery = object
+            .get("rounds")
+            .and_then(Value::as_array)
+            .and_then(|rounds| rounds.get(authority.round_idx))
+            .and_then(|round| round.get("workflow_recovery"));
+        if recovery.is_some_and(|recovery| {
+            recovery.get("workflow_revision").and_then(Value::as_u64)
+                == Some(authority.workflow_revision)
+                && recovery.get("source_round").and_then(Value::as_u64)
+                    == Some(authority.round_idx as u64 + 1)
+                && matches!(
+                    recovery.get("state").and_then(Value::as_str),
+                    Some("queued" | "exhausted")
+                )
+        }) {
+            return Ok(FailureSettlement::ExistingVerifiedOutcome);
+        }
+
+        if require_current_attempt(goal_id, object, authority).is_ok()
+            && observed_status == GoalStatus::Failed
+            && object
+                .get("rounds")
+                .and_then(Value::as_array)
+                .and_then(|rounds| rounds.get(authority.round_idx))
+                .is_some_and(|round| {
+                    round
+                        .get("failure_message")
+                        .and_then(Value::as_str)
+                        .is_some_and(|s| !s.is_empty())
+                })
+        {
+            return Ok(FailureSettlement::ExistingVerifiedOutcome);
+        }
         if !matches!(
             observed_status,
             GoalStatus::Todo
@@ -175,7 +221,7 @@ impl FileWorkItemService {
                 | GoalStatus::Governance
         ) || require_current_attempt(goal_id, object, authority).is_err()
         {
-            return Ok(false);
+            return Ok(FailureSettlement::SupersededAttempt);
         }
 
         let rounds = object
@@ -210,7 +256,7 @@ impl FileWorkItemService {
         );
         object.insert("updated".to_string(), Value::String(failure_at.to_string()));
         write_json_atomically(&goal_path, &value)?;
-        Ok(true)
+        Ok(FailureSettlement::AuthoritativeFailure)
     }
 }
 

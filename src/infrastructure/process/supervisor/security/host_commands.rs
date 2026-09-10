@@ -211,5 +211,9 @@ pub(super) fn run_managed_command(
             sensitive: true,
             metadata: Default::default(),
         })
+        .and_then(|output| {
+            output.require_complete_capture()?;
+            Ok(output)
+        })
         .map_err(|error| RefineError::Io(format!("failed to {action}: {error}")))
 }

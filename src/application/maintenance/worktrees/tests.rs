@@ -1016,3 +1016,6 @@ fn unique_temp_dir(prefix: &str) -> PathBuf {
         std::process::id()
     ))
 }
+
+#[cfg(target_os = "linux")]
+mod retained_processes;

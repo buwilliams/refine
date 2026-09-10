@@ -4,6 +4,7 @@ mod agents;
 pub mod engine;
 pub(crate) mod gates;
 pub mod governance;
+pub mod health;
 pub mod phases;
 pub mod recovery;
 

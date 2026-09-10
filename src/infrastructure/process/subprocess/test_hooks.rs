@@ -41,3 +41,33 @@ pub(super) fn tail_text(value: &str, max_chars: usize) -> String {
         value.chars().skip(count - max_chars).collect()
     }
 }
+
+#[cfg(test)]
+type CaptureHook = Box<dyn FnOnce(&ManagedProcess) + Send + 'static>;
+#[cfg(test)]
+static CAPTURE_HOOKS: std::sync::OnceLock<
+    Mutex<std::collections::BTreeMap<(PathBuf, String), CaptureHook>>,
+> = std::sync::OnceLock::new();
+#[cfg(test)]
+pub(super) fn install_capture_hook(
+    root: &Path,
+    stage: &str,
+    hook: impl FnOnce(&ManagedProcess) + Send + 'static,
+) {
+    CAPTURE_HOOKS
+        .get_or_init(Default::default)
+        .lock()
+        .unwrap()
+        .insert((root.into(), stage.into()), Box::new(hook));
+}
+#[cfg(test)]
+pub(super) fn run_capture_hook(root: &Path, stage: &str, process: &ManagedProcess) {
+    let hook = CAPTURE_HOOKS
+        .get_or_init(Default::default)
+        .lock()
+        .unwrap()
+        .remove(&(root.into(), stage.into()));
+    if let Some(hook) = hook {
+        hook(process);
+    }
+}

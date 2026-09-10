@@ -36,54 +36,6 @@ impl FileProcessSupervisor {
             .join(format!("{process_id}.json"))
     }
 
-    /// Hold transient process artifacts while a workflow-owned consumer finishes reading them.
-    ///
-    /// The filesystem lock is released automatically if the consumer exits, so later recovery can
-    /// still remove abandoned artifacts.
-    pub(crate) fn begin_artifact_handoff(&self, process_id: &str) -> RefineResult<fs::File> {
-        fs::create_dir_all(self.processes_dir()).map_err(|error| {
-            RefineError::Io(format!(
-                "failed to create process registry {}: {error}",
-                self.processes_dir().display()
-            ))
-        })?;
-        let path = self.artifact_handoff_path(process_id);
-        let file = OpenOptions::new()
-            .create(true)
-            .read(true)
-            .write(true)
-            .truncate(false)
-            .open(&path)
-            .map_err(|error| {
-                RefineError::Io(format!(
-                    "failed to open process artifact handoff {}: {error}",
-                    path.display()
-                ))
-            })?;
-        file.lock_exclusive().map_err(|error| {
-            RefineError::Io(format!(
-                "failed to lock process artifact handoff {}: {error}",
-                path.display()
-            ))
-        })?;
-        Ok(file)
-    }
-
-    pub(crate) fn finish_artifact_handoff(&self, handoff: fs::File) -> RefineResult<()> {
-        FileExt::unlock(&handoff).map_err(|error| {
-            RefineError::Io(format!(
-                "failed to unlock process artifact handoff: {error}"
-            ))
-        })?;
-        drop(handoff);
-        Ok(())
-    }
-
-    pub(crate) fn artifact_handoff_path(&self, process_id: &str) -> PathBuf {
-        self.processes_dir()
-            .join(format!("{process_id}.artifact-handoff.lock"))
-    }
-
     pub(super) fn process_identities_dir(&self) -> PathBuf {
         self.runtime_root.join(PROCESS_IDENTITIES_DIR)
     }
@@ -256,282 +208,6 @@ impl FileProcessSupervisor {
         write_json_atomically_transient(&path, &encoded, "process")
     }
 
-    pub(super) fn write_process_identity(
-        &self,
-        identity: &ManagedProcessIdentity,
-    ) -> RefineResult<()> {
-        fs::create_dir_all(self.process_identities_dir()).map_err(|error| {
-            RefineError::Io(format!(
-                "failed to create process identity registry {}: {error}",
-                self.process_identities_dir().display()
-            ))
-        })?;
-        let encoded = serde_json::to_vec_pretty(identity).map_err(|error| {
-            RefineError::Serialization(format!("failed to encode process identity: {error}"))
-        })?;
-        write_json_atomically(
-            &self.process_identity_path(&identity.process_id),
-            &encoded,
-            "process identity",
-        )
-    }
-
-    pub(super) fn create_process_identity(
-        &self,
-        process: &ManagedProcess,
-    ) -> RefineResult<ManagedProcessIdentity> {
-        let identity = self.build_process_identity(process)?;
-        self.write_process_identity(&identity)?;
-        Ok(identity)
-    }
-
-    /// Identity for a run-to-completion process; see [`Self::write_process_transient`].
-    pub(super) fn create_process_identity_transient(
-        &self,
-        process: &ManagedProcess,
-    ) -> RefineResult<ManagedProcessIdentity> {
-        let identity = self.build_process_identity(process)?;
-        fs::create_dir_all(self.process_identities_dir()).map_err(|error| {
-            RefineError::Io(format!(
-                "failed to create process identity registry {}: {error}",
-                self.process_identities_dir().display()
-            ))
-        })?;
-        let encoded = serde_json::to_vec_pretty(&identity).map_err(|error| {
-            RefineError::Serialization(format!("failed to encode process identity: {error}"))
-        })?;
-        write_json_atomically_transient(
-            &self.process_identity_path(&identity.process_id),
-            &encoded,
-            "process identity",
-        )?;
-        Ok(identity)
-    }
-
-    fn build_process_identity(
-        &self,
-        process: &ManagedProcess,
-    ) -> RefineResult<ManagedProcessIdentity> {
-        Ok(ManagedProcessIdentity {
-            process_id: process.id.clone(),
-            owner: process.owner.clone(),
-            pid: process.pid,
-            os_identity: process.pid.map(os_process_identity).transpose()?.flatten(),
-            registered_at: now_millis_string(),
-        })
-    }
-
-    pub(super) fn load_process_identity(
-        &self,
-        process: &ManagedProcess,
-    ) -> RefineResult<ManagedProcessIdentity> {
-        let path = self.process_identity_path(&process.id);
-        match fs::read(&path) {
-            Ok(bytes) => {
-                let identity =
-                    serde_json::from_slice::<ManagedProcessIdentity>(&bytes).map_err(|error| {
-                        RefineError::Serialization(format!(
-                            "failed to parse process identity {}: {error}",
-                            path.display()
-                        ))
-                    })?;
-                Ok(identity)
-            }
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                Err(RefineError::Conflict(format!(
-                    "managed process {} has no registration-time PID identity evidence; termination was not requested because the recorded PID may have been reused, and its legacy process record was retained for recovery",
-                    process.id
-                )))
-            }
-            Err(error) => Err(RefineError::Io(format!(
-                "failed to read process identity {}: {error}",
-                path.display()
-            ))),
-        }
-    }
-
-    pub(super) fn ensure_expected_registration(
-        &self,
-        expected: &ManagedProcess,
-        identity: &ManagedProcessIdentity,
-    ) -> RefineResult<()> {
-        self.ensure_identity_matches_process(expected, identity)?;
-        match self.inspect(&expected.id) {
-            Ok(current)
-                if current.id == expected.id
-                    && current.owner == expected.owner
-                    && current.pid == expected.pid
-                    && current.started_at == expected.started_at =>
-            {
-                Ok(())
-            }
-            Ok(_) => Err(RefineError::Conflict(format!(
-                "managed process {} registry identity changed before termination; termination was not requested and current evidence was retained for recovery",
-                expected.id
-            ))),
-            Err(RefineError::NotFound(_)) => match self.owned_process_state(expected, identity)? {
-                OwnedProcessState::Exited => Ok(()),
-                OwnedProcessState::Alive | OwnedProcessState::IdentityMismatch(_) => {
-                    Err(RefineError::Conflict(format!(
-                        "managed process {} is alive without its expected registry record; termination was not requested and identity evidence was retained for recovery",
-                        expected.id
-                    )))
-                }
-            },
-            Err(error) => Err(error),
-        }
-    }
-
-    pub(super) fn ensure_identity_matches_process(
-        &self,
-        process: &ManagedProcess,
-        identity: &ManagedProcessIdentity,
-    ) -> RefineResult<()> {
-        if identity.process_id != process.id
-            || identity.owner != process.owner
-            || identity.pid != process.pid
-        {
-            return Err(RefineError::Conflict(format!(
-                "managed process {} identity evidence does not match its registry record; termination was not requested and both records were retained for recovery",
-                process.id
-            )));
-        }
-        Ok(())
-    }
-
-    pub(super) fn owned_process_state(
-        &self,
-        process: &ManagedProcess,
-        identity: &ManagedProcessIdentity,
-    ) -> RefineResult<OwnedProcessState> {
-        let Some(pid) = process.pid else {
-            return Ok(OwnedProcessState::Exited);
-        };
-        if !pid_alive(pid)? {
-            return Ok(OwnedProcessState::Exited);
-        }
-        let actual = os_process_identity(pid)?;
-        // The process can exit between the liveness probe and identity read,
-        // especially immediately after a termination signal. Confirm that
-        // exact transition before treating an unavailable observation as an
-        // identity mismatch. If the PID is still alive, fail closed below.
-        if actual.is_none() && !pid_alive(pid)? {
-            return Ok(OwnedProcessState::Exited);
-        }
-        match (&identity.os_identity, &actual) {
-            (Some(expected), Some(actual)) if expected != actual => {
-                Ok(OwnedProcessState::IdentityMismatch(Some(actual.clone())))
-            }
-            (Some(_), None) => Ok(OwnedProcessState::IdentityMismatch(None)),
-            _ => Ok(OwnedProcessState::Alive),
-        }
-    }
-
-    pub(super) fn remove_process_artifacts(&self, process: &ManagedProcess) -> RefineResult<()> {
-        let lock = self.cleanup_lock(&process.id)?;
-        let removed = self.remove_process_artifacts_locked(process);
-        // The lock file itself is removed on this terminal path; the only
-        // contenders are the reaper and stoppers, and re-running these
-        // idempotent removals is harmless if one slips past the unlink.
-        let _ = fs::remove_file(self.cleanup_lock_path(&process.id));
-        FileExt::unlock(&lock).ok();
-        removed
-    }
-
-    fn remove_process_artifacts_locked(&self, process: &ManagedProcess) -> RefineResult<()> {
-        let handoff_path = self.artifact_handoff_path(&process.id);
-        // A live workflow consumer owns the transcript through this lease. Reconciliation may
-        // already persist a truthful terminal state, but deletion waits until consumption ends.
-        let handoff = match OpenOptions::new()
-            .read(true)
-            .write(true)
-            .open(&handoff_path)
-        {
-            Ok(file) => match file.try_lock_exclusive() {
-                Ok(()) => Some(file),
-                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => return Ok(()),
-                Err(error) => {
-                    return Err(RefineError::Io(format!(
-                        "failed to lock process artifact handoff {} for cleanup: {error}",
-                        handoff_path.display()
-                    )));
-                }
-            },
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
-            Err(error) => {
-                return Err(RefineError::Io(format!(
-                    "failed to open process artifact handoff {} for cleanup: {error}",
-                    handoff_path.display()
-                )));
-            }
-        };
-        for path in [
-            process.stdout_path.as_deref(),
-            process.stderr_path.as_deref(),
-            process.stdin_path.as_deref(),
-        ]
-        .into_iter()
-        .flatten()
-        {
-            match fs::remove_file(path) {
-                Ok(()) => {}
-                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-                Err(error) => {
-                    return Err(RefineError::Io(format!(
-                        "failed to remove process artifact {path}: {error}"
-                    )));
-                }
-            }
-        }
-        if let Some(handoff) = handoff {
-            drop(handoff);
-            match fs::remove_file(&handoff_path) {
-                Ok(()) => {}
-                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-                Err(error) => {
-                    return Err(RefineError::Io(format!(
-                        "failed to remove process artifact handoff {}: {error}",
-                        handoff_path.display()
-                    )));
-                }
-            }
-        }
-        let path = self.processes_dir().join(format!("{}.json", process.id));
-        match fs::remove_file(&path) {
-            Ok(()) => {}
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-            Err(error) => {
-                return Err(RefineError::Io(format!(
-                    "failed to remove process {}: {error}",
-                    path.display()
-                )));
-            }
-        }
-        let history_path = self.process_history_path(&process.id);
-        match fs::remove_file(&history_path) {
-            Ok(()) => {}
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-            Err(error) => {
-                return Err(RefineError::Io(format!(
-                    "failed to remove process history {}: {error}",
-                    history_path.display()
-                )));
-            }
-        }
-        let identity_path = self.process_identity_path(&process.id);
-        match fs::remove_file(&identity_path) {
-            Ok(()) => {}
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-            Err(error) => {
-                return Err(RefineError::Io(format!(
-                    "failed to remove process identity {}: {error}",
-                    identity_path.display()
-                )));
-            }
-        }
-        Ok(())
-    }
-
     pub(super) fn inspect_terminal(&self, process_id: &str) -> RefineResult<ManagedProcess> {
         let path = self.process_history_path(process_id);
         let bytes = fs::read(&path).map_err(|error| {
@@ -560,6 +236,7 @@ impl FileProcessSupervisor {
     /// resurrected a history record for a process an explicit stop had already
     /// cleaned. The flock is advisory, per process id, and released on drop.
     pub(super) fn cleanup_lock(&self, process_id: &str) -> RefineResult<fs::File> {
+        self.prepare_artifact_coordination()?;
         fs::create_dir_all(self.processes_dir()).map_err(|error| {
             RefineError::Io(format!(
                 "failed to create process registry {}: {error}",
@@ -579,7 +256,12 @@ impl FileProcessSupervisor {
                     path.display()
                 ))
             })?;
-        file.lock_exclusive().map_err(|error| {
+        crate::infrastructure::process::supervisor::coordination::lock_exclusive_before(
+            &file,
+            &path,
+            Duration::from_millis(200),
+        )
+        .map_err(|error| {
             RefineError::Io(format!(
                 "failed to lock process cleanup lock {}: {error}",
                 path.display()
@@ -603,6 +285,7 @@ impl FileProcessSupervisor {
                 process.id
             )));
         }
+        let _registration = self.artifact_registration_fence(&process.id)?;
         let lock = self.cleanup_lock(&process.id)?;
         let archived = self.archive_terminal_process_locked(process);
         FileExt::unlock(&lock).ok();
@@ -626,6 +309,13 @@ impl FileProcessSupervisor {
                 self.process_history_dir().display()
             ))
         })?;
+        // A leader exit is not a group exit. Preserve registration, identities and command
+        // evidence while maintenance still observes descendants or cannot prove their exit.
+        if (Self::requires_group_ownership(process) || self.group_path(&process.id).exists())
+            && self.group_pending(process).unwrap_or(true)
+        {
+            return Ok(process.clone());
+        }
         let mut archived = process.clone();
         let handoff_path = self.artifact_handoff_path(&archived.id);
         let mut handoff = None;
@@ -679,6 +369,21 @@ impl FileProcessSupervisor {
     }
 
     pub fn register(&self, process: ManagedProcess) -> RefineResult<ManagedProcess> {
+        let _retirement = self.artifact_registration_fence(&process.id)?;
+        // Terminal updates are still owned by the originating execution. A stale
+        // PTY failure must not replace a newer registration before cleanup runs.
+        match fs::read(self.processes_dir().join(format!("{}.json", process.id))) {
+            Ok(bytes) => {
+                let current: ManagedProcess = serde_json::from_slice(&bytes)
+                    .map_err(|e| RefineError::Serialization(e.to_string()))?;
+                Self::ensure_same_registration(&process, &current)?;
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => return Err(RefineError::Io(e.to_string())),
+        }
+        if self.group_path(&process.id).exists() {
+            self.owned_group_for_process(&process)?;
+        }
         if process.state != "running" {
             self.write_process(&process)?;
             return self.archive_terminal_process(&process);

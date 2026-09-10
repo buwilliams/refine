@@ -479,6 +479,7 @@ impl HostAgentProviderService {
                     }
                 },
             )?;
+        output.require_complete_capture()?;
         for line in formatter.finish() {
             on_output(line);
         }

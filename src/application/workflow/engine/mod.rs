@@ -11,3 +11,5 @@ pub(crate) use context::execution::{
 pub(crate) use policy::{agent_idle_timeout, setting_string};
 
 pub(crate) mod admission;
+#[cfg(test)]
+pub(crate) use execution::test_hooks;

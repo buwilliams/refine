@@ -752,11 +752,11 @@ fn workflow_goal_agent_handoff_survives_dead_process_recovery() {
             .join(format!("{}.stdout.log", result.process_id))
             .exists()
     );
-    assert!(
-        !supervisor
-            .artifact_handoff_path(&result.process_id)
-            .exists()
-    );
+    // The inode remains stable so a waiting consumer cannot lock an unlinked lease.
+    let lease = supervisor
+        .begin_artifact_handoff(&result.process_id)
+        .unwrap();
+    supervisor.finish_artifact_handoff(lease).unwrap();
 
     unsafe {
         if let Some(previous) = previous {

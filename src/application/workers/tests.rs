@@ -802,6 +802,29 @@ fn cleanup_runner_applies_configured_inactive_worktree_retention() {
             .success()
     );
 
+    // Worker recovery cannot block the independent cleanup lane. Repository contention is
+    // deferred, and even an otherwise eligible cancelled worktree remains while dirty.
+    std::fs::create_dir_all(&runtime_root).unwrap();
+    std::fs::write(runtime_root.join("workflow-recovery.json"), "{corrupt").unwrap();
+    assert!(
+        FileRunnerWorkerService::new(&runtime_root)
+            .ensure_background_worker(WORKFLOW_RUNNER)
+            .is_err()
+    );
+    std::fs::write(worktree.join("README.md"), "retained unfinished work\n").unwrap();
+    let lock = crate::infrastructure::git::locks::repository_git_lock(&target_root).unwrap();
+    let guard = lock.lock().unwrap();
+    let started = Instant::now();
+    run_configured_worktree_cleanup(&runtime_root, &target_root);
+    assert!(started.elapsed() < Duration::from_secs(1));
+    assert!(worktree.exists());
+    drop(guard);
+    run_configured_worktree_cleanup(&runtime_root, &target_root);
+    assert_eq!(
+        std::fs::read_to_string(worktree.join("README.md")).unwrap(),
+        "retained unfinished work\n"
+    );
+    std::fs::write(worktree.join("README.md"), "base\n").unwrap();
     run_configured_worktree_cleanup(&runtime_root, &target_root);
 
     assert!(!worktree.exists());

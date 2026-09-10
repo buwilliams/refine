@@ -97,7 +97,66 @@ impl FileNextActionsService {
             })
             .count();
 
+        let workflow_health = self
+            .runtime_root
+            .as_ref()
+            .map(|root| crate::application::workflow::health::assess_workflow_health(root));
         let mut suggestions = Vec::new();
+        let todo_count = goals
+            .iter()
+            .filter(|goal| {
+                goal.goal.status == GoalStatus::Todo
+                    && crate::application::fleet::nodes::node_ids_match(
+                        goal.goal.node_id.as_deref().unwrap_or("default"),
+                        &active_node_id,
+                    )
+            })
+            .count();
+        if let Some(health) = &workflow_health {
+            if !health.healthy {
+                let waiting = health.waiting_todo_count;
+                let last_tick = health
+                    .observation
+                    .as_ref()
+                    .map(|o| o.tick_ms.to_string())
+                    .unwrap_or_else(|| "unavailable".into());
+                suggest(
+                    &mut suggestions,
+                    "inspect-workflow-health",
+                    &format!(
+                        "{}; {waiting} continuously eligible Todo Goals waiting over 30 seconds; last scheduler tick {last_tick}",
+                        health.reason
+                    ),
+                    &health.remedy,
+                );
+            } else if todo_count > 0 {
+                let cause = if matches!(
+                    health.state.as_str(),
+                    "paused" | "disabled" | "detached" | "draining"
+                ) {
+                    health.reason.as_str()
+                } else {
+                    health
+                        .admission
+                        .as_ref()
+                        .map(|a| a.cause.as_str())
+                        .unwrap_or("admission evidence unavailable")
+                };
+                suggest(
+                    &mut suggestions,
+                    "workflow-waiting",
+                    cause,
+                    "refine system status",
+                );
+            }
+        } else if todo_count > 0 {
+            suggest(
+                &mut suggestions,
+                "workflow-evidence-unavailable",
+                "Todo work exists, but local workflow runtime evidence is unavailable",
+                "refine system status",
+            );
+        }
         if goals.is_empty() {
             suggest(
                 &mut suggestions,
@@ -167,6 +226,7 @@ impl FileNextActionsService {
                 "nodes_healthy": healthy_node_count,
                 "running_workflow_processes": running_workflow_processes,
             },
+            "workflow_health": workflow_health,
             "suggestions": suggestions
         }))
     }
@@ -185,10 +245,9 @@ impl FileNextActionsService {
                         .details
                         .as_deref()
                         .and_then(|details| serde_json::from_str::<serde_json::Value>(details).ok())
-                        .and_then(|details| details.get("kind").cloned())
-                        .and_then(|kind| kind.as_str().map(str::to_string))
-                        .as_deref()
-                        == Some("workflow")
+                        .is_some_and(|details| {
+                            details["kind"] == "workflow" || details["goal_id"].is_string()
+                        })
             })
             .count()
     }

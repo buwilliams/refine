@@ -26,8 +26,16 @@ const COORDINATION_ACQUIRE_POLL_INTERVAL: Duration = Duration::from_millis(25);
 /// `fs2` offers only a blocking or an immediate attempt, so a bounded wait is
 /// polled. The interval is short enough that ordinary contention is
 /// indistinguishable from a blocking acquire.
-fn lock_exclusive_before(file: &File, path: &Path, timeout: Duration) -> RefineResult<()> {
-    let deadline = Instant::now() + timeout;
+pub(crate) fn lock_exclusive_before(
+    file: &File,
+    path: &Path,
+    timeout: Duration,
+) -> RefineResult<()> {
+    let timeout = LOCK_TIMEOUT.with(|value| value.get()).unwrap_or(timeout);
+    let deadline = LOCK_DEADLINE
+        .with(|value| value.get())
+        .map(|d| d.min(Instant::now() + timeout))
+        .unwrap_or_else(|| Instant::now() + timeout);
     loop {
         match file.try_lock_exclusive() {
             Ok(()) => return Ok(()),
@@ -46,8 +54,42 @@ fn lock_exclusive_before(file: &File, path: &Path, timeout: Duration) -> RefineR
                 timeout.as_secs()
             )));
         }
-        std::thread::sleep(COORDINATION_ACQUIRE_POLL_INTERVAL);
+        std::thread::sleep(
+            COORDINATION_ACQUIRE_POLL_INTERVAL
+                .min(deadline.saturating_duration_since(Instant::now())),
+        );
     }
+}
+
+thread_local! { static LOCK_TIMEOUT: std::cell::Cell<Option<Duration>> = const { std::cell::Cell::new(None) }; }
+
+pub fn with_lock_timeout<T>(timeout: Duration, operation: impl FnOnce() -> T) -> T {
+    struct Reset(Option<Duration>);
+    impl Drop for Reset {
+        fn drop(&mut self) {
+            LOCK_TIMEOUT.with(|value| value.set(self.0));
+        }
+    }
+    let _reset = Reset(LOCK_TIMEOUT.with(|value| value.replace(Some(timeout))));
+    operation()
+}
+
+thread_local! { static LOCK_DEADLINE: std::cell::Cell<Option<Instant>> = const { std::cell::Cell::new(None) }; }
+
+/// Nested coordination cannot extend an owning operation's monotonic budget.
+pub(crate) fn with_lock_deadline<T>(deadline: Instant, operation: impl FnOnce() -> T) -> T {
+    struct Reset(Option<Instant>);
+    impl Drop for Reset {
+        fn drop(&mut self) {
+            LOCK_DEADLINE.with(|v| v.set(self.0));
+        }
+    }
+    let _reset = Reset(LOCK_DEADLINE.with(|v| {
+        let old = v.get();
+        v.set(Some(old.map_or(deadline, |d| d.min(deadline))));
+        old
+    }));
+    operation()
 }
 
 /// Where record locks live. Under `runtime/` because a lock describes this

@@ -4,91 +4,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
-const PTY_EOF_RETRY_INITIAL: Duration = Duration::from_millis(20);
-const PTY_EOF_RETRY_MAX: Duration = Duration::from_millis(500);
-
-/// Move a failed session's transcript out of the artifact set that supervisor
-/// cleanup deletes. Renamed in place (same directory, `.failed` suffix) so the
-/// evidence stays node-local under the runtime tree.
-fn preserve_failed_transcript(stdout_path: &Path) -> Option<PathBuf> {
-    let file_name = stdout_path.file_name()?.to_str()?;
-    let preserved = stdout_path.with_file_name(format!("{file_name}.failed"));
-    fs::rename(stdout_path, &preserved).ok()?;
-    Some(preserved)
-}
-
-/// Copy PTY output into the transcript until the child is confirmed gone.
-///
-/// A zero-byte read is not trusted as EOF: on Linux the master reads EIO —
-/// which the vendored PTY surfaces as `Ok(0)` — whenever no process
-/// momentarily holds the slave side, and the agent spawns and reaps its own
-/// subprocesses. Treating that transient state as EOF once froze the activity
-/// clock and let the idle watchdog kill a live agent, so zero-byte reads are
-/// retried with capped backoff until the poll loop confirms via `child_exited`
-/// that the child was actually reaped.
-pub(super) fn pump_pty_output(
-    reader: &mut dyn Read,
-    transcript: &mut fs::File,
-    transcript_path: &Path,
-    activity: &Mutex<Instant>,
-    child_exited: &AtomicBool,
-) -> RefineResult<()> {
-    let mut buffer = [0_u8; 4096];
-    let mut eof_retry = PTY_EOF_RETRY_INITIAL;
-    loop {
-        match reader.read(&mut buffer) {
-            Ok(0) => {
-                if child_exited.load(Ordering::SeqCst) {
-                    return Ok(());
-                }
-                thread::sleep(eof_retry);
-                eof_retry = (eof_retry * 2).min(PTY_EOF_RETRY_MAX);
-            }
-            Ok(count) => {
-                eof_retry = PTY_EOF_RETRY_INITIAL;
-                *activity.lock().expect("Goal Agent activity clock poisoned") = Instant::now();
-                transcript.write_all(&buffer[..count]).map_err(|error| {
-                    RefineError::Io(format!(
-                        "failed to append Goal Agent transcript {}: {error}",
-                        transcript_path.display()
-                    ))
-                })?;
-                transcript.flush().map_err(|error| {
-                    RefineError::Io(format!(
-                        "failed to flush Goal Agent transcript {}: {error}",
-                        transcript_path.display()
-                    ))
-                })?;
-            }
-            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => {}
-            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
-                thread::sleep(Duration::from_millis(10));
-            }
-            Err(error) => {
-                return Err(RefineError::Io(format!(
-                    "Goal Agent output stream failed: {error}"
-                )));
-            }
-        }
-    }
-}
-
-/// The distinct failure for a reader thread that died while the child was
-/// still running. The activity clock is frozen from that moment, so letting
-/// the idle watchdog speak would blame a live agent for the harness's own
-/// capture fault.
-pub(super) fn transcript_capture_failure(
-    join_result: std::thread::Result<RefineResult<()>>,
-) -> RefineError {
-    let cause = match join_result {
-        Ok(Err(error)) => error.to_string(),
-        Ok(Ok(())) => "transcript reader stopped without an error".to_string(),
-        Err(_) => "transcript reader panicked".to_string(),
-    };
-    RefineError::Io(format!(
-        "Goal Agent transcript capture failed while the agent was still running: {cause}"
-    ))
-}
+use super::output_capture::*;
 
 /// The PTY is owned by the workflow runner, while its process record, transcript,
 /// command queue, and signal file are ordinary runtime artifacts. That split lets
@@ -124,278 +40,23 @@ where
     F: FnMut(GoalAgentAttention),
     O: FnMut(&FileProcessSupervisor, &ManagedProcess, &GoalAgentSettlement) -> RefineResult<()>,
 {
-    crate::infrastructure::git::worktrees::validate_workspace_launch(
-        &launch.metadata,
-        Some(&launch.cwd),
-    )?;
-    let cwd = launch.cwd.canonicalize().map_err(|error| {
-        RefineError::InvalidInput(format!(
-            "Goal Agent cwd {} is not available: {error}",
-            launch.cwd.display()
-        ))
-    })?;
-    let session_id = Uuid::new_v4().to_string();
-    let process_id = format!("goal-agent-{session_id}");
-    let supervisor = FileProcessSupervisor::new(&launch.runtime_root);
-    fs::create_dir_all(supervisor.processes_dir()).map_err(|error| {
-        RefineError::Io(format!(
-            "failed to create Goal Agent process registry {}: {error}",
-            supervisor.processes_dir().display()
-        ))
-    })?;
-    let launch_lock_path = supervisor.processes_dir().join(".goal-agent-launch.lock");
-    let launch_lock = OpenOptions::new()
-        .create(true)
-        .read(true)
-        .write(true)
-        .truncate(false)
-        .open(&launch_lock_path)
-        .map_err(|error| {
-            RefineError::Io(format!(
-                "failed to open Goal Agent launch lock {}: {error}",
-                launch_lock_path.display()
-            ))
-        })?;
-    launch_lock.lock_exclusive().map_err(|error| {
-        RefineError::Io(format!(
-            "failed to lock Goal Agent launch coordination {}: {error}",
-            launch_lock_path.display()
-        ))
-    })?;
-    if let Some(goal_id) = launch
-        .metadata
-        .get("goal_id")
-        .and_then(Value::as_str)
-        .filter(|goal_id| !goal_id.trim().is_empty())
-    {
-        match find_goal_agent_session(&launch.runtime_root, goal_id) {
-            Ok(_) => {
-                return Err(RefineError::Conflict(format!(
-                    "Goal {goal_id} already has a running Goal Agent"
-                )));
-            }
-            Err(RefineError::NotFound(_)) => {}
-            Err(error) => return Err(error),
-        }
-    }
-    let stdout_path = supervisor
-        .processes_dir()
-        .join(format!("{process_id}.stdout.log"));
-    let command_path = supervisor
-        .processes_dir()
-        .join(format!("{process_id}.commands.jsonl"));
-    let signal_path = supervisor
-        .processes_dir()
-        .join(format!("{process_id}.signal.json"));
-    fs::File::create(&stdout_path).map_err(|error| {
-        RefineError::Io(format!(
-            "failed to create Goal Agent transcript {}: {error}",
-            stdout_path.display()
-        ))
-    })?;
-    if let Err(error) = fs::File::create(&command_path) {
-        let _ = fs::remove_file(&stdout_path);
-        return Err(RefineError::Io(format!(
-            "failed to create Goal Agent command queue {}: {error}",
-            command_path.display()
-        )));
-    }
-
-    let provider_service = HostAgentProviderService::with_runtime_root(&launch.runtime_root);
-    let implementation_phase = launch
-        .metadata
-        .get("implementation_phase")
-        .and_then(Value::as_str);
-    let requires_planning_result =
-        matches!(implementation_phase, Some("plan" | "criticize" | "revise"));
-    let protocol_prompt =
-        goal_agent_protocol_prompt(&launch.prompt, &signal_path, implementation_phase);
-    let launch_env_overrides = vec![
-        ("TERM".to_string(), "xterm-256color".to_string()),
-        ("COLORTERM".to_string(), "truecolor".to_string()),
-        ("REFINE_TERMINAL".to_string(), "1".to_string()),
-        ("REFINE_SESSION_ROLE".to_string(), "goal".to_string()),
-        ("REFINE_AGENT_SESSION_ID".to_string(), session_id.clone()),
-        (
-            "REFINE_AGENT_SIGNAL_PATH".to_string(),
-            signal_path.display().to_string(),
-        ),
-    ];
-    let command = match provider_service.interactive_command_with_session_and_environment(
-        &launch.provider,
-        &protocol_prompt,
-        launch.provider_session.as_ref(),
-        &launch_env_overrides,
-    ) {
-        Ok(command) => command,
-        Err(error) => {
-            cleanup_session_artifacts(&command_path, &signal_path);
-            let _ = fs::remove_file(&stdout_path);
-            return Err(error);
-        }
-    };
-    if let Err(error) = command.validate_prompt_artifact() {
-        cleanup_session_artifacts(&command_path, &signal_path);
-        let _ = fs::remove_file(&stdout_path);
-        return Err(error);
-    }
-    let completion_timeout = launch.completion_timeout;
-    let idle_timeout = launch.idle_timeout;
-    let mut metadata = launch.metadata;
-    metadata.insert("kind".to_string(), json!("interactive_session"));
-    metadata.insert("profile".to_string(), json!("goal"));
-    metadata.insert("role".to_string(), json!("goal"));
-    metadata.insert("mode".to_string(), json!("goal"));
-    metadata.insert("provider".to_string(), json!(&launch.provider));
-    metadata.insert("session_id".to_string(), json!(&session_id));
-    metadata.insert("cwd".to_string(), json!(cwd.display().to_string()));
-    metadata.insert("attention_state".to_string(), json!("working"));
-    // Launch metadata cannot grant the Toolbar exemption. Only an attachment
-    // command accepted by this live runtime may make the state one-way true.
-    metadata.insert(TOOLBAR_TIMEOUT_PROTECTED_KEY.to_string(), json!(false));
-    metadata.remove(TOOLBAR_ATTACHMENT_ACKS_KEY);
-    metadata.insert(
-        "prompt_transport".to_string(),
-        serde_json::to_value(&command.prompt_transport).map_err(|error| {
-            RefineError::Serialization(format!(
-                "failed to encode Goal Agent prompt transport metadata: {error}"
-            ))
-        })?,
-    );
-    metadata.insert(
-        "command_path".to_string(),
-        json!(command_path.display().to_string()),
-    );
-    metadata.insert(
-        "signal_path".to_string(),
-        json!(signal_path.display().to_string()),
-    );
-
-    let managed_spec = ManagedProcessSpec {
-        owner: ProcessOwner::Agent,
-        command: command.binary.clone(),
-        args: command.args.clone(),
-        cwd: Some(cwd.display().to_string()),
-        env: launch_env_overrides,
-        stdin: command.stdin.clone(),
-        limits: Some(ProcessResourceLimits {
-            kill_on_parent_exit: true,
-            ..Default::default()
-        }),
-        authorization_command: Some(command.authorization_command.clone()),
-        sensitive: false,
-        metadata: metadata.clone(),
-    };
-    if let Err(error) = supervisor.validate_interactive_launch(&managed_spec) {
-        cleanup_session_artifacts(&command_path, &signal_path);
-        let _ = fs::remove_file(&stdout_path);
-        return Err(error);
-    }
-    let pty_system = native_pty_system();
-    let pair = match pty_system.openpty(pty_size(DEFAULT_COLS, DEFAULT_ROWS)) {
-        Ok(pair) => pair,
-        Err(error) => {
-            cleanup_session_artifacts(&command_path, &signal_path);
-            let _ = fs::remove_file(&stdout_path);
-            return Err(RefineError::Io(format!(
-                "failed to open Goal Agent PTY: {error}"
-            )));
-        }
-    };
-    let mut pty_command = CommandBuilder::new(&command.binary);
-    pty_command.args(&command.args);
-    pty_command.cwd(&cwd);
-    command.launch_environment.apply_to_pty(&mut pty_command);
-    crate::infrastructure::git::worktrees::validate_workspace_launch(&metadata, Some(&cwd))?;
-    let mut child = match pair.slave.spawn_command(pty_command) {
-        Ok(child) => child,
-        Err(error) => {
-            cleanup_session_artifacts(&command_path, &signal_path);
-            let _ = fs::remove_file(&stdout_path);
-            return Err(RefineError::Io(format!(
-                "failed to start interactive Goal Agent with {}: {error}",
-                launch.provider
-            )));
-        }
-    };
-    let pid = child.process_id();
-    let mut reader = match pair.master.try_clone_reader() {
-        Ok(reader) => reader,
-        Err(error) => {
-            let _ = child.kill();
-            let _ = child.wait();
-            cleanup_session_artifacts(&command_path, &signal_path);
-            let _ = fs::remove_file(&stdout_path);
-            return Err(RefineError::Io(format!(
-                "failed to read Goal Agent output: {error}"
-            )));
-        }
-    };
-    let mut writer = match pair.master.take_writer() {
-        Ok(writer) => writer,
-        Err(error) => {
-            let _ = child.kill();
-            let _ = child.wait();
-            cleanup_session_artifacts(&command_path, &signal_path);
-            let _ = fs::remove_file(&stdout_path);
-            return Err(RefineError::Io(format!(
-                "failed to open Goal Agent input: {error}"
-            )));
-        }
-    };
-    drop(pair.slave);
-
-    let details = match encode_metadata(&metadata) {
-        Ok(details) => details,
-        Err(error) => {
-            let _ = child.kill();
-            let _ = child.wait();
-            cleanup_session_artifacts(&command_path, &signal_path);
-            let _ = fs::remove_file(&stdout_path);
-            return Err(error);
-        }
-    };
-    let artifact_handoff = match supervisor.begin_artifact_handoff(&process_id) {
-        Ok(handoff) => handoff,
-        Err(error) => {
-            let _ = child.kill();
-            let _ = child.wait();
-            cleanup_session_artifacts(&command_path, &signal_path);
-            let _ = fs::remove_file(&stdout_path);
-            return Err(error);
-        }
-    };
-    let mut process = ManagedProcess {
-        id: process_id.clone(),
-        owner: ProcessOwner::Agent,
-        pid,
-        state: "running".to_string(),
-        label: Some(format!(
-            "Goal {} agent",
-            metadata
-                .get("goal_id")
-                .and_then(Value::as_str)
-                .unwrap_or("workflow")
-        )),
-        details: Some(details),
-        stdout_path: Some(stdout_path.display().to_string()),
-        stderr_path: None,
-        stdin_path: Some(command_path.display().to_string()),
-        limits: managed_spec.limits,
-        started_at: Utc::now().to_rfc3339(),
-        exit_code: None,
-    };
-    if let Err(error) = supervisor.register(process.clone()) {
-        let _ = child.kill();
-        let _ = child.wait();
-        let _ = supervisor.finish_artifact_handoff(artifact_handoff);
-        let _ = fs::remove_file(supervisor.artifact_handoff_path(&process_id));
-        cleanup_session_artifacts(&command_path, &signal_path);
-        let _ = fs::remove_file(&stdout_path);
-        return Err(error);
-    }
-    let _ = FileExt::unlock(&launch_lock);
-    drop(launch_lock);
+    let super::pty_lifecycle::StartedSession {
+        supervisor,
+        session_id,
+        stdout_path,
+        command_path,
+        signal_path,
+        mut metadata,
+        mut process,
+        mut lifecycle,
+        master,
+        mut reader,
+        mut writer,
+        artifact_handoff,
+        completion_timeout,
+        idle_timeout,
+        requires_planning_result,
+    } = super::pty_lifecycle::launch_session(launch)?;
 
     let reader_path = stdout_path.clone();
     // Written by the reader thread on every PTY chunk and read by the poll
@@ -403,9 +64,7 @@ where
     // chunk for the idle budget" means the agent has stalled.
     let last_activity = Arc::new(Mutex::new(Instant::now()));
     let reader_activity = Arc::clone(&last_activity);
-    // Raised by the poll loop once `child.try_wait()` or `child.wait()` has
-    // reaped the child; only then may the reader treat a zero-byte read as EOF
-    // instead of a transient PTY EIO.
+    // Raised after bounded scope settlement to request a bounded final drain.
     let child_exited = Arc::new(AtomicBool::new(false));
     let reader_child_exited = Arc::clone(&child_exited);
     let mut reader_thread = Some(thread::spawn(move || -> RefineResult<()> {
@@ -438,8 +97,10 @@ where
         SignalReader::default().requiring_planning_result(requires_planning_result);
     let mut invalid_signal_recovery = InvalidSignalRecovery::default();
     let mut toolbar_timeout_protected = false;
-    let status_result = (|| -> RefineResult<_> {
+    let mut status_result = (|| -> RefineResult<_> {
         loop {
+            #[cfg(all(test, target_os = "linux"))]
+            super::ownership_tests::hook(&supervisor.runtime_root, "poll", &process)?;
             for command in read_commands_since(&command_path, &mut command_offset)? {
                 match command {
                     AgentSessionCommand::Input { data } => {
@@ -472,7 +133,7 @@ where
                             .lock()
                             .expect("Goal Agent activity clock poisoned") =
                             std::time::Instant::now();
-                        pair.master.resize(pty_size(cols, rows)).map_err(|error| {
+                        master.resize(pty_size(cols, rows)).map_err(|error| {
                             RefineError::Io(format!("failed to resize Goal Agent PTY: {error}"))
                         })?;
                     }
@@ -510,12 +171,7 @@ where
                 }
             }
 
-            let process_exit = child.try_wait().map_err(|error| {
-                RefineError::Io(format!("failed to inspect Goal Agent process: {error}"))
-            })?;
-            if process_exit.is_some() {
-                child_exited.store(true, Ordering::SeqCst);
-            }
+            let process_exit = lifecycle.workload_status(&process)?;
             let signal_read = if process_exit.is_some() {
                 signal_reader.finish(&signal_path)?
             } else {
@@ -565,15 +221,11 @@ where
                             planning_result = signal.planning_result;
                             metadata.insert("attention_state".to_string(), json!("completed"));
                             metadata.remove("attention_message");
+                            metadata.insert("workload_result".into(), json!({"completed_by_signal":true,"output":completion_report,"guidance_applied":guidance_applied,"implementation_evidence":implementation_evidence,"planning_result":planning_result}));
                             process.details = Some(encode_metadata(&metadata)?);
                             supervisor.register(process.clone())?;
-                            // The PTY child is a setsid session leader; kill
-                            // its whole group first so descendants holding the
-                            // slave die with it and the reader sees EOF.
-                            if let Some(pid) = pid {
-                                let _ = signal_os_process(pid, "kill", true);
-                            }
-                            let _ = child.kill();
+                            break Ok(process_exit
+                                .unwrap_or_else(|| portable_pty::ExitStatus::with_exit_code(0)));
                         }
                         AgentSessionState::NeedsInput => {
                             let message = if signal.message.trim().is_empty() {
@@ -648,40 +300,58 @@ where
             thread::sleep(COMMAND_POLL_INTERVAL);
         }
     })();
+    // Workload result and whole-scope exit are independent. Always settle owned
+    // descendants through the shared owner, including natural leader exit.
+    if let Ok(status) = &status_result {
+        process.exit_code = i32::try_from(status.exit_code()).ok();
+    }
+    let termination = lifecycle.settle(&process);
+    if completed_by_signal && termination.is_ok() {
+        status_result = lifecycle.workload_status(&process).and_then(|status| {
+            status.ok_or_else(|| {
+                RefineError::Degraded("completed PTY scope has no workload-status receipt".into())
+            })
+        });
+    }
+    if let Err(error) = &termination {
+        metadata.insert("scope_settlement_error".into(), json!(error.to_string()));
+        process.details = Some(encode_metadata(&metadata)?);
+    }
+    child_exited.store(true, Ordering::SeqCst);
+    let capture = finish_capture(&mut reader_thread);
+    let status_result = match (status_result, termination, capture) {
+        (Err(error), stop, capture) => {
+            Err(append_settlement_faults(error, stop.err(), capture.err()))
+        }
+        (Ok(status), Err(error), capture) => {
+            if !status.success() && !completed_by_signal {
+                Err(append_settlement_faults(
+                    RefineError::Degraded(format!(
+                        "Goal Agent exited unsuccessfully: {}",
+                        status.exit_code()
+                    )),
+                    Some(error),
+                    capture.err(),
+                ))
+            } else {
+                Err(append_settlement_faults(error, None, capture.err()))
+            }
+        }
+        (Ok(_), Ok(()), Err(error)) => Err(error),
+        (Ok(status), Ok(()), Ok(())) => Ok(status),
+    };
     let status = match status_result {
         Ok(status) => status,
         Err(error) => {
-            // Kill the whole process group first: the PTY child is a setsid
-            // session leader, and killing only the leader leaves descendants
-            // holding the slave, so the reader would block on the terminal
-            // until they finished on their own.
-            if let Some(pid) = pid {
-                let _ = signal_os_process(pid, "kill", true);
-            }
-            let _ = child.kill();
-            let _ = child.wait();
-            child_exited.store(true, Ordering::SeqCst);
-            let capture_error = reader_thread.take().and_then(|handle| match handle.join() {
-                Ok(Ok(())) => None,
-                Ok(Err(error)) => Some(error.to_string()),
-                Err(_) => Some("transcript reader panicked".to_string()),
-            });
-            let error = match capture_error {
-                Some(capture) => match error {
-                    RefineError::Degraded(message) => RefineError::Degraded(format!(
-                        "{message}; transcript capture error: {capture}"
-                    )),
-                    RefineError::Io(message) => {
-                        RefineError::Io(format!("{message}; transcript capture error: {capture}"))
-                    }
-                    other => other,
-                },
-                None => error,
-            };
             // Preserve the transcript before artifact cleanup deletes it: for
             // a timed-out or stalled agent it is the only evidence of what the
             // session actually did, and the failure record points here.
-            let error = match preserve_failed_transcript(&stdout_path) {
+            let error = match supervisor
+                .group_pending(&process)
+                .is_ok_and(|p| !p)
+                .then(|| preserve_failed_transcript(&stdout_path))
+                .flatten()
+            {
                 Some(preserved) => {
                     let note = format!("transcript preserved at {}", preserved.display());
                     match error {
@@ -697,40 +367,36 @@ where
             process.state = "failed".to_string();
             let _ = supervisor.finish_artifact_handoff(artifact_handoff);
             let process_id = process.id.clone();
-            let _ = supervisor.register(process);
+            if let Err(registration_error) = supervisor.register(process.clone()) {
+                return Err(append_settlement_faults(
+                    error,
+                    Some(registration_error),
+                    None,
+                ));
+            }
             let _ = supervisor.cleanup(&process_id);
-            cleanup_session_artifacts(&command_path, &signal_path);
             return Err(error);
         }
     };
-    let reader_result = reader_thread
-        .take()
-        .expect("Goal Agent reader was joined before the session settled")
-        .join()
-        .map_err(|_| RefineError::Io("Goal Agent output reader panicked".to_string()))
-        .and_then(|result| result);
-    if let Err(error) = reader_result {
-        process.state = "failed".to_string();
-        let _ = supervisor.finish_artifact_handoff(artifact_handoff);
-        let process_id = process.id.clone();
-        let _ = supervisor.register(process);
-        let _ = supervisor.cleanup(&process_id);
-        cleanup_session_artifacts(&command_path, &signal_path);
-        return Err(error);
-    }
     let output = match fs::read(&stdout_path) {
         Ok(output) => String::from_utf8_lossy(&output).into_owned(),
         Err(error) => {
             process.state = "failed".to_string();
             let _ = supervisor.finish_artifact_handoff(artifact_handoff);
             let process_id = process.id.clone();
-            let _ = supervisor.register(process);
-            let _ = supervisor.cleanup(&process_id);
-            cleanup_session_artifacts(&command_path, &signal_path);
-            return Err(RefineError::Io(format!(
+            let error = RefineError::Io(format!(
                 "failed to read Goal Agent transcript {}: {error}",
                 stdout_path.display()
-            )));
+            ));
+            if let Err(registration_error) = supervisor.register(process.clone()) {
+                return Err(append_settlement_faults(
+                    error,
+                    Some(registration_error),
+                    None,
+                ));
+            }
+            let _ = supervisor.cleanup(&process_id);
+            return Err(error);
         }
     };
     let result_output = completion_report
@@ -755,7 +421,6 @@ where
         planning_result: planning_result.clone(),
     };
     if let Err(error) = on_process_settlement(&supervisor, &process, &settlement) {
-        cleanup_session_artifacts(&command_path, &signal_path);
         let _ = supervisor.finish_artifact_handoff(artifact_handoff);
         let _ = supervisor.cleanup(&process_id);
         return Err(error);
@@ -763,7 +428,6 @@ where
     // Give attached SSE readers one final polling interval to consume the fully
     // flushed transcript after durable workflow evidence has consumed it.
     thread::sleep(Duration::from_millis(120));
-    cleanup_session_artifacts(&command_path, &signal_path);
     supervisor.finish_artifact_handoff(artifact_handoff)?;
     supervisor.cleanup(&process_id)?;
 

@@ -1,7 +1,20 @@
 use super::*;
 
 impl FileProcessSupervisor {
-    fn wait_for_reaper_idle(&self, process_id: &str) -> RefineResult<()> {
+    /// Reuse the launching supervisor's child-handle reaping lane. Reaping a
+    /// guardian never supplies workload status or authorizes artifact retirement.
+    pub(crate) fn reap_pty_handle<T: Send + 'static>(
+        &self,
+        mut child: Box<dyn portable_pty::Child + Send + Sync>,
+        retained: T,
+    ) {
+        std::thread::spawn(move || {
+            let _retained = retained;
+            let _ = child.wait();
+        });
+    }
+
+    pub(super) fn wait_for_reaper_idle(&self, process_id: &str) -> RefineResult<()> {
         let deadline = Instant::now() + Duration::from_secs(1);
         loop {
             let reaper_owned = self
@@ -82,6 +95,13 @@ impl ProcessSupervisor for FileProcessSupervisor {
         })?;
 
         let mut command = process_command(&spec)?;
+        #[cfg(target_os = "linux")]
+        let mut scope_launch = owned_groups::launch_scope::ScopeLaunch::prepare(
+            self,
+            &process_id,
+            &spec,
+            &mut command,
+        )?;
         command.stdout(Stdio::from(stdout));
         command.stderr(Stdio::from(stderr));
         if spec.stdin.is_some() {
@@ -96,6 +116,21 @@ impl ProcessSupervisor for FileProcessSupervisor {
                 spec.command
             ))
         })?;
+        let mut details = process_details(&spec);
+        #[cfg(target_os = "linux")]
+        let workload_pid = match scope_launch.as_mut() {
+            Some(scope) => match scope.attach(&child, &mut details) {
+                Ok(pid) => pid,
+                Err(error) => {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return Err(error);
+                }
+            },
+            None => child.id(),
+        };
+        #[cfg(not(target_os = "linux"))]
+        let workload_pid = child.id();
         let stdin_path = if let Some(stdin) = spec.stdin.as_deref() {
             let path = self.processes_dir().join(format!("{process_id}.stdin.txt"));
             if !spec.sensitive && !spec.metadata.contains_key("prompt_transport") {
@@ -104,11 +139,6 @@ impl ProcessSupervisor for FileProcessSupervisor {
                         "failed to write process stdin {}: {error}",
                         path.display()
                     ))
-                })?;
-            }
-            if let Some(mut child_stdin) = child.stdin.take() {
-                child_stdin.write_all(stdin.as_bytes()).map_err(|error| {
-                    RefineError::Io(format!("failed to send managed process stdin: {error}"))
                 })?;
             }
             if spec.sensitive || spec.metadata.contains_key("prompt_transport") {
@@ -123,10 +153,10 @@ impl ProcessSupervisor for FileProcessSupervisor {
         let process = ManagedProcess {
             id: process_id,
             owner: spec.owner.clone(),
-            pid: Some(child.id()),
+            pid: Some(workload_pid),
             state: "running".to_string(),
             label: Some(spec.command.clone()),
-            details: Some(process_details(&spec)),
+            details: Some(details),
             stdout_path: Some(stdout_path.display().to_string()),
             stderr_path: Some(stderr_path.display().to_string()),
             stdin_path,
@@ -144,6 +174,17 @@ impl ProcessSupervisor for FileProcessSupervisor {
             let _ = child.wait();
             let _ = self.remove_process_artifacts(&process);
             return Err(error);
+        }
+        #[cfg(target_os = "linux")]
+        if let Some(scope) = scope_launch.as_mut() {
+            scope.release()?;
+        }
+        if let Some(stdin) = spec.stdin.as_deref() {
+            if let Some(mut child_stdin) = child.stdin.take() {
+                child_stdin.write_all(stdin.as_bytes()).map_err(|error| {
+                    RefineError::Io(format!("failed to send managed process stdin: {error}"))
+                })?;
+            }
         }
         drop(launch_guard);
         self.reaper_owned
@@ -352,5 +393,29 @@ impl ProcessSupervisor for FileProcessSupervisor {
             recovered.push(process);
         }
         Ok(recovered)
+    }
+}
+
+/// Every return path transfers guardian handle reaping to the existing deferred
+/// lifecycle lane. Dropping a handle never kills a guardian or proves scope exit.
+pub(super) struct ReapedChild(pub Option<std::process::Child>);
+impl std::ops::Deref for ReapedChild {
+    type Target = std::process::Child;
+    fn deref(&self) -> &Self::Target {
+        self.0.as_ref().unwrap()
+    }
+}
+impl std::ops::DerefMut for ReapedChild {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.0.as_mut().unwrap()
+    }
+}
+impl Drop for ReapedChild {
+    fn drop(&mut self) {
+        if let Some(mut child) = self.0.take() {
+            std::thread::spawn(move || {
+                let _ = child.wait();
+            });
+        }
     }
 }

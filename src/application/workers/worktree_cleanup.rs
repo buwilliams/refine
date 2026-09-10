@@ -6,8 +6,14 @@ pub(super) fn run_worktree_cleanup_worker(
 ) -> RefineResult<()> {
     let mut next_cleanup = Instant::now();
     loop {
-        if background_automation_is_paused(runtime_root)? {
-            return Ok(());
+        match background_automation_is_paused(runtime_root) {
+            Ok(true) => return Ok(()),
+            Ok(false) => {}
+            Err(error) => {
+                eprintln!("refine cleanup pause inspection: {error}");
+                thread::sleep(WORKTREE_CLEANUP_POLL_INTERVAL);
+                continue;
+            }
         }
         if Instant::now() >= next_cleanup {
             match registered_target_roots(runtime_root, project_registry_root) {
@@ -22,9 +28,10 @@ pub(super) fn run_worktree_cleanup_worker(
                                 // belonging to the other registered apps.
                                 run_configured_worktree_cleanup(runtime_root, &target_root);
                             },
-                        )? {
-                            BackgroundOperationOutcome::Completed(()) => {}
-                            BackgroundOperationOutcome::Paused => return Ok(()),
+                        ) {
+                            Ok(BackgroundOperationOutcome::Completed(())) => {}
+                            Ok(BackgroundOperationOutcome::Paused) => return Ok(()),
+                            Err(error) => eprintln!("refine cleanup inspection: {error}"),
                         }
                     }
                 }
@@ -62,23 +69,33 @@ pub(super) fn registered_target_roots(
 }
 
 pub(super) fn run_configured_worktree_cleanup(runtime_root: &Path, target_root: &Path) {
-    let result = (|| {
-        let refine_dir = refine_dir_for_target_root(target_root)?;
-        let settings = FileSettingsService::with_active_root(&refine_dir, runtime_root).load()?;
-        let Some(older_than_seconds) = automatic_cleanup_delay_seconds(&settings) else {
-            return Ok(());
-        };
-        let report = FileWorktreeCleanupService::new(target_root, runtime_root).run(
-            WorktreeCleanupOptions {
-                apply: true,
-                older_than_seconds,
-            },
-        )?;
-        if let Some(failures) = cleanup_failure_summary(&report) {
-            eprintln!("refine worktree cleanup: {failures}");
-        }
-        Ok::<(), RefineError>(())
-    })();
+    let result = crate::infrastructure::process::supervisor::coordination::with_lock_timeout(
+        Duration::from_millis(200),
+        || {
+            crate::infrastructure::git::locks::with_repository_lock_timeout(
+                Duration::from_millis(200),
+                || {
+                    let refine_dir = refine_dir_for_target_root(target_root)?;
+                    let settings =
+                        FileSettingsService::with_active_root(&refine_dir, runtime_root).load()?;
+                    let Some(older_than_seconds) = automatic_cleanup_delay_seconds(&settings)
+                    else {
+                        return Ok(());
+                    };
+                    let report = FileWorktreeCleanupService::new(target_root, runtime_root).run(
+                        WorktreeCleanupOptions {
+                            apply: true,
+                            older_than_seconds,
+                        },
+                    )?;
+                    if let Some(failures) = cleanup_failure_summary(&report) {
+                        eprintln!("refine worktree cleanup: {failures}");
+                    }
+                    Ok::<(), RefineError>(())
+                },
+            )
+        },
+    );
     if let Err(error) = result {
         eprintln!("refine worktree cleanup: {error}");
     }

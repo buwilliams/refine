@@ -526,6 +526,7 @@ pub(super) fn port_status_with_processes(
     let port_root = runtime.port_root(status.port);
     let process_summary = FileProcessStatusService::new(&port_root).summary();
     let mut value = serde_json::to_value(status).unwrap_or_else(|_| json!({}));
+    crate::application::workflow::health::enrich_status(&port_root, &mut value);
     if let Some(object) = value.as_object_mut() {
         object.insert(
             "runtime_root".to_string(),
