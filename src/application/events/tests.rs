@@ -785,3 +785,77 @@ fn oversized_configuration_is_rejected_before_replacing_the_readable_document() 
     assert!(error.to_string().contains("16 MiB"));
     assert_eq!(service.config().unwrap().as_ref(), original.as_ref());
 }
+
+#[test]
+fn skill_event_assignments_save_atomically_and_preserve_other_skills() {
+    let fixture = Fixture::new();
+    let service = fixture.service();
+    let config = service.config().unwrap();
+    let original_quality = config.events["workflow.quality.enter"].bindings.clone();
+    let skill = json!({"id":"release-review", "name":"Release review", "prompt":"Review release evidence", "role":"task"});
+    let assignments = json!([
+        {"event_id":"workflow.quality.enter", "binding":{"id":"review", "skill_id":"release-review", "order":4}},
+        {"event_id":"workflow.quality.enter", "binding":{"id":"node-review", "skill_id":"release-review", "scope":{"node_id":"node-a"}, "overrides":"review", "mode":"background", "order":5}},
+        {"event_id":"node.startup.ready", "binding":{"id":"startup-review", "skill_id":"release-review"}}
+    ]);
+    let saved = service
+        .save(
+            "skills",
+            "release-review",
+            json!({"revision":config.revision, "item":skill, "event_bindings":assignments}),
+        )
+        .unwrap();
+    assert_eq!(saved["revision"], config.revision + 1);
+    let current = service.config().unwrap();
+    assert_eq!(
+        current.events["workflow.quality.enter"].bindings[0],
+        original_quality[0]
+    );
+    assert_eq!(current.events["workflow.quality.enter"].bindings.len(), 3);
+    assert_eq!(current.events["node.startup.ready"].bindings.len(), 1);
+
+    // An invalid cross-reference cannot partially rename the Skill or erase its bindings.
+    let mut invalid_skill = skill.clone();
+    invalid_skill["name"] = json!("Must not be saved");
+    for invalid in [
+        json!([{"event_id":"missing-event", "binding":{"id":"review", "skill_id":"release-review"}}]),
+        json!([{"event_id":"workflow.quality.enter", "binding":{"id":"review", "skill_id":"default-quality"}}]),
+        json!([{"event_id":"workflow.quality.enter", "binding":{"id":"default-quality", "skill_id":"release-review"}}]),
+    ] {
+        assert!(service.save("skills", "release-review", json!({"revision":current.revision, "item":invalid_skill, "event_bindings":invalid})).is_err());
+        assert_eq!(*service.config().unwrap(), *current);
+    }
+    assert!(
+        service
+            .save(
+                "skills",
+                "release-review",
+                json!({"revision":config.revision, "item":skill, "event_bindings":[]})
+            )
+            .is_err()
+    );
+    assert_eq!(*service.config().unwrap(), *current);
+
+    // Ordinary prompt-only clients retain assignments; an explicit empty selection removes them.
+    let prompt_only = service
+        .save(
+            "skills",
+            "release-review",
+            json!({"revision":current.revision, "item":skill}),
+        )
+        .unwrap();
+    assert_eq!(service.config().unwrap().events, current.events);
+    service
+        .save(
+            "skills",
+            "release-review",
+            json!({"revision":prompt_only["revision"], "item":skill, "event_bindings":[]}),
+        )
+        .unwrap();
+    let cleared = service.config().unwrap();
+    assert_eq!(
+        cleared.events["workflow.quality.enter"].bindings,
+        original_quality
+    );
+    assert!(cleared.events["node.startup.ready"].bindings.is_empty());
+}

@@ -40,6 +40,8 @@ current, stale, checking, available, Agent progress, reconnecting, success,
 failure, and retry states. Update is one-click authorization with no second
 confirmation; concurrent clients converge on the same operation and attempt.
 
+The Controls Events section uses the same section labels and menu rows as the rest of Controls. Enabled custom Events are followed by **Add event...**, which opens the New Event modal without leaving the current screen.
+
 ## Future Direction
 
 Future navigation may become more command-palette and agent-driven. As agents take over more work, nav should help people jump to exceptions, evidence, pending review, active processes, and high-risk changes.

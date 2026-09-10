@@ -1,6 +1,6 @@
 # Configure Events and Skills
 
-Events select when reusable Skill instructions run. Use **Controls → Settings → Skills** to edit instructions and **Settings → Events** to configure triggers, parameters, and ordered bindings. Definitions can apply to the project or a named node and synchronize through refine-state.
+Events select when reusable Skill instructions run. Use **Controls → Settings → Skills** to edit instructions and assign system or custom Events to each Skill. Use **Settings → Events** to create and edit custom Events and their launch parameters. Definitions can apply to the project or a named node and synchronize through refine-state.
 
 Refine supplies Plan, Implement, Quality, and Governance Skills and binds them to the corresponding Workflow Enter Events. Each of those workflow steps requires an enabled blocking Skill with its matching result role. The default Plan Skill chooses its own planning method. Refine supplies output contracts and retains independent results.
 
@@ -21,7 +21,7 @@ refine skills save release-check --revision 1 --file skill.json
 
 Use the revision returned by the most recent read. A stale revision returns a conflict and preserves the current definitions. Refresh, review concurrent edits, and save again. A referenced Skill must be unbound before deletion.
 
-An Event binding names a Skill, order, mode, scope, optional overridden project binding, and input mappings. A node override disables or replaces only the named project binding. Additional bindings remain independent. Map parameters to paths such as `goal.rounds.0.prompt`, `system.node_id`, or `event.subject`. Defaults and explicit manual input complete the launch values.
+In a Skill editor, **Add event** creates an assignment with an Event, order, mode, scope, optional overridden project assignment, and input mappings. Saving the Skill and all its assignments is atomic; assignments for other Skills are preserved. A node override disables or replaces only the named project binding. Additional bindings remain independent. Map parameters to paths such as `goal.rounds.0.prompt`, `system.node_id`, or `event.subject`. Defaults and explicit manual input complete the launch values.
 
 - **Blocking**: every blocking result must pass before normal advancement.
 - **Background**: its verdict does not gate progression. Checkout serialization can still delay other work.
@@ -29,7 +29,7 @@ An Event binding names a Skill, order, mode, scope, optional overridden project 
 
 ## Trigger and inspect
 
-Enabled custom Events appear in Controls under Events and in the command palette. The launch form collects typed parameters and defaults. Select a Goal when the Event has a lifecycle success action; otherwise work without a Goal uses the selected project checkout.
+Enabled custom Events appear in Controls under Events and in the command palette. **Add event...** at the bottom of the Controls Events section opens the New Event modal. The Events tab lists custom Events; system Events remain available in each Skill’s Event selector. The launch form collects typed parameters and defaults. Select a Goal when the Event has a lifecycle success action; otherwise work without a Goal uses the selected project checkout.
 
 ```sh
 refine events trigger release-check --goal-id GOAL1 --param subject=release --request-id release-check-001

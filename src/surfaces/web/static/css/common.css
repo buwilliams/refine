@@ -1118,6 +1118,7 @@ select {
   border-bottom: 1px solid var(--color-border-subtle);
   background: linear-gradient(to bottom, #ffffff, #fbfcfe);
 }
+:where(.segmented-control),
 .changes-period-control,
 .logs-period-control {
   display: inline-flex;
@@ -1128,6 +1129,7 @@ select {
   border-radius: var(--radius-md);
   background: var(--color-surface-muted);
 }
+:where(.segmented-control) button,
 .changes-period-control button,
 .logs-period-control button {
   height: 28px;
@@ -1140,6 +1142,7 @@ select {
   font-size: 12px;
   font-weight: 650;
 }
+:where(.segmented-control) button[aria-pressed="true"],
 .changes-period-control button.active,
 .changes-period-control button[aria-pressed="true"],
 .logs-period-control button.active,
@@ -1148,6 +1151,7 @@ select {
   color: var(--color-text);
   box-shadow: var(--shadow-sm);
 }
+:where(.segmented-control) button:hover:not(:disabled),
 .changes-period-control button:hover:not(:disabled),
 .logs-period-control button:hover:not(:disabled) {
   background: var(--color-surface);

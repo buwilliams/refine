@@ -98,6 +98,8 @@ The Goals screen sends its filter-scoped bulk selection to `POST /work/goals/exp
 
 The API should remain local-first. It should be secure by context, constrained by local daemon ownership, and careful about which operations mutate target state.
 
+A Skill save can include `event_bindings`, a complete list of `{event_id, binding}` assignments for that Skill. The Skill and its assignments update atomically under the observed configuration revision. Omitting the field preserves assignments; an empty list removes them. Other Skills’ assignments remain unchanged.
+
 ## Future Direction
 
 Future agent-native surfaces may use the API directly or through a higher-level protocol. The API should be structured enough for automated discovery and stable enough that agents can rely on it.

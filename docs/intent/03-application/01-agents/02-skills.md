@@ -22,7 +22,7 @@ There is one default Plan Skill. The prompt can choose how to investigate, criti
 
 Context attachment bindings reuse Skill text without spawning an agent. Imported Guidance becomes context Skills with its applicability and enabled state preserved. Existing Governance and Quality instructions become default Skill text. Migration archives the originals before installing the new configuration and is safe to resume. Previously enforced Quality commands remain supervised until the imported Quality Skill is deliberately edited or replaced. Legacy files do not regain configuration authority after installation.
 
-Skill configuration uses the same revision and cross-reference validation as Events. A referenced Skill cannot be deleted until its bindings are removed. Editing instructions never rewrites completed invocation or Round evidence.
+The Skill editor selects the system and custom Events that trigger it. The Skill and its Event assignments save together under the same revision and cross-reference validation as Events, preserving assignments belonging to other Skills. A referenced Skill cannot be deleted until its bindings are removed. Editing instructions never rewrites completed invocation or Round evidence.
 
 ## Future Direction
 

@@ -6,6 +6,13 @@ use crate::error::{RefineError, RefineResult};
 use crate::infrastructure::storage::automation::AutomationStore;
 use crate::model::automation::*;
 
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SkillEventBinding {
+    event_id: String,
+    binding: Binding,
+}
+
 #[derive(Clone)]
 pub struct FileEventService {
     pub refine_dir: PathBuf,
@@ -80,6 +87,18 @@ impl FileEventService {
             ));
         }
         object.insert("id".into(), json!(id));
+        // The Skill editor owns its assignments. Apply the complete selection with
+        // the Skill under the same revision fence; leave other Skills untouched.
+        let assignments = body
+            .get("event_bindings")
+            .map(|value| serde_json::from_value::<Vec<SkillEventBinding>>(value.clone()))
+            .transpose()
+            .map_err(|e| RefineError::InvalidInput(e.to_string()))?;
+        if assignments.is_some() && collection != "skills" {
+            return Err(RefineError::InvalidInput(
+                "event_bindings can only be saved with a Skill".into(),
+            ));
+        }
         self.config()?;
         let config = AutomationStore::new(&self.refine_dir).update(revision, |config| {
             match collection {
@@ -87,6 +106,23 @@ impl FileEventService {
                     let skill: Skill = serde_json::from_value(item.clone())
                         .map_err(|e| RefineError::InvalidInput(e.to_string()))?;
                     config.skills.insert(id.into(), skill);
+                    if let Some(assignments) = assignments {
+                        for event in config.events.values_mut() {
+                            event.bindings.retain(|binding| binding.skill_id != id);
+                        }
+                        for assignment in assignments {
+                            if assignment.binding.skill_id != id {
+                                return Err(RefineError::InvalidInput(
+                                    "Event assignments must reference the edited Skill".into(),
+                                ));
+                            }
+                            let event =
+                                config.events.get_mut(&assignment.event_id).ok_or_else(|| {
+                                    RefineError::NotFound(format!("Event {}", assignment.event_id))
+                                })?;
+                            event.bindings.push(assignment.binding);
+                        }
+                    }
                 }
                 "events" => {
                     let event: EventDefinition = serde_json::from_value(item.clone())

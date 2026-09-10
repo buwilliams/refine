@@ -155,6 +155,66 @@
   justify-content: flex-end;
 }
 
+/* Events and Skills use the shared form, table, and segmented controls. */
+.automation-modal {
+  max-width: 900px;
+  max-height: calc(100dvh - 40px);
+  display: flex;
+  flex-direction: column;
+}
+.automation-modal .modal-body {
+  overflow: auto;
+  min-height: 0;
+}
+.automation-modal [hidden] { display: none; }
+.automation-modal .form-error:empty { display: none; }
+.automation-modal .modal-body input[type="text"] { margin-top: 0; }
+.automation-modal :is(input, textarea, select):focus-visible {
+  outline: 1px solid var(--color-border);
+  outline-offset: 0;
+}
+.automation-modal .segmented-control {
+  align-self: flex-start;
+  flex-wrap: wrap;
+}
+.automation-modal .segmented-control button { font-weight: 550; }
+.automation-field-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.automation-section { margin: 20px 0; }
+.automation-table-scroll {
+  overflow-x: auto;
+  margin-bottom: 12px;
+}
+.automation-parameters { min-width: 610px; }
+.automation-parameters th { white-space: nowrap; }
+.automation-parameters td { vertical-align: top; }
+.automation-parameters th:first-child { width: 25%; }
+.automation-parameters th:nth-child(2) { min-width: 135px; }
+.automation-parameters .segmented-control { flex-wrap: nowrap; }
+.automation-parameters [data-choices-row] .form-row { margin-bottom: 0; }
+.automation-binding {
+  min-width: 0;
+  margin: 0 0 12px;
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+.automation-binding legend {
+  padding: 0 4px;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+[data-testid="settings-events"] > .actions,
+[data-testid="settings-skills"] > .actions { flex-wrap: wrap; }
+[data-automation-scope] { width: auto; }
+
+@media (max-width: 600px) {
+  .automation-field-pair { grid-template-columns: minmax(0, 1fr); gap: 0; }
+}
+
 .reporter-onboarding-modal {
   max-width: 520px;
 }

@@ -33,7 +33,7 @@ Current implementation details that matter to intent:
 - governance should preserve human-editable project intent rather than hiding policy inside code;
 - governance verdicts should cite actual rule violations rather than preferences or hypothetical risks.
 - the default Governance Skill preserves existing product, constitution, and rule text; edits use the shared Events/Skills revision fence;
-- the shared automatic recovery Round limit belongs in Runtime Config;
+- the shared automatic recovery Round limit belongs in Runtime;
 - every blocking Governance Skill must pass for the collective gate to pass; invalid provider output remains an execution fault rather than a fabricated violation;
 - post-Quality integration takes the repository workflow lease before final target revalidation and retains it through any provable candidate refresh, replacement Quality and Governance, publication, integration, and evidence settlement. Governance always judges the exact candidate that the lease will integrate; a replacement commit invalidates and reruns the prior gates. The verdict itself runs between repository-lock holds under a no-output stall budget, and integration re-proves the exact target tip it will merge onto.
 

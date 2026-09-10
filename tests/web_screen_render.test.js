@@ -1800,3 +1800,129 @@ test("Goal Event agents open scoped invocation evidence during workflow executio
     assert.deepEqual(app.pageErrors,[]);
   } finally { await app.close(); }
 });
+
+test("Settings rows, Event creation, and Skill assignments use shared controls and preserve edits", {skip: SKIP}, async () => {
+  let revision = 1;
+  const skill = {id:"inspect", name:"Inspect", prompt:"Inspect the changes.", role:"task", enabled:true, scope:{node_id:null}, parameters:[]};
+  const otherBinding = {id:"quality-default", skill_id:"quality", mode:"blocking", order:0, enabled:true, scope:{node_id:null}, inputs:{}};
+  const events = [
+    {id:"workflow.quality.enter", name:"Workflow Quality Enter", source:"workflow.quality.enter", kind:"system", enabled:true, scope:{node_id:null}, parameters:[], bindings:[otherBinding]},
+    {id:"check", name:"Check release", source:null, kind:"custom", enabled:true, scope:{node_id:null}, parameters:[], bindings:[], on_success:null},
+  ];
+  const writes = [];
+  const app = await openApp({fixture: (pathname, request) => {
+    if (pathname === "/api/skills") return {revision, items:[skill]};
+    if (pathname === "/api/event-definitions") return {revision, items:events};
+    if (request.method() === "PUT" && (pathname.startsWith("/api/skills/") || pathname.startsWith("/api/event-definitions/"))) {
+      const body = request.postDataJSON(); assert.equal(body.revision, revision); writes.push(body);
+      if (pathname.startsWith("/api/skills/")) {
+        Object.assign(skill, body.item);
+        for (const event of events) event.bindings = event.bindings.filter(b => b.skill_id !== skill.id);
+        for (const assignment of body.event_bindings) events.find(e => e.id === assignment.event_id).bindings.push(assignment.binding);
+      } else {
+        const existing = events.findIndex(e => e.id === body.item.id);
+        if (existing === -1) events.push(body.item); else events[existing] = body.item;
+      }
+      return {revision:++revision, item:body.item};
+    }
+    return apiFixture(pathname);
+  }});
+  try {
+    const page = app.page;
+    await page.goto(`${app.origin}/#/settings/skills`);
+    await page.locator('[data-automation-row]').waitFor();
+    assert.deepEqual(await page.locator('.settings-tab').allTextContents().then(labels => labels.map(s => s.trim())), ["Processes", "Application", "Reporters", "Skills", "Events", "Target App", "Runtime", "Refine (dev)"]);
+    assert.equal(await page.locator('[data-testid="automation-table"] button').count(), 0);
+    await page.locator('[data-automation-row]').focus();
+    await page.keyboard.press("Enter");
+    const modal = page.locator('[data-testid="automation-modal"]');
+    await modal.locator('#automation-name').waitFor();
+    assert.equal(await modal.locator('[data-delete]').isVisible(), true);
+    assert.equal(await modal.locator('label input, label select, label textarea').count(), 0);
+    await modal.locator('[data-role] [data-choice="quality"]').click();
+    await modal.locator('[data-enabled] [data-choice="false"]').click();
+    await modal.locator('[data-scope] [data-choice="node"]').click();
+    assert.equal(await modal.locator('[data-scope-node]').inputValue(), "node-a");
+    await modal.locator('[data-add-parameter]').click();
+    const parameter = modal.locator('[data-parameter]');
+    await parameter.locator('[data-name]').fill("channel");
+    await parameter.locator('[data-kind]').selectOption("choice");
+    assert.equal(await parameter.locator('[data-kind]').inputValue(), "choice");
+    assert.equal(await parameter.locator('[data-choices]').isVisible(), true);
+    await parameter.locator('[data-choices]').fill("stable, beta");
+    await parameter.locator('[data-choices]').press("Tab");
+    await parameter.locator('[data-default]').selectOption("beta");
+    await parameter.locator('[data-required] [data-choice="true"]').click();
+    await modal.locator('[data-add-binding]').click();
+    const assignment = modal.locator('[data-binding]').first();
+    assert.equal(await assignment.locator('[data-event]').inputValue(), "workflow.quality.enter");
+    assert.equal(await assignment.locator('[data-event] optgroup[label="Custom events"] option').count(), 1);
+    await assignment.locator('[data-input-name="channel"]').fill("event.channel");
+    await assignment.locator('[data-order]').fill("3");
+    await assignment.locator('[data-mode] [data-choice="background"]').click();
+    await modal.locator('[data-add-binding]').click();
+    await modal.locator('[data-binding]').last().locator('[data-event]').selectOption("check");
+    await modal.locator('[data-binding]').last().locator('[data-input-name="channel"]').fill("system.node_id");
+    await modal.locator('#automation-name').focus();
+    const styles = await modal.locator('#automation-name').evaluate(input => {
+      const style = getComputedStyle(input);
+      return {height:style.height, weight:style.fontWeight, radius:style.borderRadius, outline:style.outlineColor, border:style.borderColor};
+    });
+    assert.equal(styles.height, "34px");
+    assert.equal(styles.weight, "400");
+    assert.notEqual(styles.radius, "0px");
+    assert.equal(styles.outline, styles.border, "focus keeps the shared neutral input border");
+    await modal.locator('[data-save]').click();
+    await modal.waitFor({state:"detached"});
+    assert.equal(skill.scope.node_id, "node-a");
+    assert.equal(skill.role, "quality");
+    assert.equal(skill.enabled, false);
+    assert.deepEqual(skill.parameters[0], {name:"channel", kind:"choice", required:true, default:"beta", choices:["stable","beta"], description:""});
+    assert.equal(writes[0].event_bindings.length, 2);
+    assert.equal(writes[0].event_bindings[0].binding.order, 3);
+    assert.equal(writes[0].event_bindings[0].binding.mode, "background");
+    assert.deepEqual(events[0].bindings[0], otherBinding);
+
+    await page.locator('[data-automation-row]').click();
+    await modal.locator('[data-kind]').waitFor();
+    assert.equal(await modal.locator('[data-kind]').inputValue(), "choice");
+    assert.equal(await modal.locator('[data-default]').inputValue(), "beta");
+    assert.equal(await modal.locator('[data-binding]').count(), 2);
+    await modal.locator('[data-kind]').selectOption("text");
+    assert.equal(await modal.locator('[data-choices]').isVisible(), false);
+    await page.keyboard.press("Escape");
+
+    await page.locator('[data-testid="settings-tab-events"]').click();
+    await page.locator('[data-testid="settings-events"]').waitFor();
+    const eventRows = page.locator('[data-testid="settings-events"] [data-automation-row]');
+    assert.equal(await page.locator('[data-testid="settings-events"] [data-automation-row]').count(), 1, "system Events are selected inside Skills, not listed on the Events tab");
+    assert.equal(await page.locator('[data-testid="automation-table"] button').count(), 0);
+    await eventRows.first().click();
+    await modal.locator('#automation-name').waitFor();
+    assert.equal(await modal.locator('[data-bindings], [data-source]').count(), 0);
+    await modal.locator('#automation-name').fill("Review release");
+    await modal.locator('[data-save]').click();
+    await modal.waitFor({state:"detached"});
+    assert.equal(events[1].bindings.length, 1, "editing Event details preserves assigned Skills");
+
+    await page.locator('#nav-context-menu > summary').click();
+    const nav = page.locator('#nav-custom-events');
+    await nav.locator('[data-add-event]').waitFor();
+    assert.equal(await nav.locator('.nav-menu-label.nav-context-section-label').textContent(), "Events");
+    assert.equal(await nav.locator('button').last().textContent(), "Add event...");
+    await nav.locator('[data-add-event]').click();
+    await modal.locator('#automation-name').waitFor();
+    assert.equal(await modal.locator('[data-delete]').isVisible(), false);
+    await modal.locator('#automation-name').fill("Publish report");
+    await modal.locator('[data-add-parameter]').click();
+    await modal.locator('[data-parameter] [data-name]').fill("count");
+    await modal.locator('[data-kind]').selectOption("number");
+    await modal.locator('[data-default]').fill("3");
+    await modal.locator('[data-save]').click();
+    await modal.waitFor({state:"detached"});
+    assert.equal(events.at(-1).kind, "custom");
+    assert.equal(events.at(-1).parameters[0].default, 3);
+    assert.equal(await eventRows.count(), 2);
+    assert.deepEqual(app.pageErrors, []);
+  } finally { await app.close(); }
+});
