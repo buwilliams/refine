@@ -1,10 +1,10 @@
 {
-  "id": "b8a981a0213135b579b4885cac6a4ca5882d492d037fac6786967353d3641807",
+  "id": "feb9d4115e47d28b42253e7d0a604fb0fea632ff3937e131c8ab3b67d93e1c5a",
   "event": {
-    "id": "workflow.implement.enter",
-    "name": "Workflow Implement Enter",
+    "id": "workflow.quality.enter",
+    "name": "Workflow Quality Enter",
     "kind": "system",
-    "source": "workflow.implement.enter",
+    "source": "workflow.quality.enter",
     "enabled": true,
     "scope": {
       "node_id": null
@@ -12,8 +12,8 @@
     "parameters": [],
     "bindings": [
       {
-        "id": "default-implement",
-        "skill_id": "default-implement",
+        "id": "default-quality",
+        "skill_id": "default-quality",
         "enabled": true,
         "mode": "blocking",
         "order": 0,
@@ -35,7 +35,7 @@
     "goal_id": "DR07C216F3E4EC22A57C60BE0B",
     "round_idx": 1,
     "workflow_revision": 18,
-    "candidate_commit": null,
+    "candidate_commit": "2015f58d6b2c6e8b1edfaee09e770240b23d9359",
     "data": {
       "context": {
         "agent_context": {
@@ -226,6 +226,7 @@
           "version": 1,
           "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
         },
+        "implementation_report": "workflow.implement.enter:default-implement: Implemented Goal failure containment, scheduler health and safe recovery, shared diagnostics, and independent maintenance with focused verification.",
         "plans": {
           "checklist": [
             {
@@ -279,11 +280,11 @@
       "event": {},
       "goal": {
         "assignee": "ethan.jacobson@insurity.com",
-        "base_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+        "base_commit": "b47569adb8d4c5d1d7335ba91729a3e486a38fe0",
         "branch_name": "refine/DR07C216F3E4EC22A57C60BE0B/round-2",
-        "candidate_commit": null,
+        "candidate_commit": "2015f58d6b2c6e8b1edfaee09e770240b23d9359",
         "created": "2026-09-10T08:26:00Z",
-        "event_generation": 3,
+        "event_generation": 4,
         "feature_id": null,
         "feature_order": null,
         "id": "DR07C216F3E4EC22A57C60BE0B",
@@ -560,17 +561,22 @@
           },
           {
             "assignee": "ethan.jacobson@insurity.com",
-            "constitution_state": "unclassified",
+            "constitution_state": null,
             "created": "2026-09-10T13:06:37Z",
             "failure_at": "",
             "failure_category": "",
             "failure_message": "",
-            "governance_candidate_commit": "",
-            "governance_checked_at": "",
-            "governance_details": "",
-            "governance_message": "",
+            "governance_candidate_commit": null,
+            "governance_checked_at": null,
+            "governance_details": null,
+            "governance_message": null,
             "governance_rule_actions": [],
-            "guidance_decision": null,
+            "guidance_decision": {
+              "applied": [],
+              "context_version": 1,
+              "recorded_at": "2026-09-10T14:59:15Z",
+              "skipped": []
+            },
             "implementation_plan": {
               "binding": {
                 "base_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
@@ -581,6 +587,7 @@
                 "round_idx": 1,
                 "target_branch": "main"
               },
+              "completed_at": "2026-09-10T14:59:14Z",
               "final_plan": {
                 "completed_at": "2026-09-10T13:48:22Z",
                 "git_after": {
@@ -643,6 +650,81 @@
                   "summary": "workflow.plan.enter:default-plan: Keep Goal failures isolated, detect stalled scheduling through independent supervision, and expose actionable health while preserving execution authority, capacity, and retained evidence."
                 },
                 "started_at": "2026-09-10T13:43:00Z"
+              },
+              "implementation": {
+                "completed_at": "2026-09-10T14:59:14Z",
+                "execution": {
+                  "checklist": [
+                    {
+                      "evidence": "Extracted attempt.rs to contain preparation, Skill execution, result construction and settlement errors and panics. Finished handles release ended attempts. Panic and result-failure regressions pass.",
+                      "id": "workflow.plan.enter:default-plan:P1",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Added explicit settlement outcomes, at most three transient retries, bounded record-lock waits and retained originating failure evidence. Tests preserve cancellation and newer Round authority and verify exhausted writes.",
+                      "id": "workflow.plan.enter:default-plan:P2",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Moved blocking work outside admission control, replaced the scheduler error latch and fixed stale discovery results after completion. Capacity includes preparation, settlement, Skill reservations and surviving owned children, including missing primary registrations.",
+                      "id": "workflow.plan.enter:default-plan:P3",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Added atomic scheduler observations bound to runtime, registration, OS identity, incarnation, node and target. Actual scheduler ticks continue during blocked preparation, pause and detachment; silence and startup bounds are 30 seconds.",
+                      "id": "workflow.plan.enter:default-plan:P4",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Added fenced Application recovery with confirmed group exit, bounded restart backoff and replacement-tick verification. Real process tests cover a stopped scheduler, identity mismatch, duplicate workers, termination failure and surviving escaped descendants.",
+                      "id": "workflow.plan.enter:default-plan:P5",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "System status, process diagnostics and next actions share Application health assessment. Continuous Todo eligibility, waiting causes and stale evidence are distinguished. HTTP remains reachable when unhealthy, and workflow degradation does not trigger shutdown.",
+                      "id": "workflow.plan.enter:default-plan:P6",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Added the shared maintain_daemon interface for DR74050DA12C5442DF797B8AB6, selectively reusing retained group-supervision work. Tests preserve original deadlines, Toolbar and human-input exceptions, live sibling capacity and newer operation revisions.",
+                      "id": "workflow.plan.enter:default-plan:P7",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Cleanup and deadline maintenance run independently of admission and recovery waits. Tests verify bounded repository contention, dirty-worktree preservation, retained transcripts and refs, and protection while owned work survives a missing primary registration.",
+                      "id": "workflow.plan.enter:default-plan:P8",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Kept health and recovery policy in Application, observation and termination mechanisms in Infrastructure, and surfaces thin. Split execution responsibilities into cohesive modules and updated only the five affected intent pages.",
+                      "id": "workflow.plan.enter:default-plan:P9",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Six liveness regressions pass, including real stale-candidate integration followed by supersession, preparation/execution/settlement/delivery panics, bounded persistence retries and transient discovery failure. Follow-up admission timing assertions pass within one second.",
+                      "id": "workflow.plan.enter:default-plan:P10",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Worker, ownership, maintenance, admission and HTTP regressions pass. They cover missing/corrupt observations, target changes, restart backoff, stale observer races, retained descendants and legitimate waiting. Automatic group-exit verification was exercised on Linux; unsupported inspection fails closed.",
+                      "id": "workflow.plan.enter:default-plan:P11",
+                      "outcome": "completed"
+                    }
+                  ],
+                  "verification": [
+                    "cargo test --lib workflow -- --test-threads=1 --skip multiple_plan_skills_contribute_separate_namespaced_checklists: 236 passed. Log: /tmp/refine-round2-workflow-final-complete.log",
+                    "cargo test --lib worker_liveness -- --test-threads=1, with an inherited worker token: 6 passed, including one-second timing assertions. Log: /tmp/refine-round2-timed-liveness.log",
+                    "cargo test --lib application::workers -- --test-threads=1: 31 passed.",
+                    "cargo test --lib application::maintenance::worktrees -- --test-threads=1: 19 passed.",
+                    "Focused process supervisor, subprocess and interactive-session suites: 52, 20 and 37 passed respectively.",
+                    "Focused HTTP runtime and next-action suites: 8 and 3 passed respectively.",
+                    "cargo check --lib: passed on final files. Scoped rustfmt checks and git diff --check passed.",
+                    "cargo clippy --lib --message-format=json: passed with five warnings on unchanged code.",
+                    "The excluded planning fixture also fails in an archive of pinned base f880b7767149e4de43d5bc4d4786247d1e536a8c: a Skill is assigned multiple triggers. Its fixture remains unchanged. Log: /tmp/refine-round2-baseline-planning-test.log"
+                  ]
+                },
+                "report": "workflow.implement.enter:default-implement: Implemented Goal failure containment, scheduler health and safe recovery, shared diagnostics, and independent maintenance with focused verification.",
+                "started_at": "2026-09-10T13:48:22Z"
               },
               "phase": "implement",
               "phase_started_at": "2026-09-10T13:48:22Z",
@@ -711,44 +793,76 @@
               },
               "schema_version": 2,
               "started_at": "2026-09-10T13:43:00Z",
-              "state": "in_progress",
-              "updated_at": "2026-09-10T13:48:22Z"
+              "state": "completed",
+              "updated_at": "2026-09-10T14:59:14Z"
             },
-            "implementation_report": null,
-            "implementation_reported_at": null,
+            "implementation_report": "workflow.implement.enter:default-implement: Implemented Goal failure containment, scheduler health and safe recovery, shared diagnostics, and independent maintenance with focused verification.",
+            "implementation_reported_at": "2026-09-10T14:59:14Z",
             "latest_log": {
               "actor": "refine",
-              "category": "state",
-              "datetime": "2026-09-10T13:48:22Z",
+              "category": "candidate_refresh",
+              "datetime": "2026-09-10T14:59:15Z",
               "details": {
-                "node_id": "default"
+                "node_id": "default",
+                "original_candidate_commit": "9a92b5a7c4878448557d47be41db166ca2b6d1d7",
+                "refresh_evidence": {
+                  "authorizing_status": "quality",
+                  "branch": "refine/DR07C216F3E4EC22A57C60BE0B/round-2",
+                  "node_id": "default",
+                  "original_base_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+                  "original_candidate_commit": "9a92b5a7c4878448557d47be41db166ca2b6d1d7",
+                  "previous_gate_evidence": {
+                    "constitution_state": "unclassified",
+                    "governance_candidate_commit": "",
+                    "governance_checked_at": "",
+                    "governance_details": "",
+                    "governance_message": "",
+                    "meta_rule_state": "unclassified",
+                    "product_state": "unclassified",
+                    "quality_candidate_commit": null,
+                    "quality_checked_at": "",
+                    "quality_details": "",
+                    "quality_message": "",
+                    "quality_state": "unclassified",
+                    "rule_state": "unclassified"
+                  },
+                  "refreshed_at": "2026-09-10T14:59:15Z",
+                  "replacement_base_commit": "b47569adb8d4c5d1d7335ba91729a3e486a38fe0",
+                  "replacement_candidate_commit": "2015f58d6b2c6e8b1edfaee09e770240b23d9359",
+                  "round_idx": 1,
+                  "state": "refreshed",
+                  "workflow_revision": 18,
+                  "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR07C216F3E4EC22A57C60BE0B-round-2"
+                },
+                "replacement_base_commit": "b47569adb8d4c5d1d7335ba91729a3e486a38fe0",
+                "replacement_candidate_commit": "2015f58d6b2c6e8b1edfaee09e770240b23d9359"
               },
               "goal_id": "DR07C216F3E4EC22A57C60BE0B",
-              "message": "Workflow status changed: plan -> implement",
+              "message": "Refreshed the candidate onto the advanced target before Quality",
               "round_idx": 1,
               "severity": "info"
             },
             "latest_state_log": {
               "actor": "refine",
               "category": "state",
-              "datetime": "2026-09-10T13:48:22Z",
+              "datetime": "2026-09-10T14:59:15Z",
               "details": {
                 "node_id": "default"
               },
               "goal_id": "DR07C216F3E4EC22A57C60BE0B",
-              "message": "Workflow status changed: plan -> implement",
+              "message": "Workflow status changed: implement -> quality",
               "round_idx": 1,
               "severity": "info"
             },
             "latest_workflow_log": {
               "actor": "refine",
               "category": "state",
-              "datetime": "2026-09-10T13:48:22Z",
+              "datetime": "2026-09-10T14:59:15Z",
               "details": {
                 "node_id": "default"
               },
               "goal_id": "DR07C216F3E4EC22A57C60BE0B",
-              "message": "Workflow status changed: plan -> implement",
+              "message": "Workflow status changed: implement -> quality",
               "round_idx": 1,
               "severity": "info"
             },
@@ -807,43 +921,160 @@
                 "message": "Workflow status changed: plan -> implement",
                 "round_idx": 1,
                 "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "agent",
+                "datetime": "2026-09-10T14:59:14Z",
+                "details": {
+                  "branch": "refine/DR07C216F3E4EC22A57C60BE0B/round-2",
+                  "node_id": "default",
+                  "output": "workflow.implement.enter:default-implement: Implemented Goal failure containment, scheduler health and safe recovery, shared diagnostics, and independent maintenance with focused verification.",
+                  "provider": "codex",
+                  "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR07C216F3E4EC22A57C60BE0B-round-2"
+                },
+                "goal_id": "DR07C216F3E4EC22A57C60BE0B",
+                "message": "Goal agent completed",
+                "round_idx": 1,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "git",
+                "datetime": "2026-09-10T14:59:15Z",
+                "details": {
+                  "branch": "refine/DR07C216F3E4EC22A57C60BE0B/round-2",
+                  "commit": "9a92b5a7c4878448557d47be41db166ca2b6d1d7",
+                  "node_id": "default",
+                  "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR07C216F3E4EC22A57C60BE0B-round-2"
+                },
+                "goal_id": "DR07C216F3E4EC22A57C60BE0B",
+                "message": "Committed implementation branch refine/DR07C216F3E4EC22A57C60BE0B/round-2",
+                "round_idx": 1,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "state",
+                "datetime": "2026-09-10T14:59:15Z",
+                "details": {
+                  "node_id": "default"
+                },
+                "goal_id": "DR07C216F3E4EC22A57C60BE0B",
+                "message": "Workflow status changed: implement -> quality",
+                "round_idx": 1,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "candidate_refresh",
+                "datetime": "2026-09-10T14:59:15Z",
+                "details": {
+                  "node_id": "default",
+                  "original_candidate_commit": "9a92b5a7c4878448557d47be41db166ca2b6d1d7",
+                  "refresh_evidence": {
+                    "authorizing_status": "quality",
+                    "branch": "refine/DR07C216F3E4EC22A57C60BE0B/round-2",
+                    "node_id": "default",
+                    "original_base_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+                    "original_candidate_commit": "9a92b5a7c4878448557d47be41db166ca2b6d1d7",
+                    "previous_gate_evidence": {
+                      "constitution_state": "unclassified",
+                      "governance_candidate_commit": "",
+                      "governance_checked_at": "",
+                      "governance_details": "",
+                      "governance_message": "",
+                      "meta_rule_state": "unclassified",
+                      "product_state": "unclassified",
+                      "quality_candidate_commit": null,
+                      "quality_checked_at": "",
+                      "quality_details": "",
+                      "quality_message": "",
+                      "quality_state": "unclassified",
+                      "rule_state": "unclassified"
+                    },
+                    "refreshed_at": "2026-09-10T14:59:15Z",
+                    "replacement_base_commit": "b47569adb8d4c5d1d7335ba91729a3e486a38fe0",
+                    "replacement_candidate_commit": "2015f58d6b2c6e8b1edfaee09e770240b23d9359",
+                    "round_idx": 1,
+                    "state": "refreshed",
+                    "workflow_revision": 18,
+                    "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR07C216F3E4EC22A57C60BE0B-round-2"
+                  },
+                  "replacement_base_commit": "b47569adb8d4c5d1d7335ba91729a3e486a38fe0",
+                  "replacement_candidate_commit": "2015f58d6b2c6e8b1edfaee09e770240b23d9359"
+                },
+                "goal_id": "DR07C216F3E4EC22A57C60BE0B",
+                "message": "Refreshed the candidate onto the advanced target before Quality",
+                "round_idx": 1,
+                "severity": "info"
               }
             ],
-            "meta_rule_state": "unclassified",
-            "product_state": "unclassified",
+            "meta_rule_state": null,
+            "product_state": null,
             "prompt": "Keep a per-Goal error from stopping workflow scheduling, and detect a live worker whose scheduling loop has stopped making progress.\n\nThe August field report is a hypothesis to reproduce, not proof that a specific stale-candidate error kills today's worker. Current execution already catches some task panics, but preparation runs in the scheduling path and scheduler_error suppresses admission until the pass ends. There is no scheduler-tick health evidence in the current runner. Round 1 retained unfinished failure-containment and watchdog changes without a candidate; its final log reports an unsuccessful agent exit and superseded attempt.\n\nContain preparation, Skill execution, result handling and failure-settlement errors at the owning Goal boundary. Ensure ended attempts release their local active entry and unrelated eligible work continues. Distinguish an authoritative failure, a superseded attempt and failure to persist evidence; retry transient persistence failures within a bound while rechecking authority. Never overwrite a newer Round or cancellation to make an old failure appear settled. Keep blocking Git, lock or settlement work from freezing the admission control path, without releasing capacity while owned work is still alive.\n\nPublish runtime-local health tied to the actual worker incarnation and target, with ticks emitted by the scheduling loop itself. Use independent existing daemon supervision to detect stale ticks. Recover with bounded restart backoff only after safely stopping the old worker and its owned work, or report unhealthy with a concrete remedy if this cannot be proved. Keep daemon reachability and shutdown control available.\n\nUse one shared health assessment in system status and refine next, distinguishing a stall from pause, missing required Plan/Implement Skills, scope or ordering blocks, long-running tasks and unavailable evidence. Keep worktree cleanup and deadline enforcement independently responsive. Share the latter and operation-recovery changes with Goal DR74050DA12C5442DF797B8AB6 instead of adding competing supervision.\n\nVerify a superseded integration failure, preparation and settlement faults, and a task panic cannot stop the next eligible Goal entering Plan after capacity is available. Inject a non-ticking worker and verify detection plus safe recovery or unhealthy reporting. Test pause and legitimate waiting without false alarms, and confirm cleanup and deadline checks remain responsive without deleting retained work.\n\nThis is a recovery Round following the Skills review on 10 September 2026. Start from current main in a new managed Round worktree. Preserve Round 1, its plans, logs, branches, commits and uncommitted files; inspect and selectively reuse useful work instead of replaying the whole old attempt. Use the current Skills and docs/intent contracts, not archived Governance, Quality or Guidance configuration or the old fixed planning sequence. Refine owns workflow advancement and integration; human approval remains separate. Update only affected documentation and report focused verification with actual results.",
-            "quality_checked_at": "",
-            "quality_details": "",
-            "quality_message": "",
-            "quality_state": "unclassified",
+            "quality_candidate_commit": null,
+            "quality_checked_at": null,
+            "quality_details": null,
+            "quality_message": null,
+            "quality_state": null,
             "reporter": "Buddy Williams",
-            "rule_state": "unclassified",
-            "updated": "2026-09-10T13:48:22Z",
+            "rule_state": null,
+            "updated": "2026-09-10T14:59:15Z",
             "workflow_attempt_authority": {
               "claimed_at": "2026-09-10T13:42:58Z",
               "round_idx": 1,
               "workflow_revision": 18
             },
+            "workflow_candidate_refresh": {
+              "authorizing_status": "quality",
+              "branch": "refine/DR07C216F3E4EC22A57C60BE0B/round-2",
+              "node_id": "default",
+              "original_base_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+              "original_candidate_commit": "9a92b5a7c4878448557d47be41db166ca2b6d1d7",
+              "previous_gate_evidence": {
+                "constitution_state": "unclassified",
+                "governance_candidate_commit": "",
+                "governance_checked_at": "",
+                "governance_details": "",
+                "governance_message": "",
+                "meta_rule_state": "unclassified",
+                "product_state": "unclassified",
+                "quality_candidate_commit": null,
+                "quality_checked_at": "",
+                "quality_details": "",
+                "quality_message": "",
+                "quality_state": "unclassified",
+                "rule_state": "unclassified"
+              },
+              "refreshed_at": "2026-09-10T14:59:15Z",
+              "replacement_base_commit": "b47569adb8d4c5d1d7335ba91729a3e486a38fe0",
+              "replacement_candidate_commit": "2015f58d6b2c6e8b1edfaee09e770240b23d9359",
+              "round_idx": 1,
+              "state": "refreshed",
+              "workflow_revision": 18,
+              "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR07C216F3E4EC22A57C60BE0B-round-2"
+            },
             "workflow_reconciliation": null,
             "workflow_recovery": null
           }
         ],
-        "status": "implement",
+        "status": "quality",
         "target_branch": "main",
-        "updated": "2026-09-10T13:48:22Z",
-        "workflow_revision": 32
+        "updated": "2026-09-10T14:59:15Z",
+        "workflow_revision": 41
       },
       "system": {
-        "candidate_commit": null,
+        "candidate_commit": "2015f58d6b2c6e8b1edfaee09e770240b23d9359",
         "node_id": "default",
         "project_root": "/home/buddy/projects/refine-next",
-        "workflow_step": "implement",
+        "workflow_step": "quality",
         "workspace": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR07C216F3E4EC22A57C60BE0B-round-2"
       }
     },
     "metadata": {
       "behavior": "EventSkill",
-      "event_operation_id": "1a08b939e9d113c7611",
+      "event_operation_id": "1a08bd48460113c763b",
       "goal_id": "DR07C216F3E4EC22A57C60BE0B",
       "kind": "workflow",
       "node_id": "default",
@@ -851,14 +1082,14 @@
       "round_idx": 1,
       "target_app_id": "/home/buddy/projects/refine-next",
       "workflow_revision": 18,
-      "workflow_state": "implement"
+      "workflow_state": "quality"
     }
   },
   "bindings": [
     {
       "binding": {
-        "id": "default-implement",
-        "skill_id": "default-implement",
+        "id": "default-quality",
+        "skill_id": "default-quality",
         "enabled": true,
         "mode": "blocking",
         "order": 0,
@@ -869,10 +1100,10 @@
         "inputs": {}
       },
       "skill": {
-        "id": "default-implement",
-        "name": "Implement",
-        "prompt": "## Implement\n\nImplement the current Goal Round using every accepted plan and attached Skill. Inspect existing code, make the complete change, run appropriate verification, and report evidence for each checklist item. Preserve unrelated changes and historical evidence. Refine owns candidate commits, workflow advancement, Quality, Governance and integration.\n\n## Intent and architecture\n\nApplicability: Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract.\n\nUse the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Model, Application, Infrastructure, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.\n\nFor this project on the current Default node, /home/buddy/projects/refine-next is the target development checkout and /home/buddy/projects/refine is the serving Refine installation. Use the invocation's pinned workspace (the managed Goal Round worktree when supplied) for code changes and verification, and read the relevant intent from that candidate. Verify paths from the current invocation and runtime before operating on another node. Source promotion and restarting the serving installation are separate operator actions; an ordinary implementation or Quality run should not deploy its candidate or restart the daemon that is supervising it.\n\n## Cohesive code files\n\nApplicability: Apply whenever an agent adds or changes code files in any language.\n\nKeep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.\n",
-        "role": "implement",
+        "id": "default-quality",
+        "name": "Quality",
+        "prompt": "## Quality review\n\nIndependently review the finalized plans and candidate implementation. Select or add meaningful tests, correct defects when needed, and run the relevant checks. Report actual commands, results and findings. Refine verifies the exact candidate and supervises evaluation commands.\n\n## Required behavior\n\nPreserve the relevant Goal and docs/intent product behavior. Keep Model, Application, Infrastructure, and Surfaces coherent; shared capabilities authoritative; local state and evidence inspectable and recoverable; and affected surfaces semantically consistent.\n\n## Review and verification\n\nJudge the candidate against the Goal and only the relevant docs/intent pages. Use the smallest deterministic checks that cover the affected behavior, adding or adjusting behavior-focused tests only when evidence is missing. Scale integration and failure-path checks to actual risk. Report exact commands, results, and remaining uncertainty. Do not require unrelated tests, documentation, refactors, or cleanup; documentation is relevant only when product intent or an architectural contract changes.\n\n## Acceptance checks\n\n- The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks.\n\n## Intent and architecture\n\nApplicability: Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract.\n\nUse the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Model, Application, Infrastructure, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.\n\nFor this project on the current Default node, /home/buddy/projects/refine-next is the target development checkout and /home/buddy/projects/refine is the serving Refine installation. Use the invocation's pinned workspace (the managed Goal Round worktree when supplied) for code changes and verification, and read the relevant intent from that candidate. Verify paths from the current invocation and runtime before operating on another node. Source promotion and restarting the serving installation are separate operator actions; an ordinary implementation or Quality run should not deploy its candidate or restart the daemon that is supervising it.\n\n## Cohesive code files\n\nApplicability: Apply whenever an agent adds or changes code files in any language.\n\nKeep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.\n",
+        "role": "quality",
         "enabled": true,
         "scope": {
           "node_id": null
@@ -883,106 +1114,11 @@
       "parameters": {}
     }
   ],
-  "state": "succeeded",
-  "results": {
-    "default-implement": {
-      "invocation_id": "b8a981a0213135b579b4885cac6a4ca5882d492d037fac6786967353d3641807",
-      "binding_id": "default-implement",
-      "role": "implement",
-      "outcome": "success",
-      "summary": "Implemented Goal failure containment, scheduler health and safe recovery, shared diagnostics, and independent maintenance with focused verification.",
-      "evidence": [
-        "Implemented in the pinned Round 2 worktree; HEAD remains f880b7767149e4de43d5bc4d4786247d1e536a8c.",
-        "Preserved Round 1 and its retained work. No Goal advancement, candidate commit, merge, push, deployment or serving-daemon restart was performed.",
-        "The August report remained a hypothesis; testing reproduced the integration failure and separately exposed and corrected a completion/discovery scheduling race."
-      ],
-      "artifacts": {
-        "implementation_evidence": {
-          "checklist": [
-            {
-              "evidence": "Extracted attempt.rs to contain preparation, Skill execution, result construction and settlement errors and panics. Finished handles release ended attempts. Panic and result-failure regressions pass.",
-              "id": "workflow.plan.enter:default-plan:P1",
-              "outcome": "completed"
-            },
-            {
-              "evidence": "Added explicit settlement outcomes, at most three transient retries, bounded record-lock waits and retained originating failure evidence. Tests preserve cancellation and newer Round authority and verify exhausted writes.",
-              "id": "workflow.plan.enter:default-plan:P2",
-              "outcome": "completed"
-            },
-            {
-              "evidence": "Moved blocking work outside admission control, replaced the scheduler error latch and fixed stale discovery results after completion. Capacity includes preparation, settlement, Skill reservations and surviving owned children, including missing primary registrations.",
-              "id": "workflow.plan.enter:default-plan:P3",
-              "outcome": "completed"
-            },
-            {
-              "evidence": "Added atomic scheduler observations bound to runtime, registration, OS identity, incarnation, node and target. Actual scheduler ticks continue during blocked preparation, pause and detachment; silence and startup bounds are 30 seconds.",
-              "id": "workflow.plan.enter:default-plan:P4",
-              "outcome": "completed"
-            },
-            {
-              "evidence": "Added fenced Application recovery with confirmed group exit, bounded restart backoff and replacement-tick verification. Real process tests cover a stopped scheduler, identity mismatch, duplicate workers, termination failure and surviving escaped descendants.",
-              "id": "workflow.plan.enter:default-plan:P5",
-              "outcome": "completed"
-            },
-            {
-              "evidence": "System status, process diagnostics and next actions share Application health assessment. Continuous Todo eligibility, waiting causes and stale evidence are distinguished. HTTP remains reachable when unhealthy, and workflow degradation does not trigger shutdown.",
-              "id": "workflow.plan.enter:default-plan:P6",
-              "outcome": "completed"
-            },
-            {
-              "evidence": "Added the shared maintain_daemon interface for DR74050DA12C5442DF797B8AB6, selectively reusing retained group-supervision work. Tests preserve original deadlines, Toolbar and human-input exceptions, live sibling capacity and newer operation revisions.",
-              "id": "workflow.plan.enter:default-plan:P7",
-              "outcome": "completed"
-            },
-            {
-              "evidence": "Cleanup and deadline maintenance run independently of admission and recovery waits. Tests verify bounded repository contention, dirty-worktree preservation, retained transcripts and refs, and protection while owned work survives a missing primary registration.",
-              "id": "workflow.plan.enter:default-plan:P8",
-              "outcome": "completed"
-            },
-            {
-              "evidence": "Kept health and recovery policy in Application, observation and termination mechanisms in Infrastructure, and surfaces thin. Split execution responsibilities into cohesive modules and updated only the five affected intent pages.",
-              "id": "workflow.plan.enter:default-plan:P9",
-              "outcome": "completed"
-            },
-            {
-              "evidence": "Six liveness regressions pass, including real stale-candidate integration followed by supersession, preparation/execution/settlement/delivery panics, bounded persistence retries and transient discovery failure. Follow-up admission timing assertions pass within one second.",
-              "id": "workflow.plan.enter:default-plan:P10",
-              "outcome": "completed"
-            },
-            {
-              "evidence": "Worker, ownership, maintenance, admission and HTTP regressions pass. They cover missing/corrupt observations, target changes, restart backoff, stale observer races, retained descendants and legitimate waiting. Automatic group-exit verification was exercised on Linux; unsupported inspection fails closed.",
-              "id": "workflow.plan.enter:default-plan:P11",
-              "outcome": "completed"
-            }
-          ],
-          "verification": [
-            "cargo test --lib workflow -- --test-threads=1 --skip multiple_plan_skills_contribute_separate_namespaced_checklists: 236 passed. Log: /tmp/refine-round2-workflow-final-complete.log",
-            "cargo test --lib worker_liveness -- --test-threads=1, with an inherited worker token: 6 passed, including one-second timing assertions. Log: /tmp/refine-round2-timed-liveness.log",
-            "cargo test --lib application::workers -- --test-threads=1: 31 passed.",
-            "cargo test --lib application::maintenance::worktrees -- --test-threads=1: 19 passed.",
-            "Focused process supervisor, subprocess and interactive-session suites: 52, 20 and 37 passed respectively.",
-            "Focused HTTP runtime and next-action suites: 8 and 3 passed respectively.",
-            "cargo check --lib: passed on final files. Scoped rustfmt checks and git diff --check passed.",
-            "cargo clippy --lib --message-format=json: passed with five warnings on unchanged code.",
-            "The excluded planning fixture also fails in an archive of pinned base f880b7767149e4de43d5bc4d4786247d1e536a8c: a Skill is assigned multiple triggers. Its fixture remains unchanged. Log: /tmp/refine-round2-baseline-planning-test.log"
-          ]
-        }
-      }
-    }
-  },
-  "attempts": [
-    {
-      "attempt": 0,
-      "binding_id": "default-implement",
-      "diagnostic": null,
-      "operation_id": null,
-      "process_id": "proc-1789048102598-1129590-126",
-      "raw_output": "{\n  \"artifacts\": {\n    \"implementation_evidence\": {\n      \"checklist\": [\n        {\n          \"id\": \"workflow.plan.enter:default-plan:P1\",\n          \"outcome\": \"completed\",\n          \"evidence\": \"Extracted attempt.rs to contain preparation, Skill execution, result construction and settlement errors and panics. Finished handles release ended attempts. Panic and result-failure regressions pass.\"\n        },\n        {\n          \"id\": \"workflow.plan.enter:default-plan:P2\",\n          \"outcome\": \"completed\",\n          \"evidence\": \"Added explicit settlement outcomes, at most three transient retries, bounded record-lock waits and retained originating failure evidence. Tests preserve cancellation and newer Round authority and verify exhausted writes.\"\n        },\n        {\n          \"id\": \"workflow.plan.enter:default-plan:P3\",\n          \"outcome\": \"completed\",\n          \"evidence\": \"Moved blocking work outside admission control, replaced the scheduler error latch and fixed stale discovery results after completion. Capacity includes preparation, settlement, Skill reservations and surviving owned children, including missing primary registrations.\"\n        },\n        {\n          \"id\": \"workflow.plan.enter:default-plan:P4\",\n          \"outcome\": \"completed\",\n          \"evidence\": \"Added atomic scheduler observations bound to runtime, registration, OS identity, incarnation, node and target. Actual scheduler ticks continue during blocked preparation, pause and detachment; silence and startup bounds are 30 seconds.\"\n        },\n        {\n          \"id\": \"workflow.plan.enter:default-plan:P5\",\n          \"outcome\": \"completed\",\n          \"evidence\": \"Added fenced Application recovery with confirmed group exit, bounded restart backoff and replacement-tick verification. Real process tests cover a stopped scheduler, identity mismatch, duplicate workers, termination failure and surviving escaped descendants.\"\n        },\n        {\n          \"id\": \"workflow.plan.enter:default-plan:P6\",\n          \"outcome\": \"completed\",\n          \"evidence\": \"System status, process diagnostics and next actions share Application health assessment. Continuous Todo eligibility, waiting causes and stale evidence are distinguished. HTTP remains reachable when unhealthy, and workflow degradation does not trigger shutdown.\"\n        },\n        {\n          \"id\": \"workflow.plan.enter:default-plan:P7\",\n          \"outcome\": \"completed\",\n          \"evidence\": \"Added the shared maintain_daemon interface for DR74050DA12C5442DF797B8AB6, selectively reusing retained group-supervision work. Tests preserve original deadlines, Toolbar and human-input exceptions, live sibling capacity and newer operation revisions.\"\n        },\n        {\n          \"id\": \"workflow.plan.enter:default-plan:P8\",\n          \"outcome\": \"completed\",\n          \"evidence\": \"Cleanup and deadline maintenance run independently of admission and recovery waits. Tests verify bounded repository contention, dirty-worktree preservation, retained transcripts and refs, and protection while owned work survives a missing primary registration.\"\n        },\n        {\n          \"id\": \"workflow.plan.enter:default-plan:P9\",\n          \"outcome\": \"completed\",\n          \"evidence\": \"Kept health and recovery policy in Application, observation and termination mechanisms in Infrastructure, and surfaces thin. Split execution responsibilities into cohesive modules and updated only the five affected intent pages.\"\n        },\n        {\n          \"id\": \"workflow.plan.enter:default-plan:P10\",\n          \"outcome\": \"completed\",\n          \"evidence\": \"Six liveness regressions pass, including real stale-candidate integration followed by supersession, preparation/execution/settlement/delivery panics, bounded persistence retries and transient discovery failure. Follow-up admission timing assertions pass within one second.\"\n        },\n        {\n          \"id\": \"workflow.plan.enter:default-plan:P11\",\n          \"outcome\": \"completed\",\n          \"evidence\": \"Worker, ownership, maintenance, admission and HTTP regressions pass. They cover missing/corrupt observations, target changes, restart backoff, stale observer races, retained descendants and legitimate waiting. Automatic group-exit verification was exercised on Linux; unsupported inspection fails closed.\"\n        }\n      ],\n      \"verification\": [\n        \"cargo test --lib workflow -- --test-threads=1 --skip multiple_plan_skills_contribute_separate_namespaced_checklists: 236 passed. Log: /tmp/refine-round2-workflow-final-complete.log\",\n        \"cargo test --lib worker_liveness -- --test-threads=1, with an inherited worker token: 6 passed, including one-second timing assertions. Log: /tmp/refine-round2-timed-liveness.log\",\n        \"cargo test --lib application::workers -- --test-threads=1: 31 passed.\",\n        \"cargo test --lib application::maintenance::worktrees -- --test-threads=1: 19 passed.\",\n        \"Focused process supervisor, subprocess and interactive-session suites: 52, 20 and 37 passed respectively.\",\n        \"Focused HTTP runtime and next-action suites: 8 and 3 passed respectively.\",\n        \"cargo check --lib: passed on final files. Scoped rustfmt checks and git diff --check passed.\",\n        \"cargo clippy --lib --message-format=json: passed with five warnings on unchanged code.\",\n        \"The excluded planning fixture also fails in an archive of pinned base f880b7767149e4de43d5bc4d4786247d1e536a8c: a Skill is assigned multiple triggers. Its fixture remains unchanged. Log: /tmp/refine-round2-baseline-planning-test.log\"\n      ]\n    }\n  },\n  \"binding_id\": \"default-implement\",\n  \"evidence\": [\n    \"Implemented in the pinned Round 2 worktree; HEAD remains f880b7767149e4de43d5bc4d4786247d1e536a8c.\",\n    \"Preserved Round 1 and its retained work. No Goal advancement, candidate commit, merge, push, deployment or serving-daemon restart was performed.\",\n    \"The August report remained a hypothesis; testing reproduced the integration failure and separately exposed and corrected a completion/discovery scheduling race.\"\n  ],\n  \"invocation_id\": \"b8a981a0213135b579b4885cac6a4ca5882d492d037fac6786967353d3641807\",\n  \"outcome\": \"success\",\n  \"role\": \"implement\",\n  \"summary\": \"Implemented Goal failure containment, scheduler health and safe recovery, shared diagnostics, and independent maintenance with focused verification.\"\n}\n",
-      "workflow_revision": 18
-    }
-  ],
-  "created_at": "2026-09-10T13:48:22.539924320+00:00",
-  "completed_at": "2026-09-10T14:59:14.492442136+00:00",
+  "state": "running",
+  "results": {},
+  "attempts": [],
+  "created_at": "2026-09-10T14:59:15.659153146+00:00",
+  "completed_at": null,
   "error": null,
   "action_applied": false
 }
