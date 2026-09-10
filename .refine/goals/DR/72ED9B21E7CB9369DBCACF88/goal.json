@@ -3,7 +3,7 @@
   "branch_name": "refine/DR72ED9B21E7CB9369DBCACF88/round-2",
   "candidate_commit": null,
   "created": "2026-09-10T08:26:05Z",
-  "event_generation": 2,
+  "event_generation": 3,
   "feature_id": null,
   "feature_order": null,
   "id": "DR72ED9B21E7CB9369DBCACF88",
@@ -906,6 +906,93 @@
           }
         }
       },
+      "event_results": {
+        "1d9139a06353a0278ec5a8ffa5a1ef24140b8b7247aa899896ed8435512c7927": {
+          "candidate_commit": null,
+          "results": {
+            "default-plan": {
+              "artifacts": {
+                "plan": {
+                  "checklist": [
+                    {
+                      "description": "Add shared workspace admission that proves repository, linked registration, Goal, Round, branch or candidate, and canonical working-directory containment.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "Enforce admission during worktree creation, reuse, restart and recovery while preserving retained work and declared-base branch creation.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "Carry the admitted workspace through Goal-bound Skill contexts, ordered bindings, diagnostic repairs and recovered invocations.",
+                      "id": "P3"
+                    },
+                    {
+                      "description": "Require workspace revalidation and explicit cwd for managed Goal process launches, provider-session resumes and fresh-launch fallbacks.",
+                      "id": "P4"
+                    },
+                    {
+                      "description": "Revalidate workspace identity before candidate staging, commits, correction settlement and refresh operations.",
+                      "id": "P5"
+                    },
+                    {
+                      "description": "Apply workspace admission to Quality Skills and supervised checks, including isolated regeneration of legacy post-build evidence.",
+                      "id": "P6"
+                    },
+                    {
+                      "description": "Remove inherited Git redirection from managed Goal processes and Git commands while preserving deliberate internal command overrides.",
+                      "id": "P7"
+                    },
+                    {
+                      "description": "Add focused isolation and recovery regressions that prove primary-checkout contents and index bytes remain unchanged.",
+                      "id": "P8"
+                    },
+                    {
+                      "description": "Update affected workspace, Goal Agent, Skills and process intent contracts.",
+                      "id": "P9"
+                    }
+                  ],
+                  "criticism_resolutions": [
+                    {
+                      "criticism_id": "C1",
+                      "resolution": "Branch-name matching and optional workspace metadata permit bypasses. Require a Goal-bound workspace commitment, checked against durable Round authority and actual linked-worktree registration."
+                    },
+                    {
+                      "criticism_id": "C2",
+                      "resolution": "Replaying Round 1 would omit current Skills execution and restore outdated workflow assumptions. Selectively adapt its admission helpers, environment handling and tests to the pinned implementation."
+                    },
+                    {
+                      "criticism_id": "C3",
+                      "resolution": "A creation-time check cannot protect later writes or resumes. Revalidate at execution boundaries, preserve ambiguous work, and keep infrastructure faults distinct from finding-recovery requests."
+                    }
+                  ],
+                  "summary": "Require proven managed workspaces throughout automated Goal execution so Skills, recovery agents and Git writes cannot interfere with the developer's primary checkout."
+                }
+              },
+              "binding_id": "default-plan",
+              "evidence": [
+                "Planning method: traced workspace creation, Skill dispatch, provider execution, Quality commands and candidate writes against current docs/intent, then compared the retained Round 1 changes and challenged the proposed enforcement boundaries.",
+                "Observed baseline: the pinned Round 2 workspace is /home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR72ED9B21E7CB9369DBCACF88-round-2, registered on refine/DR72ED9B21E7CB9369DBCACF88/round-2 at f880b7767149e4de43d5bc4d4786247d1e536a8c. Round 1 remains at 8f6de519c62a8a373b19482d5c7842068acfb35d with 31 modified tracked files, five untracked files and no staged changes.",
+                "P1-P2 architecture: Application derives workspace purpose and Goal/Round authority from existing Round and handoff records; Infrastructure proves canonical repository identity, linked Git directory and reciprocal registration, expected location, branch and phase-specific commit. Reject primary, foreign, stale, replaced or conflicting registrations before adopting or modifying them. Resolve agent_subpath to an existing contained directory and reject symlink escape and nested-repository redirection. Preserve valid dirty implementation work; require clean exact candidates for observational verification. Recreate missing workspaces only from unambiguous retained evidence, without resetting conflicting branches or broadly pruning unrelated registrations.",
+                "P2 retained comparison: current creation and restart paths already call ensure_worktree_from_base; preserve that behavior and the round_base regressions. Round 1's admission.rs, workspace.rs, environment changes and isolation tests are useful starting points. Its optional validate_workspace_launch metadata check is insufficient, and its old Goal Agent documentation conflicts with the current Event-driven Skills contract. Recovery must preserve earlier Round workspaces and use a separately admitted current-Round checkout.",
+                "P3-P4 observed gaps: src/application/events/execution.rs acquires a lease and launches providers using saved context.cwd without proving managed ownership. Diagnostic repairs repeat that path. agent_worktree_cwd in engine/context/execution.rs rejects lexical parent traversal but does not resolve containment. Carry a typed commitment through invocation and process records; revalidate before lease-related workspace writes, each launch and result acceptance. Persisted metadata is provenance, not authority. Goal-bound resume must supply admitted cwd; missing legacy commitments require reconstruction from durable evidence or an actionable error.",
+                "P5 enforcement: use the shared admission capability in candidate_handoff, candidate_refresh, implementation commits and Quality correction commits. Revalidate under existing short repository-lock boundaries immediately before writes, and preserve resolver execution outside that lock. Model an owned in-progress rebase explicitly so its detached HEAD is accepted only for the proven refresh operation. Errors should identify expected and observed workspace identity, preserve dirty files and evidence, and avoid consuming a finding-recovery Round.",
+                "P6 observed gaps: service/skill_checks.rs verifies candidate HEAD and cleanliness but does not establish linked-worktree ownership before each supervised command. service/runner.rs still selects target_root for legacy post_build evaluation. Route new legacy evaluations through the existing exact-source-candidate reconciliation checkout and retain historical proof identities and terminal failed findings. Validate admission before every Skill/check and before proof settlement, including when no required Skills apply.",
+                "P7 environment scope: sanitize inherited repository, worktree, common-directory, index, object-store and Git configuration redirection after host-shell projection. Apply this consistently to provider, PTY, supervised Quality and direct Git execution. Allow deliberate internal temporary-index overrides only through their explicit command boundary. Preserve independently launched Custom Skill and toolbar context; do not infer Goal ownership from a provider profile or an open Goal.",
+                "P8 proposed tests: use disposable repositories with staged, unstaged and untracked primary-checkout sentinels. Exercise Plan, Implement, corrective Quality, observational Skill checks, diagnostic repair, interrupted invocation recovery, process resume and candidate refresh. Assert unchanged file bytes, raw primary-index bytes, HEAD and branch. Cover matching branches in primary or unrelated worktrees, missing/replaced registrations, wrong repository/Round/branch/commit, symlink and nested-repository escape, absent commitment metadata, inherited Git redirection, and mutation between admission and launch or commit. Assert rejected execution launches no child and preserves retained work. Retain manual Custom Skill independence and main-integration boundary regressions.",
+                "P8 proposed commands, not executed: run cargo test --lib with each relevant filter separately and -- --test-threads=1: application::events::tests, application::workflow::tests::round_base, application::workflow::tests::worktree_resume, application::workflow::tests::candidate_refresh, application::workflow::phases::quality::tests, infrastructure::git::worktrees::tests, infrastructure::agents::invocation::tests, and infrastructure::process::launch_environment::tests. Run focused new resume/PTY tests and git diff --check. Report actual selected-test counts, failures and skips; run formatting checks only for changed Rust files.",
+                "P9 intent and Governance rationale: current Skills and Goal Agent intent assign workflow advancement and integration to Refine, keep Plan/Governance observational, and separate human acceptance. Preserve those boundaries and existing integration leases and checkout synchronization. Update only affected sections of 02-skills.md, 05-merge-review-git-worktrees.md, 10-goal-agents.md and 04-infrastructure/01-process.md. Keep admission and Quality registration in cohesive modules rather than expanding the already large execution and workflow files. No archived configuration or fixed planning sequence gains authority.",
+                "Actual verification: before-and-after read-only Git observations showed unchanged heads, branches and raw index hashes for Round 2, Round 1 and the primary checkout. Round 2 and primary remained clean; Round 1 retained its observed dirty-file inventory. No repository files or Git state were changed, no tests were executed, and no Goal transition, merge, push, deployment or daemon restart was performed. Deliberately dirty-primary isolation remains proposed verification, not a claimed pass."
+              ],
+              "invocation_id": "1d9139a06353a0278ec5a8ffa5a1ef24140b8b7247aa899896ed8435512c7927",
+              "outcome": "success",
+              "role": "plan",
+              "summary": "Completed the read-only recovery plan and corrected the result structure. Checklist items contain only id and description; supporting analysis and proposed verification are separate."
+            }
+          },
+          "source": "workflow.plan.enter",
+          "state": "succeeded"
+        }
+      },
       "failure_at": "",
       "failure_category": "",
       "failure_message": "",
@@ -925,12 +1012,122 @@
           "round_idx": 1,
           "target_branch": "main"
         },
-        "phase": "plan",
-        "phase_started_at": "2026-09-10T13:43:02Z",
+        "final_plan": {
+          "completed_at": "2026-09-10T13:54:19Z",
+          "git_after": {
+            "branch": "refine/DR72ED9B21E7CB9369DBCACF88/round-2",
+            "head_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR72ED9B21E7CB9369DBCACF88/round-2",
+            "head_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Add shared workspace admission that proves repository, linked registration, Goal, Round, branch or candidate, and canonical working-directory containment.",
+                "id": "workflow.plan.enter:default-plan:P1"
+              },
+              {
+                "description": "Enforce admission during worktree creation, reuse, restart and recovery while preserving retained work and declared-base branch creation.",
+                "id": "workflow.plan.enter:default-plan:P2"
+              },
+              {
+                "description": "Carry the admitted workspace through Goal-bound Skill contexts, ordered bindings, diagnostic repairs and recovered invocations.",
+                "id": "workflow.plan.enter:default-plan:P3"
+              },
+              {
+                "description": "Require workspace revalidation and explicit cwd for managed Goal process launches, provider-session resumes and fresh-launch fallbacks.",
+                "id": "workflow.plan.enter:default-plan:P4"
+              },
+              {
+                "description": "Revalidate workspace identity before candidate staging, commits, correction settlement and refresh operations.",
+                "id": "workflow.plan.enter:default-plan:P5"
+              },
+              {
+                "description": "Apply workspace admission to Quality Skills and supervised checks, including isolated regeneration of legacy post-build evidence.",
+                "id": "workflow.plan.enter:default-plan:P6"
+              },
+              {
+                "description": "Remove inherited Git redirection from managed Goal processes and Git commands while preserving deliberate internal command overrides.",
+                "id": "workflow.plan.enter:default-plan:P7"
+              },
+              {
+                "description": "Add focused isolation and recovery regressions that prove primary-checkout contents and index bytes remain unchanged.",
+                "id": "workflow.plan.enter:default-plan:P8"
+              },
+              {
+                "description": "Update affected workspace, Goal Agent, Skills and process intent contracts.",
+                "id": "workflow.plan.enter:default-plan:P9"
+              }
+            ],
+            "summary": "workflow.plan.enter:default-plan: Require proven managed workspaces throughout automated Goal execution so Skills, recovery agents and Git writes cannot interfere with the developer's primary checkout."
+          },
+          "started_at": "2026-09-10T13:43:02Z"
+        },
+        "phase": "implement",
+        "phase_started_at": "2026-09-10T13:54:19Z",
+        "proposal": {
+          "completed_at": "2026-09-10T13:54:19Z",
+          "git_after": {
+            "branch": "refine/DR72ED9B21E7CB9369DBCACF88/round-2",
+            "head_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR72ED9B21E7CB9369DBCACF88/round-2",
+            "head_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Add shared workspace admission that proves repository, linked registration, Goal, Round, branch or candidate, and canonical working-directory containment.",
+                "id": "workflow.plan.enter:default-plan:P1"
+              },
+              {
+                "description": "Enforce admission during worktree creation, reuse, restart and recovery while preserving retained work and declared-base branch creation.",
+                "id": "workflow.plan.enter:default-plan:P2"
+              },
+              {
+                "description": "Carry the admitted workspace through Goal-bound Skill contexts, ordered bindings, diagnostic repairs and recovered invocations.",
+                "id": "workflow.plan.enter:default-plan:P3"
+              },
+              {
+                "description": "Require workspace revalidation and explicit cwd for managed Goal process launches, provider-session resumes and fresh-launch fallbacks.",
+                "id": "workflow.plan.enter:default-plan:P4"
+              },
+              {
+                "description": "Revalidate workspace identity before candidate staging, commits, correction settlement and refresh operations.",
+                "id": "workflow.plan.enter:default-plan:P5"
+              },
+              {
+                "description": "Apply workspace admission to Quality Skills and supervised checks, including isolated regeneration of legacy post-build evidence.",
+                "id": "workflow.plan.enter:default-plan:P6"
+              },
+              {
+                "description": "Remove inherited Git redirection from managed Goal processes and Git commands while preserving deliberate internal command overrides.",
+                "id": "workflow.plan.enter:default-plan:P7"
+              },
+              {
+                "description": "Add focused isolation and recovery regressions that prove primary-checkout contents and index bytes remain unchanged.",
+                "id": "workflow.plan.enter:default-plan:P8"
+              },
+              {
+                "description": "Update affected workspace, Goal Agent, Skills and process intent contracts.",
+                "id": "workflow.plan.enter:default-plan:P9"
+              }
+            ],
+            "summary": "workflow.plan.enter:default-plan: Require proven managed workspaces throughout automated Goal execution so Skills, recovery agents and Git writes cannot interfere with the developer's primary checkout."
+          },
+          "started_at": "2026-09-10T13:43:02Z"
+        },
         "schema_version": 2,
         "started_at": "2026-09-10T13:43:02Z",
         "state": "in_progress",
-        "updated_at": "2026-09-10T13:43:02Z"
+        "updated_at": "2026-09-10T13:54:19Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -944,7 +1141,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T13:43:02Z",
+      "updated": "2026-09-10T13:54:19Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T13:43:01Z",
         "round_idx": 1,
@@ -954,9 +1151,9 @@
       "workflow_recovery": null
     }
   ],
-  "status": "plan",
+  "status": "implement",
   "target_branch": "main",
-  "updated": "2026-09-10T13:43:02Z",
+  "updated": "2026-09-10T13:54:19Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:06:36.706264729+00:00",
@@ -975,7 +1172,16 @@
       "node_id": "default",
       "round_idx": 1,
       "to": "plan"
+    },
+    {
+      "at": "2026-09-10T13:54:19.294851433+00:00",
+      "forced": false,
+      "from": "plan",
+      "generation": 3,
+      "node_id": "default",
+      "round_idx": 1,
+      "to": "implement"
     }
   ],
-  "workflow_revision": 26
+  "workflow_revision": 32
 }

@@ -3,7 +3,7 @@
   "branch_name": "refine/DR54BF57DCE017ED8EC68A5EEB/round-2",
   "candidate_commit": null,
   "created": "2026-09-10T08:26:04Z",
-  "event_generation": 2,
+  "event_generation": 3,
   "feature_id": null,
   "feature_order": null,
   "id": "DR54BF57DCE017ED8EC68A5EEB",
@@ -974,6 +974,103 @@
           }
         }
       },
+      "event_results": {
+        "894cad460b1714982b449f5f3810746b6c55a76868d318f16e6a8d0976f6ddfd": {
+          "candidate_commit": null,
+          "results": {
+            "default-plan": {
+              "artifacts": {
+                "plan": {
+                  "checklist": [
+                    {
+                      "description": "Validate worktree, base, target, authority, and planning or Skill context before agent edits; preserve existing-work bases.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "Establish the Goal-owned replay range from retained Round and Git evidence; preserve ambiguous history for explicit recovery.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "Replay proven changes onto one observed target SHA in a managed workspace with durable interruption evidence.",
+                      "id": "P3"
+                    },
+                    {
+                      "description": "Route wrong-base, advanced-target, and scoped retry candidates through the shared refresh path with bounded retries.",
+                      "id": "P4"
+                    },
+                    {
+                      "description": "Persist original and replacement identities atomically, retain source attempts, and reconcile superseded planning and candidate evidence.",
+                      "id": "P5"
+                    },
+                    {
+                      "description": "Rerun applicable current Skills and exact-candidate checks for replacements, preserving required, background, and context-only semantics.",
+                      "id": "P6"
+                    },
+                    {
+                      "description": "Journal candidate publication and atomically replace only the previously recorded remote SHA, including idempotent interrupted retries.",
+                      "id": "P7"
+                    },
+                    {
+                      "description": "Preserve supported conflict resolution and distinguish conflicts, ambiguous history, dirty work, authority loss, and Git errors.",
+                      "id": "P8"
+                    },
+                    {
+                      "description": "Keep changed responsibilities in cohesive modules and update only the affected worktree, workflow, and Skills intent contracts.",
+                      "id": "P9"
+                    },
+                    {
+                      "description": "Verify lineage, retries, replacement checks, conflicts, publication races, interruption, and existing Round-creation behavior.",
+                      "id": "P10"
+                    }
+                  ],
+                  "criticism_resolutions": [
+                    {
+                      "criticism_id": "C1",
+                      "resolution": "P2 rejects merge-base-only ownership inference and implicit merge squashing. Automatic replay requires an evidenced Goal-owned range."
+                    },
+                    {
+                      "criticism_id": "C2",
+                      "resolution": "P7 addresses publication before integration: retain the expected remote SHA and pending replacement across target movement and interruption."
+                    },
+                    {
+                      "criticism_id": "C3",
+                      "resolution": "P5-P6 cover Skill invocation identities and proof eligibility as well as legacy gate fields, preventing replacement candidates from inheriting stale results."
+                    },
+                    {
+                      "criticism_id": "C4",
+                      "resolution": "P3-P4 and P8 retain interrupted work, preserve lock ordering, and reuse bounded recovery rather than repeatedly replaying an unprovable candidate."
+                    }
+                  ],
+                  "summary": "Recover stale candidates by replaying only proven Goal changes, retaining source evidence, rerunning current Skills, and fencing replacement publication."
+                }
+              },
+              "binding_id": "default-plan",
+              "evidence": [
+                "Observed baseline: the pinned Round 2 workspace is /home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR54BF57DCE017ED8EC68A5EEB-round-2, on refine/DR54BF57DCE017ED8EC68A5EEB/round-2. HEAD, local main, and local origin/main all resolve to f880b7767149e4de43d5bc4d4786247d1e536a8c, matching the supplied base. Final status was clean and git diff --check exited 0. No remote freshness claim is made; no fetch, tests, repository edits, or lifecycle mutations were performed.",
+                "Retained source: Round 1 remains at 8f6de519c62a8a373b19482d5c7842068acfb35d with 22 modified tracked files and untracked lineage, replay, publication, and test modules. Inspected its replay.rs, behaviors/lineage.rs, candidate_handoff/publication.rs, and worktrees/publication.rs. Its journal and lease patterns are selective references; its merge-base ownership inference and automatic merge-history squashing are unsuitable. The supplied record contains no finalized Round 1 candidate or verification.",
+                "P1-P2 implementation: extend workflow preparation and candidate_refresh with a shared lineage classification. Capture actual initial HEAD separately from recorded base, then reconcile retained creation observations, planning Git snapshots, handoff records, and supervised candidate history. Require exact identities and an accounted-for linear range from an evidenced Goal starting commit to the candidate. A developer-branch prefix preceding that start must be excluded. Conflicting anchors, unexplained commits, missing objects, or merges without proven replay semantics remain recoverable. Branch names, commit authors, merge bases, and clean application do not establish ownership.",
+                "P1-P4 observed gaps: recovery/candidate_refresh/mod.rs returns Unchanged when resolved base equals target before inspecting candidate HEAD and ancestry. engine/behaviors/mod.rs:1726 then makes unchanged-target stale lineage an immediate governance_candidate_lineage failure. Scoped recovery currently branches from the retained candidate while retaining its old base. Preserve ensure_worktree_from_base and existing creation/resumption regressions; validate before early returns, route provable mismatches through refresh, and prepare successor workspaces from retained candidates without switching or rewriting the source attempt.",
+                "P3-P5 implementation: pass exact target, source candidate, and proven range boundary to the Git capability. Retain source commits and write replay intent before mutation. Persist the target snapshot, ownership evidence, original base/candidate, replacement base/candidate, branch/workspace, and attempt identity. Complete local ref changes with exact comparisons and reconcile interruption between replay, ref movement, and Goal persistence. Preserve the original creation base and historical plans; record replacement bindings separately and regenerate planning context when its assumptions changed. Already-applied changes require explicit evidence, not silent skipped conflicts.",
+                "P4-P8 integration: retain the existing integration-target lease and short repository-lock holds, with agent checks and conflict resolution outside the repository lock. Revalidate authority and target before consequential actions. Reuse INTEGRATION_REFRESH_ATTEMPTS and the shared automatic Round budget. Continue supported conflict resolution with scoped edits, conflicting paths, resolution attempts, and verified abort outcomes. Dirty work, unrelated Git operations, cancellation, reassignment, and Git failures must preserve evidence and prevent successful replay settlement.",
+                "P5-P6 observed Skills context: docs/intent/03-application/01-agents/02-skills.md establishes current required, background, and context-only behavior. events/workflow.rs selects current configuration; events/execution.rs:321 reuses invocations by occurrence identity. Quality and Governance already use candidate-bearing invocation keys in relevant paths. Extend identity validation and supersession consistently to affected planning, refresh, check, and exit paths, preserving historical results. Every replacement must receive applicable current checks; optional background execution remains nonblocking and context attachments do not launch checks. Record the configuration and absence of required checks while still enforcing exact candidate and integration invariants.",
+                "P7 observed publication gap: engine/behaviors/mod.rs publishes through ordinary worktree_git.push before integration. candidate_handoff/mod.rs has no publication journal, and operation update_progress replaces the progress object. Add narrowly scoped durable publication updates that retain remote identity, candidate ref, prior confirmed remote SHA or proven absence, pending replacement, and outcomes through later progress and failure writes. Persist and read back intent before an atomic explicit force-with-lease update of the candidate ref. Reconcile an identical pending replacement idempotently; never adopt an unexpected remote SHA, erase unresolved pending evidence, or force-update the target.",
+                "P9 architecture and Governance rationale: retain Application ownership of lineage decisions, workflow advancement, and recovery; Infrastructure owns Git mechanisms and durable storage; Model types express evidence and invariants without surface dependencies. Reuse existing handoff and refresh records rather than adding another workflow authority. behaviors/mod.rs is 2621 lines and candidate_refresh/mod.rs is 916 lines; extract touched preparation, replay persistence, resolution, and publication responsibilities into real modules with their tests. Human Review remains separate, and this work does not promote or restart the serving installation.",
+                "P9 documentation scope: amend the affected portions of docs/intent/03-application/01-agents/05-merge-review-git-worktrees.md and workflow pages 02-todo.md, 03-plan.md, 04-implement.md, 05-quality.md, 06-governance.md, and 11-consistency-contract.md. Update 02-skills.md only where replacement invocation identity needs clarification. Remove contradictory lineage and retry statements in those affected passages without restoring archived configuration or the fixed planning sequence.",
+                "P10 proposed regression matrix: cover fresh creation from a declared target while the shared checkout is elsewhere; recreation and unchanged resumption bases; advanced targets; wrong recorded bases with unchanged targets; proven divergent Goal suffixes excluding unrelated commits; missing or contradictory ownership evidence; merge ambiguity; already-applied changes; scoped finding retries; repeated target movement and exhaustion; resolved and unresolved conflicts; dirty/untracked work; lost authority; Git failures; and interruption before and after replay/ref/persistence boundaries. Assert exact trees and identities, source preservation, bounded attempts, and zero mutation on rejected provenance.",
+                "P10 proposed publication and Skills tests: use isolated local bare remotes and deterministic race hooks for absent-ref publication, leased replacement, target movement after publication, unexpected remote updates before and during push, identical replacement retries, and interruption before push or after remote acceptance. Verify durable pending evidence survives failure updates. Exercise required, background-only, context-only, and no-required-check configurations; prove each changed candidate receives new applicable invocations and supervised proof, late old results cannot authorize it, and identical retries remain idempotent.",
+                "Proposed verification commands, not executed: run cargo test --locked --lib round_base -- --test-threads=1; cargo test --locked --lib candidate_refresh -- --test-threads=1; cargo test --locked --lib quality_base_refresh -- --test-threads=1; cargo test --locked --lib application::events:: -- --test-threads=1; cargo test --locked --lib infrastructure::git:: -- --test-threads=1; and the new publication/handoff regression filters. Finish with cargo check --locked --all-targets, cargo test --locked --lib --bins -- --test-threads=1, cargo fmt --all -- --check, and git diff --check. Cargo.toml, tests/test_all.rs, and xtask/src/main.rs confirm explicit library testing is appropriate. Report selected test counts, actual exits, failures, and skips against the final candidate; distinguish unchanged baseline failures.",
+                ""
+              ],
+              "invocation_id": "894cad460b1714982b449f5f3810746b6c55a76868d318f16e6a8d0976f6ddfd",
+              "outcome": "success",
+              "role": "plan",
+              "summary": "Produced a read-only Round 2 implementation plan with compact checklist pairs, resolved design critiques, observed repository evidence, and proposed verification."
+            }
+          },
+          "source": "workflow.plan.enter",
+          "state": "succeeded"
+        }
+      },
       "failure_at": "",
       "failure_category": "",
       "failure_message": "",
@@ -993,12 +1090,130 @@
           "round_idx": 1,
           "target_branch": "main"
         },
-        "phase": "plan",
-        "phase_started_at": "2026-09-10T13:43:01Z",
+        "final_plan": {
+          "completed_at": "2026-09-10T13:54:14Z",
+          "git_after": {
+            "branch": "refine/DR54BF57DCE017ED8EC68A5EEB/round-2",
+            "head_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR54BF57DCE017ED8EC68A5EEB/round-2",
+            "head_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Validate worktree, base, target, authority, and planning or Skill context before agent edits; preserve existing-work bases.",
+                "id": "workflow.plan.enter:default-plan:P1"
+              },
+              {
+                "description": "Establish the Goal-owned replay range from retained Round and Git evidence; preserve ambiguous history for explicit recovery.",
+                "id": "workflow.plan.enter:default-plan:P2"
+              },
+              {
+                "description": "Replay proven changes onto one observed target SHA in a managed workspace with durable interruption evidence.",
+                "id": "workflow.plan.enter:default-plan:P3"
+              },
+              {
+                "description": "Route wrong-base, advanced-target, and scoped retry candidates through the shared refresh path with bounded retries.",
+                "id": "workflow.plan.enter:default-plan:P4"
+              },
+              {
+                "description": "Persist original and replacement identities atomically, retain source attempts, and reconcile superseded planning and candidate evidence.",
+                "id": "workflow.plan.enter:default-plan:P5"
+              },
+              {
+                "description": "Rerun applicable current Skills and exact-candidate checks for replacements, preserving required, background, and context-only semantics.",
+                "id": "workflow.plan.enter:default-plan:P6"
+              },
+              {
+                "description": "Journal candidate publication and atomically replace only the previously recorded remote SHA, including idempotent interrupted retries.",
+                "id": "workflow.plan.enter:default-plan:P7"
+              },
+              {
+                "description": "Preserve supported conflict resolution and distinguish conflicts, ambiguous history, dirty work, authority loss, and Git errors.",
+                "id": "workflow.plan.enter:default-plan:P8"
+              },
+              {
+                "description": "Keep changed responsibilities in cohesive modules and update only the affected worktree, workflow, and Skills intent contracts.",
+                "id": "workflow.plan.enter:default-plan:P9"
+              },
+              {
+                "description": "Verify lineage, retries, replacement checks, conflicts, publication races, interruption, and existing Round-creation behavior.",
+                "id": "workflow.plan.enter:default-plan:P10"
+              }
+            ],
+            "summary": "workflow.plan.enter:default-plan: Recover stale candidates by replaying only proven Goal changes, retaining source evidence, rerunning current Skills, and fencing replacement publication."
+          },
+          "started_at": "2026-09-10T13:43:01Z"
+        },
+        "phase": "implement",
+        "phase_started_at": "2026-09-10T13:54:14Z",
+        "proposal": {
+          "completed_at": "2026-09-10T13:54:14Z",
+          "git_after": {
+            "branch": "refine/DR54BF57DCE017ED8EC68A5EEB/round-2",
+            "head_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR54BF57DCE017ED8EC68A5EEB/round-2",
+            "head_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Validate worktree, base, target, authority, and planning or Skill context before agent edits; preserve existing-work bases.",
+                "id": "workflow.plan.enter:default-plan:P1"
+              },
+              {
+                "description": "Establish the Goal-owned replay range from retained Round and Git evidence; preserve ambiguous history for explicit recovery.",
+                "id": "workflow.plan.enter:default-plan:P2"
+              },
+              {
+                "description": "Replay proven changes onto one observed target SHA in a managed workspace with durable interruption evidence.",
+                "id": "workflow.plan.enter:default-plan:P3"
+              },
+              {
+                "description": "Route wrong-base, advanced-target, and scoped retry candidates through the shared refresh path with bounded retries.",
+                "id": "workflow.plan.enter:default-plan:P4"
+              },
+              {
+                "description": "Persist original and replacement identities atomically, retain source attempts, and reconcile superseded planning and candidate evidence.",
+                "id": "workflow.plan.enter:default-plan:P5"
+              },
+              {
+                "description": "Rerun applicable current Skills and exact-candidate checks for replacements, preserving required, background, and context-only semantics.",
+                "id": "workflow.plan.enter:default-plan:P6"
+              },
+              {
+                "description": "Journal candidate publication and atomically replace only the previously recorded remote SHA, including idempotent interrupted retries.",
+                "id": "workflow.plan.enter:default-plan:P7"
+              },
+              {
+                "description": "Preserve supported conflict resolution and distinguish conflicts, ambiguous history, dirty work, authority loss, and Git errors.",
+                "id": "workflow.plan.enter:default-plan:P8"
+              },
+              {
+                "description": "Keep changed responsibilities in cohesive modules and update only the affected worktree, workflow, and Skills intent contracts.",
+                "id": "workflow.plan.enter:default-plan:P9"
+              },
+              {
+                "description": "Verify lineage, retries, replacement checks, conflicts, publication races, interruption, and existing Round-creation behavior.",
+                "id": "workflow.plan.enter:default-plan:P10"
+              }
+            ],
+            "summary": "workflow.plan.enter:default-plan: Recover stale candidates by replaying only proven Goal changes, retaining source evidence, rerunning current Skills, and fencing replacement publication."
+          },
+          "started_at": "2026-09-10T13:43:01Z"
+        },
         "schema_version": 2,
         "started_at": "2026-09-10T13:43:01Z",
         "state": "in_progress",
-        "updated_at": "2026-09-10T13:43:01Z"
+        "updated_at": "2026-09-10T13:54:14Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -1012,7 +1227,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T13:43:01Z",
+      "updated": "2026-09-10T13:54:14Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T13:43:00Z",
         "round_idx": 1,
@@ -1022,9 +1237,9 @@
       "workflow_recovery": null
     }
   ],
-  "status": "plan",
+  "status": "implement",
   "target_branch": "main",
-  "updated": "2026-09-10T13:43:01Z",
+  "updated": "2026-09-10T13:54:14Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:06:36.990956802+00:00",
@@ -1043,7 +1258,16 @@
       "node_id": "default",
       "round_idx": 1,
       "to": "plan"
+    },
+    {
+      "at": "2026-09-10T13:54:14.720273198+00:00",
+      "forced": false,
+      "from": "plan",
+      "generation": 3,
+      "node_id": "default",
+      "round_idx": 1,
+      "to": "implement"
     }
   ],
-  "workflow_revision": 26
+  "workflow_revision": 32
 }
