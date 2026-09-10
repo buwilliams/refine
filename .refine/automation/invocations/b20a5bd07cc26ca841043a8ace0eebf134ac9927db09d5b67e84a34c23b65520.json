@@ -698,11 +698,119 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "succeeded",
+  "results": {
+    "default-plan": {
+      "invocation_id": "b20a5bd07cc26ca841043a8ace0eebf134ac9927db09d5b67e84a34c23b65520",
+      "binding_id": "default-plan",
+      "role": "plan",
+      "outcome": "success",
+      "summary": "Completed a read-only implementation plan against the pinned Round 2 candidate, including alternatives, criticism resolutions, shared-work dependencies, and proposed verification.",
+      "evidence": [
+        "Verified the pinned workspace is refine-DR07C216F3E4EC22A57C60BE0B-round-2 on branch refine/DR07C216F3E4EC22A57C60BE0B/round-2 at f880b7767149e4de43d5bc4d4786247d1e536a8c. Final tracked, staged, and untracked inspections were clean; git diff --check passed.",
+        "src/application/workflow/engine/execution/mod.rs prepares Goals synchronously, retains scheduler_error until the pass ends, and removes active entries through received outcomes. Its panic fallback performs settlement before sending completion; result-construction errors lack equivalent settlement coverage.",
+        "src/application/workers/workflow.rs retries returned errors in its outer loop. src/application/workflow/recovery/failure_settlement/mod.rs currently returns Option<bool>, performs one settlement attempt, and ignores superseded-log append failure. These observations do not establish the August incident's cause.",
+        "src/application/work_items/service/workflow_attempts.rs already checks originating Round and claim authority under the Goal mutation lock. Existing failure_settlement tests cover authoritative failure and cancellation followed by same-Round or new-Round replacement.",
+        "src/application/workers/worktree_cleanup.rs already provides a separate cleanup worker. src/surfaces/web_server/http/background_loops.rs ensures workflow and cleanup sequentially; session_runtime.rs enforces agent timeouts through the active session loop.",
+        "src/infrastructure/process/supervisor/lifecycle/mod.rs returns stored health and excludes unhealthy ports from running_statuses; src/surfaces/web_server/http.rs:403 uses daemon_healthy to trigger shutdown. FileNextActionsService currently falls back to all-quiet without scheduler-tick evidence.",
+        "Inspected retained Round 1 at 8f6de519c62a8a373b19482d5c7842068acfb35d: 27 modified tracked files and seven untracked additions, including attempt, watchdog, health, and liveness-test work. No retained files, branches, or artifacts were changed.",
+        "Read current Skills and intent contracts and automation/config.json revision 22, which has enabled blocking Plan and Implement bindings. Read DR74050DA12C5442DF797B8AB6's current Round request to establish shared deadline, operation-recovery, and health ownership.",
+        "Proposed focused checks after implementation: cargo test --lib application::workflow::tests::worker_liveness -- --test-threads=1; cargo test --lib application::workflow::tests::failure_settlement -- --test-threads=1; cargo test --lib application::workflow::tests::candidate_refresh -- --test-threads=1; cargo test --lib application::workers:: -- --test-threads=1.",
+        "Proposed surface and maintenance checks: cargo test --lib application::guidance:: -- --test-threads=1; cargo test --lib application::diagnostics::processes::tests -- --test-threads=1; cargo test --lib infrastructure::process::supervisor::lifecycle::tests -- --test-threads=1; run the shared deadline/group-exit and real-worker regression modules, requiring nonzero test counts.",
+        "Proposed compilation and hygiene checks: cargo check --all-targets --locked, formatting checks for changed Rust files, and git diff --check. Builds, behavioral tests, and runtime fault injection were not run during this observational invocation; no behavioral pass is claimed."
+      ],
+      "artifacts": {
+        "plan": {
+          "checklist": [
+            {
+              "description": "Extract a cohesive per-Goal attempt runner covering preparation, Skill execution, result construction, and settlement, including panics; guarantee completion delivery with finished-handle fallback so an ended attempt cannot strand its active entry, while preserving current Event checks and workspace leases.",
+              "id": "P1"
+            },
+            {
+              "description": "Return explicit authoritative failure, existing verified outcome, superseded attempt, and unpersisted-evidence outcomes; retry transient settlement failures at most three times with bounded lock acquisition and backoff, rereading Round, claim, node, and cancellation authority each time, and retain originating failure evidence without overwriting newer decisions.",
+              "id": "P2"
+            },
+            {
+              "description": "Move blocking preparation, Git, and settlement work off admission control; bound or defer remaining promotion, Event, discovery, and lock work, and replace the pass-long scheduler_error latch with bounded retries while draining completions and ticking. Count preparation, execution, settlement, and still-live children against capacity, deduplicated with current Skill reservations and process observations.",
+              "id": "P3"
+            },
+            {
+              "description": "Publish atomic runtime-local scheduler observations bound to port runtime, managed process identity, worker incarnation, node, and canonical target: tick sequence, tick time, completed admission-cycle time, active attempts, and failure context. Emit ticks from the scheduler itself at least every second, including pause and detachment; use a 30-second silence threshold and separately bounded startup progress.",
+              "id": "P4"
+            },
+            {
+              "description": "Extend existing daemon supervision with one Application-owned recovery path using shared Infrastructure process controls: fence replacement launch, stop the exact old worker, rescan and confirm all owned process groups have exited, then accept a replacement only after its matching scheduler tick. Use bounded termination and restart backoff; retain unhealthy status and a supported remedy when identity, exit, or readiness cannot be proved.",
+              "id": "P5"
+            },
+            {
+              "description": "Provide one freshly evaluated Application health assessment to system status, process diagnostics, and refine next; keep reachable unhealthy ports visible and separate lifecycle shutdown/readiness from workflow degradation. Report continuously eligible Todo work waiting over 30 seconds with free capacity, count, last tick, cause, and supported remedy; distinguish pause, disabled automation, required Skill availability and scope, ordering, retry delay, live tasks, and unavailable evidence.",
+              "id": "P6"
+            },
+            {
+              "description": "Share deadline enforcement, confirmed process-group exit, and operation reconciliation with DR74050DA12C5442DF797B8AB6 through one daemon-maintenance interface and common health results. Reuse its implementation when available; preserve original recorded deadlines, Skill process coverage, human-input and Toolbar exceptions, live capacity, and operation evidence, with no competing reaper or recovery loop.",
+              "id": "P7"
+            },
+            {
+              "description": "Keep cleanup supervision and deadline maintenance independently runnable during admission faults and worker recovery waits; contain individual inspection failures and defer repository contention. Preserve cleanup pause boundaries, retention delays, live-use checks, dirty-worktree protection, and exact ref-retirement fences.",
+              "id": "P8"
+            },
+            {
+              "description": "Keep health policy and recovery orchestration in Application, runtime observation and termination mechanisms in Infrastructure, and surfaces thin; split changed mixed-responsibility files into cohesive modules. Update only affected workflow overview, consistency, execution-ownership, process, and CLI intent contracts.",
+              "id": "P9"
+            },
+            {
+              "description": "Add deterministic regressions for real integration failure plus supersession, preparation/result/settlement faults and panics, exhausted writes, and transient scheduler errors alongside a long-running task; prove newer intent remains unchanged and the next independently eligible Goal enters Plan within one poll interval after safe capacity becomes available.",
+              "id": "P10"
+            },
+            {
+              "description": "Exercise the actual worker and independent supervision path with a non-ticking process, replacement races, PID reuse, surviving descendants, termination failure, missing/corrupt health, target changes, and restart backoff; verify status and shutdown remain reachable, legitimate waiting causes no false stall, and cleanup/deadline maintenance progresses while retained artifacts survive.",
+              "id": "P11"
+            }
+          ],
+          "criticism_resolutions": [
+            {
+              "criticism_id": "C1",
+              "resolution": "The August stale-candidate explanation is unproven on this candidate. Use fault-boundary analysis and a real integration regression; a synthetic error string alone does not reproduce the reported cause."
+            },
+            {
+              "criticism_id": "C2",
+              "resolution": "Reject wholesale Round 1 reuse: its unfinished attempt extraction omits current pending-Event checks and workspace leases, and its scheduler still retains the error latch. Selectively adapt useful boundary and test ideas against Round 2."
+            },
+            {
+              "criticism_id": "C3",
+              "resolution": "Reject timer-only heartbeats and Goal-completion deadlines as scheduler health. Measure actual scheduling iterations and completed admission cycles; maintain separate eligibility waiting windows that reset on pause, blocking conditions, or target changes."
+            },
+            {
+              "criticism_id": "C4",
+              "resolution": "Catching errors or terminating only the worker PID is insufficient. Completion must remain observable after settlement panic, and capacity or replacement launch must wait for proven owned-work exit."
+            },
+            {
+              "criticism_id": "C5",
+              "resolution": "Do not overlay degraded health onto today's lifecycle control flag: HTTP shutdown currently watches daemon_healthy, and running-status enumeration filters unhealthy ports. Separate these meanings before exposing scheduler degradation."
+            },
+            {
+              "criticism_id": "C6",
+              "resolution": "The companion deadline/operation Goal is currently in Plan without a candidate. Treat its shared maintenance and group-exit implementation as an explicit integration dependency; a stub or unverified hook cannot satisfy P7 or the combined acceptance tests."
+            }
+          ],
+          "summary": "Keep Goal failures isolated, detect stalled scheduling through independent supervision, and expose actionable health while preserving execution authority, capacity, and retained evidence."
+        }
+      }
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "default-plan",
+      "diagnostic": null,
+      "operation_id": null,
+      "process_id": "proc-1789047781111-1129590-18",
+      "raw_output": "{\n  \"artifacts\": {\n    \"plan\": {\n      \"summary\": \"Keep Goal failures isolated, detect stalled scheduling through independent supervision, and expose actionable health while preserving execution authority, capacity, and retained evidence.\",\n      \"checklist\": [\n        {\n          \"id\": \"P1\",\n          \"description\": \"Extract a cohesive per-Goal attempt runner covering preparation, Skill execution, result construction, and settlement, including panics; guarantee completion delivery with finished-handle fallback so an ended attempt cannot strand its active entry, while preserving current Event checks and workspace leases.\"\n        },\n        {\n          \"id\": \"P2\",\n          \"description\": \"Return explicit authoritative failure, existing verified outcome, superseded attempt, and unpersisted-evidence outcomes; retry transient settlement failures at most three times with bounded lock acquisition and backoff, rereading Round, claim, node, and cancellation authority each time, and retain originating failure evidence without overwriting newer decisions.\"\n        },\n        {\n          \"id\": \"P3\",\n          \"description\": \"Move blocking preparation, Git, and settlement work off admission control; bound or defer remaining promotion, Event, discovery, and lock work, and replace the pass-long scheduler_error latch with bounded retries while draining completions and ticking. Count preparation, execution, settlement, and still-live children against capacity, deduplicated with current Skill reservations and process observations.\"\n        },\n        {\n          \"id\": \"P4\",\n          \"description\": \"Publish atomic runtime-local scheduler observations bound to port runtime, managed process identity, worker incarnation, node, and canonical target: tick sequence, tick time, completed admission-cycle time, active attempts, and failure context. Emit ticks from the scheduler itself at least every second, including pause and detachment; use a 30-second silence threshold and separately bounded startup progress.\"\n        },\n        {\n          \"id\": \"P5\",\n          \"description\": \"Extend existing daemon supervision with one Application-owned recovery path using shared Infrastructure process controls: fence replacement launch, stop the exact old worker, rescan and confirm all owned process groups have exited, then accept a replacement only after its matching scheduler tick. Use bounded termination and restart backoff; retain unhealthy status and a supported remedy when identity, exit, or readiness cannot be proved.\"\n        },\n        {\n          \"id\": \"P6\",\n          \"description\": \"Provide one freshly evaluated Application health assessment to system status, process diagnostics, and refine next; keep reachable unhealthy ports visible and separate lifecycle shutdown/readiness from workflow degradation. Report continuously eligible Todo work waiting over 30 seconds with free capacity, count, last tick, cause, and supported remedy; distinguish pause, disabled automation, required Skill availability and scope, ordering, retry delay, live tasks, and unavailable evidence.\"\n        },\n        {\n          \"id\": \"P7\",\n          \"description\": \"Share deadline enforcement, confirmed process-group exit, and operation reconciliation with DR74050DA12C5442DF797B8AB6 through one daemon-maintenance interface and common health results. Reuse its implementation when available; preserve original recorded deadlines, Skill process coverage, human-input and Toolbar exceptions, live capacity, and operation evidence, with no competing reaper or recovery loop.\"\n        },\n        {\n          \"id\": \"P8\",\n          \"description\": \"Keep cleanup supervision and deadline maintenance independently runnable during admission faults and worker recovery waits; contain individual inspection failures and defer repository contention. Preserve cleanup pause boundaries, retention delays, live-use checks, dirty-worktree protection, and exact ref-retirement fences.\"\n        },\n        {\n          \"id\": \"P9\",\n          \"description\": \"Keep health policy and recovery orchestration in Application, runtime observation and termination mechanisms in Infrastructure, and surfaces thin; split changed mixed-responsibility files into cohesive modules. Update only affected workflow overview, consistency, execution-ownership, process, and CLI intent contracts.\"\n        },\n        {\n          \"id\": \"P10\",\n          \"description\": \"Add deterministic regressions for real integration failure plus supersession, preparation/result/settlement faults and panics, exhausted writes, and transient scheduler errors alongside a long-running task; prove newer intent remains unchanged and the next independently eligible Goal enters Plan within one poll interval after safe capacity becomes available.\"\n        },\n        {\n          \"id\": \"P11\",\n          \"description\": \"Exercise the actual worker and independent supervision path with a non-ticking process, replacement races, PID reuse, surviving descendants, termination failure, missing/corrupt health, target changes, and restart backoff; verify status and shutdown remain reachable, legitimate waiting causes no false stall, and cleanup/deadline maintenance progresses while retained artifacts survive.\"\n        }\n      ],\n      \"criticism_resolutions\": [\n        {\n          \"criticism_id\": \"C1\",\n          \"resolution\": \"The August stale-candidate explanation is unproven on this candidate. Use fault-boundary analysis and a real integration regression; a synthetic error string alone does not reproduce the reported cause.\"\n        },\n        {\n          \"criticism_id\": \"C2\",\n          \"resolution\": \"Reject wholesale Round 1 reuse: its unfinished attempt extraction omits current pending-Event checks and workspace leases, and its scheduler still retains the error latch. Selectively adapt useful boundary and test ideas against Round 2.\"\n        },\n        {\n          \"criticism_id\": \"C3\",\n          \"resolution\": \"Reject timer-only heartbeats and Goal-completion deadlines as scheduler health. Measure actual scheduling iterations and completed admission cycles; maintain separate eligibility waiting windows that reset on pause, blocking conditions, or target changes.\"\n        },\n        {\n          \"criticism_id\": \"C4\",\n          \"resolution\": \"Catching errors or terminating only the worker PID is insufficient. Completion must remain observable after settlement panic, and capacity or replacement launch must wait for proven owned-work exit.\"\n        },\n        {\n          \"criticism_id\": \"C5\",\n          \"resolution\": \"Do not overlay degraded health onto today's lifecycle control flag: HTTP shutdown currently watches daemon_healthy, and running-status enumeration filters unhealthy ports. Separate these meanings before exposing scheduler degradation.\"\n        },\n        {\n          \"criticism_id\": \"C6\",\n          \"resolution\": \"The companion deadline/operation Goal is currently in Plan without a candidate. Treat its shared maintenance and group-exit implementation as an explicit integration dependency; a stub or unverified hook cannot satisfy P7 or the combined acceptance tests.\"\n        }\n      ]\n    }\n  },\n  \"binding_id\": \"default-plan\",\n  \"evidence\": [\n    \"Verified the pinned workspace is refine-DR07C216F3E4EC22A57C60BE0B-round-2 on branch refine/DR07C216F3E4EC22A57C60BE0B/round-2 at f880b7767149e4de43d5bc4d4786247d1e536a8c. Final tracked, staged, and untracked inspections were clean; git diff --check passed.\",\n    \"src/application/workflow/engine/execution/mod.rs prepares Goals synchronously, retains scheduler_error until the pass ends, and removes active entries through received outcomes. Its panic fallback performs settlement before sending completion; result-construction errors lack equivalent settlement coverage.\",\n    \"src/application/workers/workflow.rs retries returned errors in its outer loop. src/application/workflow/recovery/failure_settlement/mod.rs currently returns Option<bool>, performs one settlement attempt, and ignores superseded-log append failure. These observations do not establish the August incident's cause.\",\n    \"src/application/work_items/service/workflow_attempts.rs already checks originating Round and claim authority under the Goal mutation lock. Existing failure_settlement tests cover authoritative failure and cancellation followed by same-Round or new-Round replacement.\",\n    \"src/application/workers/worktree_cleanup.rs already provides a separate cleanup worker. src/surfaces/web_server/http/background_loops.rs ensures workflow and cleanup sequentially; session_runtime.rs enforces agent timeouts through the active session loop.\",\n    \"src/infrastructure/process/supervisor/lifecycle/mod.rs returns stored health and excludes unhealthy ports from running_statuses; src/surfaces/web_server/http.rs:403 uses daemon_healthy to trigger shutdown. FileNextActionsService currently falls back to all-quiet without scheduler-tick evidence.\",\n    \"Inspected retained Round 1 at 8f6de519c62a8a373b19482d5c7842068acfb35d: 27 modified tracked files and seven untracked additions, including attempt, watchdog, health, and liveness-test work. No retained files, branches, or artifacts were changed.\",\n    \"Read current Skills and intent contracts and automation/config.json revision 22, which has enabled blocking Plan and Implement bindings. Read DR74050DA12C5442DF797B8AB6's current Round request to establish shared deadline, operation-recovery, and health ownership.\",\n    \"Proposed focused checks after implementation: cargo test --lib application::workflow::tests::worker_liveness -- --test-threads=1; cargo test --lib application::workflow::tests::failure_settlement -- --test-threads=1; cargo test --lib application::workflow::tests::candidate_refresh -- --test-threads=1; cargo test --lib application::workers:: -- --test-threads=1.\",\n    \"Proposed surface and maintenance checks: cargo test --lib application::guidance:: -- --test-threads=1; cargo test --lib application::diagnostics::processes::tests -- --test-threads=1; cargo test --lib infrastructure::process::supervisor::lifecycle::tests -- --test-threads=1; run the shared deadline/group-exit and real-worker regression modules, requiring nonzero test counts.\",\n    \"Proposed compilation and hygiene checks: cargo check --all-targets --locked, formatting checks for changed Rust files, and git diff --check. Builds, behavioral tests, and runtime fault injection were not run during this observational invocation; no behavioral pass is claimed.\"\n  ],\n  \"invocation_id\": \"b20a5bd07cc26ca841043a8ace0eebf134ac9927db09d5b67e84a34c23b65520\",\n  \"outcome\": \"success\",\n  \"role\": \"plan\",\n  \"summary\": \"Completed a read-only implementation plan against the pinned Round 2 candidate, including alternatives, criticism resolutions, shared-work dependencies, and proposed verification.\"\n}\n",
+      "workflow_revision": 18
+    }
+  ],
   "created_at": "2026-09-10T13:43:01.021248612+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-10T13:48:22.161246154+00:00",
   "error": null,
   "action_applied": false
 }
