@@ -242,6 +242,17 @@ where
     let completion_timeout = launch.completion_timeout;
     let idle_timeout = launch.idle_timeout;
     let mut metadata = launch.metadata;
+    if let Ok(token) = std::env::var("REFINE_WORKFLOW_INCARNATION") {
+        metadata.insert("workflow_incarnation".into(), json!(token));
+    }
+    metadata.insert(
+        "agent_hard_cap_millis".into(),
+        json!(completion_timeout.map(|d| d.as_millis() as u64)),
+    );
+    metadata.insert(
+        "agent_idle_timeout_millis".into(),
+        json!(idle_timeout.map(|d| d.as_millis() as u64)),
+    );
     metadata.insert("kind".to_string(), json!("interactive_session"));
     metadata.insert("profile".to_string(), json!("goal"));
     metadata.insert("role".to_string(), json!("goal"));
@@ -306,6 +317,8 @@ where
     pty_command.args(&command.args);
     pty_command.cwd(&cwd);
     command.launch_environment.apply_to_pty(&mut pty_command);
+    #[cfg(target_os = "linux")]
+    let mut scope_launch = crate::infrastructure::process::subprocess::owned_groups::launch_scope::ScopeLaunch::prepare_pty(&supervisor,&process_id,&managed_spec,&mut pty_command)?;
     crate::infrastructure::git::worktrees::validate_workspace_launch(&metadata, Some(&cwd))?;
     let mut child = match pair.slave.spawn_command(pty_command) {
         Ok(child) => child,
@@ -318,7 +331,27 @@ where
             )));
         }
     };
-    let pid = child.process_id();
+    let mut pid = child.process_id();
+    #[cfg(target_os = "linux")]
+    if let Some(scope) = scope_launch.as_mut() {
+        let mut details = serde_json::to_string(&metadata)
+            .map_err(|e| RefineError::Serialization(e.to_string()))?;
+        match scope.attach_pid(
+            pid.ok_or_else(|| RefineError::Degraded("PTY helper has no PID".into()))?,
+            &mut details,
+        ) {
+            Ok(workload) => {
+                pid = Some(workload);
+                metadata = serde_json::from_str(&details)
+                    .map_err(|e| RefineError::Serialization(e.to_string()))?;
+            }
+            Err(error) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(error);
+            }
+        }
+    }
     let mut reader = match pair.master.try_clone_reader() {
         Ok(reader) => reader,
         Err(error) => {
@@ -393,6 +426,10 @@ where
         cleanup_session_artifacts(&command_path, &signal_path);
         let _ = fs::remove_file(&stdout_path);
         return Err(error);
+    }
+    #[cfg(target_os = "linux")]
+    if let Some(scope) = scope_launch.as_mut() {
+        scope.release()?;
     }
     let _ = FileExt::unlock(&launch_lock);
     drop(launch_lock);

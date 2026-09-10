@@ -280,6 +280,7 @@ impl FileProcessSupervisor {
         &self,
         process: &ManagedProcess,
     ) -> RefineResult<ManagedProcessIdentity> {
+        self.register_owned_group(process)?;
         let identity = self.build_process_identity(process)?;
         self.write_process_identity(&identity)?;
         Ok(identity)
@@ -290,6 +291,7 @@ impl FileProcessSupervisor {
         &self,
         process: &ManagedProcess,
     ) -> RefineResult<ManagedProcessIdentity> {
+        self.register_owned_group(process)?;
         let identity = self.build_process_identity(process)?;
         fs::create_dir_all(self.process_identities_dir()).map_err(|error| {
             RefineError::Io(format!(
@@ -428,8 +430,18 @@ impl FileProcessSupervisor {
     }
 
     pub(super) fn remove_process_artifacts(&self, process: &ManagedProcess) -> RefineResult<()> {
+        if (Self::requires_group_ownership(process) || self.group_path(&process.id).exists())
+            && self.group_pending(process).unwrap_or(true)
+        {
+            return Ok(());
+        }
+
         let lock = self.cleanup_lock(&process.id)?;
         let removed = self.remove_process_artifacts_locked(process);
+        if removed.is_ok() && process.owner == ProcessOwner::Maintenance {
+            let _ =
+                remove_file_if_present(&self.group_path(&process.id), "completed transient group");
+        }
         // The lock file itself is removed on this terminal path; the only
         // contenders are the reaper and stoppers, and re-running these
         // idempotent removals is harmless if one slips past the unlink.
@@ -626,6 +638,13 @@ impl FileProcessSupervisor {
                 self.process_history_dir().display()
             ))
         })?;
+        // A leader exit is not a group exit. Preserve registration, identities and command
+        // evidence while maintenance still observes descendants or cannot prove their exit.
+        if (Self::requires_group_ownership(process) || self.group_path(&process.id).exists())
+            && self.group_pending(process).unwrap_or(true)
+        {
+            return Ok(process.clone());
+        }
         let mut archived = process.clone();
         let handoff_path = self.artifact_handoff_path(&archived.id);
         let mut handoff = None;

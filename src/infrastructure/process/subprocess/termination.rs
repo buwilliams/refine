@@ -1,6 +1,20 @@
 use super::*;
 
 impl FileProcessSupervisor {
+    pub fn owned_process_is_alive(&self, process: &ManagedProcess) -> RefineResult<bool> {
+        let identity = self.load_process_identity(process)?;
+        self.ensure_expected_registration(process, &identity)?;
+        match self.owned_process_state(process, &identity)? {
+            OwnedProcessState::Alive => Ok(true),
+            OwnedProcessState::Exited => Ok(false),
+            OwnedProcessState::IdentityMismatch(actual) => Err(process_identity_mismatch(
+                process,
+                &identity,
+                actual.as_deref(),
+            )),
+        }
+    }
+
     /// Requests termination without removing the managed-process record. The process runner owns
     /// final reaping and artifact cleanup, so callers can keep capacity reserved until the real
     /// child has exited.
@@ -41,6 +55,19 @@ impl FileProcessSupervisor {
         process: &ManagedProcess,
         timeout: Duration,
     ) -> RefineResult<()> {
+        if Self::requires_group_ownership(process) || self.group_path(&process.id).exists() {
+            let group = self
+                .owned_groups()?
+                .into_iter()
+                .find(|g| g.process.id == process.id)
+                .ok_or_else(|| {
+                    RefineError::Degraded(
+                        "owned execution evidence missing; exit unverified".into(),
+                    )
+                })?;
+            self.stop_owned_group(&group, timeout)?;
+            return Ok(());
+        }
         if !Self::process_is_alive(process)? {
             return Ok(());
         }
@@ -86,6 +113,19 @@ impl FileProcessSupervisor {
         let started = Instant::now();
         let identity = self.load_process_identity(expected)?;
         self.ensure_expected_registration(expected, &identity)?;
+        if Self::requires_group_ownership(expected) || self.group_path(&expected.id).exists() {
+            let group = self
+                .owned_groups()?
+                .into_iter()
+                .find(|g| g.process.id == expected.id)
+                .ok_or_else(|| {
+                    RefineError::Degraded(
+                        "owned group evidence unavailable; exit unverified".into(),
+                    )
+                })?;
+            self.stop_owned_group(&group, timeout)?;
+            return Ok(confirmed_process_exit(expected, signal, &identity, started));
+        }
         match self.owned_process_state(expected, &identity)? {
             OwnedProcessState::Exited => {
                 return Ok(confirmed_process_exit(expected, signal, &identity, started));
@@ -176,6 +216,19 @@ impl FileProcessSupervisor {
             Ok(lock) => lock,
             Err(error) => return Err(ConfirmedProcessCleanupFailure { outcome, error }),
         };
+        match self.group_pending(expected) {
+            Ok(false) => {}
+            Ok(true) => {
+                return Err(ConfirmedProcessCleanupFailure {
+                    outcome,
+                    error: RefineError::Degraded(
+                        "owned execution exit is unverified; retain registration and artifacts"
+                            .into(),
+                    ),
+                });
+            }
+            Err(error) => return Err(ConfirmedProcessCleanupFailure { outcome, error }),
+        }
         let handoff_path = self.artifact_handoff_path(&expected.id);
         let handoff = match OpenOptions::new()
             .read(true)

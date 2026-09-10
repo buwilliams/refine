@@ -19,7 +19,7 @@ fn authoritative_failure_atomically_fails_goal_and_its_originating_round() {
             "quality",
             &RefineError::Conflict("quality stopped".to_string()),
         ),
-        Some(true)
+        crate::application::work_items::FailureSettlement::AuthoritativeFailure
     );
 
     let summary = work_items.show_goal_summary("GOAL1").unwrap();
@@ -28,6 +28,13 @@ fn authoritative_failure_atomically_fails_goal_and_its_originating_round() {
     assert_eq!(detail["rounds"][0]["failure_category"], "quality");
     assert_eq!(detail["rounds"][0]["failure_message"], "quality stopped");
     assert_ne!(detail["rounds"][0]["failure_at"], "");
+
+    let evidence = failure_evidence(&workflow, "GOAL1", authority);
+    assert_eq!(evidence["failure_stage"], "quality");
+    assert_eq!(evidence["original_error"], "quality stopped");
+    assert_eq!(evidence["failure_at"], detail["rounds"][0]["failure_at"]);
+    assert_eq!(evidence["settlement"], "authoritative_failure");
+    assert_eq!(evidence["runtime_evidence_persisted"], true);
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -53,7 +60,7 @@ fn undo_reclaim_of_cancelled_goal_supersedes_old_same_round_failure() {
             "workflow",
             &RefineError::Conflict("old worker stopped after reopen".to_string()),
         ),
-        Some(false)
+        crate::application::work_items::FailureSettlement::SupersededAttempt
     );
     assert_eq!(
         work_items.show_goal_summary("GOAL1").unwrap().goal.status,
@@ -69,7 +76,7 @@ fn undo_reclaim_of_cancelled_goal_supersedes_old_same_round_failure() {
             "workflow",
             &RefineError::Conflict("old worker stopped late".to_string()),
         ),
-        Some(false)
+        crate::application::work_items::FailureSettlement::SupersededAttempt
     );
 
     assert_active_replacement_is_clean(&work_items, "GOAL1", 0, replacement_authority);
@@ -111,7 +118,7 @@ fn bulk_todo_reclaim_with_new_round_supersedes_old_failure() {
             "workflow",
             &RefineError::Conflict("old round stopped late".to_string()),
         ),
-        Some(false)
+        crate::application::work_items::FailureSettlement::SupersededAttempt
     );
 
     assert_active_replacement_is_clean(&work_items, "GOAL1", 1, replacement_authority);
@@ -162,4 +169,107 @@ fn assert_active_replacement_is_clean(
         detail["rounds"][round_idx]["workflow_attempt_authority"]["workflow_revision"],
         authority.workflow_revision
     );
+}
+
+fn failure_evidence(
+    workflow: &WorkflowEngine,
+    goal: &str,
+    authority: WorkflowAttemptAuthority,
+) -> serde_json::Value {
+    let evidence = fs::read_dir(workflow.runtime_root.join("workflow-failures"))
+        .unwrap()
+        .map(|entry| {
+            serde_json::from_slice::<serde_json::Value>(&fs::read(entry.unwrap().path()).unwrap())
+                .unwrap()
+        })
+        .filter(|v| {
+            v["goal_id"] == goal
+                && v["round_idx"] == authority.round_idx
+                && v["workflow_revision"] == authority.workflow_revision
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(evidence.len(), 1);
+    evidence.into_iter().next().unwrap()
+}
+
+#[test]
+fn settlement_panic_outcomes_keep_exact_origin_and_never_claim_unavailable_storage() {
+    use crate::application::work_items::FailureSettlement;
+    use crate::application::workflow::engine::test_hooks;
+    use std::sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    };
+    for storage_available in [true, false] {
+        let temp_root = unique_temp_dir("settlement-panic-evidence");
+        let target_root = temp_root.join("target");
+        let refine_dir = test_refine_dir(&target_root);
+        let runtime_root = temp_root.join("run/8080");
+        let items = FileWorkItemService::new(&refine_dir);
+        prepare_todo_goal(&items, "ORIGIN");
+        let authority = claim_and_start(&items, "ORIGIN");
+        items.cancel_goal_summary("ORIGIN").unwrap();
+        let before = items.show_goal_detail("ORIGIN").unwrap();
+        let workflow = WorkflowEngine::with_target_root(&runtime_root, &target_root);
+        if !storage_available {
+            fs::create_dir_all(&runtime_root).unwrap();
+            fs::write(runtime_root.join("workflow-failures"), "blocked").unwrap();
+        }
+        let calls = Arc::new(AtomicUsize::new(0));
+        let attempts = calls.clone();
+        test_hooks::install(
+            &runtime_root,
+            Arc::new(move |_, _, stage, _| {
+                if stage == "settlement" {
+                    attempts.fetch_add(1, Ordering::SeqCst);
+                    panic!("settlement storage panic");
+                }
+                Ok(())
+            }),
+        );
+        let outcome = workflow.settle_goal_failure(
+            "ORIGIN",
+            authority,
+            "integration",
+            &RefineError::Io("original write error".into()),
+        );
+        assert_eq!(
+            calls.load(Ordering::SeqCst),
+            1,
+            "panics are not transient retry failures"
+        );
+        assert_eq!(items.show_goal_detail("ORIGIN").unwrap(), before);
+        let expected = FailureSettlement::UnpersistedEvidence(
+            "settlement panicked: settlement storage panic".into(),
+        );
+        let evidence = if storage_available {
+            assert_eq!(outcome, expected);
+            failure_evidence(&workflow, "ORIGIN", authority)
+        } else {
+            let reports = test_hooks::take_failures(&runtime_root);
+            assert_eq!(reports.len(), 1);
+            let evidence = reports.into_iter().next().unwrap();
+            assert_eq!(
+                evidence["final_outcome"],
+                serde_json::to_value(outcome).unwrap()
+            );
+            assert!(!evidence["write_fault"].as_str().unwrap().is_empty());
+            evidence
+        };
+        assert_eq!(evidence["goal_id"], "ORIGIN");
+        assert_eq!(evidence["round_idx"], authority.round_idx);
+        assert_eq!(evidence["workflow_revision"], authority.workflow_revision);
+        assert_eq!(evidence["failure_stage"], "integration");
+        assert_eq!(evidence["original_error"], "original write error");
+        assert!(
+            chrono::DateTime::parse_from_rfc3339(evidence["failure_at"].as_str().unwrap()).is_ok()
+        );
+        assert_eq!(
+            evidence["settlement"],
+            serde_json::to_value(expected).unwrap()
+        );
+        assert_eq!(evidence["runtime_evidence_persisted"], storage_available);
+        test_hooks::remove(&runtime_root);
+        fs::remove_dir_all(temp_root).unwrap();
+    }
 }

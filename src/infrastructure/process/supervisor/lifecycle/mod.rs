@@ -189,9 +189,7 @@ impl FileDaemonLifecycleService {
 
     pub fn running_statuses(&self) -> RefineResult<Vec<DaemonStatus>> {
         let mut statuses = self.known_statuses()?;
-        statuses.retain(|status| {
-            status.daemon_healthy && status.web_available && http_probe(status.port).is_ok()
-        });
+        statuses.retain(|status| status.web_available && http_probe(status.port).is_ok());
         Ok(statuses)
     }
 

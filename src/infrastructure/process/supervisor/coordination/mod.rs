@@ -26,7 +26,12 @@ const COORDINATION_ACQUIRE_POLL_INTERVAL: Duration = Duration::from_millis(25);
 /// `fs2` offers only a blocking or an immediate attempt, so a bounded wait is
 /// polled. The interval is short enough that ordinary contention is
 /// indistinguishable from a blocking acquire.
-fn lock_exclusive_before(file: &File, path: &Path, timeout: Duration) -> RefineResult<()> {
+pub(crate) fn lock_exclusive_before(
+    file: &File,
+    path: &Path,
+    timeout: Duration,
+) -> RefineResult<()> {
+    let timeout = LOCK_TIMEOUT.with(|value| value.get()).unwrap_or(timeout);
     let deadline = Instant::now() + timeout;
     loop {
         match file.try_lock_exclusive() {
@@ -48,6 +53,19 @@ fn lock_exclusive_before(file: &File, path: &Path, timeout: Duration) -> RefineR
         }
         std::thread::sleep(COORDINATION_ACQUIRE_POLL_INTERVAL);
     }
+}
+
+thread_local! { static LOCK_TIMEOUT: std::cell::Cell<Option<Duration>> = const { std::cell::Cell::new(None) }; }
+
+pub fn with_lock_timeout<T>(timeout: Duration, operation: impl FnOnce() -> T) -> T {
+    struct Reset(Option<Duration>);
+    impl Drop for Reset {
+        fn drop(&mut self) {
+            LOCK_TIMEOUT.with(|value| value.set(self.0));
+        }
+    }
+    let _reset = Reset(LOCK_TIMEOUT.with(|value| value.replace(Some(timeout))));
+    operation()
 }
 
 /// Where record locks live. Under `runtime/` because a lock describes this

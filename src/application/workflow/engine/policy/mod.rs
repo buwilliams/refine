@@ -4,6 +4,7 @@ use std::time::Duration;
 
 use serde_json::{Value, json};
 
+mod capacity;
 mod scheduling_eligibility;
 mod settings;
 pub(crate) use scheduling_eligibility::SchedulingEligibility;
@@ -342,51 +343,6 @@ impl WorkflowEngine {
             }
         }
         Ok(())
-    }
-
-    pub(crate) fn observed_execution_load(&self) -> RefineResult<ExecutionLoad> {
-        let mut load = ExecutionLoad::default();
-        let reservations =
-            crate::application::workflow::engine::admission::reservations(&self.runtime_root);
-        for reserved in &reservations {
-            load.record(&reserved.node, &reserved.provider, &reserved.target);
-        }
-        for root in [self.runtime_root.clone(), self.runtime_root.join("agents")] {
-            let supervisor = FileProcessSupervisor::new(root);
-            for process in supervisor.list()? {
-                if !matches!(process.owner, ProcessOwner::Agent | ProcessOwner::Quality)
-                    || !FileProcessSupervisor::process_is_alive(&process)?
-                {
-                    continue;
-                }
-                let details = process
-                    .details
-                    .as_deref()
-                    .and_then(|details| serde_json::from_str::<Value>(details).ok())
-                    .unwrap_or_else(|| json!({}));
-                if reservations
-                    .iter()
-                    .any(|reservation| reservation.covers_process(&details))
-                {
-                    continue;
-                }
-                let node = details
-                    .get("node_id")
-                    .and_then(Value::as_str)
-                    .unwrap_or("default");
-                let provider = details
-                    .get("provider")
-                    .and_then(Value::as_str)
-                    .unwrap_or("unknown");
-                let target = details
-                    .get("target_app_id")
-                    .or_else(|| details.get("cwd"))
-                    .and_then(Value::as_str)
-                    .unwrap_or("unknown");
-                load.record(node, provider, target);
-            }
-        }
-        Ok(load)
     }
 
     pub fn soft_capacity_available(

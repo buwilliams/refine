@@ -102,6 +102,10 @@ Current implementation details that matter to intent:
 
 The CLI should avoid becoming a second implementation of Refine. It should remain a reliable adapter to the same Application and Model, while host execution remains an Infrastructure concern.
 
+`refine system status`, process diagnostics and `refine next` expose the same freshly evaluated workflow health. A reachable daemon with stale scheduling evidence reports `daemon_healthy=false` and remains visible in the running-port list. Reachability and shutdown control do not depend on workflow health.
+
+Next-action guidance reports locally eligible Todo work observed continuously for over thirty seconds with free capacity and no active attempt, including its count, last scheduler tick and supported inspection/remediation commands. Its independent runtime observation distinguishes pause, disabled workflow automation, required Plan/Implement Skill availability and node scope, Feature/priority order, retry delays, live tasks and interactive Goal sessions. A missing, corrupt, stale or mismatched observation is unavailable evidence rather than an all-quiet claim. These observations do not create durable scheduling ownership or change Goal intent.
+
 ## Future Direction
 
 The CLI should become increasingly useful to agents. Future agents may prefer structured CLI calls for discoverability, reproducibility, and low visual overhead.

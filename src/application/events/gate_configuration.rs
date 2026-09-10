@@ -136,3 +136,42 @@ pub(super) fn transition_entry_configuration(
     Ok(occurrence_configuration(goal, node, &source)?
         .unwrap_or_else(|| select_source(current, node, &source)))
 }
+
+/// Read-only admission/diagnostic assessment of the same occurrence-pinned requirements
+/// consumed by workflow execution. Missing requirements never create or mutate a snapshot.
+impl FileEventService {
+    pub(crate) fn missing_workflow_requirement(
+        &self,
+        goal: &Value,
+        node: &str,
+    ) -> RefineResult<Option<String>> {
+        let current = self.config()?;
+        for role in ["plan", "implement"] {
+            let source = format!("workflow.{role}.enter");
+            let config = occurrence_configuration(goal, node, &source)?
+                .unwrap_or_else(|| select_source(&current, node, &source));
+            if !has_blocking_workflow_skill(&config, node, &source) {
+                return Ok(Some(format!(
+                    "missing enabled blocking {role} Skill in node scope"
+                )));
+            }
+        }
+        Ok(None)
+    }
+}
+pub(crate) fn has_blocking_workflow_skill(
+    config: &AutomationConfig,
+    node: &str,
+    source: &str,
+) -> bool {
+    config
+        .events
+        .values()
+        .filter(|e| e.enabled && e.source.as_deref() == Some(source) && e.scope.applies(node))
+        .any(|e| {
+            config
+                .bindings(e, node)
+                .iter()
+                .any(|(b, _)| b.mode == crate::model::automation::BindingMode::Blocking)
+        })
+}

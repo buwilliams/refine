@@ -21,7 +21,7 @@ The lifecycle is:
 
 - backlog: captured work waits until it is ready;
 - todo: actionable work is eligible on its assigned node;
-- plan: independent agents propose, critique, and finalize an implementation plan from pinned project and Goal context;
+- plan: configured Plan Skills produce accepted implementation plans from pinned project and Goal context;
 - implement: a fresh agent changes the isolated candidate using the finalized plan;
 - quality: a fresh agent reviews the plan and implementation, writes or selects appropriate tests, corrects the candidate, and proves the checks pass;
 - governance: an independent review verifies project intent and applicable Skills before exact candidate integration;
@@ -47,6 +47,12 @@ Preparation and non-retryable failures move an unchanged active Goal to failed. 
 Bulk status correction protects automated states from generic replacement. Explicit cancellation is the lifecycle exception: it writes `cancelled` as Goal intent and then performs best-effort local cleanup per Goal.
 
 The [Shared Workflow Consistency Contract](11-consistency-contract.md) and [Execution Ownership](../03-execution-ownership.md) define the authority and recovery rules.
+
+Scheduling contains each Goal's preparation, Skill execution, result construction and failure settlement, including panics. Preparation and settlement occupy the Goal's local slot until their owning task ends. Observed live child groups continue to occupy capacity after a task or group leader exits. Finished thread handles provide completion evidence even if result delivery fails. A transient admission error is retried on the next poll while completions continue to drain; it does not suppress admission for the rest of a long-running pass.
+
+The scheduling thread publishes port-local ticks at least once a second, including pause and app detachment. A tick records its worker incarnation, managed registration and OS identity, canonical runtime and target, node, sequence, last completed admission cycle, active attempts and failure context. Thirty seconds without a valid tick or completed cycle is unhealthy; startup has its own thirty-second bound. Long-running Goals retain fresh scheduling cycles. A target switch or detachment stops new admission to the old target while owned attempts drain with fresh ticks. Missing evidence is explicit, and disabled automation is a policy state.
+
+Independent daemon supervision replaces a stalled worker only after fencing launches, stopping the exact old incarnation, rescanning its registered groups and proving their exit. A replacement is accepted after its own matching scheduler tick. Restart delay grows from one second to a five-minute ceiling. Ambiguous identity, failed termination or unreadable recovery evidence remains unhealthy with inspection and recovery guidance; it never permits overlapping replacement work. HTTP reachability and shutdown remain available throughout.
 
 ## Future Direction
 

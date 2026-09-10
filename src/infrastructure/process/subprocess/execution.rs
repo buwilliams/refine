@@ -68,6 +68,13 @@ impl FileProcessSupervisor {
             Some(environment) => process_command_with_environment(&spec, environment)?,
             None => process_command(&spec)?,
         };
+        #[cfg(target_os = "linux")]
+        let mut scope_launch = owned_groups::launch_scope::ScopeLaunch::prepare(
+            self,
+            &process_id,
+            &spec,
+            &mut command,
+        )?;
         command.stdout(Stdio::piped()).stderr(Stdio::piped());
         if spec.stdin.is_some() {
             command.stdin(Stdio::piped());
@@ -81,6 +88,21 @@ impl FileProcessSupervisor {
                 spec.command
             ))
         })?;
+        let mut details = process_details(&spec);
+        #[cfg(target_os = "linux")]
+        let workload_pid = match scope_launch.as_mut() {
+            Some(scope) => match scope.attach(&child, &mut details) {
+                Ok(pid) => pid,
+                Err(error) => {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return Err(error);
+                }
+            },
+            None => child.id(),
+        };
+        #[cfg(not(target_os = "linux"))]
+        let workload_pid = child.id();
         let stdin_path = if let Some(stdin) = spec.stdin.as_deref() {
             let path = self.processes_dir().join(format!("{process_id}.stdin.txt"));
             if !spec.sensitive && !spec.metadata.contains_key("prompt_transport") {
@@ -89,11 +111,6 @@ impl FileProcessSupervisor {
                         "failed to write process stdin {}: {error}",
                         path.display()
                     ))
-                })?;
-            }
-            if let Some(mut child_stdin) = child.stdin.take() {
-                child_stdin.write_all(stdin.as_bytes()).map_err(|error| {
-                    RefineError::Io(format!("failed to send managed process stdin: {error}"))
                 })?;
             }
             if spec.sensitive || spec.metadata.contains_key("prompt_transport") {
@@ -113,10 +130,10 @@ impl FileProcessSupervisor {
         let mut process = ManagedProcess {
             id: process_id,
             owner: spec.owner.clone(),
-            pid: Some(child.id()),
+            pid: Some(workload_pid),
             state: "running".to_string(),
             label: Some(spec.command.clone()),
-            details: Some(process_details(&spec)),
+            details: Some(details),
             stdout_path: Some(stdout_path.display().to_string()),
             stderr_path: Some(stderr_path.display().to_string()),
             stdin_path,
@@ -134,6 +151,17 @@ impl FileProcessSupervisor {
             let _ = child.wait();
             let _ = self.remove_process_artifacts(&process);
             return Err(error);
+        }
+        #[cfg(target_os = "linux")]
+        if let Some(scope) = scope_launch.as_mut() {
+            scope.release()?;
+        }
+        if let Some(stdin) = spec.stdin.as_deref() {
+            if let Some(mut child_stdin) = child.stdin.take() {
+                child_stdin.write_all(stdin.as_bytes()).map_err(|error| {
+                    RefineError::Io(format!("failed to send managed process stdin: {error}"))
+                })?;
+            }
         }
         drop(launch_guard);
 
@@ -170,6 +198,12 @@ impl FileProcessSupervisor {
         let mut reader_done = 0usize;
         let mut reader_error = None;
         let mut status = None;
+        #[cfg(target_os = "linux")]
+        let launch_scope: Option<owned_groups::launch_scope::LaunchScope> = process
+            .details
+            .as_deref()
+            .and_then(|s| serde_json::from_str::<Value>(s).ok())
+            .and_then(|v| serde_json::from_value(v["launch_scope"].clone()).ok());
         // Output is the process demonstrating it is still working, so it resets
         // the budget. Without this a command that hangs holds every lock it took
         // for as long as the daemon lives.
@@ -193,17 +227,24 @@ impl FileProcessSupervisor {
                 // only the direct child leaves its descendants holding the
                 // inherited pipes, so reading would block until they finished
                 // on their own — which for a wedged command is never.
-                if let Some(pid) = process.pid {
-                    let _ = signal_os_process(pid, "kill", process_owns_group(&process));
+                if Self::requires_group_ownership(&process) {
+                    if let Some(group) = self
+                        .owned_groups()?
+                        .into_iter()
+                        .find(|g| g.process.id == process.id)
+                    {
+                        self.stop_owned_group(&group, Duration::from_secs(2))?;
+                    }
+                } else {
+                    if let Some(pid) = process.pid {
+                        let _ = signal_os_process(pid, "kill", process_owns_group(&process));
+                    }
+                    let _ = child.kill();
                 }
-                let _ = child.kill();
                 stalled = true;
-                status = Some(child.wait().map_err(|error| {
-                    RefineError::Io(format!(
-                        "failed to reap stalled managed process {}: {error}",
-                        process.id
-                    ))
-                })?);
+                status = child
+                    .try_wait()
+                    .map_err(|e| RefineError::Io(e.to_string()))?;
                 break;
             }
             match rx.recv_timeout(Duration::from_millis(25)) {
@@ -239,7 +280,15 @@ impl FileProcessSupervisor {
                     }
                 }
                 Err(mpsc::RecvTimeoutError::Timeout) => {}
-                Err(mpsc::RecvTimeoutError::Disconnected) => break,
+                Err(mpsc::RecvTimeoutError::Disconnected) => {
+                    std::thread::sleep(Duration::from_millis(5))
+                }
+            }
+            #[cfg(target_os = "linux")]
+            if status.is_none()
+                && let Some(scope) = &launch_scope
+            {
+                status = scope.workload_status(&process, &self.runtime_root)?;
             }
             if status.is_none() {
                 status = child.try_wait().map_err(|error| {
@@ -259,6 +308,11 @@ impl FileProcessSupervisor {
                 ))
             })?,
         };
+        // Workload completion does not wait for detached descendants; their scope remains
+        // registered and the dedicated helper alone produces complete exit evidence.
+        std::thread::spawn(move || {
+            let _ = child.wait();
+        });
         let _ = stdout_thread.join();
         let _ = stderr_thread.join();
         stdout_file.flush().map_err(|error| {
@@ -335,7 +389,15 @@ impl FileProcessSupervisor {
         if ids.is_empty() {
             return Ok(None);
         }
-        FileOperationRegistry::new(&self.runtime_root)
+        // Agent processes have a separate process registry within the same port runtime.
+        // Their operation authority remains owned by that port's registry.
+        let operation_root =
+            if self.runtime_root.file_name().and_then(|s| s.to_str()) == Some("agents") {
+                self.runtime_root.parent().unwrap_or(&self.runtime_root)
+            } else {
+                &self.runtime_root
+            };
+        FileOperationRegistry::new(operation_root)
             .active_launch_guards(&ids)
             .map(Some)
     }

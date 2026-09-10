@@ -1,11 +1,11 @@
-use serde_json::json;
-
-use crate::application::work_items::{FileWorkItemService, WorkflowAttemptAuthority};
+use crate::application::work_items::{
+    FailureSettlement, FileWorkItemService, WorkflowAttemptAuthority,
+};
+use crate::application::workflow::{WorkflowEngine, now_timestamp};
 use crate::error::RefineError;
-use crate::infrastructure::observability::logs::FileLogService;
-use crate::model::log::LogEntry;
-
-use crate::application::workflow::{WorkflowEngine, json_object, now_timestamp};
+use crate::infrastructure::process::supervisor::coordination::with_lock_timeout;
+use std::time::Duration;
+mod evidence;
 
 impl WorkflowEngine {
     pub(crate) fn settle_goal_failure(
@@ -14,46 +14,62 @@ impl WorkflowEngine {
         authority: WorkflowAttemptAuthority,
         failure_stage: &str,
         error: &RefineError,
-    ) -> Option<bool> {
-        let refine_dir = self.refine_dir().ok().flatten()?;
-        let work_items = FileWorkItemService::new(&refine_dir);
-        match work_items.settle_workflow_attempt_failure(
-            goal_id,
-            authority,
-            failure_stage,
-            &error.to_string(),
-            &now_timestamp(),
-        ) {
-            Ok(true) => Some(true),
-            // The attempt was superseded, so settlement was a no-op; leave a
-            // durable trace instead of dropping the failure silently.
-            Ok(false) => {
-                let _ = FileLogService::new(&refine_dir).append_round_log(
-                    goal_id,
-                    authority.round_idx,
-                    LogEntry {
-                        datetime: now_timestamp(),
-                        severity: "warning".to_string(),
-                        category: "workflow".to_string(),
-                        message: format!(
-                            "Goal failure was not durably settled (attempt superseded); original error: {error}"
-                        ),
-                        details: Some(json_object(json!({
-                            "failure_stage": failure_stage
-                        }))),
-                        actions: Vec::new(),
-                        actor: Some("refine".to_string()),
-                        goal_id: Some(goal_id.to_string()),
-                    },
-                );
-                Some(false)
-            }
-            Err(settle_error) => {
-                eprintln!(
-                    "refine workflow failure settlement: Goal {goal_id} {failure_stage} failure was not persisted: {settle_error}; original error: {error}"
-                );
-                None
+    ) -> FailureSettlement {
+        let evidence = evidence::OriginatingFailure::new(goal_id, authority, failure_stage, error);
+        let outcome = evidence::contain("settlement", || {
+            self.persist_goal_failure(&evidence, authority)
+        })
+        .unwrap_or_else(FailureSettlement::UnpersistedEvidence);
+        evidence.finalize(self, outcome)
+    }
+
+    fn persist_goal_failure(
+        &self,
+        evidence: &evidence::OriginatingFailure,
+        authority: WorkflowAttemptAuthority,
+    ) -> FailureSettlement {
+        let mut outcome = FailureSettlement::UnpersistedEvidence("settlement did not run".into());
+        for attempt in 0..3 {
+            let result = with_lock_timeout(Duration::from_millis(200), || {
+                #[cfg(test)]
+                crate::application::workflow::engine::test_hooks::run(
+                    self,
+                    &evidence.goal_id,
+                    "settlement",
+                    authority,
+                )?;
+                let refine_dir = self
+                    .refine_dir()?
+                    .ok_or_else(|| RefineError::InvalidInput("missing target".into()))?;
+                // Each retry reads Round, claim, node and cancellation again under its record lock.
+                FileWorkItemService::with_projection_cache(
+                    &refine_dir,
+                    &self.runtime_root,
+                    self.runtime_root.join("cache"),
+                )
+                .settle_workflow_attempt_failure(
+                    &evidence.goal_id,
+                    authority,
+                    &evidence.failure_stage,
+                    &evidence.original_error,
+                    &evidence.failure_at,
+                )
+            });
+            match result {
+                Ok(settled) => {
+                    outcome = settled;
+                    break;
+                }
+                Err(fault) => {
+                    let transient = matches!(&fault, RefineError::Io(_) | RefineError::Degraded(_));
+                    outcome = FailureSettlement::UnpersistedEvidence(fault.to_string());
+                    if !transient || attempt == 2 {
+                        break;
+                    }
+                    std::thread::sleep(Duration::from_millis(50 * (attempt + 1)));
+                }
             }
         }
+        outcome
     }
 }

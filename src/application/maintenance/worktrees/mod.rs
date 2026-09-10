@@ -230,7 +230,7 @@ impl FileWorktreeCleanupService {
     fn active_managed_worktree_paths(&self) -> RefineResult<Vec<PathBuf>> {
         let mut paths = Vec::new();
         for process_root in [self.runtime_root.clone(), self.runtime_root.join("agents")] {
-            for process in FileProcessSupervisor::new(process_root).list()? {
+            for process in FileProcessSupervisor::new(&process_root).capacity_processes()? {
                 collect_process_worktree_paths(&process, &mut paths);
             }
         }
@@ -251,8 +251,8 @@ impl FileWorktreeCleanupService {
     fn active_goal_ids(&self) -> RefineResult<BTreeSet<String>> {
         let mut goal_ids = BTreeSet::new();
         for process_root in [self.runtime_root.clone(), self.runtime_root.join("agents")] {
-            for process in FileProcessSupervisor::new(process_root).list()? {
-                if FileProcessSupervisor::process_is_alive(&process)? {
+            for process in FileProcessSupervisor::new(&process_root).capacity_processes()? {
+                if FileProcessSupervisor::new(&process_root).group_pending(&process)? {
                     collect_named_strings(&process.api_json(), "goal_id", &mut goal_ids);
                 }
             }

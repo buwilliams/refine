@@ -196,7 +196,7 @@ pub(super) fn runner_worker_spec(
     if let Some(operation_id) = operation_id {
         args.extend(["--operation-id".to_string(), operation_id.to_string()]);
     }
-    ManagedProcessSpec {
+    let mut spec = ManagedProcessSpec {
         owner: ProcessOwner::Runner,
         command: executable.display().to_string(),
         args,
@@ -217,5 +217,27 @@ pub(super) fn runner_worker_spec(
                 .map(|root| root.display().to_string())
         }))
         .unwrap_or_default(),
+    };
+    if worker_kind == WORKFLOW_RUNNER {
+        let token = uuid::Uuid::new_v4().to_string();
+        spec.env
+            .push(("REFINE_WORKFLOW_INCARNATION".into(), token.clone()));
+        spec.metadata
+            .insert("workflow_incarnation".into(), json!(token));
+        spec.metadata
+            .insert("isolated_process_group".into(), json!(true));
+        #[cfg(all(test, target_os = "linux"))]
+        {
+            spec.args = vec![
+                "--exact".into(),
+                "application::workers::workflow_recovery::tests::workflow_process_helper".into(),
+                "--nocapture".into(),
+            ];
+            spec.env.push((
+                "REFINE_TEST_WORKFLOW_ROOT".into(),
+                runtime_root.display().to_string(),
+            ));
+        }
     }
+    spec
 }
