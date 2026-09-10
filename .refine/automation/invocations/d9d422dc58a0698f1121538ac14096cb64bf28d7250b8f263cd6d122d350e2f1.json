@@ -2181,11 +2181,45 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "succeeded",
+  "results": {
+    "default-governance": {
+      "invocation_id": "d9d422dc58a0698f1121538ac14096cb64bf28d7250b8f263cd6d122d350e2f1",
+      "binding_id": "default-governance",
+      "role": "governance",
+      "outcome": "success",
+      "summary": "No actual governance violations found in candidate f0a9d84345e531b4bdd326c075f995e4da81eedb. The recovery follows the accepted plan and preserves project boundaries and retained evidence.",
+      "evidence": [
+        "Verified the pinned Round 2 worktree is clean at f0a9d84345e531b4bdd326c075f995e4da81eedb on refine/00000T12V8K3M05Q6JSVEMJ000/round-2. Base 7b430a6a3bc0d692f03e71da68d06f3e9534dead is an ancestor; the exact base-to-candidate diff check passed.",
+        "Reviewed both accepted plans, implementation reports, Quality corrections and proof, and the complete 10-file diff against Design, Surface Principles, Terminal, Toolbar, Command Palette, and Governance intent. No additional attached Skills or applicable AGENTS.md files were found.",
+        "Product changes remain within the shared browser surface. terminal-clipboard.js preserves native clipboard authority, explicit asynchronous fallback, copy recovery, and session fencing. Paste still uses Terminal.paste and the existing managed input queue. No Model, Application, Infrastructure, persistence, provider invocation, or CLI/API execution paths changed.",
+        "The inherited recovery/lifecycle test changes preserve their assertions and explicitly establish pending asynchronous writes before lifecycle changes. Separate tests exercise trusted native clipboard events without asynchronous API access. Quality added regressions for paste after exit and empty or unreadable paste events.",
+        "All 10 changed files, both committed and on disk, match Quality's recorded SHA-256 values in /tmp/refine-clipboard-round1-fqes06ao/round2-quality-b574d9ed-hz1ncj13/tested-files.json. The supplied supervised proof binds 117 passing tests with zero skips to this exact candidate.",
+        "Read the retained final test log and claude-smoke-final/claude-smoke.json in that Quality evidence directory. Claude 2.1.267 received bracketed Unicode multiline paste and selected-text copying through trusted browser events, without interruption or page errors. Coverage used Linux Chromium with simulated Windows/macOS platform behavior; native Windows/macOS, Safari, and Firefox were not exercised.",
+        "Documentation changes affect only the Terminal intent page and preserve its format. The 314-line clipboard module and focused test helpers retain cohesive responsibilities; toolbar.js gains only the selection-hint accessibility association.",
+        "Both retained candidate objects remain available. Round 1 remains clean at e93801fca1a1991ce4389799268de315aded1ae8. This review changed no files, Git state, or Goal state.",
+        "Reproduction command for the pinned candidate, not rerun during this observational review: NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules node --test --test-concurrency=1 tests/web_terminal*.test.js tests/web_supervisor_toolbar.test.js tests/web_command_palette.test.js tests/web_goal_log_tail.test.js tests/web_javascript_syntax.test.js. Additional check: node --check tests/support/claude-clipboard-smoke.js."
+      ],
+      "artifacts": {
+        "recovery_analysis": null,
+        "recovery_round_prompt": null,
+        "violations": []
+      }
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "default-governance",
+      "diagnostic": null,
+      "operation_id": null,
+      "process_id": "proc-1789052018272-1129590-461",
+      "raw_output": "{\n  \"artifacts\": {\n    \"recovery_analysis\": null,\n    \"recovery_round_prompt\": null,\n    \"violations\": []\n  },\n  \"binding_id\": \"default-governance\",\n  \"evidence\": [\n    \"Verified the pinned Round 2 worktree is clean at f0a9d84345e531b4bdd326c075f995e4da81eedb on refine/00000T12V8K3M05Q6JSVEMJ000/round-2. Base 7b430a6a3bc0d692f03e71da68d06f3e9534dead is an ancestor; the exact base-to-candidate diff check passed.\",\n    \"Reviewed both accepted plans, implementation reports, Quality corrections and proof, and the complete 10-file diff against Design, Surface Principles, Terminal, Toolbar, Command Palette, and Governance intent. No additional attached Skills or applicable AGENTS.md files were found.\",\n    \"Product changes remain within the shared browser surface. terminal-clipboard.js preserves native clipboard authority, explicit asynchronous fallback, copy recovery, and session fencing. Paste still uses Terminal.paste and the existing managed input queue. No Model, Application, Infrastructure, persistence, provider invocation, or CLI/API execution paths changed.\",\n    \"The inherited recovery/lifecycle test changes preserve their assertions and explicitly establish pending asynchronous writes before lifecycle changes. Separate tests exercise trusted native clipboard events without asynchronous API access. Quality added regressions for paste after exit and empty or unreadable paste events.\",\n    \"All 10 changed files, both committed and on disk, match Quality's recorded SHA-256 values in /tmp/refine-clipboard-round1-fqes06ao/round2-quality-b574d9ed-hz1ncj13/tested-files.json. The supplied supervised proof binds 117 passing tests with zero skips to this exact candidate.\",\n    \"Read the retained final test log and claude-smoke-final/claude-smoke.json in that Quality evidence directory. Claude 2.1.267 received bracketed Unicode multiline paste and selected-text copying through trusted browser events, without interruption or page errors. Coverage used Linux Chromium with simulated Windows/macOS platform behavior; native Windows/macOS, Safari, and Firefox were not exercised.\",\n    \"Documentation changes affect only the Terminal intent page and preserve its format. The 314-line clipboard module and focused test helpers retain cohesive responsibilities; toolbar.js gains only the selection-hint accessibility association.\",\n    \"Both retained candidate objects remain available. Round 1 remains clean at e93801fca1a1991ce4389799268de315aded1ae8. This review changed no files, Git state, or Goal state.\",\n    \"Reproduction command for the pinned candidate, not rerun during this observational review: NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules node --test --test-concurrency=1 tests/web_terminal*.test.js tests/web_supervisor_toolbar.test.js tests/web_command_palette.test.js tests/web_goal_log_tail.test.js tests/web_javascript_syntax.test.js. Additional check: node --check tests/support/claude-clipboard-smoke.js.\"\n  ],\n  \"invocation_id\": \"d9d422dc58a0698f1121538ac14096cb64bf28d7250b8f263cd6d122d350e2f1\",\n  \"outcome\": \"success\",\n  \"role\": \"governance\",\n  \"summary\": \"No actual governance violations found in candidate f0a9d84345e531b4bdd326c075f995e4da81eedb. The recovery follows the accepted plan and preserves project boundaries and retained evidence.\"\n}\n",
+      "workflow_revision": 34
+    }
+  ],
   "created_at": "2026-09-10T14:53:38.196360524+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-10T14:56:26.588616620+00:00",
   "error": null,
   "action_applied": false
 }
