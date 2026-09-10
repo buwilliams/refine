@@ -106,8 +106,40 @@
           "round_idx": 0,
           "target_branch": "main"
         },
-        "phase": "criticize",
-        "phase_started_at": "2026-09-10T08:30:02Z",
+        "criticism": {
+          "completed_at": "2026-09-10T08:32:47Z",
+          "git_after": {
+            "branch": "refine/DR74050DA12C5442DF797B8AB6/round-1",
+            "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR74050DA12C5442DF797B8AB6/round-1",
+            "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+            "status_porcelain": []
+          },
+          "result": {
+            "findings": [
+              {
+                "checklist_item_ids": [
+                  "P3",
+                  "P4",
+                  "P5",
+                  "P6",
+                  "P9"
+                ],
+                "description": "No checklist item delivers the requested incident reproductions or diagnostic demonstration; the existing session hard-cap test retains its poller, and workflow disruption tests recreate the engine, so they cannot establish recovery from this daemon-lifetime wedge.",
+                "id": "C1",
+                "material": true,
+                "recommendation": "Add deterministic regressions proving that a leaked agent without session tracking is killed and its operation reconciled, and that an interrupted operation plus a transient scheduler error while another worker remains active cannot prevent a fresh Todo from reaching Plan and classification within the bound; retain the same daemon and runner, and capture a stalled or degraded diagnostic with remediation."
+              }
+            ],
+            "summary": "The plan addresses the observed failure mechanisms but omits the required proof of recovery without restarting the daemon."
+          },
+          "started_at": "2026-09-10T08:30:02Z"
+        },
+        "phase": "revise",
+        "phase_started_at": "2026-09-10T08:32:47Z",
         "proposal": {
           "completed_at": "2026-09-10T08:30:02Z",
           "git_after": {
@@ -170,7 +202,7 @@
         "schema_version": 2,
         "started_at": "2026-09-10T08:26:07Z",
         "state": "in_progress",
-        "updated_at": "2026-09-10T08:30:02Z"
+        "updated_at": "2026-09-10T08:32:47Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -184,7 +216,7 @@
       "quality_state": "unclassified",
       "reporter": "ethan.jacobson@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T08:30:02Z",
+      "updated": "2026-09-10T08:32:47Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T08:26:06Z",
         "round_idx": 0,
@@ -196,6 +228,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-09-10T08:30:02Z",
-  "workflow_revision": 9
+  "updated": "2026-09-10T08:32:47Z",
+  "workflow_revision": 11
 }
