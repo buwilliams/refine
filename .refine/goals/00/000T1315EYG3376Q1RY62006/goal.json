@@ -1,0 +1,31 @@
+{
+  "base_commit": null,
+  "branch_name": null,
+  "candidate_commit": null,
+  "created": "2026-09-10T16:27:40Z",
+  "event_generation": 1,
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000T1315EYG3376Q1RY62006",
+  "name": "Fix Fetch Goals from Email being blocked by CLI dispatch",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": null,
+  "rounds": [],
+  "status": "backlog",
+  "target_branch": null,
+  "updated": "2026-09-10T16:27:40Z",
+  "workflow_events": [
+    {
+      "at": "2026-09-10T16:27:40.832459218+00:00",
+      "forced": false,
+      "from": null,
+      "generation": 1,
+      "node_id": "default",
+      "round_idx": null,
+      "to": "backlog"
+    }
+  ],
+  "workflow_revision": 1
+}
