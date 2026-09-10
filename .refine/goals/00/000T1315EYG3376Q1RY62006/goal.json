@@ -1,9 +1,9 @@
 {
   "base_commit": "0b6cc819de716b1b118f40c4465d114290117699",
   "branch_name": "refine/00000T1315EYG3376Q1RY62006/round-1",
-  "candidate_commit": null,
+  "candidate_commit": "036c0802c771a6cc5865a8bc4d669480e1a76c57",
   "created": "2026-09-10T16:27:40Z",
-  "event_generation": 4,
+  "event_generation": 5,
   "feature_id": null,
   "feature_order": null,
   "id": "00000T1315EYG3376Q1RY62006",
@@ -597,6 +597,73 @@
           },
           "source": "workflow.plan.enter",
           "state": "succeeded"
+        },
+        "e68b746327243dd2166ae8711a8c51c3025bd70741adc29ebef00ddcf4169c2b": {
+          "candidate_commit": null,
+          "results": {
+            "default-implement": {
+              "artifacts": {
+                "implementation_evidence": {
+                  "checklist": [
+                    {
+                      "evidence": "Exempted only FetchEmailGoals from direct-target rejection. Preserved the production guard and application-owned authorization.",
+                      "id": "workflow.plan.enter:default-plan:P1",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Added compiled-CLI tests using temporary Git targets and separate arguments containing spaces and apostrophes. Both new tests failed against the original guard. The corrected matching-target invocation reaches the specific missing email/fastmail_jmap_token error without contacting mail.",
+                      "id": "workflow.plan.enter:default-plan:P2",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Mismatched-target regression returns the application authorization error before malformed secret parsing or ledger processing. Complete fixture snapshots remain unchanged, including absence of fetch-lock creation. Existing command restrictions and classification tests pass.",
+                      "id": "workflow.plan.enter:default-plan:P3",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Added five passing MailSource tests in tests/intake.rs covering sender filtering, durable recording before acknowledgement, failure retries, partial-success results, deterministic deduplication, and Backlog creation. Existing MIME, migration, and historical-record tests pass. Unchanged source confirms fetched_count inclusion and JSON printing before nonzero failure; no credentialed end-to-end fetch was attempted.",
+                      "id": "workflow.plan.enter:default-plan:P4",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Updated the runbook, Skill JSON, and CLI intent. Validated separate quoted arguments, 25-message batches, ten-batch maximum, immediate stop on failure, and unchanged approval/Review/reply restrictions.",
+                      "id": "workflow.plan.enter:default-plan:P5",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "All required checks and supplemental release-binary regressions passed. Original-guard failures and final verification logs are retained in /tmp/refine-email-dispatch-e68b7463-evidence/.",
+                      "id": "workflow.plan.enter:default-plan:P6",
+                      "outcome": "completed"
+                    }
+                  ],
+                  "verification": [
+                    "Original guard: compiled CLI suite — 2 existing tests passed; both new routing tests failed as expected.",
+                    "cargo test --locked --lib surfaces::cli::tests -- --test-threads=1 — 72 passed.",
+                    "cargo test --locked --lib application::development_requests::tests -- --test-threads=1 — 22 passed.",
+                    "cargo test --locked --test cli_target_root -- --test-threads=1 — 4 passed.",
+                    "Supplemental compiled unit-harness checks — 2 MIME tests and 1 record-schema test passed.",
+                    "cargo build --release --locked --bin refine — passed.",
+                    "cargo test --release --locked --test cli_target_root -- --test-threads=1 — 4 passed.",
+                    "cargo fmt --all -- --check — passed.",
+                    "git diff --check — passed.",
+                    "Skill JSON parsing and command/batch/stop assertions — passed."
+                  ]
+                }
+              },
+              "binding_id": "default-implement",
+              "evidence": [
+                "Eight scoped changed/added files in the pinned worktree; HEAD remains 0b6cc819de716b1b118f40c4465d114290117699. No plan deviations.",
+                "Live mail, credentials, records, Goals, and serving installation were not operated on. No commit, workflow advancement, approval, merge, push, deployment, or daemon restart.",
+                "Parse-checked report, logs, and candidate patch retained in /tmp/refine-email-dispatch-e68b7463-evidence/."
+              ],
+              "invocation_id": "e68b746327243dd2166ae8711a8c51c3025bd70741adc29ebef00ddcf4169c2b",
+              "outcome": "success",
+              "role": "implement",
+              "summary": "Restored production email-fetch dispatch while preserving application authorization. Verification passed; changes are ready for Refine's candidate and Quality handoff."
+            }
+          },
+          "source": "workflow.implement.enter",
+          "state": "succeeded"
         }
       },
       "failure_at": "",
@@ -607,7 +674,12 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "guidance_decision": null,
+      "guidance_decision": {
+        "applied": [],
+        "context_version": 1,
+        "recorded_at": "2026-09-10T16:42:04Z",
+        "skipped": []
+      },
       "implementation_plan": {
         "binding": {
           "base_commit": "0b6cc819de716b1b118f40c4465d114290117699",
@@ -618,6 +690,7 @@
           "round_idx": 0,
           "target_branch": "main"
         },
+        "completed_at": "2026-09-10T16:42:04Z",
         "final_plan": {
           "completed_at": "2026-09-10T16:32:00Z",
           "git_after": {
@@ -660,6 +733,57 @@
             "summary": "workflow.plan.enter:default-plan: Restore the documented email-fetch command by correcting its dispatch classification while preserving application-owned target authorization, durable intake behavior, and restrictions on unrelated commands."
           },
           "started_at": "2026-09-10T16:28:07Z"
+        },
+        "implementation": {
+          "completed_at": "2026-09-10T16:42:04Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "Exempted only FetchEmailGoals from direct-target rejection. Preserved the production guard and application-owned authorization.",
+                "id": "workflow.plan.enter:default-plan:P1",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Added compiled-CLI tests using temporary Git targets and separate arguments containing spaces and apostrophes. Both new tests failed against the original guard. The corrected matching-target invocation reaches the specific missing email/fastmail_jmap_token error without contacting mail.",
+                "id": "workflow.plan.enter:default-plan:P2",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Mismatched-target regression returns the application authorization error before malformed secret parsing or ledger processing. Complete fixture snapshots remain unchanged, including absence of fetch-lock creation. Existing command restrictions and classification tests pass.",
+                "id": "workflow.plan.enter:default-plan:P3",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Added five passing MailSource tests in tests/intake.rs covering sender filtering, durable recording before acknowledgement, failure retries, partial-success results, deterministic deduplication, and Backlog creation. Existing MIME, migration, and historical-record tests pass. Unchanged source confirms fetched_count inclusion and JSON printing before nonzero failure; no credentialed end-to-end fetch was attempted.",
+                "id": "workflow.plan.enter:default-plan:P4",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Updated the runbook, Skill JSON, and CLI intent. Validated separate quoted arguments, 25-message batches, ten-batch maximum, immediate stop on failure, and unchanged approval/Review/reply restrictions.",
+                "id": "workflow.plan.enter:default-plan:P5",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "All required checks and supplemental release-binary regressions passed. Original-guard failures and final verification logs are retained in /tmp/refine-email-dispatch-e68b7463-evidence/.",
+                "id": "workflow.plan.enter:default-plan:P6",
+                "outcome": "completed"
+              }
+            ],
+            "verification": [
+              "Original guard: compiled CLI suite — 2 existing tests passed; both new routing tests failed as expected.",
+              "cargo test --locked --lib surfaces::cli::tests -- --test-threads=1 — 72 passed.",
+              "cargo test --locked --lib application::development_requests::tests -- --test-threads=1 — 22 passed.",
+              "cargo test --locked --test cli_target_root -- --test-threads=1 — 4 passed.",
+              "Supplemental compiled unit-harness checks — 2 MIME tests and 1 record-schema test passed.",
+              "cargo build --release --locked --bin refine — passed.",
+              "cargo test --release --locked --test cli_target_root -- --test-threads=1 — 4 passed.",
+              "cargo fmt --all -- --check — passed.",
+              "git diff --check — passed.",
+              "Skill JSON parsing and command/batch/stop assertions — passed."
+            ]
+          },
+          "report": "workflow.implement.enter:default-implement: Restored production email-fetch dispatch while preserving application authorization. Verification passed; changes are ready for Refine's candidate and Quality handoff.",
+          "started_at": "2026-09-10T16:32:00Z"
         },
         "phase": "implement",
         "phase_started_at": "2026-09-10T16:32:00Z",
@@ -708,11 +832,11 @@
         },
         "schema_version": 2,
         "started_at": "2026-09-10T16:28:07Z",
-        "state": "in_progress",
-        "updated_at": "2026-09-10T16:32:00Z"
+        "state": "completed",
+        "updated_at": "2026-09-10T16:42:04Z"
       },
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "workflow.implement.enter:default-implement: Restored production email-fetch dispatch while preserving application authorization. Verification passed; changes are ready for Refine's candidate and Quality handoff.",
+      "implementation_reported_at": "2026-09-10T16:42:04Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -723,7 +847,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T16:32:00Z",
+      "updated": "2026-09-10T16:42:05Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T16:28:06Z",
         "round_idx": 0,
@@ -733,9 +857,9 @@
       "workflow_recovery": null
     }
   ],
-  "status": "implement",
+  "status": "quality",
   "target_branch": "main",
-  "updated": "2026-09-10T16:32:00Z",
+  "updated": "2026-09-10T16:42:05Z",
   "workflow_events": [
     {
       "at": "2026-09-10T16:27:40.832459218+00:00",
@@ -772,7 +896,16 @@
       "node_id": "default",
       "round_idx": 0,
       "to": "implement"
+    },
+    {
+      "at": "2026-09-10T16:42:04.939477794+00:00",
+      "forced": false,
+      "from": "implement",
+      "generation": 5,
+      "node_id": "default",
+      "round_idx": 0,
+      "to": "quality"
     }
   ],
-  "workflow_revision": 17
+  "workflow_revision": 25
 }
