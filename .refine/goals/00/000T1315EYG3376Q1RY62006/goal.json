@@ -3,7 +3,7 @@
   "branch_name": "refine/00000T1315EYG3376Q1RY62006/round-1",
   "candidate_commit": null,
   "created": "2026-09-10T16:27:40Z",
-  "event_generation": 3,
+  "event_generation": 4,
   "feature_id": null,
   "feature_order": null,
   "id": "00000T1315EYG3376Q1RY62006",
@@ -530,6 +530,75 @@
           }
         }
       },
+      "event_results": {
+        "a6ba729a09980a783fca46819e740a0b30000159f84782a003c0466730928b7f": {
+          "candidate_commit": null,
+          "results": {
+            "default-plan": {
+              "artifacts": {
+                "plan": {
+                  "checklist": [
+                    {
+                      "description": "In src/surfaces/cli/dispatch.rs, classify only SystemAction::FetchEmailGoals as exempt from the direct-target rejection. Document that its required target identifies the connection authorized by development_requests::fetch_email_goals. Preserve the production guard and every unrelated command classification.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "Extend tests/cli_target_root.rs to execute CARGO_BIN_EXE_refine with separate arguments and temporary paths containing spaces and apostrophes. Initialize a real temporary Git target and valid local connection without credentials; require the specific missing email/fastmail_jmap_token error, proving production dispatch reached the capability without contacting mail. Both new routing tests must fail against the current guard.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "Add the compiled mismatched-target case using distinct temporary targets, a malformed secret index, and retained ledger sentinels. Require the application’s different-target error before secret parsing, fetch-lock creation, or ledger processing; assert unchanged fixture state. Retain compiled tests for rejected goal --target-root arguments and daemon-required product commands, plus unit coverage that unrelated targets remain classified as restricted.",
+                      "id": "P3"
+                    },
+                    {
+                      "description": "Preserve the existing handler and email-processing implementation. Extend existing application tests through MailSource where coverage is missing: sender filtering, durable recording before remote acknowledgement, successful imports surviving per-record failures, returned goal_ids/errors/batch_limit, retry evidence, deterministic deduplication, and ordinary Backlog creation. Retain MIME, legacy migration, and historical-record tests. Verify the unchanged handler prints JSON including fetched_count before returning nonzero for per-record errors. Put substantial new intake tests in a cohesive child module.",
+                      "id": "P4"
+                    },
+                    {
+                      "description": "Update docs/runbooks/development-request-email.md with separately quoted executable, runtime-root, and target-root values. Keep fetch-goals-from-email.json consistent with the same command, 25-message batches, ten-batch maximum, and immediate stop on command failure. Clarify the bounded one-shot exception in docs/intent/05-surfaces/02-cli.md; preserve the existing Skills intent and prohibition on fetching approving Goals, changing Review decisions, or sending replies.",
+                      "id": "P5"
+                    },
+                    {
+                      "description": "From the pinned worktree, run cargo test --locked --lib surfaces::cli::tests -- --test-threads=1; cargo test --locked --lib application::development_requests::tests -- --test-threads=1; cargo test --locked --test cli_target_root -- --test-threads=1; cargo build --release --locked --bin refine; cargo fmt --all -- --check; and git diff --check. Parse-check the Skill JSON and review its batch/stop instructions. Report actual test counts, baseline failures, and candidate evidence through the ordinary workflow, using isolated fixtures and preserving all live mail, credentials, records, and Goals.",
+                      "id": "P6"
+                    }
+                  ],
+                  "criticism_resolutions": [
+                    {
+                      "criticism_id": "C1",
+                      "resolution": "Removing the generic guard or exempting all system commands would broaden authority unnecessarily. A single command classification restores the existing capability; adding a daemon endpoint or moving authorization into the CLI would duplicate ownership and expand scope."
+                    },
+                    {
+                      "criticism_id": "C2",
+                      "resolution": "The existing cfg(test) dispatch test cannot detect this regression. Compiled subprocess tests exercise production checks. The intended-target missing-secret result proves reachability, not successful mailbox processing; application fixtures separately verify intake and retry behavior."
+                    },
+                    {
+                      "criticism_id": "C3",
+                      "resolution": "Plain-directory fixtures would fail production Git-state discovery before reaching secrets. Use real temporary Git repositories. Missing or poisoned credentials terminate before network access, while mismatch fixtures demonstrate authorization precedes downstream access."
+                    }
+                  ],
+                  "summary": "Restore the documented email-fetch command by correcting its dispatch classification while preserving application-owned target authorization, durable intake behavior, and restrictions on unrelated commands."
+                }
+              },
+              "binding_id": "default-plan",
+              "evidence": [
+                "Read-only inspection confirmed the assigned branch refine/00000T1315EYG3376Q1RY62006/round-1, HEAD, local main, and origin/main all at 0b6cc819de716b1b118f40c4465d114290117699. Working-tree status was clean and git diff --check passed; no files or Git state were changed.",
+                "src/surfaces/cli/dispatch.rs:131 rejects explicit targets under cfg(not(test)); line 699 includes FetchEmailGoals. Its existing handler at dispatch/system.rs:3-26 invokes the application capability, prints JSON, and returns an error when the result contains per-record errors.",
+                "src/application/development_requests/mod.rs:118-129 validates the canonical configured target before resolving project state or entering process_once. process_once acquires the fetch lock before loading the secret. NativeSecretStore checks the runtime-local secret index before accessing a credential backend.",
+                "Current main already contains commit 6f82674f, which introduced the one-shot command and Skills runbooks and removed email approval/reply automation. HEAD..main has no relevant differences. Skills intent explicitly preserves bounded, target-authorized email intake.",
+                "tests/cli_target_root.rs already executes CARGO_BIN_EXE_refine and protects unrelated CLI restrictions. Cargo.toml and xtask explicitly register this integration target. Production project-layout resolution requires Git; its plain-directory fallback exists only under cfg(test).",
+                "Planning was observational. No build, test suite, email fetch, serving-installation operation, or live ledger inspection was performed; listed validation commands are proposed implementation checks."
+              ],
+              "invocation_id": "a6ba729a09980a783fca46819e740a0b30000159f84782a003c0466730928b7f",
+              "outcome": "success",
+              "role": "plan",
+              "summary": "Completed repository-backed planning and self-critique for the scoped dispatch correction; the pinned candidate remains unchanged."
+            }
+          },
+          "source": "workflow.plan.enter",
+          "state": "succeeded"
+        }
+      },
       "failure_at": "",
       "failure_category": "",
       "failure_message": "",
@@ -549,12 +618,98 @@
           "round_idx": 0,
           "target_branch": "main"
         },
-        "phase": "plan",
-        "phase_started_at": "2026-09-10T16:28:07Z",
+        "final_plan": {
+          "completed_at": "2026-09-10T16:32:00Z",
+          "git_after": {
+            "branch": "refine/00000T1315EYG3376Q1RY62006/round-1",
+            "head_commit": "0b6cc819de716b1b118f40c4465d114290117699",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000T1315EYG3376Q1RY62006/round-1",
+            "head_commit": "0b6cc819de716b1b118f40c4465d114290117699",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "In src/surfaces/cli/dispatch.rs, classify only SystemAction::FetchEmailGoals as exempt from the direct-target rejection. Document that its required target identifies the connection authorized by development_requests::fetch_email_goals. Preserve the production guard and every unrelated command classification.",
+                "id": "workflow.plan.enter:default-plan:P1"
+              },
+              {
+                "description": "Extend tests/cli_target_root.rs to execute CARGO_BIN_EXE_refine with separate arguments and temporary paths containing spaces and apostrophes. Initialize a real temporary Git target and valid local connection without credentials; require the specific missing email/fastmail_jmap_token error, proving production dispatch reached the capability without contacting mail. Both new routing tests must fail against the current guard.",
+                "id": "workflow.plan.enter:default-plan:P2"
+              },
+              {
+                "description": "Add the compiled mismatched-target case using distinct temporary targets, a malformed secret index, and retained ledger sentinels. Require the application’s different-target error before secret parsing, fetch-lock creation, or ledger processing; assert unchanged fixture state. Retain compiled tests for rejected goal --target-root arguments and daemon-required product commands, plus unit coverage that unrelated targets remain classified as restricted.",
+                "id": "workflow.plan.enter:default-plan:P3"
+              },
+              {
+                "description": "Preserve the existing handler and email-processing implementation. Extend existing application tests through MailSource where coverage is missing: sender filtering, durable recording before remote acknowledgement, successful imports surviving per-record failures, returned goal_ids/errors/batch_limit, retry evidence, deterministic deduplication, and ordinary Backlog creation. Retain MIME, legacy migration, and historical-record tests. Verify the unchanged handler prints JSON including fetched_count before returning nonzero for per-record errors. Put substantial new intake tests in a cohesive child module.",
+                "id": "workflow.plan.enter:default-plan:P4"
+              },
+              {
+                "description": "Update docs/runbooks/development-request-email.md with separately quoted executable, runtime-root, and target-root values. Keep fetch-goals-from-email.json consistent with the same command, 25-message batches, ten-batch maximum, and immediate stop on command failure. Clarify the bounded one-shot exception in docs/intent/05-surfaces/02-cli.md; preserve the existing Skills intent and prohibition on fetching approving Goals, changing Review decisions, or sending replies.",
+                "id": "workflow.plan.enter:default-plan:P5"
+              },
+              {
+                "description": "From the pinned worktree, run cargo test --locked --lib surfaces::cli::tests -- --test-threads=1; cargo test --locked --lib application::development_requests::tests -- --test-threads=1; cargo test --locked --test cli_target_root -- --test-threads=1; cargo build --release --locked --bin refine; cargo fmt --all -- --check; and git diff --check. Parse-check the Skill JSON and review its batch/stop instructions. Report actual test counts, baseline failures, and candidate evidence through the ordinary workflow, using isolated fixtures and preserving all live mail, credentials, records, and Goals.",
+                "id": "workflow.plan.enter:default-plan:P6"
+              }
+            ],
+            "summary": "workflow.plan.enter:default-plan: Restore the documented email-fetch command by correcting its dispatch classification while preserving application-owned target authorization, durable intake behavior, and restrictions on unrelated commands."
+          },
+          "started_at": "2026-09-10T16:28:07Z"
+        },
+        "phase": "implement",
+        "phase_started_at": "2026-09-10T16:32:00Z",
+        "proposal": {
+          "completed_at": "2026-09-10T16:32:00Z",
+          "git_after": {
+            "branch": "refine/00000T1315EYG3376Q1RY62006/round-1",
+            "head_commit": "0b6cc819de716b1b118f40c4465d114290117699",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000T1315EYG3376Q1RY62006/round-1",
+            "head_commit": "0b6cc819de716b1b118f40c4465d114290117699",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "In src/surfaces/cli/dispatch.rs, classify only SystemAction::FetchEmailGoals as exempt from the direct-target rejection. Document that its required target identifies the connection authorized by development_requests::fetch_email_goals. Preserve the production guard and every unrelated command classification.",
+                "id": "workflow.plan.enter:default-plan:P1"
+              },
+              {
+                "description": "Extend tests/cli_target_root.rs to execute CARGO_BIN_EXE_refine with separate arguments and temporary paths containing spaces and apostrophes. Initialize a real temporary Git target and valid local connection without credentials; require the specific missing email/fastmail_jmap_token error, proving production dispatch reached the capability without contacting mail. Both new routing tests must fail against the current guard.",
+                "id": "workflow.plan.enter:default-plan:P2"
+              },
+              {
+                "description": "Add the compiled mismatched-target case using distinct temporary targets, a malformed secret index, and retained ledger sentinels. Require the application’s different-target error before secret parsing, fetch-lock creation, or ledger processing; assert unchanged fixture state. Retain compiled tests for rejected goal --target-root arguments and daemon-required product commands, plus unit coverage that unrelated targets remain classified as restricted.",
+                "id": "workflow.plan.enter:default-plan:P3"
+              },
+              {
+                "description": "Preserve the existing handler and email-processing implementation. Extend existing application tests through MailSource where coverage is missing: sender filtering, durable recording before remote acknowledgement, successful imports surviving per-record failures, returned goal_ids/errors/batch_limit, retry evidence, deterministic deduplication, and ordinary Backlog creation. Retain MIME, legacy migration, and historical-record tests. Verify the unchanged handler prints JSON including fetched_count before returning nonzero for per-record errors. Put substantial new intake tests in a cohesive child module.",
+                "id": "workflow.plan.enter:default-plan:P4"
+              },
+              {
+                "description": "Update docs/runbooks/development-request-email.md with separately quoted executable, runtime-root, and target-root values. Keep fetch-goals-from-email.json consistent with the same command, 25-message batches, ten-batch maximum, and immediate stop on command failure. Clarify the bounded one-shot exception in docs/intent/05-surfaces/02-cli.md; preserve the existing Skills intent and prohibition on fetching approving Goals, changing Review decisions, or sending replies.",
+                "id": "workflow.plan.enter:default-plan:P5"
+              },
+              {
+                "description": "From the pinned worktree, run cargo test --locked --lib surfaces::cli::tests -- --test-threads=1; cargo test --locked --lib application::development_requests::tests -- --test-threads=1; cargo test --locked --test cli_target_root -- --test-threads=1; cargo build --release --locked --bin refine; cargo fmt --all -- --check; and git diff --check. Parse-check the Skill JSON and review its batch/stop instructions. Report actual test counts, baseline failures, and candidate evidence through the ordinary workflow, using isolated fixtures and preserving all live mail, credentials, records, and Goals.",
+                "id": "workflow.plan.enter:default-plan:P6"
+              }
+            ],
+            "summary": "workflow.plan.enter:default-plan: Restore the documented email-fetch command by correcting its dispatch classification while preserving application-owned target authorization, durable intake behavior, and restrictions on unrelated commands."
+          },
+          "started_at": "2026-09-10T16:28:07Z"
+        },
         "schema_version": 2,
         "started_at": "2026-09-10T16:28:07Z",
         "state": "in_progress",
-        "updated_at": "2026-09-10T16:28:07Z"
+        "updated_at": "2026-09-10T16:32:00Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -568,7 +723,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T16:28:07Z",
+      "updated": "2026-09-10T16:32:00Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T16:28:06Z",
         "round_idx": 0,
@@ -578,9 +733,9 @@
       "workflow_recovery": null
     }
   ],
-  "status": "plan",
+  "status": "implement",
   "target_branch": "main",
-  "updated": "2026-09-10T16:28:07Z",
+  "updated": "2026-09-10T16:32:00Z",
   "workflow_events": [
     {
       "at": "2026-09-10T16:27:40.832459218+00:00",
@@ -608,7 +763,16 @@
       "node_id": "default",
       "round_idx": 0,
       "to": "plan"
+    },
+    {
+      "at": "2026-09-10T16:32:00.621522945+00:00",
+      "forced": false,
+      "from": "plan",
+      "generation": 4,
+      "node_id": "default",
+      "round_idx": 0,
+      "to": "implement"
     }
   ],
-  "workflow_revision": 11
+  "workflow_revision": 17
 }
