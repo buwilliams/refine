@@ -3423,11 +3423,46 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "failed",
+  "results": {
+    "default-governance": {
+      "invocation_id": "36d745d4e721d1c44fc8b2c02dcfe3f46d2302dc491c8a2615c4f79e7a020a87",
+      "binding_id": "default-governance",
+      "role": "governance",
+      "outcome": "failure",
+      "summary": "One recoverability violation remains: restart fails when Git completes replay before Refine journals the replacement SHA.",
+      "evidence": [
+        "Verified HEAD 05643ffb157c6404098f5437ffe8de40c721a5b7 on refine/DR54BF57DCE017ED8EC68A5EEB/round-3, with a clean checkout before and after review. Recorded base b47569adb8d4c5d1d7335ba91729a3e486a38fe0 is an ancestor; pinned git diff --check passed.",
+        "Reviewed accepted plans, implementation reports, Quality corrections, supplied exact-candidate Quality proof, recovery diff, inherited replay/publication paths and affected intent contracts.",
+        "Supplied exact-candidate Quality evidence records 18 worktree-resume, 39 candidate-refresh, 14 round-base, 5 replacement-Skills, 31 Git-worktree and 5 architecture tests passing, plus all-target compilation.",
+        "The finding follows from source control flow; no runtime reproduction is claimed. replay_fixture.rs:75 completes replay_candidate_onto before capturing the journal at line 109, excluding the identified interruption interval.",
+        "No tests were rerun, files edited, Git state changed, Goal state mutated, merge performed or push performed."
+      ],
+      "artifacts": {
+        "recovery_analysis": "The pre-hydration recovery fixes the previously reviewed journal states, but misses the interval between Git completing the detached replay and Refine recording its replacement SHA. The journal still has replacement=null while HEAD names the clean replacement. Recovery rejects that state, and engine preparation routes the error to failure settlement. Existing engine fixtures call replay_candidate_onto() to completion, which records the replacement before the fixture captures the journal, so their detached case starts after this interval.",
+        "recovery_round_prompt": "Repair the replay-completion journal gap in pinned candidate 05643ffb157c6404098f5437ffe8de40c721a5b7 through a managed recovery Round. Preserve prior branches, worktrees, journals, plans and evidence. Make a clean detached replay recoverable when Git completed but Refine stopped before recording the replacement SHA. Establish trustworthy completion evidence without weakening checks for unexpected HEAD/ref changes, dirty work, unavailable history or lost authority. Retain the detached result before any authorized restoration, and never roll back a durably persisted replacement. Add regressions through WorkflowEngine::execute_work() using a real completed replay with its pre-completion journal still present, across Plan, Implement, Quality and Governance. Verify exact replacement checks still precede publication and integration. Proposed checks: cargo test --lib application::workflow::tests::worktree_resume -- --test-threads=1; cargo test --lib application::workflow::tests::candidate_refresh -- --test-threads=1; cargo check --all-targets. Update only affected intent passages.",
+        "violations": [
+          {
+            "message": "Clean detached replay completion remains unrecoverable before its replacement SHA reaches the journal, contrary to accepted Round 3 plan P2/P6 and docs/intent/03-application/02-workflow/11-consistency-contract.md:42. src/infrastructure/git/worktrees/replay.rs:128-150 writes replacement=None before running Git; only lines 163-168 record the completed replacement. An interruption between those operations leaves clean detached HEAD at the replacement and the branch at the original. validate_completed_replay at lines 52-61 rejects this state because HEAD matches neither the original nor a recorded replacement. candidate_refresh/resumption.rs:169 propagates that rejection, and engine/execution/mod.rs:139-146 routes it to preparation failure settlement. Recovery request: close this completion-evidence gap while preserving existing safety fences, and add engine-entry regressions that interrupt before the replacement journal update.",
+            "rule_id": "intent.recoverable_git.replay_resume"
+          }
+        ]
+      }
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "default-governance",
+      "diagnostic": null,
+      "operation_id": null,
+      "process_id": "proc-1789055087323-1129590-865",
+      "raw_output": "{\n  \"artifacts\": {\n    \"recovery_analysis\": \"The pre-hydration recovery fixes the previously reviewed journal states, but misses the interval between Git completing the detached replay and Refine recording its replacement SHA. The journal still has replacement=null while HEAD names the clean replacement. Recovery rejects that state, and engine preparation routes the error to failure settlement. Existing engine fixtures call replay_candidate_onto() to completion, which records the replacement before the fixture captures the journal, so their detached case starts after this interval.\",\n    \"recovery_round_prompt\": \"Repair the replay-completion journal gap in pinned candidate 05643ffb157c6404098f5437ffe8de40c721a5b7 through a managed recovery Round. Preserve prior branches, worktrees, journals, plans and evidence. Make a clean detached replay recoverable when Git completed but Refine stopped before recording the replacement SHA. Establish trustworthy completion evidence without weakening checks for unexpected HEAD/ref changes, dirty work, unavailable history or lost authority. Retain the detached result before any authorized restoration, and never roll back a durably persisted replacement. Add regressions through WorkflowEngine::execute_work() using a real completed replay with its pre-completion journal still present, across Plan, Implement, Quality and Governance. Verify exact replacement checks still precede publication and integration. Proposed checks: cargo test --lib application::workflow::tests::worktree_resume -- --test-threads=1; cargo test --lib application::workflow::tests::candidate_refresh -- --test-threads=1; cargo check --all-targets. Update only affected intent passages.\",\n    \"violations\": [\n      {\n        \"rule_id\": \"intent.recoverable_git.replay_resume\",\n        \"message\": \"Clean detached replay completion remains unrecoverable before its replacement SHA reaches the journal, contrary to accepted Round 3 plan P2/P6 and docs/intent/03-application/02-workflow/11-consistency-contract.md:42. src/infrastructure/git/worktrees/replay.rs:128-150 writes replacement=None before running Git; only lines 163-168 record the completed replacement. An interruption between those operations leaves clean detached HEAD at the replacement and the branch at the original. validate_completed_replay at lines 52-61 rejects this state because HEAD matches neither the original nor a recorded replacement. candidate_refresh/resumption.rs:169 propagates that rejection, and engine/execution/mod.rs:139-146 routes it to preparation failure settlement. Recovery request: close this completion-evidence gap while preserving existing safety fences, and add engine-entry regressions that interrupt before the replacement journal update.\"\n      }\n    ]\n  },\n  \"binding_id\": \"default-governance\",\n  \"evidence\": [\n    \"Verified HEAD 05643ffb157c6404098f5437ffe8de40c721a5b7 on refine/DR54BF57DCE017ED8EC68A5EEB/round-3, with a clean checkout before and after review. Recorded base b47569adb8d4c5d1d7335ba91729a3e486a38fe0 is an ancestor; pinned git diff --check passed.\",\n    \"Reviewed accepted plans, implementation reports, Quality corrections, supplied exact-candidate Quality proof, recovery diff, inherited replay/publication paths and affected intent contracts.\",\n    \"Supplied exact-candidate Quality evidence records 18 worktree-resume, 39 candidate-refresh, 14 round-base, 5 replacement-Skills, 31 Git-worktree and 5 architecture tests passing, plus all-target compilation.\",\n    \"The finding follows from source control flow; no runtime reproduction is claimed. replay_fixture.rs:75 completes replay_candidate_onto before capturing the journal at line 109, excluding the identified interruption interval.\",\n    \"No tests were rerun, files edited, Git state changed, Goal state mutated, merge performed or push performed.\"\n  ],\n  \"invocation_id\": \"36d745d4e721d1c44fc8b2c02dcfe3f46d2302dc491c8a2615c4f79e7a020a87\",\n  \"outcome\": \"failure\",\n  \"role\": \"governance\",\n  \"summary\": \"One recoverability violation remains: restart fails when Git completes replay before Refine journals the replacement SHA.\"\n}\n",
+      "workflow_revision": 54
+    }
+  ],
   "created_at": "2026-09-10T15:44:47.242108231+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-10T15:48:46.583984261+00:00",
   "error": null,
   "action_applied": false
 }
