@@ -123,6 +123,65 @@
           },
           "started_at": "2026-09-10T08:29:48Z"
         },
+        "final_plan": {
+          "completed_at": "2026-09-10T08:34:23Z",
+          "git_after": {
+            "branch": "refine/DR07C216F3E4EC22A57C60BE0B/round-1",
+            "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR07C216F3E4EC22A57C60BE0B/round-1",
+            "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Extend the existing per-Goal execution boundary to contain preparation, behavior, result-construction, and settlement failures or panics, ensuring each ended attempt delivers a completion outcome and releases its local active entry so unrelated eligible Goals continue.",
+                "id": "P1"
+              },
+              {
+                "description": "Make settlement distinguish an authoritative failed or existing recovery outcome, a superseded attempt, and an unpersisted failure, preserving originating Round and revision evidence, retrying transient persistence failures within a bound with authority rechecked each time, and surfacing exhausted writes without overwriting newer Goal decisions or broadening automatic recovery policy.",
+                "id": "P2"
+              },
+              {
+                "description": "Move potentially blocking Goal preparation and settlement out of the scheduling control path, bound or defer affected lock and Git waits, and account for in-flight preparation and live executions until they end so the next eligible Todo Goal can enter Plan within one poll interval after capacity becomes available.",
+                "id": "P3"
+              },
+              {
+                "description": "Publish atomic runtime-local health tied to the exact worker incarnation and active target, with tick sequence advanced by the scheduler itself, last tick, last completed scheduling pass, active attempts, and failure context, using explicit startup and silence bounds that preserve liveness reporting during long-running Goals, pause, disabled automation, and app detachment.",
+                "id": "P4"
+              },
+              {
+                "description": "Extend daemon-side runner supervision to detect missing or stale scheduler ticks independently of workflow execution and recover with bounded restart backoff only after confirming the old worker and its owned executions have stopped, retaining artifacts and reporting unhealthy whenever identity, termination, or replacement readiness cannot be established.",
+                "id": "P5"
+              },
+              {
+                "description": "Expose one freshly evaluated workflow health assessment through shared system and process diagnostics so stalled scheduling makes daemon_healthy false while daemon reachability, shutdown control, and recovery supervision remain available.",
+                "id": "P6"
+              },
+              {
+                "description": "Schedule agent hard-cap and idle enforcement independently through existing process supervision using recorded limits and activity evidence, preserving human-input and Toolbar timeout rules and containing individual inspection or termination failures.",
+                "id": "P7"
+              },
+              {
+                "description": "Keep the existing worktree-cleanup worker independent of admission and worker-recovery waits, make its periodic supervision resilient to transient errors and bounded repository contention, and preserve pause behavior, cleanup eligibility, and retained evidence.",
+                "id": "P8"
+              },
+              {
+                "description": "Extend the shared next-action service to surface locally eligible Todo Goals waiting beyond a defined admission threshold with free capacity and no active attempts, using shared scheduling eligibility and live process observations including interactive Goal sessions, and report the waiting count, last tick or unavailable evidence, and supported remediation while distinguishing policy blocks and unknown runtime evidence from all-quiet.",
+                "id": "P9"
+              },
+              {
+                "description": "Keep failure containment, worker health, and maintenance changes within their existing shared responsibility boundaries and update only affected intent pages to describe settlement authority, liveness recovery, independent maintenance, and stalled-admission reporting.",
+                "id": "P10"
+              }
+            ],
+            "summary": "Strengthen Goal failure isolation and attempt-fenced settlement, detect and safely recover stalled workflow scheduling, expose delayed Todo admission through shared diagnostics, and keep agent timeout enforcement and worktree cleanup independently responsive so a live daemon cannot silently stop advancing work."
+          },
+          "started_at": "2026-09-10T08:31:49Z"
+        },
         "phase": "revise",
         "phase_started_at": "2026-09-10T08:31:49Z",
         "proposal": {
@@ -183,7 +242,7 @@
         "schema_version": 2,
         "started_at": "2026-09-10T08:26:01Z",
         "state": "in_progress",
-        "updated_at": "2026-09-10T08:31:49Z"
+        "updated_at": "2026-09-10T08:34:23Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -197,7 +256,7 @@
       "quality_state": "unclassified",
       "reporter": "ethan.jacobson@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T08:31:49Z",
+      "updated": "2026-09-10T08:34:23Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T08:26:00Z",
         "round_idx": 0,
@@ -209,6 +268,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-09-10T08:31:49Z",
-  "workflow_revision": 11
+  "updated": "2026-09-10T08:34:23Z",
+  "workflow_revision": 12
 }
