@@ -106,12 +106,67 @@
           "round_idx": 0,
           "target_branch": "main"
         },
-        "phase": "plan",
-        "phase_started_at": "2026-09-10T08:26:01Z",
+        "phase": "criticize",
+        "phase_started_at": "2026-09-10T08:29:48Z",
+        "proposal": {
+          "completed_at": "2026-09-10T08:29:48Z",
+          "git_after": {
+            "branch": "refine/DR07C216F3E4EC22A57C60BE0B/round-1",
+            "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR07C216F3E4EC22A57C60BE0B/round-1",
+            "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Strengthen the existing execution boundary around each Goal's preparation, behavior execution, result construction, panic handling, and failure settlement so every finished attempt delivers a terminal outcome and releases its local active entry even when settlement itself fails, while unrelated eligible Goals continue through the scheduler.",
+                "id": "P1"
+              },
+              {
+                "description": "Represent failure settlement explicitly as an authoritative failed or existing recovery outcome, a superseded attempt, or an unpersisted failure, retaining originating Round and revision evidence, surfacing persistence failures with bounded retries, and preserving newer Goal decisions and fail-closed integration conflicts.",
+                "id": "P2"
+              },
+              {
+                "description": "Keep potentially blocking Goal preparation and settlement off the scheduling control path and make affected lock acquisition and Git waits bounded or deferrable, preserving capacity until execution actually ends and admitting the next eligible Todo Goal within one poll interval after a failed attempt releases its slot.",
+                "id": "P3"
+              },
+              {
+                "description": "Publish atomic runtime-local workflow health bound to the worker's process identity and active target, including actual scheduler tick sequence, last tick, last successful scheduling pass, active attempts, and failure context, with explicit startup and silence bounds that distinguish long-running work, pause, disabled automation, and an unattached app from a stalled loop.",
+                "id": "P4"
+              },
+              {
+                "description": "Extend daemon-side worker supervision to detect stale or missing ticks independently of workflow execution and recover with bounded restart backoff only after confirming the old worker and its owned executions have stopped, retaining artifacts and reporting unhealthy when identity, termination, or replacement readiness cannot be established.",
+                "id": "P5"
+              },
+              {
+                "description": "Expose the same freshly evaluated worker health through shared system and process diagnostics so a stalled worker makes daemon_healthy false even when HTTP responds, while separating shutdown control and lifecycle reachability from worker degradation so the API and recovery supervision remain available.",
+                "id": "P6"
+              },
+              {
+                "description": "Make agent hard-cap and idle enforcement independently scheduled through existing process supervision using recorded limits and activity evidence, preserving human-input and Toolbar timeout rules, and isolate that enforcement and existing worktree-cleanup supervision from admission and worker-recovery waits while retaining cleanup eligibility and evidence protections.",
+                "id": "P7"
+              },
+              {
+                "description": "Extend the shared next-action service to report locally eligible Todo Goals waiting beyond a defined threshold with free capacity and no active attempts, using scheduler eligibility and process observations that include interactive Goal sessions, and provide the last tick, waiting count, and a supported remediation command while distinguishing policy blocks and unknown runtime evidence from all-quiet.",
+                "id": "P8"
+              },
+              {
+                "description": "Keep execution containment, liveness diagnostics, and maintenance enforcement in cohesive modules within their existing responsibility boundaries, and update the affected workflow overview, consistency contract, process intent, and CLI intent pages to explain failure isolation, worker recovery, independent maintenance, and stalled-admission reporting.",
+                "id": "P9"
+              }
+            ],
+            "summary": "Keep integration failures confined to their Goal attempts, detect and recover stalled workflow workers, expose delayed Todo admission, and keep agent timeout enforcement and worktree cleanup responsive so an alive daemon cannot silently stop advancing work."
+          },
+          "started_at": "2026-09-10T08:26:01Z"
+        },
         "schema_version": 2,
         "started_at": "2026-09-10T08:26:01Z",
         "state": "in_progress",
-        "updated_at": "2026-09-10T08:26:01Z"
+        "updated_at": "2026-09-10T08:29:48Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -125,7 +180,7 @@
       "quality_state": "unclassified",
       "reporter": "ethan.jacobson@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T08:26:01Z",
+      "updated": "2026-09-10T08:29:48Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T08:26:00Z",
         "round_idx": 0,
@@ -137,6 +192,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-09-10T08:26:01Z",
-  "workflow_revision": 7
+  "updated": "2026-09-10T08:29:48Z",
+  "workflow_revision": 9
 }
