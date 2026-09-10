@@ -1,7 +1,7 @@
 {
   "base_commit": "7b430a6a3bc0d692f03e71da68d06f3e9534dead",
   "branch_name": "refine/DRA87E5F985A1FFE2919BE7EC2/round-2",
-  "candidate_commit": "ece644ced5ad4a161d0de1515b101b8dd8050e2a",
+  "candidate_commit": "f0bcaaac7feb35efec438cbcc4bf36bfa57cd993",
   "created": "2026-09-10T08:26:05Z",
   "event_generation": 4,
   "feature_id": null,
@@ -1091,6 +1091,92 @@
           },
           "source": "workflow.plan.enter",
           "state": "succeeded"
+        },
+        "fc7c5d3925f4cd62eebd5f485a452d51905b6d9bdf632dd73dab2795b276b3ab": {
+          "candidate_commit": "ece644ced5ad4a161d0de1515b101b8dd8050e2a",
+          "results": {
+            "default-quality": {
+              "artifacts": {
+                "tests": [
+                  {
+                    "command": "cargo test --lib governance -- --test-threads=1",
+                    "evidence": "Exit 0; 84 passed, 0 failed, 0 ignored.",
+                    "status": "passed",
+                    "test": "Integration recovery, settlement, authority fencing, approval, and surface consistency"
+                  },
+                  {
+                    "command": "cargo test --lib application::events:: -- --test-threads=1",
+                    "evidence": "Exit 0; 24 passed, 0 failed.",
+                    "status": "passed",
+                    "test": "Skill evidence, optional gates, and complete workflow execution"
+                  },
+                  {
+                    "command": "cargo test --lib application::workflow::engine::behaviors::tests::quality_resume -- --test-threads=1",
+                    "evidence": "Exit 0; 6 passed, including supervised replay and explicit no-required-Skills cases.",
+                    "status": "passed",
+                    "test": "Quality proof reuse and configuration-preserving replay"
+                  },
+                  {
+                    "command": "cargo test --lib candidate_refresh -- --test-threads=1",
+                    "evidence": "Exit 0; 16 passed, 0 failed.",
+                    "status": "passed",
+                    "test": "Candidate refresh, concurrent movement, and bounded recovery"
+                  },
+                  {
+                    "command": "cargo test --lib application::work_items::tests::workflow -- --test-threads=1",
+                    "evidence": "Exit 0; 12 passed, 0 failed.",
+                    "status": "passed",
+                    "test": "Shared workflow transitions and recovery authority"
+                  },
+                  {
+                    "command": "cargo test --lib surfaces::cli::tests::goals::lifecycle -- --test-threads=1",
+                    "evidence": "Exit 0; 5 passed, 0 failed.",
+                    "status": "passed",
+                    "test": "CLI recovery and acceptance behavior"
+                  },
+                  {
+                    "command": "node --test tests/web_goal_detail_diagnostics.test.js tests/web_javascript_syntax.test.js",
+                    "evidence": "Exit 0; 6 passed, 0 failed, no skips.",
+                    "status": "passed",
+                    "test": "Browser recovery diagnostics and JavaScript syntax"
+                  },
+                  {
+                    "command": "cargo clippy --lib",
+                    "evidence": "Exit 0; six warnings whose source sites were verified unchanged from the pinned base.",
+                    "status": "passed",
+                    "test": "Rust static analysis"
+                  },
+                  {
+                    "command": "set -o pipefail\ngit diff --name-only 7b430a6a3bc0d692f03e71da68d06f3e9534dead -- '*.rs' | xargs -r rustfmt --check --edition 2024 --config skip_children=true src/application/workflow/engine/behaviors/governance/tests/receipt_replay.rs src/application/workflow/engine/behaviors/tests/quality_resume/receipt_replay.rs",
+                    "evidence": "Exit 0; all 49 changed Rust files passed formatting.",
+                    "status": "passed",
+                    "test": "Formatting of changed Rust files"
+                  },
+                  {
+                    "command": "git diff --check",
+                    "evidence": "Exit 0; no whitespace errors.",
+                    "status": "passed",
+                    "test": "Patch whitespace integrity"
+                  }
+                ]
+              },
+              "binding_id": "default-quality",
+              "evidence": [
+                "Reviewed candidate ece644ced5ad4a161d0de1515b101b8dd8050e2a against the finalized plan and affected intent contracts.",
+                "Reproduced a defect where a resumed invocation reused its original result but recorded later Skill instructions in its receipt. The initial governance_receipt_replay regression failed with exit 101.",
+                "Corrected Quality and Governance to pin configuration before invocation, preserve that configuration on replay, reject mismatched retained invocations, and reject pending receipts as passing evidence. Added two replay regressions and clarified the affected Skills intent.",
+                "Verified interrupted integration before and after publication, exact ancestry versus content equality, required and absent Skills, missing and failed evidence, duplicate recovery, cancellation, supersession, bounded recovery, strict approval, and shared surface diagnostics.",
+                "All 58 changed candidate file hashes remained unchanged during final verification. Corrections remain in the pinned worktree. Round 1 and the serving installation were untouched; no Goal advancement, merge, or push was performed.",
+                "Verification used temporary Git repositories and process fixtures. Live deployment and production remote recovery were not exercised."
+              ],
+              "invocation_id": "fc7c5d3925f4cd62eebd5f485a452d51905b6d9bdf632dd73dab2795b276b3ab",
+              "outcome": "success",
+              "role": "quality",
+              "summary": "Reviewed the candidate and corrected a Skill receipt provenance defect. Focused regression checks pass with no unresolved findings."
+            }
+          },
+          "source": "workflow.quality.enter",
+          "state": "succeeded"
         }
       },
       "failure_at": "",
@@ -1321,14 +1407,96 @@
       "meta_rule_state": null,
       "product_state": null,
       "prompt": "Provide a supported recovery path for a Goal stranded in Review when integration effects or publication occurred but successful settlement was interrupted.\n\nThis is still relevant after Skills: current approval requires settled integration, and RetryGovernance remains unavailable from Review. The four old Governance sub-states in the original report are historical evidence, not sufficient current authority. Round 1 retained unfinished retry and settlement changes without a candidate or verified completion; preserve them and its superseded-attempt failure.\n\nExtend the existing recovery capability so an eligible Review Goal can recheck or complete settlement through the normal workflow and return to Review for human acceptance. Keep approval strict. Resolve required Skill results and supervised candidate proof from the applicable pinned configuration, including an explicitly recorded case where no required Quality or Governance Skills apply. Never infer a pass from background/context Skills, obsolete configuration flags, a missing result or matching file content.\n\nUnder the existing target lease and Goal authority checks, compare the exact candidate with the current local and required published target. Recover settlement only from proof tied to that candidate and its actual integration. Content-equal commits with different identities need normal refresh or reconciliation and new checks when the candidate changes. Handle non-fast-forward publication and concurrent target movement through bounded existing recovery.\n\nRecord completed Git effects on the originating attempt even when it was cancelled or superseded, without advancing replacement work or reviving stale authority. Make settlement and entry to Review consistent and retries idempotent. CLI, API and browser guidance should expose the same allowed recovery and explain missing evidence clearly.\n\nVerify interrupted settlement before and after publication, an already-integrated exact candidate, content equality without identity, required Skills enabled or absent, failed and missing results, duplicate recovery, cancellation and supersession. Recovery must not approve the Goal, force-push a contested ref or rewrite historical results.\n\nThis is a recovery Round following the Skills review on 10 September 2026. Start from current main in a new managed Round worktree. Preserve Round 1, its plans, logs, branches, commits and uncommitted files; inspect and selectively reuse useful work instead of replaying the whole old attempt. Use the current Skills and docs/intent contracts, not archived Governance, Quality or Guidance configuration or the old fixed planning sequence. Refine owns workflow advancement and integration; human approval remains separate. Update only affected documentation and report focused verification with actual results.",
-      "quality_candidate_commit": null,
+      "quality_agent_report": "workflow.quality.enter:default-quality: Reviewed the candidate and corrected a Skill receipt provenance defect. Focused regression checks pass with no unresolved findings.",
+      "quality_candidate_commit": "f0bcaaac7feb35efec438cbcc4bf36bfa57cd993",
       "quality_checked_at": null,
       "quality_details": null,
       "quality_message": null,
+      "quality_skill_results": [
+        {
+          "artifacts": {
+            "tests": [
+              {
+                "command": "cargo test --lib governance -- --test-threads=1",
+                "evidence": "Exit 0; 84 passed, 0 failed, 0 ignored.",
+                "status": "passed",
+                "test": "Integration recovery, settlement, authority fencing, approval, and surface consistency"
+              },
+              {
+                "command": "cargo test --lib application::events:: -- --test-threads=1",
+                "evidence": "Exit 0; 24 passed, 0 failed.",
+                "status": "passed",
+                "test": "Skill evidence, optional gates, and complete workflow execution"
+              },
+              {
+                "command": "cargo test --lib application::workflow::engine::behaviors::tests::quality_resume -- --test-threads=1",
+                "evidence": "Exit 0; 6 passed, including supervised replay and explicit no-required-Skills cases.",
+                "status": "passed",
+                "test": "Quality proof reuse and configuration-preserving replay"
+              },
+              {
+                "command": "cargo test --lib candidate_refresh -- --test-threads=1",
+                "evidence": "Exit 0; 16 passed, 0 failed.",
+                "status": "passed",
+                "test": "Candidate refresh, concurrent movement, and bounded recovery"
+              },
+              {
+                "command": "cargo test --lib application::work_items::tests::workflow -- --test-threads=1",
+                "evidence": "Exit 0; 12 passed, 0 failed.",
+                "status": "passed",
+                "test": "Shared workflow transitions and recovery authority"
+              },
+              {
+                "command": "cargo test --lib surfaces::cli::tests::goals::lifecycle -- --test-threads=1",
+                "evidence": "Exit 0; 5 passed, 0 failed.",
+                "status": "passed",
+                "test": "CLI recovery and acceptance behavior"
+              },
+              {
+                "command": "node --test tests/web_goal_detail_diagnostics.test.js tests/web_javascript_syntax.test.js",
+                "evidence": "Exit 0; 6 passed, 0 failed, no skips.",
+                "status": "passed",
+                "test": "Browser recovery diagnostics and JavaScript syntax"
+              },
+              {
+                "command": "cargo clippy --lib",
+                "evidence": "Exit 0; six warnings whose source sites were verified unchanged from the pinned base.",
+                "status": "passed",
+                "test": "Rust static analysis"
+              },
+              {
+                "command": "set -o pipefail\ngit diff --name-only 7b430a6a3bc0d692f03e71da68d06f3e9534dead -- '*.rs' | xargs -r rustfmt --check --edition 2024 --config skip_children=true src/application/workflow/engine/behaviors/governance/tests/receipt_replay.rs src/application/workflow/engine/behaviors/tests/quality_resume/receipt_replay.rs",
+                "evidence": "Exit 0; all 49 changed Rust files passed formatting.",
+                "status": "passed",
+                "test": "Formatting of changed Rust files"
+              },
+              {
+                "command": "git diff --check",
+                "evidence": "Exit 0; no whitespace errors.",
+                "status": "passed",
+                "test": "Patch whitespace integrity"
+              }
+            ]
+          },
+          "binding_id": "workflow.quality.enter:default-quality",
+          "evidence": [
+            "Reviewed candidate ece644ced5ad4a161d0de1515b101b8dd8050e2a against the finalized plan and affected intent contracts.",
+            "Reproduced a defect where a resumed invocation reused its original result but recorded later Skill instructions in its receipt. The initial governance_receipt_replay regression failed with exit 101.",
+            "Corrected Quality and Governance to pin configuration before invocation, preserve that configuration on replay, reject mismatched retained invocations, and reject pending receipts as passing evidence. Added two replay regressions and clarified the affected Skills intent.",
+            "Verified interrupted integration before and after publication, exact ancestry versus content equality, required and absent Skills, missing and failed evidence, duplicate recovery, cancellation, supersession, bounded recovery, strict approval, and shared surface diagnostics.",
+            "All 58 changed candidate file hashes remained unchanged during final verification. Corrections remain in the pinned worktree. Round 1 and the serving installation were untouched; no Goal advancement, merge, or push was performed.",
+            "Verification used temporary Git repositories and process fixtures. Live deployment and production remote recovery were not exercised."
+          ],
+          "invocation_id": "fc7c5d3925f4cd62eebd5f485a452d51905b6d9bdf632dd73dab2795b276b3ab",
+          "outcome": "success",
+          "role": "quality",
+          "summary": "Reviewed the candidate and corrected a Skill receipt provenance defect. Focused regression checks pass with no unresolved findings."
+        }
+      ],
       "quality_state": null,
       "reporter": "Buddy Williams",
       "rule_state": null,
-      "updated": "2026-09-10T14:35:30Z",
+      "updated": "2026-09-10T14:47:56Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T13:43:03Z",
         "round_idx": 1,
@@ -1369,7 +1537,7 @@
   ],
   "status": "quality",
   "target_branch": "main",
-  "updated": "2026-09-10T14:35:30Z",
+  "updated": "2026-09-10T14:47:56Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:06:37.079960889+00:00",
@@ -1408,5 +1576,5 @@
       "to": "quality"
     }
   ],
-  "workflow_revision": 41
+  "workflow_revision": 45
 }
