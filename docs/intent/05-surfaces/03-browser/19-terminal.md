@@ -44,6 +44,9 @@ Current implementation details that matter to intent:
   a standard selectable field with instructions for manual copying, without
   stealing focus from another tab;
 - control-Enter inserts an editable line break in native agent TUI prompts;
+- focused Alt+Up and Alt+Down preserve their modifiers across all shared
+  terminal profiles and providers; the attached application owns what those
+  shortcuts do;
 - control-Z is consumed by Agent terminal profiles so it cannot suspend the
   attached agent TUI, while ordinary shell terminals retain job control;
 - clipboard text, including multiline text, uses xterm's terminal-native paste

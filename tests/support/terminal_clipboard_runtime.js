@@ -174,6 +174,7 @@ function clipboardRuntime() {
   const staticRoot = path.join(__dirname, "../../src/surfaces/web/static/js");
   vm.runInContext(fs.readFileSync(path.join(staticRoot, "common.js"), "utf8"), context);
   vm.runInContext(fs.readFileSync(path.join(staticRoot, "features/terminal-clipboard.js"), "utf8"), context);
+  vm.runInContext(fs.readFileSync(path.join(staticRoot, "features/terminal-keyboard.js"), "utf8"), context);
   vm.runInContext(fs.readFileSync(path.join(staticRoot, "features/toolbar.js"), "utf8"), context);
   vm.runInContext(`
     api = (method, requestPath, body) => globalThis.__recordRequest(method, requestPath, body);
