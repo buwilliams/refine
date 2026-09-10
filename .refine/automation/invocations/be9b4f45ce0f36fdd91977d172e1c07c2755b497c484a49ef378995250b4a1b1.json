@@ -1073,11 +1073,72 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "failed",
+  "results": {
+    "default-quality": {
+      "invocation_id": "be9b4f45ce0f36fdd91977d172e1c07c2755b497c484a49ef378995250b4a1b1",
+      "binding_id": "default-quality",
+      "role": "quality",
+      "outcome": "failure",
+      "summary": "The refreshed candidate passes the planned checks but fails nine relevant clipboard recovery regressions. The inherited tests still assume Ctrl+C invokes asynchronous clipboard writes.",
+      "evidence": [
+        "Reviewed candidate e93801fca1a1991ce4389799268de315aded1ae8 against the finalized plan and Terminal, Toolbar, Command Palette, and Surface Principles intent. Clipboard behavior remains shared across providers and uses the existing managed-session input queue.",
+        "P2 finding: tests/web_terminal_copy_recovery_browser.test.js:44,110,138 and tests/web_terminal_copy_lifecycle_browser.test.js:96,134,206,217 use Ctrl+C to initiate mocked asynchronous copies. The candidate correctly routes Ctrl+C through native Copy events, so those mocks never run and the intended recovery scenarios are no longer exercised.",
+        "A read-only browser diagnostic confirmed the cause: Ctrl+C completed copying with zero asynchronous calls and pending=false; Ctrl+Shift+C invoked the mocked write once and retained pending=true. No product defect was demonstrated by these failures.",
+        "Proposed correction: use Ctrl+Shift+C or the Copy selection button for asynchronous recovery scenarios, while preserving Ctrl+C coverage for native copying and the manual recovery field. Then rerun the exact failing two-suite command recorded above.",
+        "Browser verification used Linux Chromium with simulated Windows/macOS platform selection behavior. Native macOS, Safari, and Firefox integration remain unverified. The prior Claude 2.1.267 smoke report was inspected; no fresh Claude smoke was executed against this refreshed candidate.",
+        "Final HEAD remained e93801fca1a1991ce4389799268de315aded1ae8. Git status, working-tree diff, and staged diff were clean. No candidate files, Goal state, branches, deployment, or serving processes were changed.",
+        ""
+      ],
+      "artifacts": {
+        "tests": [
+          {
+            "command": "NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules node --test tests/web_terminal_clipboard.test.js tests/web_terminal_clipboard_browser.test.js tests/web_supervisor_toolbar.test.js tests/web_command_palette.test.js tests/web_javascript_syntax.test.js",
+            "evidence": "Exit 0: 88 passed, including 25 executed browser tests; 0 failed, 0 skipped.",
+            "status": "passed",
+            "test": "Shared clipboard behavior, session fencing, terminal controls, toolbar lifecycle, command-palette precedence, and JavaScript syntax"
+          },
+          {
+            "command": "NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules node --test tests/web_terminal_copy_recovery_browser.test.js tests/web_terminal_copy_lifecycle_browser.test.js",
+            "evidence": "Exit 1: 11 passed, 9 failed, 0 skipped. Failures included undefined rejectCopy/resolveCopy callbacks, recovery timeouts, and two launch-count assertions reporting 3 instead of 2.",
+            "status": "failed",
+            "test": "Retained-copy recovery, delayed clipboard completion, focus preservation, and restart behavior"
+          },
+          {
+            "command": "node --test tests/web_goal_log_tail.test.js",
+            "evidence": "Exit 0: 7 passed, 0 failed, 0 skipped.",
+            "status": "passed",
+            "test": "Affected Goal-log loader and retained log behavior"
+          },
+          {
+            "command": "node --check tests/support/claude-clipboard-smoke.js",
+            "evidence": "Exit 0.",
+            "status": "passed",
+            "test": "Claude smoke-helper syntax"
+          },
+          {
+            "command": "git diff --check 7b430a6a3bc0d692f03e71da68d06f3e9534dead..e93801fca1a1991ce4389799268de315aded1ae8",
+            "evidence": "Exit 0.",
+            "status": "passed",
+            "test": "Pinned candidate diff integrity"
+          }
+        ]
+      }
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "default-quality",
+      "diagnostic": null,
+      "operation_id": "1a08bb53ea3113c7621",
+      "process_id": "proc-1789050307206-1129590-319",
+      "raw_output": "{\n  \"artifacts\": {\n    \"tests\": [\n      {\n        \"command\": \"NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules node --test tests/web_terminal_clipboard.test.js tests/web_terminal_clipboard_browser.test.js tests/web_supervisor_toolbar.test.js tests/web_command_palette.test.js tests/web_javascript_syntax.test.js\",\n        \"evidence\": \"Exit 0: 88 passed, including 25 executed browser tests; 0 failed, 0 skipped.\",\n        \"status\": \"passed\",\n        \"test\": \"Shared clipboard behavior, session fencing, terminal controls, toolbar lifecycle, command-palette precedence, and JavaScript syntax\"\n      },\n      {\n        \"command\": \"NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules node --test tests/web_terminal_copy_recovery_browser.test.js tests/web_terminal_copy_lifecycle_browser.test.js\",\n        \"evidence\": \"Exit 1: 11 passed, 9 failed, 0 skipped. Failures included undefined rejectCopy/resolveCopy callbacks, recovery timeouts, and two launch-count assertions reporting 3 instead of 2.\",\n        \"status\": \"failed\",\n        \"test\": \"Retained-copy recovery, delayed clipboard completion, focus preservation, and restart behavior\"\n      },\n      {\n        \"command\": \"node --test tests/web_goal_log_tail.test.js\",\n        \"evidence\": \"Exit 0: 7 passed, 0 failed, 0 skipped.\",\n        \"status\": \"passed\",\n        \"test\": \"Affected Goal-log loader and retained log behavior\"\n      },\n      {\n        \"command\": \"node --check tests/support/claude-clipboard-smoke.js\",\n        \"evidence\": \"Exit 0.\",\n        \"status\": \"passed\",\n        \"test\": \"Claude smoke-helper syntax\"\n      },\n      {\n        \"command\": \"git diff --check 7b430a6a3bc0d692f03e71da68d06f3e9534dead..e93801fca1a1991ce4389799268de315aded1ae8\",\n        \"evidence\": \"Exit 0.\",\n        \"status\": \"passed\",\n        \"test\": \"Pinned candidate diff integrity\"\n      }\n    ]\n  },\n  \"binding_id\": \"default-quality\",\n  \"invocation_id\": \"be9b4f45ce0f36fdd91977d172e1c07c2755b497c484a49ef378995250b4a1b1\",\n  \"outcome\": \"failure\",\n  \"role\": \"quality\",\n  \"summary\": \"The refreshed candidate passes the planned checks but fails nine relevant clipboard recovery regressions. The inherited tests still assume Ctrl+C invokes asynchronous clipboard writes.\",\n  \"evidence\": [\n    \"Reviewed candidate e93801fca1a1991ce4389799268de315aded1ae8 against the finalized plan and Terminal, Toolbar, Command Palette, and Surface Principles intent. Clipboard behavior remains shared across providers and uses the existing managed-session input queue.\",\n    \"P2 finding: tests/web_terminal_copy_recovery_browser.test.js:44,110,138 and tests/web_terminal_copy_lifecycle_browser.test.js:96,134,206,217 use Ctrl+C to initiate mocked asynchronous copies. The candidate correctly routes Ctrl+C through native Copy events, so those mocks never run and the intended recovery scenarios are no longer exercised.\",\n    \"A read-only browser diagnostic confirmed the cause: Ctrl+C completed copying with zero asynchronous calls and pending=false; Ctrl+Shift+C invoked the mocked write once and retained pending=true. No product defect was demonstrated by these failures.\",\n    \"Proposed correction: use Ctrl+Shift+C or the Copy selection button for asynchronous recovery scenarios, while preserving Ctrl+C coverage for native copying and the manual recovery field. Then rerun the exact failing two-suite command recorded above.\",\n    \"Browser verification used Linux Chromium with simulated Windows/macOS platform selection behavior. Native macOS, Safari, and Firefox integration remain unverified. The prior Claude 2.1.267 smoke report was inspected; no fresh Claude smoke was executed against this refreshed candidate.\",\n    \"Final HEAD remained e93801fca1a1991ce4389799268de315aded1ae8. Git status, working-tree diff, and staged diff were clean. No candidate files, Goal state, branches, deployment, or serving processes were changed.\",\n    \"\"\n  ]\n}",
+      "workflow_revision": 2
+    }
+  ],
   "created_at": "2026-09-10T14:25:06.709831757+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-10T14:28:42.203277163+00:00",
   "error": null,
   "action_applied": false
 }

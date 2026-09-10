@@ -1,0 +1,1693 @@
+{
+  "id": "bddb4147dfa5434dffb53720f5fd0f1a722ab48939270ed6c7451e91a3de53df",
+  "event": {
+    "id": "workflow.plan.enter",
+    "name": "Workflow Plan Enter",
+    "kind": "system",
+    "source": "workflow.plan.enter",
+    "enabled": true,
+    "scope": {
+      "node_id": null
+    },
+    "parameters": [],
+    "bindings": [
+      {
+        "id": "default-plan",
+        "skill_id": "default-plan",
+        "enabled": true,
+        "mode": "blocking",
+        "order": 0,
+        "scope": {
+          "node_id": null
+        },
+        "overrides": null,
+        "inputs": {}
+      }
+    ],
+    "on_success": null
+  },
+  "config_revision": 22,
+  "context": {
+    "node_id": "default",
+    "target_root": "/home/buddy/projects/refine-next",
+    "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T12V8K3M05Q6JSVEMJ000-round-2",
+    "provider": "codex",
+    "goal_id": "00000T12V8K3M05Q6JSVEMJ000",
+    "round_idx": 1,
+    "workflow_revision": 34,
+    "candidate_commit": null,
+    "data": {
+      "context": {
+        "assembled_at": "2026-09-10T14:28:44Z",
+        "current_round": {
+          "assignee": "Refine",
+          "prompt": "Recover the prior candidate from a shared-target integration race without discarding its evidence.\n\nReason: replacement candidate failed exact-candidate Quality\n\nRetained integration evidence:\n```json\n{\n  \"attempt\": 1,\n  \"kind\": \"integration\",\n  \"max_automatic_round_retries\": 5,\n  \"node_id\": \"default\",\n  \"reason\": \"replacement candidate failed exact-candidate Quality\",\n  \"recorded_at\": \"2026-09-10T14:28:43Z\",\n  \"retained_evidence\": {\n    \"candidate_refresh\": {\n      \"authorizing_status\": \"governance\",\n      \"branch\": \"refine/00000T12V8K3M05Q6JSVEMJ000/round-1\",\n      \"conflict_resolution\": {\n        \"attempts\": [\n          {\n            \"attempt\": 1,\n            \"files\": [\n              \"docs/intent/05-surfaces/03-browser/19-terminal.md\",\n              \"src/surfaces/web/static/js/features/terminal-clipboard.js\",\n              \"src/surfaces/web/static/js/features/toolbar.js\",\n              \"tests/web_terminal_clipboard.test.js\",\n              \"tests/web_terminal_clipboard_browser.test.js\"\n            ],\n            \"outcome\": \"accepted\"\n          }\n        ],\n        \"files\": [\n          \"docs/intent/05-surfaces/03-browser/19-terminal.md\",\n          \"src/surfaces/web/static/js/features/terminal-clipboard.js\",\n          \"src/surfaces/web/static/js/features/toolbar.js\",\n          \"tests/web_terminal_clipboard.test.js\",\n          \"tests/web_terminal_clipboard_browser.test.js\"\n        ],\n        \"outcome\": \"resolved\"\n      },\n      \"node_id\": \"default\",\n      \"original_base_commit\": \"f880b7767149e4de43d5bc4d4786247d1e536a8c\",\n      \"original_candidate_commit\": \"b831779bd97a2d4356020319f6cb600ec2f55928\",\n      \"previous_gate_evidence\": {\n        \"constitution_state\": \"unclassified\",\n        \"governance_candidate_commit\": \"\",\n        \"governance_checked_at\": \"\",\n        \"governance_details\": \"\",\n        \"governance_message\": \"\",\n        \"meta_rule_state\": \"unclassified\",\n        \"product_state\": \"unclassified\",\n        \"quality_candidate_commit\": \"b831779bd97a2d4356020319f6cb600ec2f55928\",\n        \"quality_checked_at\": \"2026-09-10T14:19:47Z\",\n        \"quality_details\": {\n          \"candidate_commit\": \"b831779bd97a2d4356020319f6cb600ec2f55928\",\n          \"cwd\": \"/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T12V8K3M05Q6JSVEMJ000-round-1\",\n          \"diagnostics\": [\n            \"Event invocation fcbdf3d837ff0f725fe767be3fca3a504dc65d1b0b9a658a575ab59292a3530c: automation/invocations/fcbdf3d837ff0f725fe767be3fca3a504dc65d1b0b9a658a575ab59292a3530c.json\",\n            \"Observed supervised process proc-1789049968114-1129590-294 exited 0. stdout: (54.374702ms)\\n✔ native paste is sent exactly once instead of being reprocessed by xterm (27.721425ms)\\n✔ terminal-specific fallback errors are visible and suppress terminal interpretation (83.659596ms)\\n✔ an asynchronous paste cannot cross into a replacement managed session (30.729113ms)\\n✔ clipboard text buffered before replacement cannot cross managed sessions (29.679934ms)\\n✔ clipboard shortcuts remain untouched when focus is outside a terminal (29.284218ms)\\n✔ Cmd clipboard shortcuts yield to native browser events (29.399799ms)\\n✔ terminal-specific fallback performs one operation and ignores key repeat (28.55452ms)\\n✔ pending read results and errors cannot affect an inactive terminal (224.581415ms)\\n✔ native keyboard clipboard works with async access allowed (1022.094551ms)\\n✔ native keyboard clipboard works with async access denied (993.309675ms)\\n✔ native keyboard clipboard works with async access unavailable (1034.039086ms)\\n✔ selection overrides mouse capture on Linux x86_64 (1120.951613ms)\\n✔ selection overrides mouse capture on Win32 (1107.740578ms)\\n✔ selection overrides mouse capture on MacIntel (1076.770018ms)\\n✔ context-menu clipboard path with async access allowed (922.423322ms)\\n✔ context-menu clipboard path with async access denied (1000.680141ms)\\n✔ context-menu clipboard path with async access unavailable (848.085615ms)\\n✔ native keyboard gestures survive actual browser permission denial (852.676415ms)\\n✔ terminal-specific fallback is singular and reports actual permission denial (905.259566ms)\\n✔ Ctrl+Insert and Shift+Insert use native clipboard events exactly once (826.416824ms)\\n✔ all profiles and both provider fixtures retain native clipboard and key semantics (4040.102272ms)\\n✔ retained renderer remounts and outside focus preserve one clipboard operation (1383.133297ms)\\n✔ pending fallback paste is fenced by tab, focus, exit, and session replacement (800.57924ms)\\nℹ tests 75\\nℹ suites 0\\nℹ pass 75\\nℹ fail 0\\nℹ cancelled 0\\nℹ skipped 0\\nℹ todo 0\\nℹ duration_ms 18507.753446\",\n            \"Observed supervised process proc-1789049986862-1129590-297 exited 0. stdout: ✔ the initial Goal log request fetches the newest page and displays it chronologically (15.74866ms)\\n✔ the first Goal SSE log reaches the toolbar and replayed entries stay deduplicated (6.260128ms)\\n✔ main SSE transport reconnects in place and reconciles durable visible state (3.715158ms)\\n✔ background operations use SSE after one durable registration read (10.475238ms)\\n✔ Goal log search covers trail content and Head/Tail changes visible order (2.628102ms)\\n✔ Goal log stream renders safe formatted messages and validated action links (11.082791ms)\\n✔ Goal log search and stream order persist with the toolbar tab (1.810342ms)\\nℹ tests 7\\nℹ suites 0\\nℹ pass 7\\nℹ fail 0\\nℹ cancelled 0\\nℹ skipped 0\\nℹ todo 0\\nℹ duration_ms 195.443217\",\n            \"Observed supervised process proc-1789049987296-1129590-300 exited 0.\",\n            \"Observed supervised process proc-1789049987513-1129590-303 exited 0.\"\n          ],\n          \"evaluation_scope\": \"isolated_candidate\",\n          \"operation_id\": \"1a08bad36a4113c761e\",\n          \"provider_attempts\": [],\n          \"quality_proof\": {\n            \"checked_at\": \"2026-09-10T14:19:47Z\",\n            \"checked_candidate_commit\": \"b831779bd97a2d4356020319f6cb600ec2f55928\",\n            \"evaluation_scope\": \"isolated_candidate\",\n            \"goal_id\": \"00000T12V8K3M05Q6JSVEMJ000\",\n            \"operation_id\": \"1a08bad36a4113c761e\",\n            \"results\": [\n              {\n                \"command\": \"NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules node --test tests/web_terminal_clipboard.test.js tests/web_terminal_clipboard_browser.test.js tests/web_supervisor_toolbar.test.js tests/web_command_palette.test.js tests/web_javascript_syntax.test.js\",\n                \"evidence\": \"Observed supervised process proc-1789049968114-1129590-294 exited 0. stdout: (54.374702ms)\\n✔ native paste is sent exactly once instead of being reprocessed by xterm (27.721425ms)\\n✔ terminal-specific fallback errors are visible and suppress terminal interpretation (83.659596ms)\\n✔ an asynchronous paste cannot cross into a replacement managed session (30.729113ms)\\n✔ clipboard text buffered before replacement cannot cross managed sessions (29.679934ms)\\n✔ clipboard shortcuts remain untouched when focus is outside a terminal (29.284218ms)\\n✔ Cmd clipboard shortcuts yield to native browser events (29.399799ms)\\n✔ terminal-specific fallback performs one operation and ignores key repeat (28.55452ms)\\n✔ pending read results and errors cannot affect an inactive terminal (224.581415ms)\\n✔ native keyboard clipboard works with async access allowed (1022.094551ms)\\n✔ native keyboard clipboard works with async access denied (993.309675ms)\\n✔ native keyboard clipboard works with async access unavailable (1034.039086ms)\\n✔ selection overrides mouse capture on Linux x86_64 (1120.951613ms)\\n✔ selection overrides mouse capture on Win32 (1107.740578ms)\\n✔ selection overrides mouse capture on MacIntel (1076.770018ms)\\n✔ context-menu clipboard path with async access allowed (922.423322ms)\\n✔ context-menu clipboard path with async access denied (1000.680141ms)\\n✔ context-menu clipboard path with async access unavailable (848.085615ms)\\n✔ native keyboard gestures survive actual browser permission denial (852.676415ms)\\n✔ terminal-specific fallback is singular and reports actual permission denial (905.259566ms)\\n✔ Ctrl+Insert and Shift+Insert use native clipboard events exactly once (826.416824ms)\\n✔ all profiles and both provider fixtures retain native clipboard and key semantics (4040.102272ms)\\n✔ retained renderer remounts and outside focus preserve one clipboard operation (1383.133297ms)\\n✔ pending fallback paste is fenced by tab, focus, exit, and session replacement (800.57924ms)\\nℹ tests 75\\nℹ suites 0\\nℹ pass 75\\nℹ fail 0\\nℹ cancelled 0\\nℹ skipped 0\\nℹ todo 0\\nℹ duration_ms 18507.753446\",\n                \"exit_code\": 0,\n                \"process_id\": \"proc-1789049968114-1129590-294\",\n                \"status\": \"passed\",\n                \"test\": \"workflow.quality.enter:default-quality: Clipboard behavior, selection during mouse capture, session fencing, terminal controls, toolbar lifecycle, command-palette precedence, and shipped JavaScript syntax\"\n              },\n              {\n                \"command\": \"node --test tests/web_goal_log_tail.test.js\",\n                \"evidence\": \"Observed supervised process proc-1789049986862-1129590-297 exited 0. stdout: ✔ the initial Goal log request fetches the newest page and displays it chronologically (15.74866ms)\\n✔ the first Goal SSE log reaches the toolbar and replayed entries stay deduplicated (6.260128ms)\\n✔ main SSE transport reconnects in place and reconciles durable visible state (3.715158ms)\\n✔ background operations use SSE after one durable registration read (10.475238ms)\\n✔ Goal log search covers trail content and Head/Tail changes visible order (2.628102ms)\\n✔ Goal log stream renders safe formatted messages and validated action links (11.082791ms)\\n✔ Goal log search and stream order persist with the toolbar tab (1.810342ms)\\nℹ tests 7\\nℹ suites 0\\nℹ pass 7\\nℹ fail 0\\nℹ cancelled 0\\nℹ skipped 0\\nℹ todo 0\\nℹ duration_ms 195.443217\",\n                \"exit_code\": 0,\n                \"process_id\": \"proc-1789049986862-1129590-297\",\n                \"status\": \"passed\",\n                \"test\": \"workflow.quality.enter:default-quality: Affected Goal-log loader and retained log behavior\"\n              },\n              {\n                \"command\": \"node --check tests/support/claude-clipboard-smoke.js\",\n                \"evidence\": \"Observed supervised process proc-1789049987296-1129590-300 exited 0.\",\n                \"exit_code\": 0,\n                \"process_id\": \"proc-1789049987296-1129590-300\",\n                \"status\": \"passed\",\n                \"test\": \"workflow.quality.enter:default-quality: Claude smoke-helper syntax\"\n              },\n              {\n                \"command\": \"git diff --check f880b7767149e4de43d5bc4d4786247d1e536a8c..b831779bd97a2d4356020319f6cb600ec2f55928\",\n                \"evidence\": \"Observed supervised process proc-1789049987513-1129590-303 exited 0.\",\n                \"exit_code\": 0,\n                \"process_id\": \"proc-1789049987513-1129590-303\",\n                \"status\": \"passed\",\n                \"test\": \"workflow.quality.enter:default-quality: Candidate diff integrity\"\n              }\n            ],\n            \"round_idx\": 0,\n            \"schema_version\": 1,\n            \"source_candidate_commit\": \"b831779bd97a2d4356020319f6cb600ec2f55928\",\n            \"state\": \"passed\"\n          },\n          \"results\": [\n            {\n              \"command\": \"NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules node --test tests/web_terminal_clipboard.test.js tests/web_terminal_clipboard_browser.test.js tests/web_supervisor_toolbar.test.js tests/web_command_palette.test.js tests/web_javascript_syntax.test.js\",\n              \"evidence\": \"Observed supervised process proc-1789049968114-1129590-294 exited 0. stdout: (54.374702ms)\\n✔ native paste is sent exactly once instead of being reprocessed by xterm (27.721425ms)\\n✔ terminal-specific fallback errors are visible and suppress terminal interpretation (83.659596ms)\\n✔ an asynchronous paste cannot cross into a replacement managed session (30.729113ms)\\n✔ clipboard text buffered before replacement cannot cross managed sessions (29.679934ms)\\n✔ clipboard shortcuts remain untouched when focus is outside a terminal (29.284218ms)\\n✔ Cmd clipboard shortcuts yield to native browser events (29.399799ms)\\n✔ terminal-specific fallback performs one operation and ignores key repeat (28.55452ms)\\n✔ pending read results and errors cannot affect an inactive terminal (224.581415ms)\\n✔ native keyboard clipboard works with async access allowed (1022.094551ms)\\n✔ native keyboard clipboard works with async access denied (993.309675ms)\\n✔ native keyboard clipboard works with async access unavailable (1034.039086ms)\\n✔ selection overrides mouse capture on Linux x86_64 (1120.951613ms)\\n✔ selection overrides mouse capture on Win32 (1107.740578ms)\\n✔ selection overrides mouse capture on MacIntel (1076.770018ms)\\n✔ context-menu clipboard path with async access allowed (922.423322ms)\\n✔ context-menu clipboard path with async access denied (1000.680141ms)\\n✔ context-menu clipboard path with async access unavailable (848.085615ms)\\n✔ native keyboard gestures survive actual browser permission denial (852.676415ms)\\n✔ terminal-specific fallback is singular and reports actual permission denial (905.259566ms)\\n✔ Ctrl+Insert and Shift+Insert use native clipboard events exactly once (826.416824ms)\\n✔ all profiles and both provider fixtures retain native clipboard and key semantics (4040.102272ms)\\n✔ retained renderer remounts and outside focus preserve one clipboard operation (1383.133297ms)\\n✔ pending fallback paste is fenced by tab, focus, exit, and session replacement (800.57924ms)\\nℹ tests 75\\nℹ suites 0\\nℹ pass 75\\nℹ fail 0\\nℹ cancelled 0\\nℹ skipped 0\\nℹ todo 0\\nℹ duration_ms 18507.753446\",\n              \"exit_code\": 0,\n              \"process_id\": \"proc-1789049968114-1129590-294\",\n              \"status\": \"passed\",\n              \"test\": \"workflow.quality.enter:default-quality: Clipboard behavior, selection during mouse capture, session fencing, terminal controls, toolbar lifecycle, command-palette precedence, and shipped JavaScript syntax\"\n            },\n            {\n              \"command\": \"node --test tests/web_goal_log_tail.test.js\",\n              \"evidence\": \"Observed supervised process proc-1789049986862-1129590-297 exited 0. stdout: ✔ the initial Goal log request fetches the newest page and displays it chronologically (15.74866ms)\\n✔ the first Goal SSE log reaches the toolbar and replayed entries stay deduplicated (6.260128ms)\\n✔ main SSE transport reconnects in place and reconciles durable visible state (3.715158ms)\\n✔ background operations use SSE after one durable registration read (10.475238ms)\\n✔ Goal log search covers trail content and Head/Tail changes visible order (2.628102ms)\\n✔ Goal log stream renders safe formatted messages and validated action links (11.082791ms)\\n✔ Goal log search and stream order persist with the toolbar tab (1.810342ms)\\nℹ tests 7\\nℹ suites 0\\nℹ pass 7\\nℹ fail 0\\nℹ cancelled 0\\nℹ skipped 0\\nℹ todo 0\\nℹ duration_ms 195.443217\",\n              \"exit_code\": 0,\n              \"process_id\": \"proc-1789049986862-1129590-297\",\n              \"status\": \"passed\",\n              \"test\": \"workflow.quality.enter:default-quality: Affected Goal-log loader and retained log behavior\"\n            },\n            {\n              \"command\": \"node --check tests/support/claude-clipboard-smoke.js\",\n              \"evidence\": \"Observed supervised process proc-1789049987296-1129590-300 exited 0.\",\n              \"exit_code\": 0,\n              \"process_id\": \"proc-1789049987296-1129590-300\",\n              \"status\": \"passed\",\n              \"test\": \"workflow.quality.enter:default-quality: Claude smoke-helper syntax\"\n            },\n            {\n              \"command\": \"git diff --check f880b7767149e4de43d5bc4d4786247d1e536a8c..b831779bd97a2d4356020319f6cb600ec2f55928\",\n              \"evidence\": \"Observed supervised process proc-1789049987513-1129590-303 exited 0.\",\n              \"exit_code\": 0,\n              \"process_id\": \"proc-1789049987513-1129590-303\",\n              \"status\": \"passed\",\n              \"test\": \"workflow.quality.enter:default-quality: Candidate diff integrity\"\n            }\n          ],\n          \"source_candidate_commit\": \"b831779bd97a2d4356020319f6cb600ec2f55928\"\n        },\n        \"quality_message\": \"All Quality Skills passed with supervised evidence.\",\n        \"quality_state\": \"passed\",\n        \"rule_state\": \"unclassified\"\n      },\n      \"refreshed_at\": \"2026-09-10T14:25:05Z\",\n      \"replacement_base_commit\": \"7b430a6a3bc0d692f03e71da68d06f3e9534dead\",\n      \"replacement_candidate_commit\": \"e93801fca1a1991ce4389799268de315aded1ae8\",\n      \"round_idx\": 0,\n      \"state\": \"refreshed\",\n      \"workflow_revision\": 2,\n      \"worktree\": \"/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T12V8K3M05Q6JSVEMJ000-round-1\"\n    },\n    \"quality_diagnostics\": [\n      \"Event invocation be9b4f45ce0f36fdd91977d172e1c07c2755b497c484a49ef378995250b4a1b1: automation/invocations/be9b4f45ce0f36fdd91977d172e1c07c2755b497c484a49ef378995250b4a1b1.json\"\n    ],\n    \"quality_results\": [\n      {\n        \"command\": \"\",\n        \"evidence\": \"The refreshed candidate passes the planned checks but fails nine relevant clipboard recovery regressions. The inherited tests still assume Ctrl+C invokes asynchronous clipboard writes.\",\n        \"status\": \"failed\",\n        \"test\": \"workflow.quality.enter:default-quality\"\n      }\n    ],\n    \"quality_summary\": \"Quality failed: “workflow.quality.enter:default-quality” — The refreshed candidate passes the planned checks but fails nine relevant clipboard recovery regressions. The inherited tests still assume Ctrl+C invokes asynchronous clipboard writes.\",\n    \"replacement_candidate_commit\": \"e93801fca1a1991ce4389799268de315aded1ae8\"\n  },\n  \"source_round\": 1,\n  \"state\": \"queued\",\n  \"successor_round\": 2,\n  \"workflow_revision\": 2\n}\n```\n\nRe-evaluate the current Round request from the current target branch. Reapply only the intended candidate delta, resolve conflicts deliberately, and rerun exact-candidate Quality and Governance before integration. Do not move, delete, or rewrite the retained original candidate or its evidence.",
+          "reporter": "Refine",
+          "round": 2
+        },
+        "goal": {
+          "assignee": "Refine",
+          "id": "00000T12V8K3M05Q6JSVEMJ000",
+          "name": "Copy and paste in the agent toolbar isn't working for Claude Code sessions. It s",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": false,
+          "constitution": "",
+          "product": "",
+          "rules": []
+        },
+        "guidance_candidates": [],
+        "previous_rounds": [
+          {
+            "assignee": "Buddy Williams",
+            "guidance_decision": {
+              "applied": [],
+              "context_version": 1,
+              "recorded_at": "2026-09-10T14:07:52Z",
+              "skipped": []
+            },
+            "implementation_plan": {
+              "binding": {
+                "base_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+                "context_digest": "7eebecbe124fe4a5e95a31ec50d96cdbe1d0cb542a07666a8a3fc22b82162e17",
+                "context_version": 1,
+                "goal_id": "00000T12V8K3M05Q6JSVEMJ000",
+                "implementation_branch": "refine/00000T12V8K3M05Q6JSVEMJ000/round-1",
+                "round_idx": 0,
+                "target_branch": "main"
+              },
+              "completed_at": "2026-09-10T14:07:52Z",
+              "final_plan": {
+                "completed_at": "2026-09-10T13:49:17Z",
+                "git_after": {
+                  "branch": "refine/00000T12V8K3M05Q6JSVEMJ000/round-1",
+                  "head_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/00000T12V8K3M05Q6JSVEMJ000/round-1",
+                  "head_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "checklist": [
+                    {
+                      "description": "Add tests using the shipped xterm renderer in tests/web_terminal_clipboard_browser.test.js, following the isolated static-server/API-fixture pattern in tests/web_screen_render.test.js. Reproduce keyboard and context-menu clipboard behavior with asynchronous clipboard access allowed, denied, and unavailable; also exercise alternate-screen and mouse-reporting modes. Record whether the failure concerns browser events, terminal selection, or application-generated clipboard output. Use an isolated Claude session for the provider smoke check and record its actual clipboard path.",
+                      "id": "workflow.plan.enter:default-plan:P1"
+                    },
+                    {
+                      "description": "Extract clipboard handling from the 3,087-line toolbar.js into a cohesive features/terminal-clipboard.js module with explicit renderer/session callbacks. Load it before toolbar.js in index.html and update affected test loaders. Make native browser copy/paste events authoritative for browser clipboard shortcuts: prevent xterm from interpreting those keystrokes without cancelling the browser action. Preserve supported terminal-specific shortcuts through a separate fallback with visible errors. Verify that one gesture produces one clipboard operation.",
+                      "id": "workflow.plan.enter:default-plan:P2"
+                    },
+                    {
+                      "description": "Provide reliable browser-owned selection while an agent captures the mouse: retain Shift-drag on Windows/Linux, enable xterm's macOptionClickForcesSelection for Option-drag on macOS, and expose a concise selection hint in the shared terminal surface. Preserve ordinary TUI mouse interaction. Copy the selected text without sending an interrupt; retain Ctrl+C terminal semantics when no xterm selection exists. Verify selection and clipboard contents with actual browser gestures.",
+                      "id": "workflow.plan.enter:default-plan:P3"
+                    },
+                    {
+                      "description": "Keep accepted paste text on Terminal.paste → onData → the existing managed-session input queue. Preserve line-ending normalization, application-controlled bracketed-paste framing, duplicate-event suppression, and replacement-session fencing. If P1 demonstrates that application-owned copying requires OSC 52, add a bounded, write-only handler in the clipboard module: validate payloads, respect browser permissions, restrict side effects to the current focused live session, and suppress transcript/history replay. Verify split sequences, malformed payloads, stale sessions, and denied writes before accepting that extension.",
+                      "id": "workflow.plan.enter:default-plan:P4"
+                    },
+                    {
+                      "description": "Extend focused regressions across Terminal, Agent, Planning Agent, Goal, Standalone/Agent in Worktree, and Skill profiles, with Claude and another provider represented. Cover Unicode and multiline paste, bracketed mode enabled/disabled, no duplicate input, tab changes, session replacement, retained renderer remounts, and focus outside the terminal. Preserve Ctrl+Enter, Agent Ctrl+Z suppression, shell job control, and command-palette precedence. Move reusable clipboard test scaffolding into tests/support if needed to keep files cohesive.",
+                      "id": "workflow.plan.enter:default-plan:P5"
+                    },
+                    {
+                      "description": "Update only docs/intent/05-surfaces/03-browser/19-terminal.md to describe the provider-independent text clipboard contract, selection gestures, and browser restrictions; document OSC behavior only if implemented. From the pinned worktree run node --test tests/web_terminal_clipboard.test.js tests/web_terminal_clipboard_browser.test.js tests/web_supervisor_toolbar.test.js tests/web_command_palette.test.js tests/web_javascript_syntax.test.js, plus git diff --check. Require executed browser tests and a Claude copy/paste smoke check for completion; report missing tooling and skips explicitly. Keep source promotion, serving-daemon restart, Goal transitions, merge, and push outside this Round.",
+                      "id": "workflow.plan.enter:default-plan:P6"
+                    }
+                  ],
+                  "summary": "workflow.plan.enter:default-plan: Use a regression-led repair of the shared browser terminal clipboard behavior. Make native browser copy/paste reliable across agents, preserve selection during terminal mouse capture, and retain xterm paste framing and session isolation. Perform implementation and verification in the pinned Round worktree at f880b7767149e4de43d5bc4d4786247d1e536a8c."
+                },
+                "started_at": "2026-09-10T13:43:07Z"
+              },
+              "implementation": {
+                "completed_at": "2026-09-10T14:07:52Z",
+                "execution": {
+                  "checklist": [
+                    {
+                      "evidence": "Added tests/web_terminal_clipboard_browser.test.js using the shipped xterm renderer and an isolated static server/API fixture. Covered native keyboard and menu clipboard paths with asynchronous access allowed, denied, and unavailable. Isolated Claude 2.1.247 and 2.1.267 sessions passed real browser copy/paste checks.",
+                      "id": "workflow.plan.enter:default-plan:P1",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Extracted clipboard handling into the 91-line features/terminal-clipboard.js with explicit renderer/session callbacks. Loaded it before toolbar.js and updated affected test loaders. Native shortcuts preserve browser defaults; Ctrl+Shift+C/V uses a separate fallback with visible errors. Browser tests verify one clipboard write and one paste operation.",
+                      "id": "workflow.plan.enter:default-plan:P2",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Enabled macOptionClickForcesSelection and added an accessible selection hint. Actual browser gestures verified Shift-drag and Option-drag selection during alternate-screen mouse capture, preserved ordinary TUI mouse reporting, and copied selection without sending an interrupt.",
+                      "id": "workflow.plan.enter:default-plan:P3",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Paste remains on Terminal.paste → onData → existing managed input queue. Verified newline normalization, bracketed mode enabled/disabled, duplicate suppression, buffered replacement-session fencing, and pending-read fencing across session, renderer, tab, focus, and exit changes. Claude smoke copying used native browser events and emitted no OSC 52; no OSC extension was needed.",
+                      "id": "workflow.plan.enter:default-plan:P4",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Browser coverage exercises all six profiles with Claude and Codex fixtures, Unicode/multiline paste, retained renderer remounts, tab changes, and outside focus. Verified Ctrl+C semantics, Ctrl+Enter, Agent Ctrl+Z suppression, shell job control, and command-palette precedence. Reusable scaffolding resides in tests/support.",
+                      "id": "workflow.plan.enter:default-plan:P5",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Updated only docs/intent/05-surfaces/03-browser/19-terminal.md within the intent documentation. Required suite passed 74/74 with zero skips; the additional affected loader suite passed 7/7. Claude smoke reports record trusted browser events, bracketed multiline input, successful selected-text copying, and no interrupt.",
+                      "id": "workflow.plan.enter:default-plan:P6",
+                      "outcome": "completed"
+                    }
+                  ],
+                  "verification": [
+                    "NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules node --test tests/web_terminal_clipboard.test.js tests/web_terminal_clipboard_browser.test.js tests/web_supervisor_toolbar.test.js tests/web_command_palette.test.js tests/web_javascript_syntax.test.js — exit 0; 74 passed, 0 failed, 0 skipped. Log: /tmp/refine-clipboard-round1-fqes06ao/required-verification-final.log",
+                    "node --test tests/web_goal_log_tail.test.js — exit 0; 7 passed, 0 failed, 0 skipped.",
+                    "NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules:/home/linuxbrew/.linuxbrew/lib/node_modules/openclaw/node_modules node tests/support/claude-clipboard-smoke.js /tmp/refine-clipboard-round1-fqes06ao/claude-smoke-final — exit 0; Claude 2.1.267 copy/paste passed. Claude 2.1.247 also passed using CLAUDE_BIN=/home/buddy/.local/share/claude/versions/2.1.247; evidence in claude-smoke-pinned-v2.",
+                    "git diff --check — exit 0.",
+                    "Playwright was installed in a temporary tooling directory; cached Chromium was available. No browser verification was skipped."
+                  ]
+                },
+                "report": "workflow.implement.enter:default-implement: Implemented provider-independent terminal clipboard handling. Required verification passed: 74 tests, including 14 executed browser tests, with no skips. Isolated Claude copy/paste smoke checks passed.",
+                "started_at": "2026-09-10T13:49:17Z"
+              },
+              "phase": "implement",
+              "phase_started_at": "2026-09-10T13:49:17Z",
+              "proposal": {
+                "completed_at": "2026-09-10T13:49:17Z",
+                "git_after": {
+                  "branch": "refine/00000T12V8K3M05Q6JSVEMJ000/round-1",
+                  "head_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/00000T12V8K3M05Q6JSVEMJ000/round-1",
+                  "head_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "checklist": [
+                    {
+                      "description": "Add tests using the shipped xterm renderer in tests/web_terminal_clipboard_browser.test.js, following the isolated static-server/API-fixture pattern in tests/web_screen_render.test.js. Reproduce keyboard and context-menu clipboard behavior with asynchronous clipboard access allowed, denied, and unavailable; also exercise alternate-screen and mouse-reporting modes. Record whether the failure concerns browser events, terminal selection, or application-generated clipboard output. Use an isolated Claude session for the provider smoke check and record its actual clipboard path.",
+                      "id": "workflow.plan.enter:default-plan:P1"
+                    },
+                    {
+                      "description": "Extract clipboard handling from the 3,087-line toolbar.js into a cohesive features/terminal-clipboard.js module with explicit renderer/session callbacks. Load it before toolbar.js in index.html and update affected test loaders. Make native browser copy/paste events authoritative for browser clipboard shortcuts: prevent xterm from interpreting those keystrokes without cancelling the browser action. Preserve supported terminal-specific shortcuts through a separate fallback with visible errors. Verify that one gesture produces one clipboard operation.",
+                      "id": "workflow.plan.enter:default-plan:P2"
+                    },
+                    {
+                      "description": "Provide reliable browser-owned selection while an agent captures the mouse: retain Shift-drag on Windows/Linux, enable xterm's macOptionClickForcesSelection for Option-drag on macOS, and expose a concise selection hint in the shared terminal surface. Preserve ordinary TUI mouse interaction. Copy the selected text without sending an interrupt; retain Ctrl+C terminal semantics when no xterm selection exists. Verify selection and clipboard contents with actual browser gestures.",
+                      "id": "workflow.plan.enter:default-plan:P3"
+                    },
+                    {
+                      "description": "Keep accepted paste text on Terminal.paste → onData → the existing managed-session input queue. Preserve line-ending normalization, application-controlled bracketed-paste framing, duplicate-event suppression, and replacement-session fencing. If P1 demonstrates that application-owned copying requires OSC 52, add a bounded, write-only handler in the clipboard module: validate payloads, respect browser permissions, restrict side effects to the current focused live session, and suppress transcript/history replay. Verify split sequences, malformed payloads, stale sessions, and denied writes before accepting that extension.",
+                      "id": "workflow.plan.enter:default-plan:P4"
+                    },
+                    {
+                      "description": "Extend focused regressions across Terminal, Agent, Planning Agent, Goal, Standalone/Agent in Worktree, and Skill profiles, with Claude and another provider represented. Cover Unicode and multiline paste, bracketed mode enabled/disabled, no duplicate input, tab changes, session replacement, retained renderer remounts, and focus outside the terminal. Preserve Ctrl+Enter, Agent Ctrl+Z suppression, shell job control, and command-palette precedence. Move reusable clipboard test scaffolding into tests/support if needed to keep files cohesive.",
+                      "id": "workflow.plan.enter:default-plan:P5"
+                    },
+                    {
+                      "description": "Update only docs/intent/05-surfaces/03-browser/19-terminal.md to describe the provider-independent text clipboard contract, selection gestures, and browser restrictions; document OSC behavior only if implemented. From the pinned worktree run node --test tests/web_terminal_clipboard.test.js tests/web_terminal_clipboard_browser.test.js tests/web_supervisor_toolbar.test.js tests/web_command_palette.test.js tests/web_javascript_syntax.test.js, plus git diff --check. Require executed browser tests and a Claude copy/paste smoke check for completion; report missing tooling and skips explicitly. Keep source promotion, serving-daemon restart, Goal transitions, merge, and push outside this Round.",
+                      "id": "workflow.plan.enter:default-plan:P6"
+                    }
+                  ],
+                  "summary": "workflow.plan.enter:default-plan: Use a regression-led repair of the shared browser terminal clipboard behavior. Make native browser copy/paste reliable across agents, preserve selection during terminal mouse capture, and retain xterm paste framing and session isolation. Perform implementation and verification in the pinned Round worktree at f880b7767149e4de43d5bc4d4786247d1e536a8c."
+                },
+                "started_at": "2026-09-10T13:43:07Z"
+              },
+              "schema_version": 2,
+              "started_at": "2026-09-10T13:43:07Z",
+              "state": "completed",
+              "updated_at": "2026-09-10T14:07:52Z"
+            },
+            "implementation_report": "workflow.implement.enter:default-implement: Implemented provider-independent terminal clipboard handling. Required verification passed: 74 tests, including 14 executed browser tests, with no skips. Isolated Claude copy/paste smoke checks passed.",
+            "implementation_reported_at": "2026-09-10T14:07:52Z",
+            "prompt": "Copy and paste in the agent toolbar isn't working for Claude Code sessions. It should work regardless of which agent is being used.",
+            "quality_checked_at": "2026-09-10T14:28:42Z",
+            "quality_details": {
+              "candidate_commit": "e93801fca1a1991ce4389799268de315aded1ae8",
+              "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T12V8K3M05Q6JSVEMJ000-round-1",
+              "diagnostics": [
+                "Event invocation be9b4f45ce0f36fdd91977d172e1c07c2755b497c484a49ef378995250b4a1b1: automation/invocations/be9b4f45ce0f36fdd91977d172e1c07c2755b497c484a49ef378995250b4a1b1.json"
+              ],
+              "evaluation_scope": "isolated_candidate",
+              "operation_id": "1a08bb53ea3113c7621",
+              "provider_attempts": [],
+              "quality_proof": {
+                "checked_at": "2026-09-10T14:28:42Z",
+                "checked_candidate_commit": "e93801fca1a1991ce4389799268de315aded1ae8",
+                "evaluation_scope": "isolated_candidate",
+                "goal_id": "00000T12V8K3M05Q6JSVEMJ000",
+                "operation_id": "1a08bb53ea3113c7621",
+                "results": [
+                  {
+                    "command": "",
+                    "evidence": "The refreshed candidate passes the planned checks but fails nine relevant clipboard recovery regressions. The inherited tests still assume Ctrl+C invokes asynchronous clipboard writes.",
+                    "status": "failed",
+                    "test": "workflow.quality.enter:default-quality"
+                  }
+                ],
+                "round_idx": 0,
+                "schema_version": 1,
+                "source_candidate_commit": "e93801fca1a1991ce4389799268de315aded1ae8",
+                "state": "failed"
+              },
+              "results": [
+                {
+                  "command": "",
+                  "evidence": "The refreshed candidate passes the planned checks but fails nine relevant clipboard recovery regressions. The inherited tests still assume Ctrl+C invokes asynchronous clipboard writes.",
+                  "status": "failed",
+                  "test": "workflow.quality.enter:default-quality"
+                }
+              ],
+              "source_candidate_commit": "e93801fca1a1991ce4389799268de315aded1ae8"
+            },
+            "quality_message": "Quality failed: “workflow.quality.enter:default-quality” — The refreshed candidate passes the planned checks but fails nine relevant clipboard recovery regressions. The inherited tests still assume Ctrl+C invokes asynchronous clipboard writes.",
+            "quality_state": "failed",
+            "reporter": "Buddy Williams",
+            "round": 1
+          }
+        ],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
+      },
+      "event": {},
+      "goal": {
+        "assignee": "Refine",
+        "base_commit": "7b430a6a3bc0d692f03e71da68d06f3e9534dead",
+        "branch_name": "refine/00000T12V8K3M05Q6JSVEMJ000/round-2",
+        "candidate_commit": null,
+        "created": "2026-09-10T13:01:23Z",
+        "event_generation": 8,
+        "feature_id": null,
+        "feature_order": null,
+        "id": "00000T12V8K3M05Q6JSVEMJ000",
+        "name": "Copy and paste in the agent toolbar isn't working for Claude Code sessions. It s",
+        "node_display_name": "Default",
+        "node_id": "default",
+        "notes": [],
+        "priority": "low",
+        "reporter": "Buddy Williams",
+        "round_count": 2,
+        "rounds": [
+          {
+            "assignee": "Buddy Williams",
+            "constitution_state": null,
+            "created": "2026-09-10T13:01:23Z",
+            "failure_at": "",
+            "failure_category": "",
+            "failure_message": "",
+            "governance_candidate_commit": null,
+            "governance_checked_at": null,
+            "governance_details": null,
+            "governance_message": null,
+            "governance_rule_actions": [],
+            "guidance_decision": {
+              "applied": [],
+              "context_version": 1,
+              "recorded_at": "2026-09-10T14:07:52Z",
+              "skipped": []
+            },
+            "implementation_plan": {
+              "binding": {
+                "base_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+                "context_digest": "7eebecbe124fe4a5e95a31ec50d96cdbe1d0cb542a07666a8a3fc22b82162e17",
+                "context_version": 1,
+                "goal_id": "00000T12V8K3M05Q6JSVEMJ000",
+                "implementation_branch": "refine/00000T12V8K3M05Q6JSVEMJ000/round-1",
+                "round_idx": 0,
+                "target_branch": "main"
+              },
+              "completed_at": "2026-09-10T14:07:52Z",
+              "final_plan": {
+                "completed_at": "2026-09-10T13:49:17Z",
+                "git_after": {
+                  "branch": "refine/00000T12V8K3M05Q6JSVEMJ000/round-1",
+                  "head_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/00000T12V8K3M05Q6JSVEMJ000/round-1",
+                  "head_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "checklist": [
+                    {
+                      "description": "Add tests using the shipped xterm renderer in tests/web_terminal_clipboard_browser.test.js, following the isolated static-server/API-fixture pattern in tests/web_screen_render.test.js. Reproduce keyboard and context-menu clipboard behavior with asynchronous clipboard access allowed, denied, and unavailable; also exercise alternate-screen and mouse-reporting modes. Record whether the failure concerns browser events, terminal selection, or application-generated clipboard output. Use an isolated Claude session for the provider smoke check and record its actual clipboard path.",
+                      "id": "workflow.plan.enter:default-plan:P1"
+                    },
+                    {
+                      "description": "Extract clipboard handling from the 3,087-line toolbar.js into a cohesive features/terminal-clipboard.js module with explicit renderer/session callbacks. Load it before toolbar.js in index.html and update affected test loaders. Make native browser copy/paste events authoritative for browser clipboard shortcuts: prevent xterm from interpreting those keystrokes without cancelling the browser action. Preserve supported terminal-specific shortcuts through a separate fallback with visible errors. Verify that one gesture produces one clipboard operation.",
+                      "id": "workflow.plan.enter:default-plan:P2"
+                    },
+                    {
+                      "description": "Provide reliable browser-owned selection while an agent captures the mouse: retain Shift-drag on Windows/Linux, enable xterm's macOptionClickForcesSelection for Option-drag on macOS, and expose a concise selection hint in the shared terminal surface. Preserve ordinary TUI mouse interaction. Copy the selected text without sending an interrupt; retain Ctrl+C terminal semantics when no xterm selection exists. Verify selection and clipboard contents with actual browser gestures.",
+                      "id": "workflow.plan.enter:default-plan:P3"
+                    },
+                    {
+                      "description": "Keep accepted paste text on Terminal.paste → onData → the existing managed-session input queue. Preserve line-ending normalization, application-controlled bracketed-paste framing, duplicate-event suppression, and replacement-session fencing. If P1 demonstrates that application-owned copying requires OSC 52, add a bounded, write-only handler in the clipboard module: validate payloads, respect browser permissions, restrict side effects to the current focused live session, and suppress transcript/history replay. Verify split sequences, malformed payloads, stale sessions, and denied writes before accepting that extension.",
+                      "id": "workflow.plan.enter:default-plan:P4"
+                    },
+                    {
+                      "description": "Extend focused regressions across Terminal, Agent, Planning Agent, Goal, Standalone/Agent in Worktree, and Skill profiles, with Claude and another provider represented. Cover Unicode and multiline paste, bracketed mode enabled/disabled, no duplicate input, tab changes, session replacement, retained renderer remounts, and focus outside the terminal. Preserve Ctrl+Enter, Agent Ctrl+Z suppression, shell job control, and command-palette precedence. Move reusable clipboard test scaffolding into tests/support if needed to keep files cohesive.",
+                      "id": "workflow.plan.enter:default-plan:P5"
+                    },
+                    {
+                      "description": "Update only docs/intent/05-surfaces/03-browser/19-terminal.md to describe the provider-independent text clipboard contract, selection gestures, and browser restrictions; document OSC behavior only if implemented. From the pinned worktree run node --test tests/web_terminal_clipboard.test.js tests/web_terminal_clipboard_browser.test.js tests/web_supervisor_toolbar.test.js tests/web_command_palette.test.js tests/web_javascript_syntax.test.js, plus git diff --check. Require executed browser tests and a Claude copy/paste smoke check for completion; report missing tooling and skips explicitly. Keep source promotion, serving-daemon restart, Goal transitions, merge, and push outside this Round.",
+                      "id": "workflow.plan.enter:default-plan:P6"
+                    }
+                  ],
+                  "summary": "workflow.plan.enter:default-plan: Use a regression-led repair of the shared browser terminal clipboard behavior. Make native browser copy/paste reliable across agents, preserve selection during terminal mouse capture, and retain xterm paste framing and session isolation. Perform implementation and verification in the pinned Round worktree at f880b7767149e4de43d5bc4d4786247d1e536a8c."
+                },
+                "started_at": "2026-09-10T13:43:07Z"
+              },
+              "implementation": {
+                "completed_at": "2026-09-10T14:07:52Z",
+                "execution": {
+                  "checklist": [
+                    {
+                      "evidence": "Added tests/web_terminal_clipboard_browser.test.js using the shipped xterm renderer and an isolated static server/API fixture. Covered native keyboard and menu clipboard paths with asynchronous access allowed, denied, and unavailable. Isolated Claude 2.1.247 and 2.1.267 sessions passed real browser copy/paste checks.",
+                      "id": "workflow.plan.enter:default-plan:P1",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Extracted clipboard handling into the 91-line features/terminal-clipboard.js with explicit renderer/session callbacks. Loaded it before toolbar.js and updated affected test loaders. Native shortcuts preserve browser defaults; Ctrl+Shift+C/V uses a separate fallback with visible errors. Browser tests verify one clipboard write and one paste operation.",
+                      "id": "workflow.plan.enter:default-plan:P2",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Enabled macOptionClickForcesSelection and added an accessible selection hint. Actual browser gestures verified Shift-drag and Option-drag selection during alternate-screen mouse capture, preserved ordinary TUI mouse reporting, and copied selection without sending an interrupt.",
+                      "id": "workflow.plan.enter:default-plan:P3",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Paste remains on Terminal.paste → onData → existing managed input queue. Verified newline normalization, bracketed mode enabled/disabled, duplicate suppression, buffered replacement-session fencing, and pending-read fencing across session, renderer, tab, focus, and exit changes. Claude smoke copying used native browser events and emitted no OSC 52; no OSC extension was needed.",
+                      "id": "workflow.plan.enter:default-plan:P4",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Browser coverage exercises all six profiles with Claude and Codex fixtures, Unicode/multiline paste, retained renderer remounts, tab changes, and outside focus. Verified Ctrl+C semantics, Ctrl+Enter, Agent Ctrl+Z suppression, shell job control, and command-palette precedence. Reusable scaffolding resides in tests/support.",
+                      "id": "workflow.plan.enter:default-plan:P5",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Updated only docs/intent/05-surfaces/03-browser/19-terminal.md within the intent documentation. Required suite passed 74/74 with zero skips; the additional affected loader suite passed 7/7. Claude smoke reports record trusted browser events, bracketed multiline input, successful selected-text copying, and no interrupt.",
+                      "id": "workflow.plan.enter:default-plan:P6",
+                      "outcome": "completed"
+                    }
+                  ],
+                  "verification": [
+                    "NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules node --test tests/web_terminal_clipboard.test.js tests/web_terminal_clipboard_browser.test.js tests/web_supervisor_toolbar.test.js tests/web_command_palette.test.js tests/web_javascript_syntax.test.js — exit 0; 74 passed, 0 failed, 0 skipped. Log: /tmp/refine-clipboard-round1-fqes06ao/required-verification-final.log",
+                    "node --test tests/web_goal_log_tail.test.js — exit 0; 7 passed, 0 failed, 0 skipped.",
+                    "NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules:/home/linuxbrew/.linuxbrew/lib/node_modules/openclaw/node_modules node tests/support/claude-clipboard-smoke.js /tmp/refine-clipboard-round1-fqes06ao/claude-smoke-final — exit 0; Claude 2.1.267 copy/paste passed. Claude 2.1.247 also passed using CLAUDE_BIN=/home/buddy/.local/share/claude/versions/2.1.247; evidence in claude-smoke-pinned-v2.",
+                    "git diff --check — exit 0.",
+                    "Playwright was installed in a temporary tooling directory; cached Chromium was available. No browser verification was skipped."
+                  ]
+                },
+                "report": "workflow.implement.enter:default-implement: Implemented provider-independent terminal clipboard handling. Required verification passed: 74 tests, including 14 executed browser tests, with no skips. Isolated Claude copy/paste smoke checks passed.",
+                "started_at": "2026-09-10T13:49:17Z"
+              },
+              "phase": "implement",
+              "phase_started_at": "2026-09-10T13:49:17Z",
+              "proposal": {
+                "completed_at": "2026-09-10T13:49:17Z",
+                "git_after": {
+                  "branch": "refine/00000T12V8K3M05Q6JSVEMJ000/round-1",
+                  "head_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/00000T12V8K3M05Q6JSVEMJ000/round-1",
+                  "head_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "checklist": [
+                    {
+                      "description": "Add tests using the shipped xterm renderer in tests/web_terminal_clipboard_browser.test.js, following the isolated static-server/API-fixture pattern in tests/web_screen_render.test.js. Reproduce keyboard and context-menu clipboard behavior with asynchronous clipboard access allowed, denied, and unavailable; also exercise alternate-screen and mouse-reporting modes. Record whether the failure concerns browser events, terminal selection, or application-generated clipboard output. Use an isolated Claude session for the provider smoke check and record its actual clipboard path.",
+                      "id": "workflow.plan.enter:default-plan:P1"
+                    },
+                    {
+                      "description": "Extract clipboard handling from the 3,087-line toolbar.js into a cohesive features/terminal-clipboard.js module with explicit renderer/session callbacks. Load it before toolbar.js in index.html and update affected test loaders. Make native browser copy/paste events authoritative for browser clipboard shortcuts: prevent xterm from interpreting those keystrokes without cancelling the browser action. Preserve supported terminal-specific shortcuts through a separate fallback with visible errors. Verify that one gesture produces one clipboard operation.",
+                      "id": "workflow.plan.enter:default-plan:P2"
+                    },
+                    {
+                      "description": "Provide reliable browser-owned selection while an agent captures the mouse: retain Shift-drag on Windows/Linux, enable xterm's macOptionClickForcesSelection for Option-drag on macOS, and expose a concise selection hint in the shared terminal surface. Preserve ordinary TUI mouse interaction. Copy the selected text without sending an interrupt; retain Ctrl+C terminal semantics when no xterm selection exists. Verify selection and clipboard contents with actual browser gestures.",
+                      "id": "workflow.plan.enter:default-plan:P3"
+                    },
+                    {
+                      "description": "Keep accepted paste text on Terminal.paste → onData → the existing managed-session input queue. Preserve line-ending normalization, application-controlled bracketed-paste framing, duplicate-event suppression, and replacement-session fencing. If P1 demonstrates that application-owned copying requires OSC 52, add a bounded, write-only handler in the clipboard module: validate payloads, respect browser permissions, restrict side effects to the current focused live session, and suppress transcript/history replay. Verify split sequences, malformed payloads, stale sessions, and denied writes before accepting that extension.",
+                      "id": "workflow.plan.enter:default-plan:P4"
+                    },
+                    {
+                      "description": "Extend focused regressions across Terminal, Agent, Planning Agent, Goal, Standalone/Agent in Worktree, and Skill profiles, with Claude and another provider represented. Cover Unicode and multiline paste, bracketed mode enabled/disabled, no duplicate input, tab changes, session replacement, retained renderer remounts, and focus outside the terminal. Preserve Ctrl+Enter, Agent Ctrl+Z suppression, shell job control, and command-palette precedence. Move reusable clipboard test scaffolding into tests/support if needed to keep files cohesive.",
+                      "id": "workflow.plan.enter:default-plan:P5"
+                    },
+                    {
+                      "description": "Update only docs/intent/05-surfaces/03-browser/19-terminal.md to describe the provider-independent text clipboard contract, selection gestures, and browser restrictions; document OSC behavior only if implemented. From the pinned worktree run node --test tests/web_terminal_clipboard.test.js tests/web_terminal_clipboard_browser.test.js tests/web_supervisor_toolbar.test.js tests/web_command_palette.test.js tests/web_javascript_syntax.test.js, plus git diff --check. Require executed browser tests and a Claude copy/paste smoke check for completion; report missing tooling and skips explicitly. Keep source promotion, serving-daemon restart, Goal transitions, merge, and push outside this Round.",
+                      "id": "workflow.plan.enter:default-plan:P6"
+                    }
+                  ],
+                  "summary": "workflow.plan.enter:default-plan: Use a regression-led repair of the shared browser terminal clipboard behavior. Make native browser copy/paste reliable across agents, preserve selection during terminal mouse capture, and retain xterm paste framing and session isolation. Perform implementation and verification in the pinned Round worktree at f880b7767149e4de43d5bc4d4786247d1e536a8c."
+                },
+                "started_at": "2026-09-10T13:43:07Z"
+              },
+              "schema_version": 2,
+              "started_at": "2026-09-10T13:43:07Z",
+              "state": "completed",
+              "updated_at": "2026-09-10T14:07:52Z"
+            },
+            "implementation_report": "workflow.implement.enter:default-implement: Implemented provider-independent terminal clipboard handling. Required verification passed: 74 tests, including 14 executed browser tests, with no skips. Isolated Claude copy/paste smoke checks passed.",
+            "implementation_reported_at": "2026-09-10T14:07:52Z",
+            "logs": [
+              {
+                "actor": "refine",
+                "category": "git",
+                "datetime": "2026-09-10T13:43:06Z",
+                "details": {
+                  "node_id": "default",
+                  "remote": "origin",
+                  "target_branch": "main",
+                  "target_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c"
+                },
+                "goal_id": "00000T12V8K3M05Q6JSVEMJ000",
+                "message": "Local main already carried the fetched tip",
+                "round_idx": 0,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "state",
+                "datetime": "2026-09-10T13:43:07Z",
+                "details": {
+                  "node_id": "default"
+                },
+                "goal_id": "00000T12V8K3M05Q6JSVEMJ000",
+                "message": "Workflow status changed: todo -> plan",
+                "round_idx": 0,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "git",
+                "datetime": "2026-09-10T13:43:07Z",
+                "details": {
+                  "base_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+                  "branch": "refine/00000T12V8K3M05Q6JSVEMJ000/round-1",
+                  "branch_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+                  "node_id": "default",
+                  "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T12V8K3M05Q6JSVEMJ000-round-1"
+                },
+                "goal_id": "00000T12V8K3M05Q6JSVEMJ000",
+                "message": "Created implementation worktree for refine/00000T12V8K3M05Q6JSVEMJ000/round-1",
+                "round_idx": 0,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "state",
+                "datetime": "2026-09-10T13:49:17Z",
+                "details": {
+                  "node_id": "default"
+                },
+                "goal_id": "00000T12V8K3M05Q6JSVEMJ000",
+                "message": "Workflow status changed: plan -> implement",
+                "round_idx": 0,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "agent",
+                "datetime": "2026-09-10T14:07:52Z",
+                "details": {
+                  "branch": "refine/00000T12V8K3M05Q6JSVEMJ000/round-1",
+                  "node_id": "default",
+                  "output": "workflow.implement.enter:default-implement: Implemented provider-independent terminal clipboard handling. Required verification passed: 74 tests, including 14 executed browser tests, with no skips. Isolated Claude copy/paste smoke checks passed.",
+                  "provider": "codex",
+                  "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T12V8K3M05Q6JSVEMJ000-round-1"
+                },
+                "goal_id": "00000T12V8K3M05Q6JSVEMJ000",
+                "message": "Goal agent completed",
+                "round_idx": 0,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "git",
+                "datetime": "2026-09-10T14:07:53Z",
+                "details": {
+                  "branch": "refine/00000T12V8K3M05Q6JSVEMJ000/round-1",
+                  "commit": "1b7d840ec589f55affe645d87f661b2fbda2e8bd",
+                  "node_id": "default",
+                  "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T12V8K3M05Q6JSVEMJ000-round-1"
+                },
+                "goal_id": "00000T12V8K3M05Q6JSVEMJ000",
+                "message": "Committed implementation branch refine/00000T12V8K3M05Q6JSVEMJ000/round-1",
+                "round_idx": 0,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "state",
+                "datetime": "2026-09-10T14:07:53Z",
+                "details": {
+                  "node_id": "default"
+                },
+                "goal_id": "00000T12V8K3M05Q6JSVEMJ000",
+                "message": "Workflow status changed: implement -> quality",
+                "round_idx": 0,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "quality",
+                "datetime": "2026-09-10T14:16:19Z",
+                "details": {
+                  "candidate_commit": "b831779bd97a2d4356020319f6cb600ec2f55928",
+                  "node_id": "default",
+                  "report": "workflow.quality.enter:default-quality: Reviewed the candidate and finalized plan. Corrected two test-tooling defects and added Insert-shortcut coverage. Focused verification and the isolated Claude smoke check passed; no unresolved product defects found."
+                },
+                "goal_id": "00000T12V8K3M05Q6JSVEMJ000",
+                "message": "Quality Agent completed candidate review and corrections",
+                "round_idx": 0,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "quality",
+                "datetime": "2026-09-10T14:19:48Z",
+                "details": {
+                  "candidate_commit": "b831779bd97a2d4356020319f6cb600ec2f55928",
+                  "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T12V8K3M05Q6JSVEMJ000-round-1",
+                  "diagnostics": [
+                    "Event invocation fcbdf3d837ff0f725fe767be3fca3a504dc65d1b0b9a658a575ab59292a3530c: automation/invocations/fcbdf3d837ff0f725fe767be3fca3a504dc65d1b0b9a658a575ab59292a3530c.json",
+                    "Observed supervised process proc-1789049968114-1129590-294 exited 0. stdout: (54.374702ms)\n✔ native paste is sent exactly once instead of being reprocessed by xterm (27.721425ms)\n✔ terminal-specific fallback errors are visible and suppress terminal interpretation (83.659596ms)\n✔ an asynchronous paste cannot cross into a replacement managed session (30.729113ms)\n✔ clipboard text buffered before replacement cannot cross managed sessions (29.679934ms)\n✔ clipboard shortcuts remain untouched when focus is outside a terminal (29.284218ms)\n✔ Cmd clipboard shortcuts yield to native browser events (29.399799ms)\n✔ terminal-specific fallback performs one operation and ignores key repeat (28.55452ms)\n✔ pending read results and errors cannot affect an inactive terminal (224.581415ms)\n✔ native keyboard clipboard works with async access allowed (1022.094551ms)\n✔ native keyboard clipboard works with async access denied (993.309675ms)\n✔ native keyboard clipboard works with async access unavailable (1034.039086ms)\n✔ selection overrides mouse capture on Linux x86_64 (1120.951613ms)\n✔ selection overrides mouse capture on Win32 (1107.740578ms)\n✔ selection overrides mouse capture on MacIntel (1076.770018ms)\n✔ context-menu clipboard path with async access allowed (922.423322ms)\n✔ context-menu clipboard path with async access denied (1000.680141ms)\n✔ context-menu clipboard path with async access unavailable (848.085615ms)\n✔ native keyboard gestures survive actual browser permission denial (852.676415ms)\n✔ terminal-specific fallback is singular and reports actual permission denial (905.259566ms)\n✔ Ctrl+Insert and Shift+Insert use native clipboard events exactly once (826.416824ms)\n✔ all profiles and both provider fixtures retain native clipboard and key semantics (4040.102272ms)\n✔ retained renderer remounts and outside focus preserve one clipboard operation (1383.133297ms)\n✔ pending fallback paste is fenced by tab, focus, exit, and session replacement (800.57924ms)\nℹ tests 75\nℹ suites 0\nℹ pass 75\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 18507.753446",
+                    "Observed supervised process proc-1789049986862-1129590-297 exited 0. stdout: ✔ the initial Goal log request fetches the newest page and displays it chronologically (15.74866ms)\n✔ the first Goal SSE log reaches the toolbar and replayed entries stay deduplicated (6.260128ms)\n✔ main SSE transport reconnects in place and reconciles durable visible state (3.715158ms)\n✔ background operations use SSE after one durable registration read (10.475238ms)\n✔ Goal log search covers trail content and Head/Tail changes visible order (2.628102ms)\n✔ Goal log stream renders safe formatted messages and validated action links (11.082791ms)\n✔ Goal log search and stream order persist with the toolbar tab (1.810342ms)\nℹ tests 7\nℹ suites 0\nℹ pass 7\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 195.443217",
+                    "Observed supervised process proc-1789049987296-1129590-300 exited 0.",
+                    "Observed supervised process proc-1789049987513-1129590-303 exited 0."
+                  ],
+                  "evaluation_scope": "isolated_candidate",
+                  "operation_id": "1a08bad36a4113c761e",
+                  "provider_attempts": [],
+                  "quality_proof": {
+                    "checked_at": "2026-09-10T14:19:47Z",
+                    "checked_candidate_commit": "b831779bd97a2d4356020319f6cb600ec2f55928",
+                    "evaluation_scope": "isolated_candidate",
+                    "goal_id": "00000T12V8K3M05Q6JSVEMJ000",
+                    "operation_id": "1a08bad36a4113c761e",
+                    "results": [
+                      {
+                        "command": "NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules node --test tests/web_terminal_clipboard.test.js tests/web_terminal_clipboard_browser.test.js tests/web_supervisor_toolbar.test.js tests/web_command_palette.test.js tests/web_javascript_syntax.test.js",
+                        "evidence": "Observed supervised process proc-1789049968114-1129590-294 exited 0. stdout: (54.374702ms)\n✔ native paste is sent exactly once instead of being reprocessed by xterm (27.721425ms)\n✔ terminal-specific fallback errors are visible and suppress terminal interpretation (83.659596ms)\n✔ an asynchronous paste cannot cross into a replacement managed session (30.729113ms)\n✔ clipboard text buffered before replacement cannot cross managed sessions (29.679934ms)\n✔ clipboard shortcuts remain untouched when focus is outside a terminal (29.284218ms)\n✔ Cmd clipboard shortcuts yield to native browser events (29.399799ms)\n✔ terminal-specific fallback performs one operation and ignores key repeat (28.55452ms)\n✔ pending read results and errors cannot affect an inactive terminal (224.581415ms)\n✔ native keyboard clipboard works with async access allowed (1022.094551ms)\n✔ native keyboard clipboard works with async access denied (993.309675ms)\n✔ native keyboard clipboard works with async access unavailable (1034.039086ms)\n✔ selection overrides mouse capture on Linux x86_64 (1120.951613ms)\n✔ selection overrides mouse capture on Win32 (1107.740578ms)\n✔ selection overrides mouse capture on MacIntel (1076.770018ms)\n✔ context-menu clipboard path with async access allowed (922.423322ms)\n✔ context-menu clipboard path with async access denied (1000.680141ms)\n✔ context-menu clipboard path with async access unavailable (848.085615ms)\n✔ native keyboard gestures survive actual browser permission denial (852.676415ms)\n✔ terminal-specific fallback is singular and reports actual permission denial (905.259566ms)\n✔ Ctrl+Insert and Shift+Insert use native clipboard events exactly once (826.416824ms)\n✔ all profiles and both provider fixtures retain native clipboard and key semantics (4040.102272ms)\n✔ retained renderer remounts and outside focus preserve one clipboard operation (1383.133297ms)\n✔ pending fallback paste is fenced by tab, focus, exit, and session replacement (800.57924ms)\nℹ tests 75\nℹ suites 0\nℹ pass 75\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 18507.753446",
+                        "exit_code": 0,
+                        "process_id": "proc-1789049968114-1129590-294",
+                        "status": "passed",
+                        "test": "workflow.quality.enter:default-quality: Clipboard behavior, selection during mouse capture, session fencing, terminal controls, toolbar lifecycle, command-palette precedence, and shipped JavaScript syntax"
+                      },
+                      {
+                        "command": "node --test tests/web_goal_log_tail.test.js",
+                        "evidence": "Observed supervised process proc-1789049986862-1129590-297 exited 0. stdout: ✔ the initial Goal log request fetches the newest page and displays it chronologically (15.74866ms)\n✔ the first Goal SSE log reaches the toolbar and replayed entries stay deduplicated (6.260128ms)\n✔ main SSE transport reconnects in place and reconciles durable visible state (3.715158ms)\n✔ background operations use SSE after one durable registration read (10.475238ms)\n✔ Goal log search covers trail content and Head/Tail changes visible order (2.628102ms)\n✔ Goal log stream renders safe formatted messages and validated action links (11.082791ms)\n✔ Goal log search and stream order persist with the toolbar tab (1.810342ms)\nℹ tests 7\nℹ suites 0\nℹ pass 7\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 195.443217",
+                        "exit_code": 0,
+                        "process_id": "proc-1789049986862-1129590-297",
+                        "status": "passed",
+                        "test": "workflow.quality.enter:default-quality: Affected Goal-log loader and retained log behavior"
+                      },
+                      {
+                        "command": "node --check tests/support/claude-clipboard-smoke.js",
+                        "evidence": "Observed supervised process proc-1789049987296-1129590-300 exited 0.",
+                        "exit_code": 0,
+                        "process_id": "proc-1789049987296-1129590-300",
+                        "status": "passed",
+                        "test": "workflow.quality.enter:default-quality: Claude smoke-helper syntax"
+                      },
+                      {
+                        "command": "git diff --check f880b7767149e4de43d5bc4d4786247d1e536a8c..b831779bd97a2d4356020319f6cb600ec2f55928",
+                        "evidence": "Observed supervised process proc-1789049987513-1129590-303 exited 0.",
+                        "exit_code": 0,
+                        "process_id": "proc-1789049987513-1129590-303",
+                        "status": "passed",
+                        "test": "workflow.quality.enter:default-quality: Candidate diff integrity"
+                      }
+                    ],
+                    "round_idx": 0,
+                    "schema_version": 1,
+                    "source_candidate_commit": "b831779bd97a2d4356020319f6cb600ec2f55928",
+                    "state": "passed"
+                  },
+                  "results": [
+                    {
+                      "command": "NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules node --test tests/web_terminal_clipboard.test.js tests/web_terminal_clipboard_browser.test.js tests/web_supervisor_toolbar.test.js tests/web_command_palette.test.js tests/web_javascript_syntax.test.js",
+                      "evidence": "Observed supervised process proc-1789049968114-1129590-294 exited 0. stdout: (54.374702ms)\n✔ native paste is sent exactly once instead of being reprocessed by xterm (27.721425ms)\n✔ terminal-specific fallback errors are visible and suppress terminal interpretation (83.659596ms)\n✔ an asynchronous paste cannot cross into a replacement managed session (30.729113ms)\n✔ clipboard text buffered before replacement cannot cross managed sessions (29.679934ms)\n✔ clipboard shortcuts remain untouched when focus is outside a terminal (29.284218ms)\n✔ Cmd clipboard shortcuts yield to native browser events (29.399799ms)\n✔ terminal-specific fallback performs one operation and ignores key repeat (28.55452ms)\n✔ pending read results and errors cannot affect an inactive terminal (224.581415ms)\n✔ native keyboard clipboard works with async access allowed (1022.094551ms)\n✔ native keyboard clipboard works with async access denied (993.309675ms)\n✔ native keyboard clipboard works with async access unavailable (1034.039086ms)\n✔ selection overrides mouse capture on Linux x86_64 (1120.951613ms)\n✔ selection overrides mouse capture on Win32 (1107.740578ms)\n✔ selection overrides mouse capture on MacIntel (1076.770018ms)\n✔ context-menu clipboard path with async access allowed (922.423322ms)\n✔ context-menu clipboard path with async access denied (1000.680141ms)\n✔ context-menu clipboard path with async access unavailable (848.085615ms)\n✔ native keyboard gestures survive actual browser permission denial (852.676415ms)\n✔ terminal-specific fallback is singular and reports actual permission denial (905.259566ms)\n✔ Ctrl+Insert and Shift+Insert use native clipboard events exactly once (826.416824ms)\n✔ all profiles and both provider fixtures retain native clipboard and key semantics (4040.102272ms)\n✔ retained renderer remounts and outside focus preserve one clipboard operation (1383.133297ms)\n✔ pending fallback paste is fenced by tab, focus, exit, and session replacement (800.57924ms)\nℹ tests 75\nℹ suites 0\nℹ pass 75\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 18507.753446",
+                      "exit_code": 0,
+                      "process_id": "proc-1789049968114-1129590-294",
+                      "status": "passed",
+                      "test": "workflow.quality.enter:default-quality: Clipboard behavior, selection during mouse capture, session fencing, terminal controls, toolbar lifecycle, command-palette precedence, and shipped JavaScript syntax"
+                    },
+                    {
+                      "command": "node --test tests/web_goal_log_tail.test.js",
+                      "evidence": "Observed supervised process proc-1789049986862-1129590-297 exited 0. stdout: ✔ the initial Goal log request fetches the newest page and displays it chronologically (15.74866ms)\n✔ the first Goal SSE log reaches the toolbar and replayed entries stay deduplicated (6.260128ms)\n✔ main SSE transport reconnects in place and reconciles durable visible state (3.715158ms)\n✔ background operations use SSE after one durable registration read (10.475238ms)\n✔ Goal log search covers trail content and Head/Tail changes visible order (2.628102ms)\n✔ Goal log stream renders safe formatted messages and validated action links (11.082791ms)\n✔ Goal log search and stream order persist with the toolbar tab (1.810342ms)\nℹ tests 7\nℹ suites 0\nℹ pass 7\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 195.443217",
+                      "exit_code": 0,
+                      "process_id": "proc-1789049986862-1129590-297",
+                      "status": "passed",
+                      "test": "workflow.quality.enter:default-quality: Affected Goal-log loader and retained log behavior"
+                    },
+                    {
+                      "command": "node --check tests/support/claude-clipboard-smoke.js",
+                      "evidence": "Observed supervised process proc-1789049987296-1129590-300 exited 0.",
+                      "exit_code": 0,
+                      "process_id": "proc-1789049987296-1129590-300",
+                      "status": "passed",
+                      "test": "workflow.quality.enter:default-quality: Claude smoke-helper syntax"
+                    },
+                    {
+                      "command": "git diff --check f880b7767149e4de43d5bc4d4786247d1e536a8c..b831779bd97a2d4356020319f6cb600ec2f55928",
+                      "evidence": "Observed supervised process proc-1789049987513-1129590-303 exited 0.",
+                      "exit_code": 0,
+                      "process_id": "proc-1789049987513-1129590-303",
+                      "status": "passed",
+                      "test": "workflow.quality.enter:default-quality: Candidate diff integrity"
+                    }
+                  ],
+                  "source_candidate_commit": "b831779bd97a2d4356020319f6cb600ec2f55928"
+                },
+                "goal_id": "00000T12V8K3M05Q6JSVEMJ000",
+                "message": "All Quality Skills passed with supervised evidence.",
+                "round_idx": 0,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "state",
+                "datetime": "2026-09-10T14:19:48Z",
+                "details": {
+                  "node_id": "default"
+                },
+                "goal_id": "00000T12V8K3M05Q6JSVEMJ000",
+                "message": "Workflow status changed: quality -> governance",
+                "round_idx": 0,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "governance_integration",
+                "datetime": "2026-09-10T14:25:05Z",
+                "details": {
+                  "node_id": "default",
+                  "original_candidate_commit": "b831779bd97a2d4356020319f6cb600ec2f55928",
+                  "refresh_evidence": {
+                    "authorizing_status": "governance",
+                    "branch": "refine/00000T12V8K3M05Q6JSVEMJ000/round-1",
+                    "conflict_resolution": {
+                      "attempts": [
+                        {
+                          "attempt": 1,
+                          "files": [
+                            "docs/intent/05-surfaces/03-browser/19-terminal.md",
+                            "src/surfaces/web/static/js/features/terminal-clipboard.js",
+                            "src/surfaces/web/static/js/features/toolbar.js",
+                            "tests/web_terminal_clipboard.test.js",
+                            "tests/web_terminal_clipboard_browser.test.js"
+                          ],
+                          "outcome": "accepted"
+                        }
+                      ],
+                      "files": [
+                        "docs/intent/05-surfaces/03-browser/19-terminal.md",
+                        "src/surfaces/web/static/js/features/terminal-clipboard.js",
+                        "src/surfaces/web/static/js/features/toolbar.js",
+                        "tests/web_terminal_clipboard.test.js",
+                        "tests/web_terminal_clipboard_browser.test.js"
+                      ],
+                      "outcome": "resolved"
+                    },
+                    "node_id": "default",
+                    "original_base_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+                    "original_candidate_commit": "b831779bd97a2d4356020319f6cb600ec2f55928",
+                    "previous_gate_evidence": {
+                      "constitution_state": "unclassified",
+                      "governance_candidate_commit": "",
+                      "governance_checked_at": "",
+                      "governance_details": "",
+                      "governance_message": "",
+                      "meta_rule_state": "unclassified",
+                      "product_state": "unclassified",
+                      "quality_candidate_commit": "b831779bd97a2d4356020319f6cb600ec2f55928",
+                      "quality_checked_at": "2026-09-10T14:19:47Z",
+                      "quality_details": {
+                        "candidate_commit": "b831779bd97a2d4356020319f6cb600ec2f55928",
+                        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T12V8K3M05Q6JSVEMJ000-round-1",
+                        "diagnostics": [
+                          "Event invocation fcbdf3d837ff0f725fe767be3fca3a504dc65d1b0b9a658a575ab59292a3530c: automation/invocations/fcbdf3d837ff0f725fe767be3fca3a504dc65d1b0b9a658a575ab59292a3530c.json",
+                          "Observed supervised process proc-1789049968114-1129590-294 exited 0. stdout: (54.374702ms)\n✔ native paste is sent exactly once instead of being reprocessed by xterm (27.721425ms)\n✔ terminal-specific fallback errors are visible and suppress terminal interpretation (83.659596ms)\n✔ an asynchronous paste cannot cross into a replacement managed session (30.729113ms)\n✔ clipboard text buffered before replacement cannot cross managed sessions (29.679934ms)\n✔ clipboard shortcuts remain untouched when focus is outside a terminal (29.284218ms)\n✔ Cmd clipboard shortcuts yield to native browser events (29.399799ms)\n✔ terminal-specific fallback performs one operation and ignores key repeat (28.55452ms)\n✔ pending read results and errors cannot affect an inactive terminal (224.581415ms)\n✔ native keyboard clipboard works with async access allowed (1022.094551ms)\n✔ native keyboard clipboard works with async access denied (993.309675ms)\n✔ native keyboard clipboard works with async access unavailable (1034.039086ms)\n✔ selection overrides mouse capture on Linux x86_64 (1120.951613ms)\n✔ selection overrides mouse capture on Win32 (1107.740578ms)\n✔ selection overrides mouse capture on MacIntel (1076.770018ms)\n✔ context-menu clipboard path with async access allowed (922.423322ms)\n✔ context-menu clipboard path with async access denied (1000.680141ms)\n✔ context-menu clipboard path with async access unavailable (848.085615ms)\n✔ native keyboard gestures survive actual browser permission denial (852.676415ms)\n✔ terminal-specific fallback is singular and reports actual permission denial (905.259566ms)\n✔ Ctrl+Insert and Shift+Insert use native clipboard events exactly once (826.416824ms)\n✔ all profiles and both provider fixtures retain native clipboard and key semantics (4040.102272ms)\n✔ retained renderer remounts and outside focus preserve one clipboard operation (1383.133297ms)\n✔ pending fallback paste is fenced by tab, focus, exit, and session replacement (800.57924ms)\nℹ tests 75\nℹ suites 0\nℹ pass 75\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 18507.753446",
+                          "Observed supervised process proc-1789049986862-1129590-297 exited 0. stdout: ✔ the initial Goal log request fetches the newest page and displays it chronologically (15.74866ms)\n✔ the first Goal SSE log reaches the toolbar and replayed entries stay deduplicated (6.260128ms)\n✔ main SSE transport reconnects in place and reconciles durable visible state (3.715158ms)\n✔ background operations use SSE after one durable registration read (10.475238ms)\n✔ Goal log search covers trail content and Head/Tail changes visible order (2.628102ms)\n✔ Goal log stream renders safe formatted messages and validated action links (11.082791ms)\n✔ Goal log search and stream order persist with the toolbar tab (1.810342ms)\nℹ tests 7\nℹ suites 0\nℹ pass 7\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 195.443217",
+                          "Observed supervised process proc-1789049987296-1129590-300 exited 0.",
+                          "Observed supervised process proc-1789049987513-1129590-303 exited 0."
+                        ],
+                        "evaluation_scope": "isolated_candidate",
+                        "operation_id": "1a08bad36a4113c761e",
+                        "provider_attempts": [],
+                        "quality_proof": {
+                          "checked_at": "2026-09-10T14:19:47Z",
+                          "checked_candidate_commit": "b831779bd97a2d4356020319f6cb600ec2f55928",
+                          "evaluation_scope": "isolated_candidate",
+                          "goal_id": "00000T12V8K3M05Q6JSVEMJ000",
+                          "operation_id": "1a08bad36a4113c761e",
+                          "results": [
+                            {
+                              "command": "NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules node --test tests/web_terminal_clipboard.test.js tests/web_terminal_clipboard_browser.test.js tests/web_supervisor_toolbar.test.js tests/web_command_palette.test.js tests/web_javascript_syntax.test.js",
+                              "evidence": "Observed supervised process proc-1789049968114-1129590-294 exited 0. stdout: (54.374702ms)\n✔ native paste is sent exactly once instead of being reprocessed by xterm (27.721425ms)\n✔ terminal-specific fallback errors are visible and suppress terminal interpretation (83.659596ms)\n✔ an asynchronous paste cannot cross into a replacement managed session (30.729113ms)\n✔ clipboard text buffered before replacement cannot cross managed sessions (29.679934ms)\n✔ clipboard shortcuts remain untouched when focus is outside a terminal (29.284218ms)\n✔ Cmd clipboard shortcuts yield to native browser events (29.399799ms)\n✔ terminal-specific fallback performs one operation and ignores key repeat (28.55452ms)\n✔ pending read results and errors cannot affect an inactive terminal (224.581415ms)\n✔ native keyboard clipboard works with async access allowed (1022.094551ms)\n✔ native keyboard clipboard works with async access denied (993.309675ms)\n✔ native keyboard clipboard works with async access unavailable (1034.039086ms)\n✔ selection overrides mouse capture on Linux x86_64 (1120.951613ms)\n✔ selection overrides mouse capture on Win32 (1107.740578ms)\n✔ selection overrides mouse capture on MacIntel (1076.770018ms)\n✔ context-menu clipboard path with async access allowed (922.423322ms)\n✔ context-menu clipboard path with async access denied (1000.680141ms)\n✔ context-menu clipboard path with async access unavailable (848.085615ms)\n✔ native keyboard gestures survive actual browser permission denial (852.676415ms)\n✔ terminal-specific fallback is singular and reports actual permission denial (905.259566ms)\n✔ Ctrl+Insert and Shift+Insert use native clipboard events exactly once (826.416824ms)\n✔ all profiles and both provider fixtures retain native clipboard and key semantics (4040.102272ms)\n✔ retained renderer remounts and outside focus preserve one clipboard operation (1383.133297ms)\n✔ pending fallback paste is fenced by tab, focus, exit, and session replacement (800.57924ms)\nℹ tests 75\nℹ suites 0\nℹ pass 75\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 18507.753446",
+                              "exit_code": 0,
+                              "process_id": "proc-1789049968114-1129590-294",
+                              "status": "passed",
+                              "test": "workflow.quality.enter:default-quality: Clipboard behavior, selection during mouse capture, session fencing, terminal controls, toolbar lifecycle, command-palette precedence, and shipped JavaScript syntax"
+                            },
+                            {
+                              "command": "node --test tests/web_goal_log_tail.test.js",
+                              "evidence": "Observed supervised process proc-1789049986862-1129590-297 exited 0. stdout: ✔ the initial Goal log request fetches the newest page and displays it chronologically (15.74866ms)\n✔ the first Goal SSE log reaches the toolbar and replayed entries stay deduplicated (6.260128ms)\n✔ main SSE transport reconnects in place and reconciles durable visible state (3.715158ms)\n✔ background operations use SSE after one durable registration read (10.475238ms)\n✔ Goal log search covers trail content and Head/Tail changes visible order (2.628102ms)\n✔ Goal log stream renders safe formatted messages and validated action links (11.082791ms)\n✔ Goal log search and stream order persist with the toolbar tab (1.810342ms)\nℹ tests 7\nℹ suites 0\nℹ pass 7\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 195.443217",
+                              "exit_code": 0,
+                              "process_id": "proc-1789049986862-1129590-297",
+                              "status": "passed",
+                              "test": "workflow.quality.enter:default-quality: Affected Goal-log loader and retained log behavior"
+                            },
+                            {
+                              "command": "node --check tests/support/claude-clipboard-smoke.js",
+                              "evidence": "Observed supervised process proc-1789049987296-1129590-300 exited 0.",
+                              "exit_code": 0,
+                              "process_id": "proc-1789049987296-1129590-300",
+                              "status": "passed",
+                              "test": "workflow.quality.enter:default-quality: Claude smoke-helper syntax"
+                            },
+                            {
+                              "command": "git diff --check f880b7767149e4de43d5bc4d4786247d1e536a8c..b831779bd97a2d4356020319f6cb600ec2f55928",
+                              "evidence": "Observed supervised process proc-1789049987513-1129590-303 exited 0.",
+                              "exit_code": 0,
+                              "process_id": "proc-1789049987513-1129590-303",
+                              "status": "passed",
+                              "test": "workflow.quality.enter:default-quality: Candidate diff integrity"
+                            }
+                          ],
+                          "round_idx": 0,
+                          "schema_version": 1,
+                          "source_candidate_commit": "b831779bd97a2d4356020319f6cb600ec2f55928",
+                          "state": "passed"
+                        },
+                        "results": [
+                          {
+                            "command": "NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules node --test tests/web_terminal_clipboard.test.js tests/web_terminal_clipboard_browser.test.js tests/web_supervisor_toolbar.test.js tests/web_command_palette.test.js tests/web_javascript_syntax.test.js",
+                            "evidence": "Observed supervised process proc-1789049968114-1129590-294 exited 0. stdout: (54.374702ms)\n✔ native paste is sent exactly once instead of being reprocessed by xterm (27.721425ms)\n✔ terminal-specific fallback errors are visible and suppress terminal interpretation (83.659596ms)\n✔ an asynchronous paste cannot cross into a replacement managed session (30.729113ms)\n✔ clipboard text buffered before replacement cannot cross managed sessions (29.679934ms)\n✔ clipboard shortcuts remain untouched when focus is outside a terminal (29.284218ms)\n✔ Cmd clipboard shortcuts yield to native browser events (29.399799ms)\n✔ terminal-specific fallback performs one operation and ignores key repeat (28.55452ms)\n✔ pending read results and errors cannot affect an inactive terminal (224.581415ms)\n✔ native keyboard clipboard works with async access allowed (1022.094551ms)\n✔ native keyboard clipboard works with async access denied (993.309675ms)\n✔ native keyboard clipboard works with async access unavailable (1034.039086ms)\n✔ selection overrides mouse capture on Linux x86_64 (1120.951613ms)\n✔ selection overrides mouse capture on Win32 (1107.740578ms)\n✔ selection overrides mouse capture on MacIntel (1076.770018ms)\n✔ context-menu clipboard path with async access allowed (922.423322ms)\n✔ context-menu clipboard path with async access denied (1000.680141ms)\n✔ context-menu clipboard path with async access unavailable (848.085615ms)\n✔ native keyboard gestures survive actual browser permission denial (852.676415ms)\n✔ terminal-specific fallback is singular and reports actual permission denial (905.259566ms)\n✔ Ctrl+Insert and Shift+Insert use native clipboard events exactly once (826.416824ms)\n✔ all profiles and both provider fixtures retain native clipboard and key semantics (4040.102272ms)\n✔ retained renderer remounts and outside focus preserve one clipboard operation (1383.133297ms)\n✔ pending fallback paste is fenced by tab, focus, exit, and session replacement (800.57924ms)\nℹ tests 75\nℹ suites 0\nℹ pass 75\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 18507.753446",
+                            "exit_code": 0,
+                            "process_id": "proc-1789049968114-1129590-294",
+                            "status": "passed",
+                            "test": "workflow.quality.enter:default-quality: Clipboard behavior, selection during mouse capture, session fencing, terminal controls, toolbar lifecycle, command-palette precedence, and shipped JavaScript syntax"
+                          },
+                          {
+                            "command": "node --test tests/web_goal_log_tail.test.js",
+                            "evidence": "Observed supervised process proc-1789049986862-1129590-297 exited 0. stdout: ✔ the initial Goal log request fetches the newest page and displays it chronologically (15.74866ms)\n✔ the first Goal SSE log reaches the toolbar and replayed entries stay deduplicated (6.260128ms)\n✔ main SSE transport reconnects in place and reconciles durable visible state (3.715158ms)\n✔ background operations use SSE after one durable registration read (10.475238ms)\n✔ Goal log search covers trail content and Head/Tail changes visible order (2.628102ms)\n✔ Goal log stream renders safe formatted messages and validated action links (11.082791ms)\n✔ Goal log search and stream order persist with the toolbar tab (1.810342ms)\nℹ tests 7\nℹ suites 0\nℹ pass 7\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 195.443217",
+                            "exit_code": 0,
+                            "process_id": "proc-1789049986862-1129590-297",
+                            "status": "passed",
+                            "test": "workflow.quality.enter:default-quality: Affected Goal-log loader and retained log behavior"
+                          },
+                          {
+                            "command": "node --check tests/support/claude-clipboard-smoke.js",
+                            "evidence": "Observed supervised process proc-1789049987296-1129590-300 exited 0.",
+                            "exit_code": 0,
+                            "process_id": "proc-1789049987296-1129590-300",
+                            "status": "passed",
+                            "test": "workflow.quality.enter:default-quality: Claude smoke-helper syntax"
+                          },
+                          {
+                            "command": "git diff --check f880b7767149e4de43d5bc4d4786247d1e536a8c..b831779bd97a2d4356020319f6cb600ec2f55928",
+                            "evidence": "Observed supervised process proc-1789049987513-1129590-303 exited 0.",
+                            "exit_code": 0,
+                            "process_id": "proc-1789049987513-1129590-303",
+                            "status": "passed",
+                            "test": "workflow.quality.enter:default-quality: Candidate diff integrity"
+                          }
+                        ],
+                        "source_candidate_commit": "b831779bd97a2d4356020319f6cb600ec2f55928"
+                      },
+                      "quality_message": "All Quality Skills passed with supervised evidence.",
+                      "quality_state": "passed",
+                      "rule_state": "unclassified"
+                    },
+                    "refreshed_at": "2026-09-10T14:25:05Z",
+                    "replacement_base_commit": "7b430a6a3bc0d692f03e71da68d06f3e9534dead",
+                    "replacement_candidate_commit": "e93801fca1a1991ce4389799268de315aded1ae8",
+                    "round_idx": 0,
+                    "state": "refreshed",
+                    "workflow_revision": 2,
+                    "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T12V8K3M05Q6JSVEMJ000-round-1"
+                  },
+                  "replacement_base_commit": "7b430a6a3bc0d692f03e71da68d06f3e9534dead",
+                  "replacement_candidate_commit": "e93801fca1a1991ce4389799268de315aded1ae8"
+                },
+                "goal_id": "00000T12V8K3M05Q6JSVEMJ000",
+                "message": "Refreshed a provable candidate delta onto the advanced target",
+                "round_idx": 0,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "quality",
+                "datetime": "2026-09-10T14:28:43Z",
+                "details": {
+                  "candidate_commit": "e93801fca1a1991ce4389799268de315aded1ae8",
+                  "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T12V8K3M05Q6JSVEMJ000-round-1",
+                  "diagnostics": [
+                    "Event invocation be9b4f45ce0f36fdd91977d172e1c07c2755b497c484a49ef378995250b4a1b1: automation/invocations/be9b4f45ce0f36fdd91977d172e1c07c2755b497c484a49ef378995250b4a1b1.json"
+                  ],
+                  "evaluation_scope": "isolated_candidate",
+                  "operation_id": "1a08bb53ea3113c7621",
+                  "provider_attempts": [],
+                  "quality_proof": {
+                    "checked_at": "2026-09-10T14:28:42Z",
+                    "checked_candidate_commit": "e93801fca1a1991ce4389799268de315aded1ae8",
+                    "evaluation_scope": "isolated_candidate",
+                    "goal_id": "00000T12V8K3M05Q6JSVEMJ000",
+                    "operation_id": "1a08bb53ea3113c7621",
+                    "results": [
+                      {
+                        "command": "",
+                        "evidence": "The refreshed candidate passes the planned checks but fails nine relevant clipboard recovery regressions. The inherited tests still assume Ctrl+C invokes asynchronous clipboard writes.",
+                        "status": "failed",
+                        "test": "workflow.quality.enter:default-quality"
+                      }
+                    ],
+                    "round_idx": 0,
+                    "schema_version": 1,
+                    "source_candidate_commit": "e93801fca1a1991ce4389799268de315aded1ae8",
+                    "state": "failed"
+                  },
+                  "results": [
+                    {
+                      "command": "",
+                      "evidence": "The refreshed candidate passes the planned checks but fails nine relevant clipboard recovery regressions. The inherited tests still assume Ctrl+C invokes asynchronous clipboard writes.",
+                      "status": "failed",
+                      "test": "workflow.quality.enter:default-quality"
+                    }
+                  ],
+                  "source_candidate_commit": "e93801fca1a1991ce4389799268de315aded1ae8"
+                },
+                "goal_id": "00000T12V8K3M05Q6JSVEMJ000",
+                "message": "Quality failed: “workflow.quality.enter:default-quality” — The refreshed candidate passes the planned checks but fails nine relevant clipboard recovery regressions. The inherited tests still assume Ctrl+C invokes asynchronous clipboard writes.",
+                "round_idx": 0,
+                "severity": "error"
+              }
+            ],
+            "meta_rule_state": null,
+            "product_state": null,
+            "prompt": "Copy and paste in the agent toolbar isn't working for Claude Code sessions. It should work regardless of which agent is being used.",
+            "quality_agent_report": "workflow.quality.enter:default-quality: Reviewed the candidate and finalized plan. Corrected two test-tooling defects and added Insert-shortcut coverage. Focused verification and the isolated Claude smoke check passed; no unresolved product defects found.",
+            "quality_candidate_commit": "e93801fca1a1991ce4389799268de315aded1ae8",
+            "quality_checked_at": "2026-09-10T14:28:42Z",
+            "quality_details": {
+              "candidate_commit": "e93801fca1a1991ce4389799268de315aded1ae8",
+              "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T12V8K3M05Q6JSVEMJ000-round-1",
+              "diagnostics": [
+                "Event invocation be9b4f45ce0f36fdd91977d172e1c07c2755b497c484a49ef378995250b4a1b1: automation/invocations/be9b4f45ce0f36fdd91977d172e1c07c2755b497c484a49ef378995250b4a1b1.json"
+              ],
+              "evaluation_scope": "isolated_candidate",
+              "operation_id": "1a08bb53ea3113c7621",
+              "provider_attempts": [],
+              "quality_proof": {
+                "checked_at": "2026-09-10T14:28:42Z",
+                "checked_candidate_commit": "e93801fca1a1991ce4389799268de315aded1ae8",
+                "evaluation_scope": "isolated_candidate",
+                "goal_id": "00000T12V8K3M05Q6JSVEMJ000",
+                "operation_id": "1a08bb53ea3113c7621",
+                "results": [
+                  {
+                    "command": "",
+                    "evidence": "The refreshed candidate passes the planned checks but fails nine relevant clipboard recovery regressions. The inherited tests still assume Ctrl+C invokes asynchronous clipboard writes.",
+                    "status": "failed",
+                    "test": "workflow.quality.enter:default-quality"
+                  }
+                ],
+                "round_idx": 0,
+                "schema_version": 1,
+                "source_candidate_commit": "e93801fca1a1991ce4389799268de315aded1ae8",
+                "state": "failed"
+              },
+              "results": [
+                {
+                  "command": "",
+                  "evidence": "The refreshed candidate passes the planned checks but fails nine relevant clipboard recovery regressions. The inherited tests still assume Ctrl+C invokes asynchronous clipboard writes.",
+                  "status": "failed",
+                  "test": "workflow.quality.enter:default-quality"
+                }
+              ],
+              "source_candidate_commit": "e93801fca1a1991ce4389799268de315aded1ae8"
+            },
+            "quality_message": "Quality failed: “workflow.quality.enter:default-quality” — The refreshed candidate passes the planned checks but fails nine relevant clipboard recovery regressions. The inherited tests still assume Ctrl+C invokes asynchronous clipboard writes.",
+            "quality_skill_results": [
+              {
+                "artifacts": {
+                  "tests": [
+                    {
+                      "command": "NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules node --test tests/web_terminal_clipboard.test.js tests/web_terminal_clipboard_browser.test.js tests/web_supervisor_toolbar.test.js tests/web_command_palette.test.js tests/web_javascript_syntax.test.js",
+                      "evidence": "Final run: exit 0; 75 passed, 0 failed, 0 skipped, including 15 executed browser tests.",
+                      "status": "passed",
+                      "test": "Shared clipboard behavior, session fencing, terminal controls, toolbar lifecycle, command-palette precedence, and shipped JavaScript syntax"
+                    },
+                    {
+                      "command": "node --test tests/web_goal_log_tail.test.js",
+                      "evidence": "Exit 0; 7 passed, 0 failed, 0 skipped.",
+                      "status": "passed",
+                      "test": "Affected Goal-log loader and retained log behavior"
+                    },
+                    {
+                      "command": "NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules:/home/linuxbrew/.linuxbrew/lib/node_modules/openclaw/node_modules node tests/support/claude-clipboard-smoke.js /tmp/refine-clipboard-round1-fqes06ao/quality-64d53005-claude",
+                      "evidence": "Exit 0; Claude 2.1.267 accepted bracketed multiline paste and copied selected text without interruption. No page errors; pasted prompt remained unsubmitted.",
+                      "status": "passed",
+                      "test": "Isolated Claude copy/paste through the shipped terminal renderer"
+                    },
+                    {
+                      "command": "node --check tests/support/claude-clipboard-smoke.js",
+                      "evidence": "Exit 0.",
+                      "status": "passed",
+                      "test": "Corrected smoke-helper syntax"
+                    },
+                    {
+                      "command": "git diff --check",
+                      "evidence": "Exit 0.",
+                      "status": "passed",
+                      "test": "Quality-change whitespace integrity"
+                    }
+                  ]
+                },
+                "binding_id": "workflow.quality.enter:default-quality",
+                "evidence": [
+                  "Reviewed candidate 1b7d840ec589f55affe645d87f661b2fbda2e8bd against the Goal and relevant Terminal, Toolbar, Command Palette, and Surface Principles intent. Clipboard handling remains shared across providers and preserves the existing managed input queue.",
+                  "Initial required-suite run returned exit 1: 73 passed, 1 failed. The outside-focus test raced the toolbar's existing scheduled focus callback. Corrected it to await remount completion and click the outside field; added trusted Ctrl+Insert/Shift+Insert coverage.",
+                  "Initial Claude smoke execution timed out at the folder-trust menu. Startup diagnostics confirmed that the helper confused a menu cursor with a ready prompt. Corrected prompt detection and made the trusted scratch-parent prerequisite explicit. Failed-run screenshots and transcripts remain under /tmp/refine-clipboard-quality-64d53005-claude, its -fixed directory, and its -debug directory.",
+                  "Final Claude 2.1.267 smoke verified trusted browser copy/paste events, Unicode multiline bracketed paste, selected-text copying without an interrupt, and no OSC 52 output. Evidence: /tmp/refine-clipboard-round1-fqes06ao/quality-64d53005-claude/claude-smoke.json.",
+                  "Quality modified only tests/web_terminal_clipboard_browser.test.js and tests/support/claude-clipboard-smoke.js. Product implementation required no correction. Changes remain in the pinned worktree for Refine's candidate handoff; no Goal transitions, deployment, restart, merge, or push occurred.",
+                  "Verification used Linux Chromium, with simulated Windows/macOS platform selection behavior. Native Safari, Firefox, and macOS clipboard integration were not exercised. Claude smoke used normal-screen mode; browser fixtures covered alternate-screen mouse capture."
+                ],
+                "invocation_id": "64d53005e347c020347e77f0d4022d54852ab27f01f123c25910e5d56a2e72ce",
+                "outcome": "success",
+                "role": "quality",
+                "summary": "Reviewed the candidate and finalized plan. Corrected two test-tooling defects and added Insert-shortcut coverage. Focused verification and the isolated Claude smoke check passed; no unresolved product defects found."
+              }
+            ],
+            "quality_state": "failed",
+            "reporter": "Buddy Williams",
+            "rule_state": null,
+            "updated": "2026-09-10T14:28:43Z",
+            "workflow_attempt_authority": null,
+            "workflow_candidate_refresh": {
+              "authorizing_status": "governance",
+              "branch": "refine/00000T12V8K3M05Q6JSVEMJ000/round-1",
+              "conflict_resolution": {
+                "attempts": [
+                  {
+                    "attempt": 1,
+                    "files": [
+                      "docs/intent/05-surfaces/03-browser/19-terminal.md",
+                      "src/surfaces/web/static/js/features/terminal-clipboard.js",
+                      "src/surfaces/web/static/js/features/toolbar.js",
+                      "tests/web_terminal_clipboard.test.js",
+                      "tests/web_terminal_clipboard_browser.test.js"
+                    ],
+                    "outcome": "accepted"
+                  }
+                ],
+                "files": [
+                  "docs/intent/05-surfaces/03-browser/19-terminal.md",
+                  "src/surfaces/web/static/js/features/terminal-clipboard.js",
+                  "src/surfaces/web/static/js/features/toolbar.js",
+                  "tests/web_terminal_clipboard.test.js",
+                  "tests/web_terminal_clipboard_browser.test.js"
+                ],
+                "outcome": "resolved"
+              },
+              "node_id": "default",
+              "original_base_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+              "original_candidate_commit": "b831779bd97a2d4356020319f6cb600ec2f55928",
+              "previous_gate_evidence": {
+                "constitution_state": "unclassified",
+                "governance_candidate_commit": "",
+                "governance_checked_at": "",
+                "governance_details": "",
+                "governance_message": "",
+                "meta_rule_state": "unclassified",
+                "product_state": "unclassified",
+                "quality_candidate_commit": "b831779bd97a2d4356020319f6cb600ec2f55928",
+                "quality_checked_at": "2026-09-10T14:19:47Z",
+                "quality_details": {
+                  "candidate_commit": "b831779bd97a2d4356020319f6cb600ec2f55928",
+                  "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T12V8K3M05Q6JSVEMJ000-round-1",
+                  "diagnostics": [
+                    "Event invocation fcbdf3d837ff0f725fe767be3fca3a504dc65d1b0b9a658a575ab59292a3530c: automation/invocations/fcbdf3d837ff0f725fe767be3fca3a504dc65d1b0b9a658a575ab59292a3530c.json",
+                    "Observed supervised process proc-1789049968114-1129590-294 exited 0. stdout: (54.374702ms)\n✔ native paste is sent exactly once instead of being reprocessed by xterm (27.721425ms)\n✔ terminal-specific fallback errors are visible and suppress terminal interpretation (83.659596ms)\n✔ an asynchronous paste cannot cross into a replacement managed session (30.729113ms)\n✔ clipboard text buffered before replacement cannot cross managed sessions (29.679934ms)\n✔ clipboard shortcuts remain untouched when focus is outside a terminal (29.284218ms)\n✔ Cmd clipboard shortcuts yield to native browser events (29.399799ms)\n✔ terminal-specific fallback performs one operation and ignores key repeat (28.55452ms)\n✔ pending read results and errors cannot affect an inactive terminal (224.581415ms)\n✔ native keyboard clipboard works with async access allowed (1022.094551ms)\n✔ native keyboard clipboard works with async access denied (993.309675ms)\n✔ native keyboard clipboard works with async access unavailable (1034.039086ms)\n✔ selection overrides mouse capture on Linux x86_64 (1120.951613ms)\n✔ selection overrides mouse capture on Win32 (1107.740578ms)\n✔ selection overrides mouse capture on MacIntel (1076.770018ms)\n✔ context-menu clipboard path with async access allowed (922.423322ms)\n✔ context-menu clipboard path with async access denied (1000.680141ms)\n✔ context-menu clipboard path with async access unavailable (848.085615ms)\n✔ native keyboard gestures survive actual browser permission denial (852.676415ms)\n✔ terminal-specific fallback is singular and reports actual permission denial (905.259566ms)\n✔ Ctrl+Insert and Shift+Insert use native clipboard events exactly once (826.416824ms)\n✔ all profiles and both provider fixtures retain native clipboard and key semantics (4040.102272ms)\n✔ retained renderer remounts and outside focus preserve one clipboard operation (1383.133297ms)\n✔ pending fallback paste is fenced by tab, focus, exit, and session replacement (800.57924ms)\nℹ tests 75\nℹ suites 0\nℹ pass 75\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 18507.753446",
+                    "Observed supervised process proc-1789049986862-1129590-297 exited 0. stdout: ✔ the initial Goal log request fetches the newest page and displays it chronologically (15.74866ms)\n✔ the first Goal SSE log reaches the toolbar and replayed entries stay deduplicated (6.260128ms)\n✔ main SSE transport reconnects in place and reconciles durable visible state (3.715158ms)\n✔ background operations use SSE after one durable registration read (10.475238ms)\n✔ Goal log search covers trail content and Head/Tail changes visible order (2.628102ms)\n✔ Goal log stream renders safe formatted messages and validated action links (11.082791ms)\n✔ Goal log search and stream order persist with the toolbar tab (1.810342ms)\nℹ tests 7\nℹ suites 0\nℹ pass 7\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 195.443217",
+                    "Observed supervised process proc-1789049987296-1129590-300 exited 0.",
+                    "Observed supervised process proc-1789049987513-1129590-303 exited 0."
+                  ],
+                  "evaluation_scope": "isolated_candidate",
+                  "operation_id": "1a08bad36a4113c761e",
+                  "provider_attempts": [],
+                  "quality_proof": {
+                    "checked_at": "2026-09-10T14:19:47Z",
+                    "checked_candidate_commit": "b831779bd97a2d4356020319f6cb600ec2f55928",
+                    "evaluation_scope": "isolated_candidate",
+                    "goal_id": "00000T12V8K3M05Q6JSVEMJ000",
+                    "operation_id": "1a08bad36a4113c761e",
+                    "results": [
+                      {
+                        "command": "NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules node --test tests/web_terminal_clipboard.test.js tests/web_terminal_clipboard_browser.test.js tests/web_supervisor_toolbar.test.js tests/web_command_palette.test.js tests/web_javascript_syntax.test.js",
+                        "evidence": "Observed supervised process proc-1789049968114-1129590-294 exited 0. stdout: (54.374702ms)\n✔ native paste is sent exactly once instead of being reprocessed by xterm (27.721425ms)\n✔ terminal-specific fallback errors are visible and suppress terminal interpretation (83.659596ms)\n✔ an asynchronous paste cannot cross into a replacement managed session (30.729113ms)\n✔ clipboard text buffered before replacement cannot cross managed sessions (29.679934ms)\n✔ clipboard shortcuts remain untouched when focus is outside a terminal (29.284218ms)\n✔ Cmd clipboard shortcuts yield to native browser events (29.399799ms)\n✔ terminal-specific fallback performs one operation and ignores key repeat (28.55452ms)\n✔ pending read results and errors cannot affect an inactive terminal (224.581415ms)\n✔ native keyboard clipboard works with async access allowed (1022.094551ms)\n✔ native keyboard clipboard works with async access denied (993.309675ms)\n✔ native keyboard clipboard works with async access unavailable (1034.039086ms)\n✔ selection overrides mouse capture on Linux x86_64 (1120.951613ms)\n✔ selection overrides mouse capture on Win32 (1107.740578ms)\n✔ selection overrides mouse capture on MacIntel (1076.770018ms)\n✔ context-menu clipboard path with async access allowed (922.423322ms)\n✔ context-menu clipboard path with async access denied (1000.680141ms)\n✔ context-menu clipboard path with async access unavailable (848.085615ms)\n✔ native keyboard gestures survive actual browser permission denial (852.676415ms)\n✔ terminal-specific fallback is singular and reports actual permission denial (905.259566ms)\n✔ Ctrl+Insert and Shift+Insert use native clipboard events exactly once (826.416824ms)\n✔ all profiles and both provider fixtures retain native clipboard and key semantics (4040.102272ms)\n✔ retained renderer remounts and outside focus preserve one clipboard operation (1383.133297ms)\n✔ pending fallback paste is fenced by tab, focus, exit, and session replacement (800.57924ms)\nℹ tests 75\nℹ suites 0\nℹ pass 75\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 18507.753446",
+                        "exit_code": 0,
+                        "process_id": "proc-1789049968114-1129590-294",
+                        "status": "passed",
+                        "test": "workflow.quality.enter:default-quality: Clipboard behavior, selection during mouse capture, session fencing, terminal controls, toolbar lifecycle, command-palette precedence, and shipped JavaScript syntax"
+                      },
+                      {
+                        "command": "node --test tests/web_goal_log_tail.test.js",
+                        "evidence": "Observed supervised process proc-1789049986862-1129590-297 exited 0. stdout: ✔ the initial Goal log request fetches the newest page and displays it chronologically (15.74866ms)\n✔ the first Goal SSE log reaches the toolbar and replayed entries stay deduplicated (6.260128ms)\n✔ main SSE transport reconnects in place and reconciles durable visible state (3.715158ms)\n✔ background operations use SSE after one durable registration read (10.475238ms)\n✔ Goal log search covers trail content and Head/Tail changes visible order (2.628102ms)\n✔ Goal log stream renders safe formatted messages and validated action links (11.082791ms)\n✔ Goal log search and stream order persist with the toolbar tab (1.810342ms)\nℹ tests 7\nℹ suites 0\nℹ pass 7\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 195.443217",
+                        "exit_code": 0,
+                        "process_id": "proc-1789049986862-1129590-297",
+                        "status": "passed",
+                        "test": "workflow.quality.enter:default-quality: Affected Goal-log loader and retained log behavior"
+                      },
+                      {
+                        "command": "node --check tests/support/claude-clipboard-smoke.js",
+                        "evidence": "Observed supervised process proc-1789049987296-1129590-300 exited 0.",
+                        "exit_code": 0,
+                        "process_id": "proc-1789049987296-1129590-300",
+                        "status": "passed",
+                        "test": "workflow.quality.enter:default-quality: Claude smoke-helper syntax"
+                      },
+                      {
+                        "command": "git diff --check f880b7767149e4de43d5bc4d4786247d1e536a8c..b831779bd97a2d4356020319f6cb600ec2f55928",
+                        "evidence": "Observed supervised process proc-1789049987513-1129590-303 exited 0.",
+                        "exit_code": 0,
+                        "process_id": "proc-1789049987513-1129590-303",
+                        "status": "passed",
+                        "test": "workflow.quality.enter:default-quality: Candidate diff integrity"
+                      }
+                    ],
+                    "round_idx": 0,
+                    "schema_version": 1,
+                    "source_candidate_commit": "b831779bd97a2d4356020319f6cb600ec2f55928",
+                    "state": "passed"
+                  },
+                  "results": [
+                    {
+                      "command": "NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules node --test tests/web_terminal_clipboard.test.js tests/web_terminal_clipboard_browser.test.js tests/web_supervisor_toolbar.test.js tests/web_command_palette.test.js tests/web_javascript_syntax.test.js",
+                      "evidence": "Observed supervised process proc-1789049968114-1129590-294 exited 0. stdout: (54.374702ms)\n✔ native paste is sent exactly once instead of being reprocessed by xterm (27.721425ms)\n✔ terminal-specific fallback errors are visible and suppress terminal interpretation (83.659596ms)\n✔ an asynchronous paste cannot cross into a replacement managed session (30.729113ms)\n✔ clipboard text buffered before replacement cannot cross managed sessions (29.679934ms)\n✔ clipboard shortcuts remain untouched when focus is outside a terminal (29.284218ms)\n✔ Cmd clipboard shortcuts yield to native browser events (29.399799ms)\n✔ terminal-specific fallback performs one operation and ignores key repeat (28.55452ms)\n✔ pending read results and errors cannot affect an inactive terminal (224.581415ms)\n✔ native keyboard clipboard works with async access allowed (1022.094551ms)\n✔ native keyboard clipboard works with async access denied (993.309675ms)\n✔ native keyboard clipboard works with async access unavailable (1034.039086ms)\n✔ selection overrides mouse capture on Linux x86_64 (1120.951613ms)\n✔ selection overrides mouse capture on Win32 (1107.740578ms)\n✔ selection overrides mouse capture on MacIntel (1076.770018ms)\n✔ context-menu clipboard path with async access allowed (922.423322ms)\n✔ context-menu clipboard path with async access denied (1000.680141ms)\n✔ context-menu clipboard path with async access unavailable (848.085615ms)\n✔ native keyboard gestures survive actual browser permission denial (852.676415ms)\n✔ terminal-specific fallback is singular and reports actual permission denial (905.259566ms)\n✔ Ctrl+Insert and Shift+Insert use native clipboard events exactly once (826.416824ms)\n✔ all profiles and both provider fixtures retain native clipboard and key semantics (4040.102272ms)\n✔ retained renderer remounts and outside focus preserve one clipboard operation (1383.133297ms)\n✔ pending fallback paste is fenced by tab, focus, exit, and session replacement (800.57924ms)\nℹ tests 75\nℹ suites 0\nℹ pass 75\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 18507.753446",
+                      "exit_code": 0,
+                      "process_id": "proc-1789049968114-1129590-294",
+                      "status": "passed",
+                      "test": "workflow.quality.enter:default-quality: Clipboard behavior, selection during mouse capture, session fencing, terminal controls, toolbar lifecycle, command-palette precedence, and shipped JavaScript syntax"
+                    },
+                    {
+                      "command": "node --test tests/web_goal_log_tail.test.js",
+                      "evidence": "Observed supervised process proc-1789049986862-1129590-297 exited 0. stdout: ✔ the initial Goal log request fetches the newest page and displays it chronologically (15.74866ms)\n✔ the first Goal SSE log reaches the toolbar and replayed entries stay deduplicated (6.260128ms)\n✔ main SSE transport reconnects in place and reconciles durable visible state (3.715158ms)\n✔ background operations use SSE after one durable registration read (10.475238ms)\n✔ Goal log search covers trail content and Head/Tail changes visible order (2.628102ms)\n✔ Goal log stream renders safe formatted messages and validated action links (11.082791ms)\n✔ Goal log search and stream order persist with the toolbar tab (1.810342ms)\nℹ tests 7\nℹ suites 0\nℹ pass 7\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 195.443217",
+                      "exit_code": 0,
+                      "process_id": "proc-1789049986862-1129590-297",
+                      "status": "passed",
+                      "test": "workflow.quality.enter:default-quality: Affected Goal-log loader and retained log behavior"
+                    },
+                    {
+                      "command": "node --check tests/support/claude-clipboard-smoke.js",
+                      "evidence": "Observed supervised process proc-1789049987296-1129590-300 exited 0.",
+                      "exit_code": 0,
+                      "process_id": "proc-1789049987296-1129590-300",
+                      "status": "passed",
+                      "test": "workflow.quality.enter:default-quality: Claude smoke-helper syntax"
+                    },
+                    {
+                      "command": "git diff --check f880b7767149e4de43d5bc4d4786247d1e536a8c..b831779bd97a2d4356020319f6cb600ec2f55928",
+                      "evidence": "Observed supervised process proc-1789049987513-1129590-303 exited 0.",
+                      "exit_code": 0,
+                      "process_id": "proc-1789049987513-1129590-303",
+                      "status": "passed",
+                      "test": "workflow.quality.enter:default-quality: Candidate diff integrity"
+                    }
+                  ],
+                  "source_candidate_commit": "b831779bd97a2d4356020319f6cb600ec2f55928"
+                },
+                "quality_message": "All Quality Skills passed with supervised evidence.",
+                "quality_state": "passed",
+                "rule_state": "unclassified"
+              },
+              "refreshed_at": "2026-09-10T14:25:05Z",
+              "replacement_base_commit": "7b430a6a3bc0d692f03e71da68d06f3e9534dead",
+              "replacement_candidate_commit": "e93801fca1a1991ce4389799268de315aded1ae8",
+              "round_idx": 0,
+              "state": "refreshed",
+              "workflow_revision": 2,
+              "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T12V8K3M05Q6JSVEMJ000-round-1"
+            },
+            "workflow_reconciliation": null,
+            "workflow_recovery": {
+              "attempt": 1,
+              "kind": "integration",
+              "max_automatic_round_retries": 5,
+              "node_id": "default",
+              "reason": "replacement candidate failed exact-candidate Quality",
+              "recorded_at": "2026-09-10T14:28:43Z",
+              "retained_evidence": {
+                "candidate_refresh": {
+                  "authorizing_status": "governance",
+                  "branch": "refine/00000T12V8K3M05Q6JSVEMJ000/round-1",
+                  "conflict_resolution": {
+                    "attempts": [
+                      {
+                        "attempt": 1,
+                        "files": [
+                          "docs/intent/05-surfaces/03-browser/19-terminal.md",
+                          "src/surfaces/web/static/js/features/terminal-clipboard.js",
+                          "src/surfaces/web/static/js/features/toolbar.js",
+                          "tests/web_terminal_clipboard.test.js",
+                          "tests/web_terminal_clipboard_browser.test.js"
+                        ],
+                        "outcome": "accepted"
+                      }
+                    ],
+                    "files": [
+                      "docs/intent/05-surfaces/03-browser/19-terminal.md",
+                      "src/surfaces/web/static/js/features/terminal-clipboard.js",
+                      "src/surfaces/web/static/js/features/toolbar.js",
+                      "tests/web_terminal_clipboard.test.js",
+                      "tests/web_terminal_clipboard_browser.test.js"
+                    ],
+                    "outcome": "resolved"
+                  },
+                  "node_id": "default",
+                  "original_base_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+                  "original_candidate_commit": "b831779bd97a2d4356020319f6cb600ec2f55928",
+                  "previous_gate_evidence": {
+                    "constitution_state": "unclassified",
+                    "governance_candidate_commit": "",
+                    "governance_checked_at": "",
+                    "governance_details": "",
+                    "governance_message": "",
+                    "meta_rule_state": "unclassified",
+                    "product_state": "unclassified",
+                    "quality_candidate_commit": "b831779bd97a2d4356020319f6cb600ec2f55928",
+                    "quality_checked_at": "2026-09-10T14:19:47Z",
+                    "quality_details": {
+                      "candidate_commit": "b831779bd97a2d4356020319f6cb600ec2f55928",
+                      "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T12V8K3M05Q6JSVEMJ000-round-1",
+                      "diagnostics": [
+                        "Event invocation fcbdf3d837ff0f725fe767be3fca3a504dc65d1b0b9a658a575ab59292a3530c: automation/invocations/fcbdf3d837ff0f725fe767be3fca3a504dc65d1b0b9a658a575ab59292a3530c.json",
+                        "Observed supervised process proc-1789049968114-1129590-294 exited 0. stdout: (54.374702ms)\n✔ native paste is sent exactly once instead of being reprocessed by xterm (27.721425ms)\n✔ terminal-specific fallback errors are visible and suppress terminal interpretation (83.659596ms)\n✔ an asynchronous paste cannot cross into a replacement managed session (30.729113ms)\n✔ clipboard text buffered before replacement cannot cross managed sessions (29.679934ms)\n✔ clipboard shortcuts remain untouched when focus is outside a terminal (29.284218ms)\n✔ Cmd clipboard shortcuts yield to native browser events (29.399799ms)\n✔ terminal-specific fallback performs one operation and ignores key repeat (28.55452ms)\n✔ pending read results and errors cannot affect an inactive terminal (224.581415ms)\n✔ native keyboard clipboard works with async access allowed (1022.094551ms)\n✔ native keyboard clipboard works with async access denied (993.309675ms)\n✔ native keyboard clipboard works with async access unavailable (1034.039086ms)\n✔ selection overrides mouse capture on Linux x86_64 (1120.951613ms)\n✔ selection overrides mouse capture on Win32 (1107.740578ms)\n✔ selection overrides mouse capture on MacIntel (1076.770018ms)\n✔ context-menu clipboard path with async access allowed (922.423322ms)\n✔ context-menu clipboard path with async access denied (1000.680141ms)\n✔ context-menu clipboard path with async access unavailable (848.085615ms)\n✔ native keyboard gestures survive actual browser permission denial (852.676415ms)\n✔ terminal-specific fallback is singular and reports actual permission denial (905.259566ms)\n✔ Ctrl+Insert and Shift+Insert use native clipboard events exactly once (826.416824ms)\n✔ all profiles and both provider fixtures retain native clipboard and key semantics (4040.102272ms)\n✔ retained renderer remounts and outside focus preserve one clipboard operation (1383.133297ms)\n✔ pending fallback paste is fenced by tab, focus, exit, and session replacement (800.57924ms)\nℹ tests 75\nℹ suites 0\nℹ pass 75\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 18507.753446",
+                        "Observed supervised process proc-1789049986862-1129590-297 exited 0. stdout: ✔ the initial Goal log request fetches the newest page and displays it chronologically (15.74866ms)\n✔ the first Goal SSE log reaches the toolbar and replayed entries stay deduplicated (6.260128ms)\n✔ main SSE transport reconnects in place and reconciles durable visible state (3.715158ms)\n✔ background operations use SSE after one durable registration read (10.475238ms)\n✔ Goal log search covers trail content and Head/Tail changes visible order (2.628102ms)\n✔ Goal log stream renders safe formatted messages and validated action links (11.082791ms)\n✔ Goal log search and stream order persist with the toolbar tab (1.810342ms)\nℹ tests 7\nℹ suites 0\nℹ pass 7\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 195.443217",
+                        "Observed supervised process proc-1789049987296-1129590-300 exited 0.",
+                        "Observed supervised process proc-1789049987513-1129590-303 exited 0."
+                      ],
+                      "evaluation_scope": "isolated_candidate",
+                      "operation_id": "1a08bad36a4113c761e",
+                      "provider_attempts": [],
+                      "quality_proof": {
+                        "checked_at": "2026-09-10T14:19:47Z",
+                        "checked_candidate_commit": "b831779bd97a2d4356020319f6cb600ec2f55928",
+                        "evaluation_scope": "isolated_candidate",
+                        "goal_id": "00000T12V8K3M05Q6JSVEMJ000",
+                        "operation_id": "1a08bad36a4113c761e",
+                        "results": [
+                          {
+                            "command": "NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules node --test tests/web_terminal_clipboard.test.js tests/web_terminal_clipboard_browser.test.js tests/web_supervisor_toolbar.test.js tests/web_command_palette.test.js tests/web_javascript_syntax.test.js",
+                            "evidence": "Observed supervised process proc-1789049968114-1129590-294 exited 0. stdout: (54.374702ms)\n✔ native paste is sent exactly once instead of being reprocessed by xterm (27.721425ms)\n✔ terminal-specific fallback errors are visible and suppress terminal interpretation (83.659596ms)\n✔ an asynchronous paste cannot cross into a replacement managed session (30.729113ms)\n✔ clipboard text buffered before replacement cannot cross managed sessions (29.679934ms)\n✔ clipboard shortcuts remain untouched when focus is outside a terminal (29.284218ms)\n✔ Cmd clipboard shortcuts yield to native browser events (29.399799ms)\n✔ terminal-specific fallback performs one operation and ignores key repeat (28.55452ms)\n✔ pending read results and errors cannot affect an inactive terminal (224.581415ms)\n✔ native keyboard clipboard works with async access allowed (1022.094551ms)\n✔ native keyboard clipboard works with async access denied (993.309675ms)\n✔ native keyboard clipboard works with async access unavailable (1034.039086ms)\n✔ selection overrides mouse capture on Linux x86_64 (1120.951613ms)\n✔ selection overrides mouse capture on Win32 (1107.740578ms)\n✔ selection overrides mouse capture on MacIntel (1076.770018ms)\n✔ context-menu clipboard path with async access allowed (922.423322ms)\n✔ context-menu clipboard path with async access denied (1000.680141ms)\n✔ context-menu clipboard path with async access unavailable (848.085615ms)\n✔ native keyboard gestures survive actual browser permission denial (852.676415ms)\n✔ terminal-specific fallback is singular and reports actual permission denial (905.259566ms)\n✔ Ctrl+Insert and Shift+Insert use native clipboard events exactly once (826.416824ms)\n✔ all profiles and both provider fixtures retain native clipboard and key semantics (4040.102272ms)\n✔ retained renderer remounts and outside focus preserve one clipboard operation (1383.133297ms)\n✔ pending fallback paste is fenced by tab, focus, exit, and session replacement (800.57924ms)\nℹ tests 75\nℹ suites 0\nℹ pass 75\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 18507.753446",
+                            "exit_code": 0,
+                            "process_id": "proc-1789049968114-1129590-294",
+                            "status": "passed",
+                            "test": "workflow.quality.enter:default-quality: Clipboard behavior, selection during mouse capture, session fencing, terminal controls, toolbar lifecycle, command-palette precedence, and shipped JavaScript syntax"
+                          },
+                          {
+                            "command": "node --test tests/web_goal_log_tail.test.js",
+                            "evidence": "Observed supervised process proc-1789049986862-1129590-297 exited 0. stdout: ✔ the initial Goal log request fetches the newest page and displays it chronologically (15.74866ms)\n✔ the first Goal SSE log reaches the toolbar and replayed entries stay deduplicated (6.260128ms)\n✔ main SSE transport reconnects in place and reconciles durable visible state (3.715158ms)\n✔ background operations use SSE after one durable registration read (10.475238ms)\n✔ Goal log search covers trail content and Head/Tail changes visible order (2.628102ms)\n✔ Goal log stream renders safe formatted messages and validated action links (11.082791ms)\n✔ Goal log search and stream order persist with the toolbar tab (1.810342ms)\nℹ tests 7\nℹ suites 0\nℹ pass 7\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 195.443217",
+                            "exit_code": 0,
+                            "process_id": "proc-1789049986862-1129590-297",
+                            "status": "passed",
+                            "test": "workflow.quality.enter:default-quality: Affected Goal-log loader and retained log behavior"
+                          },
+                          {
+                            "command": "node --check tests/support/claude-clipboard-smoke.js",
+                            "evidence": "Observed supervised process proc-1789049987296-1129590-300 exited 0.",
+                            "exit_code": 0,
+                            "process_id": "proc-1789049987296-1129590-300",
+                            "status": "passed",
+                            "test": "workflow.quality.enter:default-quality: Claude smoke-helper syntax"
+                          },
+                          {
+                            "command": "git diff --check f880b7767149e4de43d5bc4d4786247d1e536a8c..b831779bd97a2d4356020319f6cb600ec2f55928",
+                            "evidence": "Observed supervised process proc-1789049987513-1129590-303 exited 0.",
+                            "exit_code": 0,
+                            "process_id": "proc-1789049987513-1129590-303",
+                            "status": "passed",
+                            "test": "workflow.quality.enter:default-quality: Candidate diff integrity"
+                          }
+                        ],
+                        "round_idx": 0,
+                        "schema_version": 1,
+                        "source_candidate_commit": "b831779bd97a2d4356020319f6cb600ec2f55928",
+                        "state": "passed"
+                      },
+                      "results": [
+                        {
+                          "command": "NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules node --test tests/web_terminal_clipboard.test.js tests/web_terminal_clipboard_browser.test.js tests/web_supervisor_toolbar.test.js tests/web_command_palette.test.js tests/web_javascript_syntax.test.js",
+                          "evidence": "Observed supervised process proc-1789049968114-1129590-294 exited 0. stdout: (54.374702ms)\n✔ native paste is sent exactly once instead of being reprocessed by xterm (27.721425ms)\n✔ terminal-specific fallback errors are visible and suppress terminal interpretation (83.659596ms)\n✔ an asynchronous paste cannot cross into a replacement managed session (30.729113ms)\n✔ clipboard text buffered before replacement cannot cross managed sessions (29.679934ms)\n✔ clipboard shortcuts remain untouched when focus is outside a terminal (29.284218ms)\n✔ Cmd clipboard shortcuts yield to native browser events (29.399799ms)\n✔ terminal-specific fallback performs one operation and ignores key repeat (28.55452ms)\n✔ pending read results and errors cannot affect an inactive terminal (224.581415ms)\n✔ native keyboard clipboard works with async access allowed (1022.094551ms)\n✔ native keyboard clipboard works with async access denied (993.309675ms)\n✔ native keyboard clipboard works with async access unavailable (1034.039086ms)\n✔ selection overrides mouse capture on Linux x86_64 (1120.951613ms)\n✔ selection overrides mouse capture on Win32 (1107.740578ms)\n✔ selection overrides mouse capture on MacIntel (1076.770018ms)\n✔ context-menu clipboard path with async access allowed (922.423322ms)\n✔ context-menu clipboard path with async access denied (1000.680141ms)\n✔ context-menu clipboard path with async access unavailable (848.085615ms)\n✔ native keyboard gestures survive actual browser permission denial (852.676415ms)\n✔ terminal-specific fallback is singular and reports actual permission denial (905.259566ms)\n✔ Ctrl+Insert and Shift+Insert use native clipboard events exactly once (826.416824ms)\n✔ all profiles and both provider fixtures retain native clipboard and key semantics (4040.102272ms)\n✔ retained renderer remounts and outside focus preserve one clipboard operation (1383.133297ms)\n✔ pending fallback paste is fenced by tab, focus, exit, and session replacement (800.57924ms)\nℹ tests 75\nℹ suites 0\nℹ pass 75\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 18507.753446",
+                          "exit_code": 0,
+                          "process_id": "proc-1789049968114-1129590-294",
+                          "status": "passed",
+                          "test": "workflow.quality.enter:default-quality: Clipboard behavior, selection during mouse capture, session fencing, terminal controls, toolbar lifecycle, command-palette precedence, and shipped JavaScript syntax"
+                        },
+                        {
+                          "command": "node --test tests/web_goal_log_tail.test.js",
+                          "evidence": "Observed supervised process proc-1789049986862-1129590-297 exited 0. stdout: ✔ the initial Goal log request fetches the newest page and displays it chronologically (15.74866ms)\n✔ the first Goal SSE log reaches the toolbar and replayed entries stay deduplicated (6.260128ms)\n✔ main SSE transport reconnects in place and reconciles durable visible state (3.715158ms)\n✔ background operations use SSE after one durable registration read (10.475238ms)\n✔ Goal log search covers trail content and Head/Tail changes visible order (2.628102ms)\n✔ Goal log stream renders safe formatted messages and validated action links (11.082791ms)\n✔ Goal log search and stream order persist with the toolbar tab (1.810342ms)\nℹ tests 7\nℹ suites 0\nℹ pass 7\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 195.443217",
+                          "exit_code": 0,
+                          "process_id": "proc-1789049986862-1129590-297",
+                          "status": "passed",
+                          "test": "workflow.quality.enter:default-quality: Affected Goal-log loader and retained log behavior"
+                        },
+                        {
+                          "command": "node --check tests/support/claude-clipboard-smoke.js",
+                          "evidence": "Observed supervised process proc-1789049987296-1129590-300 exited 0.",
+                          "exit_code": 0,
+                          "process_id": "proc-1789049987296-1129590-300",
+                          "status": "passed",
+                          "test": "workflow.quality.enter:default-quality: Claude smoke-helper syntax"
+                        },
+                        {
+                          "command": "git diff --check f880b7767149e4de43d5bc4d4786247d1e536a8c..b831779bd97a2d4356020319f6cb600ec2f55928",
+                          "evidence": "Observed supervised process proc-1789049987513-1129590-303 exited 0.",
+                          "exit_code": 0,
+                          "process_id": "proc-1789049987513-1129590-303",
+                          "status": "passed",
+                          "test": "workflow.quality.enter:default-quality: Candidate diff integrity"
+                        }
+                      ],
+                      "source_candidate_commit": "b831779bd97a2d4356020319f6cb600ec2f55928"
+                    },
+                    "quality_message": "All Quality Skills passed with supervised evidence.",
+                    "quality_state": "passed",
+                    "rule_state": "unclassified"
+                  },
+                  "refreshed_at": "2026-09-10T14:25:05Z",
+                  "replacement_base_commit": "7b430a6a3bc0d692f03e71da68d06f3e9534dead",
+                  "replacement_candidate_commit": "e93801fca1a1991ce4389799268de315aded1ae8",
+                  "round_idx": 0,
+                  "state": "refreshed",
+                  "workflow_revision": 2,
+                  "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T12V8K3M05Q6JSVEMJ000-round-1"
+                },
+                "quality_diagnostics": [
+                  "Event invocation be9b4f45ce0f36fdd91977d172e1c07c2755b497c484a49ef378995250b4a1b1: automation/invocations/be9b4f45ce0f36fdd91977d172e1c07c2755b497c484a49ef378995250b4a1b1.json"
+                ],
+                "quality_results": [
+                  {
+                    "command": "",
+                    "evidence": "The refreshed candidate passes the planned checks but fails nine relevant clipboard recovery regressions. The inherited tests still assume Ctrl+C invokes asynchronous clipboard writes.",
+                    "status": "failed",
+                    "test": "workflow.quality.enter:default-quality"
+                  }
+                ],
+                "quality_summary": "Quality failed: “workflow.quality.enter:default-quality” — The refreshed candidate passes the planned checks but fails nine relevant clipboard recovery regressions. The inherited tests still assume Ctrl+C invokes asynchronous clipboard writes.",
+                "replacement_candidate_commit": "e93801fca1a1991ce4389799268de315aded1ae8"
+              },
+              "source_round": 1,
+              "state": "queued",
+              "successor_round": 2,
+              "workflow_revision": 2
+            }
+          },
+          {
+            "assignee": "Refine",
+            "automatic_retry": {
+              "attempt": 1,
+              "generated_at": "2026-09-10T14:28:43Z",
+              "kind": "integration",
+              "source_round": 1
+            },
+            "constitution_state": "unclassified",
+            "created": "2026-09-10T14:28:43Z",
+            "failure_at": "",
+            "failure_category": "",
+            "failure_message": "",
+            "governance_candidate_commit": "",
+            "governance_checked_at": "",
+            "governance_details": "",
+            "governance_message": "",
+            "governance_rule_actions": [],
+            "guidance_decision": null,
+            "implementation_plan": {
+              "binding": {
+                "base_commit": "7b430a6a3bc0d692f03e71da68d06f3e9534dead",
+                "context_digest": "152ab05e5dabfb60d172318b4dc5f5e8b296339547220e0eeef8b922c3f6cb83",
+                "context_version": 1,
+                "goal_id": "00000T12V8K3M05Q6JSVEMJ000",
+                "implementation_branch": "refine/00000T12V8K3M05Q6JSVEMJ000/round-2",
+                "round_idx": 1,
+                "target_branch": "main"
+              },
+              "phase": "plan",
+              "phase_started_at": "2026-09-10T14:28:44Z",
+              "schema_version": 2,
+              "started_at": "2026-09-10T14:28:44Z",
+              "state": "in_progress",
+              "updated_at": "2026-09-10T14:28:44Z"
+            },
+            "implementation_report": null,
+            "implementation_reported_at": null,
+            "latest_log": {
+              "actor": "refine",
+              "category": "git",
+              "datetime": "2026-09-10T14:28:44Z",
+              "details": {
+                "base_commit": "7b430a6a3bc0d692f03e71da68d06f3e9534dead",
+                "branch": "refine/00000T12V8K3M05Q6JSVEMJ000/round-2",
+                "branch_commit": "7b430a6a3bc0d692f03e71da68d06f3e9534dead",
+                "node_id": "default",
+                "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T12V8K3M05Q6JSVEMJ000-round-2"
+              },
+              "goal_id": "00000T12V8K3M05Q6JSVEMJ000",
+              "message": "Created implementation worktree for refine/00000T12V8K3M05Q6JSVEMJ000/round-2",
+              "round_idx": 1,
+              "severity": "info"
+            },
+            "latest_state_log": {
+              "actor": "refine",
+              "category": "state",
+              "datetime": "2026-09-10T14:28:43Z",
+              "details": {
+                "node_id": "default"
+              },
+              "goal_id": "00000T12V8K3M05Q6JSVEMJ000",
+              "message": "Workflow status changed: todo -> plan",
+              "round_idx": 1,
+              "severity": "info"
+            },
+            "latest_workflow_log": {
+              "actor": "refine",
+              "category": "state",
+              "datetime": "2026-09-10T14:28:43Z",
+              "details": {
+                "node_id": "default"
+              },
+              "goal_id": "00000T12V8K3M05Q6JSVEMJ000",
+              "message": "Workflow status changed: todo -> plan",
+              "round_idx": 1,
+              "severity": "info"
+            },
+            "logs": [
+              {
+                "actor": "refine",
+                "category": "git",
+                "datetime": "2026-09-10T14:28:43Z",
+                "details": {
+                  "node_id": "default",
+                  "remote": "origin",
+                  "target_branch": "main",
+                  "target_commit": "7b430a6a3bc0d692f03e71da68d06f3e9534dead"
+                },
+                "goal_id": "00000T12V8K3M05Q6JSVEMJ000",
+                "message": "Local main already carried the fetched tip",
+                "round_idx": 1,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "state",
+                "datetime": "2026-09-10T14:28:43Z",
+                "details": {
+                  "node_id": "default"
+                },
+                "goal_id": "00000T12V8K3M05Q6JSVEMJ000",
+                "message": "Workflow status changed: todo -> plan",
+                "round_idx": 1,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "git",
+                "datetime": "2026-09-10T14:28:44Z",
+                "details": {
+                  "base_commit": "7b430a6a3bc0d692f03e71da68d06f3e9534dead",
+                  "branch": "refine/00000T12V8K3M05Q6JSVEMJ000/round-2",
+                  "branch_commit": "7b430a6a3bc0d692f03e71da68d06f3e9534dead",
+                  "node_id": "default",
+                  "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T12V8K3M05Q6JSVEMJ000-round-2"
+                },
+                "goal_id": "00000T12V8K3M05Q6JSVEMJ000",
+                "message": "Created implementation worktree for refine/00000T12V8K3M05Q6JSVEMJ000/round-2",
+                "round_idx": 1,
+                "severity": "info"
+              }
+            ],
+            "meta_rule_state": "unclassified",
+            "product_state": "unclassified",
+            "prompt": "Recover the prior candidate from a shared-target integration race without discarding its evidence.\n\nReason: replacement candidate failed exact-candidate Quality\n\nRetained integration evidence:\n```json\n{\n  \"attempt\": 1,\n  \"kind\": \"integration\",\n  \"max_automatic_round_retries\": 5,\n  \"node_id\": \"default\",\n  \"reason\": \"replacement candidate failed exact-candidate Quality\",\n  \"recorded_at\": \"2026-09-10T14:28:43Z\",\n  \"retained_evidence\": {\n    \"candidate_refresh\": {\n      \"authorizing_status\": \"governance\",\n      \"branch\": \"refine/00000T12V8K3M05Q6JSVEMJ000/round-1\",\n      \"conflict_resolution\": {\n        \"attempts\": [\n          {\n            \"attempt\": 1,\n            \"files\": [\n              \"docs/intent/05-surfaces/03-browser/19-terminal.md\",\n              \"src/surfaces/web/static/js/features/terminal-clipboard.js\",\n              \"src/surfaces/web/static/js/features/toolbar.js\",\n              \"tests/web_terminal_clipboard.test.js\",\n              \"tests/web_terminal_clipboard_browser.test.js\"\n            ],\n            \"outcome\": \"accepted\"\n          }\n        ],\n        \"files\": [\n          \"docs/intent/05-surfaces/03-browser/19-terminal.md\",\n          \"src/surfaces/web/static/js/features/terminal-clipboard.js\",\n          \"src/surfaces/web/static/js/features/toolbar.js\",\n          \"tests/web_terminal_clipboard.test.js\",\n          \"tests/web_terminal_clipboard_browser.test.js\"\n        ],\n        \"outcome\": \"resolved\"\n      },\n      \"node_id\": \"default\",\n      \"original_base_commit\": \"f880b7767149e4de43d5bc4d4786247d1e536a8c\",\n      \"original_candidate_commit\": \"b831779bd97a2d4356020319f6cb600ec2f55928\",\n      \"previous_gate_evidence\": {\n        \"constitution_state\": \"unclassified\",\n        \"governance_candidate_commit\": \"\",\n        \"governance_checked_at\": \"\",\n        \"governance_details\": \"\",\n        \"governance_message\": \"\",\n        \"meta_rule_state\": \"unclassified\",\n        \"product_state\": \"unclassified\",\n        \"quality_candidate_commit\": \"b831779bd97a2d4356020319f6cb600ec2f55928\",\n        \"quality_checked_at\": \"2026-09-10T14:19:47Z\",\n        \"quality_details\": {\n          \"candidate_commit\": \"b831779bd97a2d4356020319f6cb600ec2f55928\",\n          \"cwd\": \"/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T12V8K3M05Q6JSVEMJ000-round-1\",\n          \"diagnostics\": [\n            \"Event invocation fcbdf3d837ff0f725fe767be3fca3a504dc65d1b0b9a658a575ab59292a3530c: automation/invocations/fcbdf3d837ff0f725fe767be3fca3a504dc65d1b0b9a658a575ab59292a3530c.json\",\n            \"Observed supervised process proc-1789049968114-1129590-294 exited 0. stdout: (54.374702ms)\\n✔ native paste is sent exactly once instead of being reprocessed by xterm (27.721425ms)\\n✔ terminal-specific fallback errors are visible and suppress terminal interpretation (83.659596ms)\\n✔ an asynchronous paste cannot cross into a replacement managed session (30.729113ms)\\n✔ clipboard text buffered before replacement cannot cross managed sessions (29.679934ms)\\n✔ clipboard shortcuts remain untouched when focus is outside a terminal (29.284218ms)\\n✔ Cmd clipboard shortcuts yield to native browser events (29.399799ms)\\n✔ terminal-specific fallback performs one operation and ignores key repeat (28.55452ms)\\n✔ pending read results and errors cannot affect an inactive terminal (224.581415ms)\\n✔ native keyboard clipboard works with async access allowed (1022.094551ms)\\n✔ native keyboard clipboard works with async access denied (993.309675ms)\\n✔ native keyboard clipboard works with async access unavailable (1034.039086ms)\\n✔ selection overrides mouse capture on Linux x86_64 (1120.951613ms)\\n✔ selection overrides mouse capture on Win32 (1107.740578ms)\\n✔ selection overrides mouse capture on MacIntel (1076.770018ms)\\n✔ context-menu clipboard path with async access allowed (922.423322ms)\\n✔ context-menu clipboard path with async access denied (1000.680141ms)\\n✔ context-menu clipboard path with async access unavailable (848.085615ms)\\n✔ native keyboard gestures survive actual browser permission denial (852.676415ms)\\n✔ terminal-specific fallback is singular and reports actual permission denial (905.259566ms)\\n✔ Ctrl+Insert and Shift+Insert use native clipboard events exactly once (826.416824ms)\\n✔ all profiles and both provider fixtures retain native clipboard and key semantics (4040.102272ms)\\n✔ retained renderer remounts and outside focus preserve one clipboard operation (1383.133297ms)\\n✔ pending fallback paste is fenced by tab, focus, exit, and session replacement (800.57924ms)\\nℹ tests 75\\nℹ suites 0\\nℹ pass 75\\nℹ fail 0\\nℹ cancelled 0\\nℹ skipped 0\\nℹ todo 0\\nℹ duration_ms 18507.753446\",\n            \"Observed supervised process proc-1789049986862-1129590-297 exited 0. stdout: ✔ the initial Goal log request fetches the newest page and displays it chronologically (15.74866ms)\\n✔ the first Goal SSE log reaches the toolbar and replayed entries stay deduplicated (6.260128ms)\\n✔ main SSE transport reconnects in place and reconciles durable visible state (3.715158ms)\\n✔ background operations use SSE after one durable registration read (10.475238ms)\\n✔ Goal log search covers trail content and Head/Tail changes visible order (2.628102ms)\\n✔ Goal log stream renders safe formatted messages and validated action links (11.082791ms)\\n✔ Goal log search and stream order persist with the toolbar tab (1.810342ms)\\nℹ tests 7\\nℹ suites 0\\nℹ pass 7\\nℹ fail 0\\nℹ cancelled 0\\nℹ skipped 0\\nℹ todo 0\\nℹ duration_ms 195.443217\",\n            \"Observed supervised process proc-1789049987296-1129590-300 exited 0.\",\n            \"Observed supervised process proc-1789049987513-1129590-303 exited 0.\"\n          ],\n          \"evaluation_scope\": \"isolated_candidate\",\n          \"operation_id\": \"1a08bad36a4113c761e\",\n          \"provider_attempts\": [],\n          \"quality_proof\": {\n            \"checked_at\": \"2026-09-10T14:19:47Z\",\n            \"checked_candidate_commit\": \"b831779bd97a2d4356020319f6cb600ec2f55928\",\n            \"evaluation_scope\": \"isolated_candidate\",\n            \"goal_id\": \"00000T12V8K3M05Q6JSVEMJ000\",\n            \"operation_id\": \"1a08bad36a4113c761e\",\n            \"results\": [\n              {\n                \"command\": \"NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules node --test tests/web_terminal_clipboard.test.js tests/web_terminal_clipboard_browser.test.js tests/web_supervisor_toolbar.test.js tests/web_command_palette.test.js tests/web_javascript_syntax.test.js\",\n                \"evidence\": \"Observed supervised process proc-1789049968114-1129590-294 exited 0. stdout: (54.374702ms)\\n✔ native paste is sent exactly once instead of being reprocessed by xterm (27.721425ms)\\n✔ terminal-specific fallback errors are visible and suppress terminal interpretation (83.659596ms)\\n✔ an asynchronous paste cannot cross into a replacement managed session (30.729113ms)\\n✔ clipboard text buffered before replacement cannot cross managed sessions (29.679934ms)\\n✔ clipboard shortcuts remain untouched when focus is outside a terminal (29.284218ms)\\n✔ Cmd clipboard shortcuts yield to native browser events (29.399799ms)\\n✔ terminal-specific fallback performs one operation and ignores key repeat (28.55452ms)\\n✔ pending read results and errors cannot affect an inactive terminal (224.581415ms)\\n✔ native keyboard clipboard works with async access allowed (1022.094551ms)\\n✔ native keyboard clipboard works with async access denied (993.309675ms)\\n✔ native keyboard clipboard works with async access unavailable (1034.039086ms)\\n✔ selection overrides mouse capture on Linux x86_64 (1120.951613ms)\\n✔ selection overrides mouse capture on Win32 (1107.740578ms)\\n✔ selection overrides mouse capture on MacIntel (1076.770018ms)\\n✔ context-menu clipboard path with async access allowed (922.423322ms)\\n✔ context-menu clipboard path with async access denied (1000.680141ms)\\n✔ context-menu clipboard path with async access unavailable (848.085615ms)\\n✔ native keyboard gestures survive actual browser permission denial (852.676415ms)\\n✔ terminal-specific fallback is singular and reports actual permission denial (905.259566ms)\\n✔ Ctrl+Insert and Shift+Insert use native clipboard events exactly once (826.416824ms)\\n✔ all profiles and both provider fixtures retain native clipboard and key semantics (4040.102272ms)\\n✔ retained renderer remounts and outside focus preserve one clipboard operation (1383.133297ms)\\n✔ pending fallback paste is fenced by tab, focus, exit, and session replacement (800.57924ms)\\nℹ tests 75\\nℹ suites 0\\nℹ pass 75\\nℹ fail 0\\nℹ cancelled 0\\nℹ skipped 0\\nℹ todo 0\\nℹ duration_ms 18507.753446\",\n                \"exit_code\": 0,\n                \"process_id\": \"proc-1789049968114-1129590-294\",\n                \"status\": \"passed\",\n                \"test\": \"workflow.quality.enter:default-quality: Clipboard behavior, selection during mouse capture, session fencing, terminal controls, toolbar lifecycle, command-palette precedence, and shipped JavaScript syntax\"\n              },\n              {\n                \"command\": \"node --test tests/web_goal_log_tail.test.js\",\n                \"evidence\": \"Observed supervised process proc-1789049986862-1129590-297 exited 0. stdout: ✔ the initial Goal log request fetches the newest page and displays it chronologically (15.74866ms)\\n✔ the first Goal SSE log reaches the toolbar and replayed entries stay deduplicated (6.260128ms)\\n✔ main SSE transport reconnects in place and reconciles durable visible state (3.715158ms)\\n✔ background operations use SSE after one durable registration read (10.475238ms)\\n✔ Goal log search covers trail content and Head/Tail changes visible order (2.628102ms)\\n✔ Goal log stream renders safe formatted messages and validated action links (11.082791ms)\\n✔ Goal log search and stream order persist with the toolbar tab (1.810342ms)\\nℹ tests 7\\nℹ suites 0\\nℹ pass 7\\nℹ fail 0\\nℹ cancelled 0\\nℹ skipped 0\\nℹ todo 0\\nℹ duration_ms 195.443217\",\n                \"exit_code\": 0,\n                \"process_id\": \"proc-1789049986862-1129590-297\",\n                \"status\": \"passed\",\n                \"test\": \"workflow.quality.enter:default-quality: Affected Goal-log loader and retained log behavior\"\n              },\n              {\n                \"command\": \"node --check tests/support/claude-clipboard-smoke.js\",\n                \"evidence\": \"Observed supervised process proc-1789049987296-1129590-300 exited 0.\",\n                \"exit_code\": 0,\n                \"process_id\": \"proc-1789049987296-1129590-300\",\n                \"status\": \"passed\",\n                \"test\": \"workflow.quality.enter:default-quality: Claude smoke-helper syntax\"\n              },\n              {\n                \"command\": \"git diff --check f880b7767149e4de43d5bc4d4786247d1e536a8c..b831779bd97a2d4356020319f6cb600ec2f55928\",\n                \"evidence\": \"Observed supervised process proc-1789049987513-1129590-303 exited 0.\",\n                \"exit_code\": 0,\n                \"process_id\": \"proc-1789049987513-1129590-303\",\n                \"status\": \"passed\",\n                \"test\": \"workflow.quality.enter:default-quality: Candidate diff integrity\"\n              }\n            ],\n            \"round_idx\": 0,\n            \"schema_version\": 1,\n            \"source_candidate_commit\": \"b831779bd97a2d4356020319f6cb600ec2f55928\",\n            \"state\": \"passed\"\n          },\n          \"results\": [\n            {\n              \"command\": \"NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules node --test tests/web_terminal_clipboard.test.js tests/web_terminal_clipboard_browser.test.js tests/web_supervisor_toolbar.test.js tests/web_command_palette.test.js tests/web_javascript_syntax.test.js\",\n              \"evidence\": \"Observed supervised process proc-1789049968114-1129590-294 exited 0. stdout: (54.374702ms)\\n✔ native paste is sent exactly once instead of being reprocessed by xterm (27.721425ms)\\n✔ terminal-specific fallback errors are visible and suppress terminal interpretation (83.659596ms)\\n✔ an asynchronous paste cannot cross into a replacement managed session (30.729113ms)\\n✔ clipboard text buffered before replacement cannot cross managed sessions (29.679934ms)\\n✔ clipboard shortcuts remain untouched when focus is outside a terminal (29.284218ms)\\n✔ Cmd clipboard shortcuts yield to native browser events (29.399799ms)\\n✔ terminal-specific fallback performs one operation and ignores key repeat (28.55452ms)\\n✔ pending read results and errors cannot affect an inactive terminal (224.581415ms)\\n✔ native keyboard clipboard works with async access allowed (1022.094551ms)\\n✔ native keyboard clipboard works with async access denied (993.309675ms)\\n✔ native keyboard clipboard works with async access unavailable (1034.039086ms)\\n✔ selection overrides mouse capture on Linux x86_64 (1120.951613ms)\\n✔ selection overrides mouse capture on Win32 (1107.740578ms)\\n✔ selection overrides mouse capture on MacIntel (1076.770018ms)\\n✔ context-menu clipboard path with async access allowed (922.423322ms)\\n✔ context-menu clipboard path with async access denied (1000.680141ms)\\n✔ context-menu clipboard path with async access unavailable (848.085615ms)\\n✔ native keyboard gestures survive actual browser permission denial (852.676415ms)\\n✔ terminal-specific fallback is singular and reports actual permission denial (905.259566ms)\\n✔ Ctrl+Insert and Shift+Insert use native clipboard events exactly once (826.416824ms)\\n✔ all profiles and both provider fixtures retain native clipboard and key semantics (4040.102272ms)\\n✔ retained renderer remounts and outside focus preserve one clipboard operation (1383.133297ms)\\n✔ pending fallback paste is fenced by tab, focus, exit, and session replacement (800.57924ms)\\nℹ tests 75\\nℹ suites 0\\nℹ pass 75\\nℹ fail 0\\nℹ cancelled 0\\nℹ skipped 0\\nℹ todo 0\\nℹ duration_ms 18507.753446\",\n              \"exit_code\": 0,\n              \"process_id\": \"proc-1789049968114-1129590-294\",\n              \"status\": \"passed\",\n              \"test\": \"workflow.quality.enter:default-quality: Clipboard behavior, selection during mouse capture, session fencing, terminal controls, toolbar lifecycle, command-palette precedence, and shipped JavaScript syntax\"\n            },\n            {\n              \"command\": \"node --test tests/web_goal_log_tail.test.js\",\n              \"evidence\": \"Observed supervised process proc-1789049986862-1129590-297 exited 0. stdout: ✔ the initial Goal log request fetches the newest page and displays it chronologically (15.74866ms)\\n✔ the first Goal SSE log reaches the toolbar and replayed entries stay deduplicated (6.260128ms)\\n✔ main SSE transport reconnects in place and reconciles durable visible state (3.715158ms)\\n✔ background operations use SSE after one durable registration read (10.475238ms)\\n✔ Goal log search covers trail content and Head/Tail changes visible order (2.628102ms)\\n✔ Goal log stream renders safe formatted messages and validated action links (11.082791ms)\\n✔ Goal log search and stream order persist with the toolbar tab (1.810342ms)\\nℹ tests 7\\nℹ suites 0\\nℹ pass 7\\nℹ fail 0\\nℹ cancelled 0\\nℹ skipped 0\\nℹ todo 0\\nℹ duration_ms 195.443217\",\n              \"exit_code\": 0,\n              \"process_id\": \"proc-1789049986862-1129590-297\",\n              \"status\": \"passed\",\n              \"test\": \"workflow.quality.enter:default-quality: Affected Goal-log loader and retained log behavior\"\n            },\n            {\n              \"command\": \"node --check tests/support/claude-clipboard-smoke.js\",\n              \"evidence\": \"Observed supervised process proc-1789049987296-1129590-300 exited 0.\",\n              \"exit_code\": 0,\n              \"process_id\": \"proc-1789049987296-1129590-300\",\n              \"status\": \"passed\",\n              \"test\": \"workflow.quality.enter:default-quality: Claude smoke-helper syntax\"\n            },\n            {\n              \"command\": \"git diff --check f880b7767149e4de43d5bc4d4786247d1e536a8c..b831779bd97a2d4356020319f6cb600ec2f55928\",\n              \"evidence\": \"Observed supervised process proc-1789049987513-1129590-303 exited 0.\",\n              \"exit_code\": 0,\n              \"process_id\": \"proc-1789049987513-1129590-303\",\n              \"status\": \"passed\",\n              \"test\": \"workflow.quality.enter:default-quality: Candidate diff integrity\"\n            }\n          ],\n          \"source_candidate_commit\": \"b831779bd97a2d4356020319f6cb600ec2f55928\"\n        },\n        \"quality_message\": \"All Quality Skills passed with supervised evidence.\",\n        \"quality_state\": \"passed\",\n        \"rule_state\": \"unclassified\"\n      },\n      \"refreshed_at\": \"2026-09-10T14:25:05Z\",\n      \"replacement_base_commit\": \"7b430a6a3bc0d692f03e71da68d06f3e9534dead\",\n      \"replacement_candidate_commit\": \"e93801fca1a1991ce4389799268de315aded1ae8\",\n      \"round_idx\": 0,\n      \"state\": \"refreshed\",\n      \"workflow_revision\": 2,\n      \"worktree\": \"/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T12V8K3M05Q6JSVEMJ000-round-1\"\n    },\n    \"quality_diagnostics\": [\n      \"Event invocation be9b4f45ce0f36fdd91977d172e1c07c2755b497c484a49ef378995250b4a1b1: automation/invocations/be9b4f45ce0f36fdd91977d172e1c07c2755b497c484a49ef378995250b4a1b1.json\"\n    ],\n    \"quality_results\": [\n      {\n        \"command\": \"\",\n        \"evidence\": \"The refreshed candidate passes the planned checks but fails nine relevant clipboard recovery regressions. The inherited tests still assume Ctrl+C invokes asynchronous clipboard writes.\",\n        \"status\": \"failed\",\n        \"test\": \"workflow.quality.enter:default-quality\"\n      }\n    ],\n    \"quality_summary\": \"Quality failed: “workflow.quality.enter:default-quality” — The refreshed candidate passes the planned checks but fails nine relevant clipboard recovery regressions. The inherited tests still assume Ctrl+C invokes asynchronous clipboard writes.\",\n    \"replacement_candidate_commit\": \"e93801fca1a1991ce4389799268de315aded1ae8\"\n  },\n  \"source_round\": 1,\n  \"state\": \"queued\",\n  \"successor_round\": 2,\n  \"workflow_revision\": 2\n}\n```\n\nRe-evaluate the current Round request from the current target branch. Reapply only the intended candidate delta, resolve conflicts deliberately, and rerun exact-candidate Quality and Governance before integration. Do not move, delete, or rewrite the retained original candidate or its evidence.",
+            "quality_checked_at": "",
+            "quality_details": "",
+            "quality_message": "",
+            "quality_state": "unclassified",
+            "reporter": "Refine",
+            "rule_state": "unclassified",
+            "updated": "2026-09-10T14:28:44Z",
+            "workflow_attempt_authority": {
+              "claimed_at": "2026-09-10T14:28:43Z",
+              "round_idx": 1,
+              "workflow_revision": 34
+            },
+            "workflow_reconciliation": null,
+            "workflow_recovery": {
+              "attempt": 1,
+              "kind": "integration",
+              "max_automatic_round_retries": 5,
+              "node_id": "default",
+              "reason": "replacement candidate failed exact-candidate Quality",
+              "recorded_at": "2026-09-10T14:28:43Z",
+              "retained_evidence": {
+                "candidate_refresh": {
+                  "authorizing_status": "governance",
+                  "branch": "refine/00000T12V8K3M05Q6JSVEMJ000/round-1",
+                  "conflict_resolution": {
+                    "attempts": [
+                      {
+                        "attempt": 1,
+                        "files": [
+                          "docs/intent/05-surfaces/03-browser/19-terminal.md",
+                          "src/surfaces/web/static/js/features/terminal-clipboard.js",
+                          "src/surfaces/web/static/js/features/toolbar.js",
+                          "tests/web_terminal_clipboard.test.js",
+                          "tests/web_terminal_clipboard_browser.test.js"
+                        ],
+                        "outcome": "accepted"
+                      }
+                    ],
+                    "files": [
+                      "docs/intent/05-surfaces/03-browser/19-terminal.md",
+                      "src/surfaces/web/static/js/features/terminal-clipboard.js",
+                      "src/surfaces/web/static/js/features/toolbar.js",
+                      "tests/web_terminal_clipboard.test.js",
+                      "tests/web_terminal_clipboard_browser.test.js"
+                    ],
+                    "outcome": "resolved"
+                  },
+                  "node_id": "default",
+                  "original_base_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+                  "original_candidate_commit": "b831779bd97a2d4356020319f6cb600ec2f55928",
+                  "previous_gate_evidence": {
+                    "constitution_state": "unclassified",
+                    "governance_candidate_commit": "",
+                    "governance_checked_at": "",
+                    "governance_details": "",
+                    "governance_message": "",
+                    "meta_rule_state": "unclassified",
+                    "product_state": "unclassified",
+                    "quality_candidate_commit": "b831779bd97a2d4356020319f6cb600ec2f55928",
+                    "quality_checked_at": "2026-09-10T14:19:47Z",
+                    "quality_details": {
+                      "candidate_commit": "b831779bd97a2d4356020319f6cb600ec2f55928",
+                      "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T12V8K3M05Q6JSVEMJ000-round-1",
+                      "diagnostics": [
+                        "Event invocation fcbdf3d837ff0f725fe767be3fca3a504dc65d1b0b9a658a575ab59292a3530c: automation/invocations/fcbdf3d837ff0f725fe767be3fca3a504dc65d1b0b9a658a575ab59292a3530c.json",
+                        "Observed supervised process proc-1789049968114-1129590-294 exited 0. stdout: (54.374702ms)\n✔ native paste is sent exactly once instead of being reprocessed by xterm (27.721425ms)\n✔ terminal-specific fallback errors are visible and suppress terminal interpretation (83.659596ms)\n✔ an asynchronous paste cannot cross into a replacement managed session (30.729113ms)\n✔ clipboard text buffered before replacement cannot cross managed sessions (29.679934ms)\n✔ clipboard shortcuts remain untouched when focus is outside a terminal (29.284218ms)\n✔ Cmd clipboard shortcuts yield to native browser events (29.399799ms)\n✔ terminal-specific fallback performs one operation and ignores key repeat (28.55452ms)\n✔ pending read results and errors cannot affect an inactive terminal (224.581415ms)\n✔ native keyboard clipboard works with async access allowed (1022.094551ms)\n✔ native keyboard clipboard works with async access denied (993.309675ms)\n✔ native keyboard clipboard works with async access unavailable (1034.039086ms)\n✔ selection overrides mouse capture on Linux x86_64 (1120.951613ms)\n✔ selection overrides mouse capture on Win32 (1107.740578ms)\n✔ selection overrides mouse capture on MacIntel (1076.770018ms)\n✔ context-menu clipboard path with async access allowed (922.423322ms)\n✔ context-menu clipboard path with async access denied (1000.680141ms)\n✔ context-menu clipboard path with async access unavailable (848.085615ms)\n✔ native keyboard gestures survive actual browser permission denial (852.676415ms)\n✔ terminal-specific fallback is singular and reports actual permission denial (905.259566ms)\n✔ Ctrl+Insert and Shift+Insert use native clipboard events exactly once (826.416824ms)\n✔ all profiles and both provider fixtures retain native clipboard and key semantics (4040.102272ms)\n✔ retained renderer remounts and outside focus preserve one clipboard operation (1383.133297ms)\n✔ pending fallback paste is fenced by tab, focus, exit, and session replacement (800.57924ms)\nℹ tests 75\nℹ suites 0\nℹ pass 75\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 18507.753446",
+                        "Observed supervised process proc-1789049986862-1129590-297 exited 0. stdout: ✔ the initial Goal log request fetches the newest page and displays it chronologically (15.74866ms)\n✔ the first Goal SSE log reaches the toolbar and replayed entries stay deduplicated (6.260128ms)\n✔ main SSE transport reconnects in place and reconciles durable visible state (3.715158ms)\n✔ background operations use SSE after one durable registration read (10.475238ms)\n✔ Goal log search covers trail content and Head/Tail changes visible order (2.628102ms)\n✔ Goal log stream renders safe formatted messages and validated action links (11.082791ms)\n✔ Goal log search and stream order persist with the toolbar tab (1.810342ms)\nℹ tests 7\nℹ suites 0\nℹ pass 7\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 195.443217",
+                        "Observed supervised process proc-1789049987296-1129590-300 exited 0.",
+                        "Observed supervised process proc-1789049987513-1129590-303 exited 0."
+                      ],
+                      "evaluation_scope": "isolated_candidate",
+                      "operation_id": "1a08bad36a4113c761e",
+                      "provider_attempts": [],
+                      "quality_proof": {
+                        "checked_at": "2026-09-10T14:19:47Z",
+                        "checked_candidate_commit": "b831779bd97a2d4356020319f6cb600ec2f55928",
+                        "evaluation_scope": "isolated_candidate",
+                        "goal_id": "00000T12V8K3M05Q6JSVEMJ000",
+                        "operation_id": "1a08bad36a4113c761e",
+                        "results": [
+                          {
+                            "command": "NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules node --test tests/web_terminal_clipboard.test.js tests/web_terminal_clipboard_browser.test.js tests/web_supervisor_toolbar.test.js tests/web_command_palette.test.js tests/web_javascript_syntax.test.js",
+                            "evidence": "Observed supervised process proc-1789049968114-1129590-294 exited 0. stdout: (54.374702ms)\n✔ native paste is sent exactly once instead of being reprocessed by xterm (27.721425ms)\n✔ terminal-specific fallback errors are visible and suppress terminal interpretation (83.659596ms)\n✔ an asynchronous paste cannot cross into a replacement managed session (30.729113ms)\n✔ clipboard text buffered before replacement cannot cross managed sessions (29.679934ms)\n✔ clipboard shortcuts remain untouched when focus is outside a terminal (29.284218ms)\n✔ Cmd clipboard shortcuts yield to native browser events (29.399799ms)\n✔ terminal-specific fallback performs one operation and ignores key repeat (28.55452ms)\n✔ pending read results and errors cannot affect an inactive terminal (224.581415ms)\n✔ native keyboard clipboard works with async access allowed (1022.094551ms)\n✔ native keyboard clipboard works with async access denied (993.309675ms)\n✔ native keyboard clipboard works with async access unavailable (1034.039086ms)\n✔ selection overrides mouse capture on Linux x86_64 (1120.951613ms)\n✔ selection overrides mouse capture on Win32 (1107.740578ms)\n✔ selection overrides mouse capture on MacIntel (1076.770018ms)\n✔ context-menu clipboard path with async access allowed (922.423322ms)\n✔ context-menu clipboard path with async access denied (1000.680141ms)\n✔ context-menu clipboard path with async access unavailable (848.085615ms)\n✔ native keyboard gestures survive actual browser permission denial (852.676415ms)\n✔ terminal-specific fallback is singular and reports actual permission denial (905.259566ms)\n✔ Ctrl+Insert and Shift+Insert use native clipboard events exactly once (826.416824ms)\n✔ all profiles and both provider fixtures retain native clipboard and key semantics (4040.102272ms)\n✔ retained renderer remounts and outside focus preserve one clipboard operation (1383.133297ms)\n✔ pending fallback paste is fenced by tab, focus, exit, and session replacement (800.57924ms)\nℹ tests 75\nℹ suites 0\nℹ pass 75\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 18507.753446",
+                            "exit_code": 0,
+                            "process_id": "proc-1789049968114-1129590-294",
+                            "status": "passed",
+                            "test": "workflow.quality.enter:default-quality: Clipboard behavior, selection during mouse capture, session fencing, terminal controls, toolbar lifecycle, command-palette precedence, and shipped JavaScript syntax"
+                          },
+                          {
+                            "command": "node --test tests/web_goal_log_tail.test.js",
+                            "evidence": "Observed supervised process proc-1789049986862-1129590-297 exited 0. stdout: ✔ the initial Goal log request fetches the newest page and displays it chronologically (15.74866ms)\n✔ the first Goal SSE log reaches the toolbar and replayed entries stay deduplicated (6.260128ms)\n✔ main SSE transport reconnects in place and reconciles durable visible state (3.715158ms)\n✔ background operations use SSE after one durable registration read (10.475238ms)\n✔ Goal log search covers trail content and Head/Tail changes visible order (2.628102ms)\n✔ Goal log stream renders safe formatted messages and validated action links (11.082791ms)\n✔ Goal log search and stream order persist with the toolbar tab (1.810342ms)\nℹ tests 7\nℹ suites 0\nℹ pass 7\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 195.443217",
+                            "exit_code": 0,
+                            "process_id": "proc-1789049986862-1129590-297",
+                            "status": "passed",
+                            "test": "workflow.quality.enter:default-quality: Affected Goal-log loader and retained log behavior"
+                          },
+                          {
+                            "command": "node --check tests/support/claude-clipboard-smoke.js",
+                            "evidence": "Observed supervised process proc-1789049987296-1129590-300 exited 0.",
+                            "exit_code": 0,
+                            "process_id": "proc-1789049987296-1129590-300",
+                            "status": "passed",
+                            "test": "workflow.quality.enter:default-quality: Claude smoke-helper syntax"
+                          },
+                          {
+                            "command": "git diff --check f880b7767149e4de43d5bc4d4786247d1e536a8c..b831779bd97a2d4356020319f6cb600ec2f55928",
+                            "evidence": "Observed supervised process proc-1789049987513-1129590-303 exited 0.",
+                            "exit_code": 0,
+                            "process_id": "proc-1789049987513-1129590-303",
+                            "status": "passed",
+                            "test": "workflow.quality.enter:default-quality: Candidate diff integrity"
+                          }
+                        ],
+                        "round_idx": 0,
+                        "schema_version": 1,
+                        "source_candidate_commit": "b831779bd97a2d4356020319f6cb600ec2f55928",
+                        "state": "passed"
+                      },
+                      "results": [
+                        {
+                          "command": "NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules node --test tests/web_terminal_clipboard.test.js tests/web_terminal_clipboard_browser.test.js tests/web_supervisor_toolbar.test.js tests/web_command_palette.test.js tests/web_javascript_syntax.test.js",
+                          "evidence": "Observed supervised process proc-1789049968114-1129590-294 exited 0. stdout: (54.374702ms)\n✔ native paste is sent exactly once instead of being reprocessed by xterm (27.721425ms)\n✔ terminal-specific fallback errors are visible and suppress terminal interpretation (83.659596ms)\n✔ an asynchronous paste cannot cross into a replacement managed session (30.729113ms)\n✔ clipboard text buffered before replacement cannot cross managed sessions (29.679934ms)\n✔ clipboard shortcuts remain untouched when focus is outside a terminal (29.284218ms)\n✔ Cmd clipboard shortcuts yield to native browser events (29.399799ms)\n✔ terminal-specific fallback performs one operation and ignores key repeat (28.55452ms)\n✔ pending read results and errors cannot affect an inactive terminal (224.581415ms)\n✔ native keyboard clipboard works with async access allowed (1022.094551ms)\n✔ native keyboard clipboard works with async access denied (993.309675ms)\n✔ native keyboard clipboard works with async access unavailable (1034.039086ms)\n✔ selection overrides mouse capture on Linux x86_64 (1120.951613ms)\n✔ selection overrides mouse capture on Win32 (1107.740578ms)\n✔ selection overrides mouse capture on MacIntel (1076.770018ms)\n✔ context-menu clipboard path with async access allowed (922.423322ms)\n✔ context-menu clipboard path with async access denied (1000.680141ms)\n✔ context-menu clipboard path with async access unavailable (848.085615ms)\n✔ native keyboard gestures survive actual browser permission denial (852.676415ms)\n✔ terminal-specific fallback is singular and reports actual permission denial (905.259566ms)\n✔ Ctrl+Insert and Shift+Insert use native clipboard events exactly once (826.416824ms)\n✔ all profiles and both provider fixtures retain native clipboard and key semantics (4040.102272ms)\n✔ retained renderer remounts and outside focus preserve one clipboard operation (1383.133297ms)\n✔ pending fallback paste is fenced by tab, focus, exit, and session replacement (800.57924ms)\nℹ tests 75\nℹ suites 0\nℹ pass 75\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 18507.753446",
+                          "exit_code": 0,
+                          "process_id": "proc-1789049968114-1129590-294",
+                          "status": "passed",
+                          "test": "workflow.quality.enter:default-quality: Clipboard behavior, selection during mouse capture, session fencing, terminal controls, toolbar lifecycle, command-palette precedence, and shipped JavaScript syntax"
+                        },
+                        {
+                          "command": "node --test tests/web_goal_log_tail.test.js",
+                          "evidence": "Observed supervised process proc-1789049986862-1129590-297 exited 0. stdout: ✔ the initial Goal log request fetches the newest page and displays it chronologically (15.74866ms)\n✔ the first Goal SSE log reaches the toolbar and replayed entries stay deduplicated (6.260128ms)\n✔ main SSE transport reconnects in place and reconciles durable visible state (3.715158ms)\n✔ background operations use SSE after one durable registration read (10.475238ms)\n✔ Goal log search covers trail content and Head/Tail changes visible order (2.628102ms)\n✔ Goal log stream renders safe formatted messages and validated action links (11.082791ms)\n✔ Goal log search and stream order persist with the toolbar tab (1.810342ms)\nℹ tests 7\nℹ suites 0\nℹ pass 7\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 195.443217",
+                          "exit_code": 0,
+                          "process_id": "proc-1789049986862-1129590-297",
+                          "status": "passed",
+                          "test": "workflow.quality.enter:default-quality: Affected Goal-log loader and retained log behavior"
+                        },
+                        {
+                          "command": "node --check tests/support/claude-clipboard-smoke.js",
+                          "evidence": "Observed supervised process proc-1789049987296-1129590-300 exited 0.",
+                          "exit_code": 0,
+                          "process_id": "proc-1789049987296-1129590-300",
+                          "status": "passed",
+                          "test": "workflow.quality.enter:default-quality: Claude smoke-helper syntax"
+                        },
+                        {
+                          "command": "git diff --check f880b7767149e4de43d5bc4d4786247d1e536a8c..b831779bd97a2d4356020319f6cb600ec2f55928",
+                          "evidence": "Observed supervised process proc-1789049987513-1129590-303 exited 0.",
+                          "exit_code": 0,
+                          "process_id": "proc-1789049987513-1129590-303",
+                          "status": "passed",
+                          "test": "workflow.quality.enter:default-quality: Candidate diff integrity"
+                        }
+                      ],
+                      "source_candidate_commit": "b831779bd97a2d4356020319f6cb600ec2f55928"
+                    },
+                    "quality_message": "All Quality Skills passed with supervised evidence.",
+                    "quality_state": "passed",
+                    "rule_state": "unclassified"
+                  },
+                  "refreshed_at": "2026-09-10T14:25:05Z",
+                  "replacement_base_commit": "7b430a6a3bc0d692f03e71da68d06f3e9534dead",
+                  "replacement_candidate_commit": "e93801fca1a1991ce4389799268de315aded1ae8",
+                  "round_idx": 0,
+                  "state": "refreshed",
+                  "workflow_revision": 2,
+                  "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T12V8K3M05Q6JSVEMJ000-round-1"
+                },
+                "quality_diagnostics": [
+                  "Event invocation be9b4f45ce0f36fdd91977d172e1c07c2755b497c484a49ef378995250b4a1b1: automation/invocations/be9b4f45ce0f36fdd91977d172e1c07c2755b497c484a49ef378995250b4a1b1.json"
+                ],
+                "quality_results": [
+                  {
+                    "command": "",
+                    "evidence": "The refreshed candidate passes the planned checks but fails nine relevant clipboard recovery regressions. The inherited tests still assume Ctrl+C invokes asynchronous clipboard writes.",
+                    "status": "failed",
+                    "test": "workflow.quality.enter:default-quality"
+                  }
+                ],
+                "quality_summary": "Quality failed: “workflow.quality.enter:default-quality” — The refreshed candidate passes the planned checks but fails nine relevant clipboard recovery regressions. The inherited tests still assume Ctrl+C invokes asynchronous clipboard writes.",
+                "replacement_candidate_commit": "e93801fca1a1991ce4389799268de315aded1ae8"
+              },
+              "source_round": 1,
+              "state": "queued",
+              "successor_round": 2,
+              "workflow_revision": 2
+            }
+          }
+        ],
+        "status": "plan",
+        "target_branch": "main",
+        "updated": "2026-09-10T14:28:44Z",
+        "workflow_revision": 42
+      },
+      "system": {
+        "candidate_commit": null,
+        "node_id": "default",
+        "project_root": "/home/buddy/projects/refine-next",
+        "workflow_step": "plan",
+        "workspace": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T12V8K3M05Q6JSVEMJ000-round-2"
+      }
+    },
+    "metadata": {
+      "behavior": "EventSkill",
+      "event_operation_id": "1a08bb893cb113c7624",
+      "goal_id": "00000T12V8K3M05Q6JSVEMJ000",
+      "kind": "workflow",
+      "node_id": "default",
+      "provider": "codex",
+      "round_idx": 1,
+      "target_app_id": "/home/buddy/projects/refine-next",
+      "workflow_revision": 34,
+      "workflow_state": "plan"
+    }
+  },
+  "bindings": [
+    {
+      "binding": {
+        "id": "default-plan",
+        "skill_id": "default-plan",
+        "enabled": true,
+        "mode": "blocking",
+        "order": 0,
+        "scope": {
+          "node_id": null
+        },
+        "overrides": null,
+        "inputs": {}
+      },
+      "skill": {
+        "id": "default-plan",
+        "name": "Plan",
+        "prompt": "## Plan\n\nProduce a complete, concise implementation plan for the current Goal Round. Inspect the repository and applicable context, resolve assumptions, consider alternatives and critique your proposed solution before finalizing it. Choose the planning method appropriate to the work. For a scoped finding recovery Round, focus the plan on the requested correction against the retained candidate. Do not change repository files. Return an actionable plan with stable checklist IDs and meaningful verification.\n\n## Intent and architecture\n\nApplicability: Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract.\n\nUse the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Model, Application, Infrastructure, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.\n\nFor this project on the current Default node, /home/buddy/projects/refine-next is the target development checkout and /home/buddy/projects/refine is the serving Refine installation. Use the invocation's pinned workspace (the managed Goal Round worktree when supplied) for code changes and verification, and read the relevant intent from that candidate. Verify paths from the current invocation and runtime before operating on another node. Source promotion and restarting the serving installation are separate operator actions; an ordinary implementation or Quality run should not deploy its candidate or restart the daemon that is supervising it.\n\n## Cohesive code files\n\nApplicability: Apply whenever an agent adds or changes code files in any language.\n\nKeep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.\n",
+        "role": "plan",
+        "enabled": true,
+        "scope": {
+          "node_id": null
+        },
+        "parameters": [],
+        "provenance": "refine-default-v1"
+      },
+      "parameters": {}
+    }
+  ],
+  "state": "running",
+  "results": {},
+  "attempts": [],
+  "created_at": "2026-09-10T14:28:44.596681292+00:00",
+  "completed_at": null,
+  "error": null,
+  "action_applied": false
+}
