@@ -1600,11 +1600,103 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "failed",
+  "results": {
+    "default-quality": {
+      "invocation_id": "a76f8af449310af3063d1325d55154287e455209e0dfd8f56a970fe8dd642266",
+      "binding_id": "default-quality",
+      "role": "quality",
+      "outcome": "failure",
+      "summary": "Blocking finding: scheduler admission can bypass a cancelled blocking Todo Entry Skill. The pinned candidate remains unchanged.",
+      "evidence": [
+        "Verified clean HEAD be1356af9c29c6467f03f0d38341acb2d676ceba on refine/DR72ED9B21E7CB9369DBCACF88/round-3 in the supplied workspace.",
+        "Reviewed the finalized plans, relevant Skills, Events, Todo, workspace and process intent, and candidate implementation.",
+        "P1 finding, established by source inspection: cancel a pending blocking workflow.todo.enter invocation before scheduler admission. preparation.rs accepts retained cancelled evidence; runner.rs:63-68 returns the cancelled invocation without execution. workflow.rs:152-160 rejects only Error and silently omits missing binding results. require_success accepts the empty result list. The settlement loop at workflow.rs:214-225 therefore never checks that cancelled invocation, allowing approval and Todo-to-Plan materialization.",
+        "Proposed correction: require successful completion and a successful result for every applicable blocking binding. Track required invocation identities independently of returned results so cancelled or incomplete invocations cannot disappear from settlement validation.",
+        "Missing regression: extend lifecycle_tests/workflow.rs using its existing fixture. Configure blocking Todo Entry, promote to Todo, dispatch, cancel the pending invocation, claim scheduler authority, and call WorkflowTodo.advance. Assert rejection, retained Cancelled evidence, no implementation refs or checkout, and unchanged primary contents and index. Existing cancellation tests cover Goal cancellation or manual transition dispatch, not this scheduler path. No dynamic reproduction was performed during this observational invocation.",
+        "Inspected retained final logs under /tmp/dr72-round3-quality-evidence/final/: 232 passing test executions across 15 commands, zero failures and ignored tests. Compilation and Clippy recorded exit 0; the retained comparison reports eight unchanged warnings. These are prior results, not newly executed candidate verification.",
+        "All ten retained correction-file SHA-256 values match current candidate files. Current read-only formatting checks passed for all 60 changed Rust files; whitespace checks passed against both the pinned base and retained recovery candidate.",
+        "No files, Goal state, branches, integration, publication or serving processes were intentionally changed. Runtime tests below remain proposed for Refine supervision."
+      ],
+      "artifacts": {
+        "tests": [
+          {
+            "command": "cargo test --lib application::events:: -- --test-threads=1",
+            "evidence": "Proposed supervised check. Retained final run: 44 passed. The identified scheduler cancellation case needs the regression described above.",
+            "status": "pending",
+            "test": "Lifecycle execution, cancellation, recovery and settlement"
+          },
+          {
+            "command": "cargo test --lib application::workflow::tests::execution_ownership -- --test-threads=1",
+            "evidence": "Proposed supervised check. Retained final run: 7 passed, including backlog_promotion_changes_only_goal_state_and_does_not_create_worktrees.",
+            "status": "pending",
+            "test": "State-only queueing and workflow ownership"
+          },
+          {
+            "command": "cargo test --lib infrastructure::git::worktrees::tests -- --test-threads=1",
+            "evidence": "Proposed supervised check. Retained final run: 45 passed.",
+            "status": "pending",
+            "test": "Managed workspace admission and primary-checkout isolation"
+          },
+          {
+            "command": "cargo test --lib worktree_resume -- --test-threads=1",
+            "evidence": "Proposed supervised check. Retained final run: 3 passed.",
+            "status": "pending",
+            "test": "Workspace resumption"
+          },
+          {
+            "command": "cargo test --lib quality::tests:: -- --test-threads=1",
+            "evidence": "Proposed supervised check. Retained final run: 38 passed.",
+            "status": "pending",
+            "test": "Exact-candidate Quality and isolated reconciliation"
+          },
+          {
+            "command": "cargo test --lib application::workflow::tests::candidate_refresh -- --test-threads=1",
+            "evidence": "Proposed supervised check. Retained final run: 16 passed.",
+            "status": "pending",
+            "test": "Candidate refresh and recovery"
+          },
+          {
+            "command": "cargo test --lib launch_environment -- --test-threads=1",
+            "evidence": "Proposed supervised check. Retained final run: 5 passed.",
+            "status": "pending",
+            "test": "Inherited Git environment sanitization"
+          },
+          {
+            "command": "cargo check --all-targets",
+            "evidence": "Proposed supervised check. Retained final execution recorded exit 0.",
+            "status": "pending",
+            "test": "All-target compilation"
+          },
+          {
+            "command": "GIT_OPTIONAL_LOCKS=0 git diff --name-only -z b47569adb8d4c5d1d7335ba91729a3e486a38fe0 HEAD -- '*.rs' | xargs -0 -r rustfmt --check --edition 2024 --config skip_children=true",
+            "evidence": "Executed during this invocation: exit 0; 60 changed Rust files checked.",
+            "status": "passed",
+            "test": "Changed Rust formatting"
+          },
+          {
+            "command": "GIT_OPTIONAL_LOCKS=0 git diff --check b47569adb8d4c5d1d7335ba91729a3e486a38fe0 HEAD",
+            "evidence": "Executed during this invocation: exit 0.",
+            "status": "passed",
+            "test": "Candidate whitespace"
+          }
+        ]
+      }
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "default-quality",
+      "diagnostic": null,
+      "operation_id": "1a08bf3e9b4113c7650",
+      "process_id": "proc-1789054414108-1129590-768",
+      "raw_output": "{\n  \"binding_id\": \"default-quality\",\n  \"invocation_id\": \"a76f8af449310af3063d1325d55154287e455209e0dfd8f56a970fe8dd642266\",\n  \"role\": \"quality\",\n  \"outcome\": \"failure\",\n  \"summary\": \"Blocking finding: scheduler admission can bypass a cancelled blocking Todo Entry Skill. The pinned candidate remains unchanged.\",\n  \"evidence\": [\n    \"Verified clean HEAD be1356af9c29c6467f03f0d38341acb2d676ceba on refine/DR72ED9B21E7CB9369DBCACF88/round-3 in the supplied workspace.\",\n    \"Reviewed the finalized plans, relevant Skills, Events, Todo, workspace and process intent, and candidate implementation.\",\n    \"P1 finding, established by source inspection: cancel a pending blocking workflow.todo.enter invocation before scheduler admission. preparation.rs accepts retained cancelled evidence; runner.rs:63-68 returns the cancelled invocation without execution. workflow.rs:152-160 rejects only Error and silently omits missing binding results. require_success accepts the empty result list. The settlement loop at workflow.rs:214-225 therefore never checks that cancelled invocation, allowing approval and Todo-to-Plan materialization.\",\n    \"Proposed correction: require successful completion and a successful result for every applicable blocking binding. Track required invocation identities independently of returned results so cancelled or incomplete invocations cannot disappear from settlement validation.\",\n    \"Missing regression: extend lifecycle_tests/workflow.rs using its existing fixture. Configure blocking Todo Entry, promote to Todo, dispatch, cancel the pending invocation, claim scheduler authority, and call WorkflowTodo.advance. Assert rejection, retained Cancelled evidence, no implementation refs or checkout, and unchanged primary contents and index. Existing cancellation tests cover Goal cancellation or manual transition dispatch, not this scheduler path. No dynamic reproduction was performed during this observational invocation.\",\n    \"Inspected retained final logs under /tmp/dr72-round3-quality-evidence/final/: 232 passing test executions across 15 commands, zero failures and ignored tests. Compilation and Clippy recorded exit 0; the retained comparison reports eight unchanged warnings. These are prior results, not newly executed candidate verification.\",\n    \"All ten retained correction-file SHA-256 values match current candidate files. Current read-only formatting checks passed for all 60 changed Rust files; whitespace checks passed against both the pinned base and retained recovery candidate.\",\n    \"No files, Goal state, branches, integration, publication or serving processes were intentionally changed. Runtime tests below remain proposed for Refine supervision.\"\n  ],\n  \"artifacts\": {\n    \"tests\": [\n      {\n        \"test\": \"Lifecycle execution, cancellation, recovery and settlement\",\n        \"command\": \"cargo test --lib application::events:: -- --test-threads=1\",\n        \"status\": \"pending\",\n        \"evidence\": \"Proposed supervised check. Retained final run: 44 passed. The identified scheduler cancellation case needs the regression described above.\"\n      },\n      {\n        \"test\": \"State-only queueing and workflow ownership\",\n        \"command\": \"cargo test --lib application::workflow::tests::execution_ownership -- --test-threads=1\",\n        \"status\": \"pending\",\n        \"evidence\": \"Proposed supervised check. Retained final run: 7 passed, including backlog_promotion_changes_only_goal_state_and_does_not_create_worktrees.\"\n      },\n      {\n        \"test\": \"Managed workspace admission and primary-checkout isolation\",\n        \"command\": \"cargo test --lib infrastructure::git::worktrees::tests -- --test-threads=1\",\n        \"status\": \"pending\",\n        \"evidence\": \"Proposed supervised check. Retained final run: 45 passed.\"\n      },\n      {\n        \"test\": \"Workspace resumption\",\n        \"command\": \"cargo test --lib worktree_resume -- --test-threads=1\",\n        \"status\": \"pending\",\n        \"evidence\": \"Proposed supervised check. Retained final run: 3 passed.\"\n      },\n      {\n        \"test\": \"Exact-candidate Quality and isolated reconciliation\",\n        \"command\": \"cargo test --lib quality::tests:: -- --test-threads=1\",\n        \"status\": \"pending\",\n        \"evidence\": \"Proposed supervised check. Retained final run: 38 passed.\"\n      },\n      {\n        \"test\": \"Candidate refresh and recovery\",\n        \"command\": \"cargo test --lib application::workflow::tests::candidate_refresh -- --test-threads=1\",\n        \"status\": \"pending\",\n        \"evidence\": \"Proposed supervised check. Retained final run: 16 passed.\"\n      },\n      {\n        \"test\": \"Inherited Git environment sanitization\",\n        \"command\": \"cargo test --lib launch_environment -- --test-threads=1\",\n        \"status\": \"pending\",\n        \"evidence\": \"Proposed supervised check. Retained final run: 5 passed.\"\n      },\n      {\n        \"test\": \"All-target compilation\",\n        \"command\": \"cargo check --all-targets\",\n        \"status\": \"pending\",\n        \"evidence\": \"Proposed supervised check. Retained final execution recorded exit 0.\"\n      },\n      {\n        \"test\": \"Changed Rust formatting\",\n        \"command\": \"GIT_OPTIONAL_LOCKS=0 git diff --name-only -z b47569adb8d4c5d1d7335ba91729a3e486a38fe0 HEAD -- '*.rs' | xargs -0 -r rustfmt --check --edition 2024 --config skip_children=true\",\n        \"status\": \"passed\",\n        \"evidence\": \"Executed during this invocation: exit 0; 60 changed Rust files checked.\"\n      },\n      {\n        \"test\": \"Candidate whitespace\",\n        \"command\": \"GIT_OPTIONAL_LOCKS=0 git diff --check b47569adb8d4c5d1d7335ba91729a3e486a38fe0 HEAD\",\n        \"status\": \"passed\",\n        \"evidence\": \"Executed during this invocation: exit 0.\"\n      }\n    ]\n  }\n}\n",
+      "workflow_revision": 48
+    }
+  ],
   "created_at": "2026-09-10T15:33:33.721521331+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-10T15:37:27.377359981+00:00",
   "error": null,
   "action_applied": false
 }

@@ -3093,9 +3093,46 @@
       "prompt": "Correct the pre-Plan lifecycle Skill workspace regression for Goal DR72ED9B21E7CB9369DBCACF88 in a fresh Refine-managed recovery Round. Preserve Round 1's unfinished files and all retained branches, worktrees, commits, plans, logs and failed Quality evidence. Use retained candidate 256f7fa161d12f9a82fdd99c6933f551c5173677 through the supported recovery handoff, comparing it with current main before carrying changes forward. Preserve the existing ensure_worktree_from_base fix and Round 2's workspace isolation work, including Quality's cached-success revalidation in src/application/events/execution/runner.rs.\n\nReproduce the retained failure with `cargo test --lib fresh_goal_backlog_exit_skill_remains_runnable_before_round_materialization -- --test-threads=1`. Trace src/application/events/transitions.rs, dispatch.rs, execution.rs and execution/workspace.rs. Fresh Goals with an authored Round have no branch_name before Plan, yet a configured Backlog Exit Skill must run before the transition can complete. Provide lifecycle-aware workspace admission that supports these executable Skills in an explicitly owned managed linked checkout without requiring an already-materialized implementation branch. Reuse the shared Git worktree and execution capabilities. Bind the lifecycle workspace to its repository, Goal, current Round and invocation or occurrence, and pin an explicit target-derived source commit and physical registration. Ensure the process cwd and supplied workspace context both identify that admitted checkout, with agent_subpath canonically contained inside it.\n\nPreserve the docs/intent Todo admission contract: queueing or ordinary Backlog promotion remains state-only, and the implementation branch/worktree is materialized only after capacity and atomic authored-Round admission into Plan. Any workspace needed for a pre-Plan Skill must have explicit invocation ownership and must not silently become the implementation candidate or rewrite its base. Do not fix this by falling back to the primary checkout, treating Goal-bound Skills as standalone, disabling supported bindings, or precreating every queued Goal's implementation workspace.\n\nCarry the admitted lifecycle workspace through ordered bindings, diagnostic repairs, process resumes, replay and result acceptance. Recheck Goal/Round/node/transition authority before execution side effects and settlement; preserve cancellation and idempotent transition behavior. Retain registration validation and Git-environment sanitization before launches and writes. Missing or replaced registrations, wrong branches, unrelated repositories and symlink escapes must fail with actionable errors while preserving retained work. Independently launched Custom Skills and toolbar sessions must retain their explicit context.\n\nKeep the failing regression and extend it through actual deterministic Skill execution and successful transition settlement, starting with no Goal branch or worktree. Correct the existing manual-transition fixture that currently calls goal_workspace before testing Backlog Exit. Cover other applicable pre-Plan lifecycle bindings, repeated dispatch/restart, cancellation or changed Round authority, and disabled/context-only bindings that need no checkout. Verify staged, unstaged and untracked primary-checkout contents, HEAD and raw index bytes remain unchanged. Keep cached-success and replaced-registration regressions passing.\n\nRun the events suite, relevant workflow admission tests including backlog_promotion_changes_only_goal_state_and_does_not_create_worktrees, worktree admission/resume tests, and affected Quality, candidate-refresh, recovery and declared-base suites using `cargo test --lib` with one filter per command and serial execution. Run appropriate compilation, changed-file formatting and whitespace checks. Report actual commands, counts, failures and skips; distinguish existing Clippy warnings. Update only affected Skills/workspace/Todo intent documentation. Use current Skills contracts. Refine owns workflow advancement and integration; do not directly change Goal state, approve, merge or push.",
       "quality_agent_report": "workflow.quality.enter:default-quality: Corrected Todo-to-Plan lifecycle admission and stale Entry-workspace settlement. All required checks pass; corrections await Refine candidate finalization.",
       "quality_candidate_commit": "be1356af9c29c6467f03f0d38341acb2d676ceba",
-      "quality_checked_at": null,
-      "quality_details": null,
-      "quality_message": null,
+      "quality_checked_at": "2026-09-10T15:37:27Z",
+      "quality_details": {
+        "candidate_commit": "be1356af9c29c6467f03f0d38341acb2d676ceba",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR72ED9B21E7CB9369DBCACF88-round-2",
+        "diagnostics": [
+          "Event invocation a76f8af449310af3063d1325d55154287e455209e0dfd8f56a970fe8dd642266: automation/invocations/a76f8af449310af3063d1325d55154287e455209e0dfd8f56a970fe8dd642266.json"
+        ],
+        "evaluation_scope": "isolated_candidate",
+        "operation_id": "1a08bf3e9b4113c7650",
+        "provider_attempts": [],
+        "quality_proof": {
+          "checked_at": "2026-09-10T15:37:27Z",
+          "checked_candidate_commit": "be1356af9c29c6467f03f0d38341acb2d676ceba",
+          "evaluation_scope": "isolated_candidate",
+          "goal_id": "DR72ED9B21E7CB9369DBCACF88",
+          "operation_id": "1a08bf3e9b4113c7650",
+          "results": [
+            {
+              "command": "",
+              "evidence": "Blocking finding: scheduler admission can bypass a cancelled blocking Todo Entry Skill. The pinned candidate remains unchanged.",
+              "status": "failed",
+              "test": "workflow.quality.enter:default-quality"
+            }
+          ],
+          "round_idx": 2,
+          "schema_version": 1,
+          "source_candidate_commit": "be1356af9c29c6467f03f0d38341acb2d676ceba",
+          "state": "failed"
+        },
+        "results": [
+          {
+            "command": "",
+            "evidence": "Blocking finding: scheduler admission can bypass a cancelled blocking Todo Entry Skill. The pinned candidate remains unchanged.",
+            "status": "failed",
+            "test": "workflow.quality.enter:default-quality"
+          }
+        ],
+        "source_candidate_commit": "be1356af9c29c6467f03f0d38341acb2d676ceba"
+      },
+      "quality_message": "Quality failed: “workflow.quality.enter:default-quality” — Blocking finding: scheduler admission can bypass a cancelled blocking Todo Entry Skill. The pinned candidate remains unchanged.",
       "quality_skill_results": [
         {
           "artifacts": {
@@ -3233,10 +3270,10 @@
           "summary": "Corrected Todo-to-Plan lifecycle admission and stale Entry-workspace settlement. All required checks pass; corrections await Refine candidate finalization."
         }
       ],
-      "quality_state": null,
+      "quality_state": "failed",
       "reporter": "Refine",
       "rule_state": null,
-      "updated": "2026-09-10T15:33:32Z",
+      "updated": "2026-09-10T15:37:27Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T14:52:32Z",
         "round_idx": 2,
@@ -3277,7 +3314,7 @@
   ],
   "status": "quality",
   "target_branch": "main",
-  "updated": "2026-09-10T15:33:32Z",
+  "updated": "2026-09-10T15:37:27Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:06:36.706264729+00:00",
@@ -3352,5 +3389,5 @@
       "to": "quality"
     }
   ],
-  "workflow_revision": 75
+  "workflow_revision": 76
 }
