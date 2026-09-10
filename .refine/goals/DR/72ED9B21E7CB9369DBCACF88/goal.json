@@ -1,9 +1,9 @@
 {
-  "base_commit": "7b430a6a3bc0d692f03e71da68d06f3e9534dead",
+  "base_commit": "b47569adb8d4c5d1d7335ba91729a3e486a38fe0",
   "branch_name": "refine/DR72ED9B21E7CB9369DBCACF88/round-3",
-  "candidate_commit": "256f7fa161d12f9a82fdd99c6933f551c5173677",
+  "candidate_commit": "a7f5b37adaa674cf0c6ffad7f67252f9a8dca25c",
   "created": "2026-09-10T08:26:05Z",
-  "event_generation": 7,
+  "event_generation": 8,
   "feature_id": null,
   "feature_order": null,
   "id": "DR72ED9B21E7CB9369DBCACF88",
@@ -2074,7 +2074,7 @@
         "kind": "quality",
         "source_round": 2
       },
-      "constitution_state": "unclassified",
+      "constitution_state": null,
       "created": "2026-09-10T14:52:32Z",
       "event_configuration": {
         "events": {
@@ -2563,6 +2563,94 @@
         }
       },
       "event_results": {
+        "36ef18a4504951ebf73fbe2393354a0c37b23e85f4ad5120eb2bd830b602412a": {
+          "candidate_commit": null,
+          "results": {
+            "default-implement": {
+              "artifacts": {
+                "implementation_evidence": {
+                  "checklist": [
+                    {
+                      "evidence": "Continued from retained candidate 256f7fa161d12f9a82fdd99c6933f551c5173677 in the supplied Round 3 checkout. Reproduced the missing-branch regression. Compared advanced main; its additional terminal changes are unrelated. Preserved declared-base creation and cached-success registration revalidation.",
+                      "id": "workflow.plan.enter:default-plan:P1",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Added explicit lifecycle ownership covering invocation, repository, Goal, Round/request, node, event source, transition or durable occurrence, target ref, immutable source commit, branch, path and physical registration.",
+                      "id": "workflow.plan.enter:default-plan:P2",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Executable lifecycle bindings persist ownership before shared Git checkout creation and registration before launch. Interrupted admission recovers only from unambiguous evidence; occupied paths and unproven registrations fail without resetting retained work. Goal implementation refs remain untouched.",
+                      "id": "workflow.plan.enter:default-plan:P3",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Synchronized canonical cwd, system.workspace and mapped parameters. Ordered bindings, repairs and restarted execution retain admission. Added cohesive preparation, lifecycle, dispatch-context and transition-dispatch modules. Independent Custom Skill context remains covered.",
+                      "id": "workflow.plan.enter:default-plan:P4",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Revalidated lifecycle authority and workspace identity before creation, execution, accepted results, cached-success reuse and transition settlement. Accepted results use short Goal locks; agents run unlocked. Cancellation remains terminal, and empty/nonblocking events no longer obstruct gate settlement.",
+                      "id": "workflow.plan.enter:default-plan:P5",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Extended the retained regression through deterministic execution, response repair and successful Backlog-to-Todo settlement without implementation refs. Corrected the manual-transition fixture. Coverage includes lifecycle binding modes, ordering, restart, interrupted admission, target advancement, changed authority, cancellation, registration replacement, repository/subpath escapes and Git redirection. Dirty-primary contents, staged data, HEAD and raw index bytes remain unchanged.",
+                      "id": "workflow.plan.enter:default-plan:P6",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "All 15 required serial cargo test --lib commands selected tests and passed: 228 test executions, zero failures and zero ignored tests. Confirmed backlog_promotion_changes_only_goal_state_and_does_not_create_worktrees and retained cached-success/replaced-registration regressions passed.",
+                      "id": "workflow.plan.enter:default-plan:P7",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Updated only affected Skills, Events, managed-worktree and Todo intent passages. Compilation, formatting and whitespace checks passed. Clippy reported eight unchanged warnings. Final snapshots confirm primary HEAD/status/index, all 36 retained Round 1 files, Goal refs and original worktree paths are preserved.",
+                      "id": "workflow.plan.enter:default-plan:P8",
+                      "outcome": "completed"
+                    }
+                  ],
+                  "verification": [
+                    "Baseline: cargo test --lib fresh_goal_backlog_exit_skill_remains_runnable_before_round_materialization -- --test-threads=1: exit 101; 0 passed, 1 failed with missing Round branch.",
+                    "Final: cargo test --lib fresh_goal_backlog_exit_skill_remains_runnable_before_round_materialization -- --test-threads=1: 1 passed.",
+                    "cargo test --lib application::events:: -- --test-threads=1: 41 passed.",
+                    "cargo test --lib application::workflow::tests::execution_ownership -- --test-threads=1: 7 passed.",
+                    "cargo test --lib authored_todo_start -- --test-threads=1: 2 passed.",
+                    "cargo test --lib infrastructure::git::worktrees::tests -- --test-threads=1: 45 passed.",
+                    "cargo test --lib worktree_resume -- --test-threads=1: 3 passed.",
+                    "cargo test --lib quality::tests:: -- --test-threads=1: 38 passed.",
+                    "cargo test --lib application::workflow::tests::candidate_refresh -- --test-threads=1: 16 passed.",
+                    "cargo test --lib application::workflow::tests::quality_recovery -- --test-threads=1: 1 passed.",
+                    "cargo test --lib application::workflow::tests::quality_base_refresh -- --test-threads=1: 9 passed.",
+                    "cargo test --lib round_base -- --test-threads=1: 9 passed.",
+                    "cargo test --lib workflow::engine::behaviors::tests:: -- --test-threads=1: 15 passed.",
+                    "cargo test --lib launch_environment -- --test-threads=1: 5 passed.",
+                    "cargo test --lib infrastructure::agents::invocation::tests -- --test-threads=1: 16 passed.",
+                    "cargo test --lib infrastructure::process::subprocess:: -- --test-threads=1: 20 passed.",
+                    "cargo check --all-targets: exit 0.",
+                    "cargo clippy --all-targets: exit 0; eight pre-existing warnings, with each flagged source line verified against the retained candidate.",
+                    "rustfmt --check --edition 2024 --config skip_children=true: all 21 changed Rust files passed.",
+                    "git diff --check 256f7fa161d12f9a82fdd99c6933f551c5173677: exit 0.",
+                    "Final preservation comparison: all checks passed. Logs, counts and snapshots are retained in /tmp/dr72-round3-evidence/."
+                  ]
+                }
+              },
+              "binding_id": "default-implement",
+              "evidence": [
+                "Implemented and verified in the invocation's pinned managed checkout; HEAD remains 256f7fa161d12f9a82fdd99c6933f551c5173677.",
+                "Changes remain uncommitted for Refine's candidate handoff. No Goal advancement, integration, publication or serving-installation changes were performed.",
+                "Verification used Linux and deterministic provider fixtures; real provider continuation and Windows were not exercised."
+              ],
+              "invocation_id": "36ef18a4504951ebf73fbe2393354a0c37b23e85f4ad5120eb2bd830b602412a",
+              "outcome": "success",
+              "role": "implement",
+              "summary": "Implemented invocation-owned pre-Plan lifecycle workspaces while preserving state-only queueing, implementation admission, workspace isolation and retained recovery evidence. All requested verification passed."
+            }
+          },
+          "source": "workflow.implement.enter",
+          "state": "succeeded"
+        },
         "3c9e07053a2eeaada7d74c93997d609201cb5b30bec28a0f60ff02c48e109379": {
           "candidate_commit": null,
           "results": {
@@ -2652,12 +2740,17 @@
       "failure_at": "",
       "failure_category": "",
       "failure_message": "",
-      "governance_candidate_commit": "",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
+      "governance_candidate_commit": null,
+      "governance_checked_at": null,
+      "governance_details": null,
+      "governance_message": null,
       "governance_rule_actions": [],
-      "guidance_decision": null,
+      "guidance_decision": {
+        "applied": [],
+        "context_version": 1,
+        "recorded_at": "2026-09-10T15:18:53Z",
+        "skipped": []
+      },
       "implementation_plan": {
         "binding": {
           "base_commit": "7b430a6a3bc0d692f03e71da68d06f3e9534dead",
@@ -2668,6 +2761,7 @@
           "round_idx": 2,
           "target_branch": "main"
         },
+        "completed_at": "2026-09-10T15:18:53Z",
         "final_plan": {
           "completed_at": "2026-09-10T14:56:42Z",
           "git_after": {
@@ -2718,6 +2812,78 @@
             "summary": "workflow.plan.enter:default-plan: Correct the retained candidate’s pre-Plan Skill regression by admitting invocation-owned lifecycle workspaces independently of implementation branches. Preserve state-only queueing, atomic Todo-to-Plan admission, existing workspace isolation, and retained recovery evidence."
           },
           "started_at": "2026-09-10T14:52:33Z"
+        },
+        "implementation": {
+          "completed_at": "2026-09-10T15:18:53Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "Continued from retained candidate 256f7fa161d12f9a82fdd99c6933f551c5173677 in the supplied Round 3 checkout. Reproduced the missing-branch regression. Compared advanced main; its additional terminal changes are unrelated. Preserved declared-base creation and cached-success registration revalidation.",
+                "id": "workflow.plan.enter:default-plan:P1",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Added explicit lifecycle ownership covering invocation, repository, Goal, Round/request, node, event source, transition or durable occurrence, target ref, immutable source commit, branch, path and physical registration.",
+                "id": "workflow.plan.enter:default-plan:P2",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Executable lifecycle bindings persist ownership before shared Git checkout creation and registration before launch. Interrupted admission recovers only from unambiguous evidence; occupied paths and unproven registrations fail without resetting retained work. Goal implementation refs remain untouched.",
+                "id": "workflow.plan.enter:default-plan:P3",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Synchronized canonical cwd, system.workspace and mapped parameters. Ordered bindings, repairs and restarted execution retain admission. Added cohesive preparation, lifecycle, dispatch-context and transition-dispatch modules. Independent Custom Skill context remains covered.",
+                "id": "workflow.plan.enter:default-plan:P4",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Revalidated lifecycle authority and workspace identity before creation, execution, accepted results, cached-success reuse and transition settlement. Accepted results use short Goal locks; agents run unlocked. Cancellation remains terminal, and empty/nonblocking events no longer obstruct gate settlement.",
+                "id": "workflow.plan.enter:default-plan:P5",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Extended the retained regression through deterministic execution, response repair and successful Backlog-to-Todo settlement without implementation refs. Corrected the manual-transition fixture. Coverage includes lifecycle binding modes, ordering, restart, interrupted admission, target advancement, changed authority, cancellation, registration replacement, repository/subpath escapes and Git redirection. Dirty-primary contents, staged data, HEAD and raw index bytes remain unchanged.",
+                "id": "workflow.plan.enter:default-plan:P6",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "All 15 required serial cargo test --lib commands selected tests and passed: 228 test executions, zero failures and zero ignored tests. Confirmed backlog_promotion_changes_only_goal_state_and_does_not_create_worktrees and retained cached-success/replaced-registration regressions passed.",
+                "id": "workflow.plan.enter:default-plan:P7",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Updated only affected Skills, Events, managed-worktree and Todo intent passages. Compilation, formatting and whitespace checks passed. Clippy reported eight unchanged warnings. Final snapshots confirm primary HEAD/status/index, all 36 retained Round 1 files, Goal refs and original worktree paths are preserved.",
+                "id": "workflow.plan.enter:default-plan:P8",
+                "outcome": "completed"
+              }
+            ],
+            "verification": [
+              "Baseline: cargo test --lib fresh_goal_backlog_exit_skill_remains_runnable_before_round_materialization -- --test-threads=1: exit 101; 0 passed, 1 failed with missing Round branch.",
+              "Final: cargo test --lib fresh_goal_backlog_exit_skill_remains_runnable_before_round_materialization -- --test-threads=1: 1 passed.",
+              "cargo test --lib application::events:: -- --test-threads=1: 41 passed.",
+              "cargo test --lib application::workflow::tests::execution_ownership -- --test-threads=1: 7 passed.",
+              "cargo test --lib authored_todo_start -- --test-threads=1: 2 passed.",
+              "cargo test --lib infrastructure::git::worktrees::tests -- --test-threads=1: 45 passed.",
+              "cargo test --lib worktree_resume -- --test-threads=1: 3 passed.",
+              "cargo test --lib quality::tests:: -- --test-threads=1: 38 passed.",
+              "cargo test --lib application::workflow::tests::candidate_refresh -- --test-threads=1: 16 passed.",
+              "cargo test --lib application::workflow::tests::quality_recovery -- --test-threads=1: 1 passed.",
+              "cargo test --lib application::workflow::tests::quality_base_refresh -- --test-threads=1: 9 passed.",
+              "cargo test --lib round_base -- --test-threads=1: 9 passed.",
+              "cargo test --lib workflow::engine::behaviors::tests:: -- --test-threads=1: 15 passed.",
+              "cargo test --lib launch_environment -- --test-threads=1: 5 passed.",
+              "cargo test --lib infrastructure::agents::invocation::tests -- --test-threads=1: 16 passed.",
+              "cargo test --lib infrastructure::process::subprocess:: -- --test-threads=1: 20 passed.",
+              "cargo check --all-targets: exit 0.",
+              "cargo clippy --all-targets: exit 0; eight pre-existing warnings, with each flagged source line verified against the retained candidate.",
+              "rustfmt --check --edition 2024 --config skip_children=true: all 21 changed Rust files passed.",
+              "git diff --check 256f7fa161d12f9a82fdd99c6933f551c5173677: exit 0.",
+              "Final preservation comparison: all checks passed. Logs, counts and snapshots are retained in /tmp/dr72-round3-evidence/."
+            ]
+          },
+          "report": "workflow.implement.enter:default-implement: Implemented invocation-owned pre-Plan lifecycle workspaces while preserving state-only queueing, implementation admission, workspace isolation and retained recovery evidence. All requested verification passed.",
+          "started_at": "2026-09-10T14:56:42Z"
         },
         "phase": "implement",
         "phase_started_at": "2026-09-10T14:56:42Z",
@@ -2774,34 +2940,64 @@
         },
         "schema_version": 2,
         "started_at": "2026-09-10T14:52:33Z",
-        "state": "in_progress",
-        "updated_at": "2026-09-10T14:56:42Z"
+        "state": "completed",
+        "updated_at": "2026-09-10T15:18:53Z"
       },
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "workflow.implement.enter:default-implement: Implemented invocation-owned pre-Plan lifecycle workspaces while preserving state-only queueing, implementation admission, workspace isolation and retained recovery evidence. All requested verification passed.",
+      "implementation_reported_at": "2026-09-10T15:18:53Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": null,
+      "product_state": null,
       "prompt": "Correct the pre-Plan lifecycle Skill workspace regression for Goal DR72ED9B21E7CB9369DBCACF88 in a fresh Refine-managed recovery Round. Preserve Round 1's unfinished files and all retained branches, worktrees, commits, plans, logs and failed Quality evidence. Use retained candidate 256f7fa161d12f9a82fdd99c6933f551c5173677 through the supported recovery handoff, comparing it with current main before carrying changes forward. Preserve the existing ensure_worktree_from_base fix and Round 2's workspace isolation work, including Quality's cached-success revalidation in src/application/events/execution/runner.rs.\n\nReproduce the retained failure with `cargo test --lib fresh_goal_backlog_exit_skill_remains_runnable_before_round_materialization -- --test-threads=1`. Trace src/application/events/transitions.rs, dispatch.rs, execution.rs and execution/workspace.rs. Fresh Goals with an authored Round have no branch_name before Plan, yet a configured Backlog Exit Skill must run before the transition can complete. Provide lifecycle-aware workspace admission that supports these executable Skills in an explicitly owned managed linked checkout without requiring an already-materialized implementation branch. Reuse the shared Git worktree and execution capabilities. Bind the lifecycle workspace to its repository, Goal, current Round and invocation or occurrence, and pin an explicit target-derived source commit and physical registration. Ensure the process cwd and supplied workspace context both identify that admitted checkout, with agent_subpath canonically contained inside it.\n\nPreserve the docs/intent Todo admission contract: queueing or ordinary Backlog promotion remains state-only, and the implementation branch/worktree is materialized only after capacity and atomic authored-Round admission into Plan. Any workspace needed for a pre-Plan Skill must have explicit invocation ownership and must not silently become the implementation candidate or rewrite its base. Do not fix this by falling back to the primary checkout, treating Goal-bound Skills as standalone, disabling supported bindings, or precreating every queued Goal's implementation workspace.\n\nCarry the admitted lifecycle workspace through ordered bindings, diagnostic repairs, process resumes, replay and result acceptance. Recheck Goal/Round/node/transition authority before execution side effects and settlement; preserve cancellation and idempotent transition behavior. Retain registration validation and Git-environment sanitization before launches and writes. Missing or replaced registrations, wrong branches, unrelated repositories and symlink escapes must fail with actionable errors while preserving retained work. Independently launched Custom Skills and toolbar sessions must retain their explicit context.\n\nKeep the failing regression and extend it through actual deterministic Skill execution and successful transition settlement, starting with no Goal branch or worktree. Correct the existing manual-transition fixture that currently calls goal_workspace before testing Backlog Exit. Cover other applicable pre-Plan lifecycle bindings, repeated dispatch/restart, cancellation or changed Round authority, and disabled/context-only bindings that need no checkout. Verify staged, unstaged and untracked primary-checkout contents, HEAD and raw index bytes remain unchanged. Keep cached-success and replaced-registration regressions passing.\n\nRun the events suite, relevant workflow admission tests including backlog_promotion_changes_only_goal_state_and_does_not_create_worktrees, worktree admission/resume tests, and affected Quality, candidate-refresh, recovery and declared-base suites using `cargo test --lib` with one filter per command and serial execution. Run appropriate compilation, changed-file formatting and whitespace checks. Report actual commands, counts, failures and skips; distinguish existing Clippy warnings. Update only affected Skills/workspace/Todo intent documentation. Use current Skills contracts. Refine owns workflow advancement and integration; do not directly change Goal state, approve, merge or push.",
-      "quality_checked_at": "",
-      "quality_details": "",
-      "quality_message": "",
-      "quality_state": "unclassified",
+      "quality_candidate_commit": null,
+      "quality_checked_at": null,
+      "quality_details": null,
+      "quality_message": null,
+      "quality_state": null,
       "reporter": "Refine",
-      "rule_state": "unclassified",
-      "updated": "2026-09-10T14:56:42Z",
+      "rule_state": null,
+      "updated": "2026-09-10T15:18:54Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T14:52:32Z",
         "round_idx": 2,
         "workflow_revision": 48
       },
+      "workflow_candidate_refresh": {
+        "authorizing_status": "quality",
+        "branch": "refine/DR72ED9B21E7CB9369DBCACF88/round-3",
+        "node_id": "default",
+        "original_base_commit": "7b430a6a3bc0d692f03e71da68d06f3e9534dead",
+        "original_candidate_commit": "92d4f2eeb979195708e61f06f6013890bbd36496",
+        "previous_gate_evidence": {
+          "constitution_state": "unclassified",
+          "governance_candidate_commit": "",
+          "governance_checked_at": "",
+          "governance_details": "",
+          "governance_message": "",
+          "meta_rule_state": "unclassified",
+          "product_state": "unclassified",
+          "quality_candidate_commit": null,
+          "quality_checked_at": "",
+          "quality_details": "",
+          "quality_message": "",
+          "quality_state": "unclassified",
+          "rule_state": "unclassified"
+        },
+        "refreshed_at": "2026-09-10T15:18:54Z",
+        "replacement_base_commit": "b47569adb8d4c5d1d7335ba91729a3e486a38fe0",
+        "replacement_candidate_commit": "a7f5b37adaa674cf0c6ffad7f67252f9a8dca25c",
+        "round_idx": 2,
+        "state": "refreshed",
+        "workflow_revision": 48,
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR72ED9B21E7CB9369DBCACF88-round-2"
+      },
       "workflow_reconciliation": null,
       "workflow_recovery": null
     }
   ],
-  "status": "implement",
+  "status": "quality",
   "target_branch": "main",
-  "updated": "2026-09-10T14:56:42Z",
+  "updated": "2026-09-10T15:18:54Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:06:36.706264729+00:00",
@@ -2865,7 +3061,16 @@
       "node_id": "default",
       "round_idx": 2,
       "to": "implement"
+    },
+    {
+      "at": "2026-09-10T15:18:53.786611363+00:00",
+      "forced": false,
+      "from": "implement",
+      "generation": 8,
+      "node_id": "default",
+      "round_idx": 2,
+      "to": "quality"
     }
   ],
-  "workflow_revision": 62
+  "workflow_revision": 71
 }
