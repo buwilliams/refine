@@ -106,12 +106,99 @@
           "round_idx": 0,
           "target_branch": "main"
         },
-        "phase": "plan",
-        "phase_started_at": "2026-09-10T08:26:10Z",
+        "phase": "criticize",
+        "phase_started_at": "2026-09-10T08:30:02Z",
+        "proposal": {
+          "completed_at": "2026-09-10T08:30:02Z",
+          "git_after": {
+            "branch": "refine/DRCBAA3A2FC4ABDDCEC2B87473/round-1",
+            "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DRCBAA3A2FC4ABDDCEC2B87473/round-1",
+            "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Extend the existing Goal model with rejected status, immutable review decisions containing goal_id, one-based round, node_id, actor, decided_at, accepted or rejected decision, optional reason and candidate_commit, and terminal snapshots containing final_status, resolution, completed_at, failure_category, manual_intervention_required, total_rounds, recovery_rounds and first_round_success, with stable event identities and captured node, reporter and Feature attribution.",
+                "id": "P1"
+              },
+              {
+                "description": "Define terminal resolutions as auto_integrated, human_accepted, human_rejected, cancelled and failed, preserve Governance integration into pending Review, reserve auto_integrated for proven automated completion into Done, and keep Failed recoverable while treating it as an unsuccessful settled outcome for reporting.",
+                "id": "P2"
+              },
+              {
+                "description": "Add focused decision and outcome modules within the existing work-item capability that commit status, immutable audit entries and the current outcome reference together through the existing Goal lock, record revision checks and durable atomic replacement, so failed writes cannot acknowledge an unaudited decision or completion.",
+                "id": "P3"
+              },
+              {
+                "description": "Implement shared accept and reject operations that require explicit reviewer identity and human decision provenance, retain the existing acceptance proof checks, revalidate ownership, Review status, Round and exact candidate under the mutation lock, and use request identities to make retries return the original decision and timestamp while rejecting stale or contradictory submissions.",
+                "id": "P4"
+              },
+              {
+                "description": "Make rejection settle the Goal as Rejected without reverting integrated code or automatically creating another Round, stop it from being scheduled or treated as successful Feature work, and provide explicit reopening through the existing recovery and Round capabilities while preserving its rejection reason and decision history.",
+                "id": "P5"
+              },
+              {
+                "description": "Route CLI approval, API approve and verify aliases, browser acceptance and bulk completion through the shared decision capability, add matching rejection actions and optional reasons, obtain reviewer identity from explicit input or the selected acting reviewer, and prevent generic status writes or automated callers from fabricating human acceptance.",
+                "id": "P6"
+              },
+              {
+                "description": "Capture terminal snapshots at every authoritative completion, cancellation and failure settlement, including bulk operations, process-stop failures, exhausted recovery and already-integrated recovery paths, using exact integration and structured failure evidence before mutable failure fields are cleared and preserving existing stale-worker and cancellation fences.",
+                "id": "P7"
+              },
+              {
+                "description": "Derive total_rounds from distinct recorded Rounds, count recovery_rounds from explicit automatic or operator recovery lineage, record required operator recovery or rejection as manual intervention while excluding ordinary final acceptance and automatic retries, and mark first_round_success only for successful completion in the first Round without earlier failure, rejection or required intervention.",
+                "id": "P8"
+              },
+              {
+                "description": "Record reopening and outcome supersession when undo, retry or a new Round resumes settled work, retain every previous decision and terminal snapshot unchanged, and distinguish repeated settlements within the same Round so recovery cannot erase failures or duplicate current Goal outcomes.",
+                "id": "P9"
+              },
+              {
+                "description": "Preserve source updated values during synchronization and no-op bulk operations, advance updated only for genuine Goal mutations, and write decided_at and completed_at once for their originating events without replacing them during metadata edits, transfer, projection refresh or reconciliation.",
+                "id": "P10"
+              },
+              {
+                "description": "Extend the existing persistence-sync merge and recovery rules to retain the union of immutable audit entries by event identity, preserve event timestamps and attribution, reject changes to an existing event or competing lifecycle outcomes, and prevent automated conflict resolution from rewriting or dropping committed decision history.",
+                "id": "P11"
+              },
+              {
+                "description": "Keep audit-bearing Goal state outside runtime log and telemetry retention, durably retain its decision and outcome history in synchronized archival state before Goal or Feature deletion, and deduplicate live and archived copies so deleting work never removes its metrics evidence.",
+                "id": "P12"
+              },
+              {
+                "description": "Read legacy Goals without requiring new fields, derive historical outcomes only where surviving durable evidence proves their classification and timestamp, and expose unknown or undated coverage separately while excluding unsupported human decisions and missing timestamps from attributed rates and time buckets.",
+                "id": "P13"
+              },
+              {
+                "description": "Extend the existing file-index and projection mechanisms with rebuildable outcome and decision indexes, incremental updates after local mutations and synchronization, and cached date and grouping aggregates so ordinary non-external metrics requests remain under 50 ms without scanning all Goal histories or pruned logs.",
+                "id": "P14"
+              },
+              {
+                "description": "Expose a shared metrics query through refine metrics and the API with machine-readable totals and UTC day, week or month buckets over an inclusive-start and exclusive-end date range, optional node, reporter and Feature grouping, and historical attribution taken from each recorded event rather than current mutable metadata.",
+                "id": "P15"
+              },
+              {
+                "description": "Count each Goal through its latest unsuperseded terminal outcome as of the query end and bucket that outcome by completed_at, calculate human accept rate from unique human decisions by decided_at as accepted divided by accepted plus rejected, and report auto-resolution, first-round-success and terminal-failure rates over classified terminal Goals plus average total rounds, explicit numerators and denominators, unknown coverage and null rates for empty denominators.",
+                "id": "P16"
+              },
+              {
+                "description": "Update only the affected model, workflow, persistence-sync, CLI, API and Goal browser intent pages in their established format to explain durable decisions, Rejected, recovery history and metric definitions, keeping model types, mutation policy, projection logic and surface adapters in cohesive modules under the repository's current architecture.",
+                "id": "P17"
+              }
+            ],
+            "summary": "Add permanent, attributable human review decisions and Goal outcome history so Refine can distinguish acceptance, rejection, automatic completion, cancellation, and failure, preserve their original timestamps through recovery and synchronization, and report trustworthy resolution trends without relying on execution logs."
+          },
+          "started_at": "2026-09-10T08:26:10Z"
+        },
         "schema_version": 2,
         "started_at": "2026-09-10T08:26:10Z",
         "state": "in_progress",
-        "updated_at": "2026-09-10T08:26:10Z"
+        "updated_at": "2026-09-10T08:30:02Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -125,7 +212,7 @@
       "quality_state": "unclassified",
       "reporter": "ethan.jacobson@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T08:26:10Z",
+      "updated": "2026-09-10T08:30:02Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T08:26:09Z",
         "round_idx": 0,
@@ -137,6 +224,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-09-10T08:26:10Z",
-  "workflow_revision": 7
+  "updated": "2026-09-10T08:30:02Z",
+  "workflow_revision": 9
 }

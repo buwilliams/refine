@@ -106,12 +106,71 @@
           "round_idx": 0,
           "target_branch": "main"
         },
-        "phase": "plan",
-        "phase_started_at": "2026-09-10T08:26:07Z",
+        "phase": "criticize",
+        "phase_started_at": "2026-09-10T08:30:02Z",
+        "proposal": {
+          "completed_at": "2026-09-10T08:30:02Z",
+          "git_after": {
+            "branch": "refine/DR74050DA12C5442DF797B8AB6/round-1",
+            "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR74050DA12C5442DF797B8AB6/round-1",
+            "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Share canonical workflow-agent ownership and admission observations across the existing process, workflow, and diagnostic capabilities so Goal sessions remain recognizable when their kind metadata becomes interactive_session, keeping deadline reconciliation and workflow health in cohesive modules.",
+                "id": "P1"
+              },
+              {
+                "description": "Extend existing node-local process identity evidence with the original start time, absolute hard-cap deadline, verified process-group identity, owning runtime, and available Goal, Round, and operation correlation so losing a session handle or primary process record does not erase the information needed to enforce the cap.",
+                "id": "P2"
+              },
+              {
+                "description": "Run deadline reconciliation every five seconds through existing daemon supervision independently of workflow execution and pause state, inspecting owned process and identity records in both runtime process locations and enforcing the original hard cap without extending it for activity, attachment, or recovery.",
+                "id": "P3"
+              },
+              {
+                "description": "Extend identity-fenced termination to recoverable orphan registrations with bounded TERM-to-KILL escalation, confirmation that the owned process group has exited, and bounded session shutdown and output draining, retaining transcripts and ownership evidence and raising an actionable failure when identity, permissions, or exit cannot be established safely.",
+                "id": "P4"
+              },
+              {
+                "description": "Reconcile proven abandoned operations during the daemon lifetime as well as startup, retry incomplete recovery for at most sixty seconds before recording terminal failure with retained cleanup obligations, preserve capability-owned restart handoffs, and settle only the matching Goal attempt after confirmed exit so live cleanup hazards remain visible without becoming a node-wide admission barrier.",
+                "id": "P5"
+              },
+              {
+                "description": "Replace the pass-long scheduler error latch with bounded retries capped at thirty seconds, move blocking per-Goal preparation out of shared admission, and retain transient starting and running capacity until settlement so unrelated eligible Todo Goals enter Plan and begin normal classification within one minute of local blockers clearing while pause, ownership, authoring, ordering, priority, and capacity gates remain authoritative.",
+                "id": "P6"
+              },
+              {
+                "description": "Publish a small runtime-local workflow health projection containing runner identity, admission-loop heartbeat, last successful evaluation and admission, eligible work, observed capacity, pending recovery, and causal errors so readers can distinguish real inactivity, stale observation, legitimate waiting, and unresolved degradation without scanning the host on each request.",
+                "id": "P7"
+              },
+              {
+                "description": "Have existing daemon supervision check workflow health every five seconds and raise a stalled-node alarm after sixty seconds of continuously admittable work without admission or a stale admission heartbeat, using the scheduler's eligibility rules and allowing ordinary admission to resume after safe reconciliation without launching a competing scheduler.",
+                "id": "P8"
+              },
+              {
+                "description": "Prioritize stalled and degraded conditions with their known cause, affected work, elapsed time, and supported remediation in refine next and expose the same runtime-local diagnostics through node show and node health, recording bounded onset, change, and recovery activity and clearing only resolved recovery flags while preserving historical evidence and unrelated failures.",
+                "id": "P9"
+              },
+              {
+                "description": "Update only the affected process, workflow, agent timeout, CLI, and activity intent pages in their existing format to describe independent deadline enforcement, bounded recovery and admission, and the stalled-node diagnostic contract.",
+                "id": "P10"
+              }
+            ],
+            "summary": "Make workflow automation recover from leaked agents and interrupted operations without a manual daemon restart by enforcing agent deadlines independently of session polling, removing the scheduler error latch that can stop unrelated admission, and reporting stalled or degraded nodes with actionable recovery details."
+          },
+          "started_at": "2026-09-10T08:26:07Z"
+        },
         "schema_version": 2,
         "started_at": "2026-09-10T08:26:07Z",
         "state": "in_progress",
-        "updated_at": "2026-09-10T08:26:07Z"
+        "updated_at": "2026-09-10T08:30:02Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -125,7 +184,7 @@
       "quality_state": "unclassified",
       "reporter": "ethan.jacobson@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T08:26:07Z",
+      "updated": "2026-09-10T08:30:02Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T08:26:06Z",
         "round_idx": 0,
@@ -137,6 +196,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-09-10T08:26:07Z",
-  "workflow_revision": 7
+  "updated": "2026-09-10T08:30:02Z",
+  "workflow_revision": 9
 }
