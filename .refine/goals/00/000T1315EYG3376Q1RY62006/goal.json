@@ -3,7 +3,7 @@
   "branch_name": "refine/00000T1315EYG3376Q1RY62006/round-1",
   "candidate_commit": "036c0802c771a6cc5865a8bc4d669480e1a76c57",
   "created": "2026-09-10T16:27:40Z",
-  "event_generation": 7,
+  "event_generation": 8,
   "feature_id": null,
   "feature_order": null,
   "id": "00000T1315EYG3376Q1RY62006",
@@ -1262,9 +1262,9 @@
       "workflow_recovery": null
     }
   ],
-  "status": "review",
+  "status": "done",
   "target_branch": "main",
-  "updated": "2026-09-10T16:52:39Z",
+  "updated": "2026-09-10T18:15:44Z",
   "workflow_events": [
     {
       "at": "2026-09-10T16:27:40.832459218+00:00",
@@ -1328,7 +1328,16 @@
       "node_id": "default",
       "round_idx": 0,
       "to": "review"
+    },
+    {
+      "at": "2026-09-10T18:15:44.775233938+00:00",
+      "forced": false,
+      "from": "review",
+      "generation": 8,
+      "node_id": "default",
+      "round_idx": 0,
+      "to": "done"
     }
   ],
-  "workflow_revision": 40
+  "workflow_revision": 41
 }
