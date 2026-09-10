@@ -19,7 +19,7 @@
     }
   ],
   "priority": "low",
-  "reporter": "ethan.jacobson@insurity.com",
+  "reporter": "Ethan Jacobson",
   "rounds": [
     {
       "agent_context": {
@@ -93,7 +93,7 @@
         "version": 1,
         "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
       },
-      "assignee": "ethan.jacobson@insurity.com",
+      "assignee": "Ethan Jacobson",
       "constitution_state": "unclassified",
       "created": "2026-09-10T08:26:07Z",
       "failure_at": "",
@@ -329,7 +329,7 @@
       "quality_details": "",
       "quality_message": "",
       "quality_state": "unclassified",
-      "reporter": "ethan.jacobson@insurity.com",
+      "reporter": "Ethan Jacobson",
       "rule_state": "unclassified",
       "updated": "2026-09-10T08:35:02Z",
       "workflow_attempt_authority": null,
@@ -585,7 +585,7 @@
         "version": 1,
         "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
       },
-      "assignee": "ethan.jacobson@insurity.com",
+      "assignee": "Ethan Jacobson",
       "constitution_state": null,
       "created": "2026-09-10T13:06:36Z",
       "event_configuration": {
@@ -5477,5 +5477,5 @@
       "to": "todo"
     }
   ],
-  "workflow_revision": 89
+  "workflow_revision": 90
 }
