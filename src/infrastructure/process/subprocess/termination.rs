@@ -56,15 +56,7 @@ impl FileProcessSupervisor {
         timeout: Duration,
     ) -> RefineResult<()> {
         if Self::requires_group_ownership(process) || self.group_path(&process.id).exists() {
-            let group = self
-                .owned_groups()?
-                .into_iter()
-                .find(|g| g.process.id == process.id)
-                .ok_or_else(|| {
-                    RefineError::Degraded(
-                        "owned execution evidence missing; exit unverified".into(),
-                    )
-                })?;
+            let group = self.owned_group_for_process(process)?;
             self.stop_owned_group(&group, timeout)?;
             return Ok(());
         }
@@ -114,15 +106,7 @@ impl FileProcessSupervisor {
         let identity = self.load_process_identity(expected)?;
         self.ensure_expected_registration(expected, &identity)?;
         if Self::requires_group_ownership(expected) || self.group_path(&expected.id).exists() {
-            let group = self
-                .owned_groups()?
-                .into_iter()
-                .find(|g| g.process.id == expected.id)
-                .ok_or_else(|| {
-                    RefineError::Degraded(
-                        "owned group evidence unavailable; exit unverified".into(),
-                    )
-                })?;
+            let group = self.owned_group_for_process(expected)?;
             self.stop_owned_group(&group, timeout)?;
             return Ok(confirmed_process_exit(expected, signal, &identity, started));
         }

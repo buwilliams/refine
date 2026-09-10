@@ -370,6 +370,20 @@ impl FileProcessSupervisor {
 
     pub fn register(&self, process: ManagedProcess) -> RefineResult<ManagedProcess> {
         let _retirement = self.artifact_registration_fence(&process.id)?;
+        // Terminal updates are still owned by the originating execution. A stale
+        // PTY failure must not replace a newer registration before cleanup runs.
+        match fs::read(self.processes_dir().join(format!("{}.json", process.id))) {
+            Ok(bytes) => {
+                let current: ManagedProcess = serde_json::from_slice(&bytes)
+                    .map_err(|e| RefineError::Serialization(e.to_string()))?;
+                Self::ensure_same_registration(&process, &current)?;
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => return Err(RefineError::Io(e.to_string())),
+        }
+        if self.group_path(&process.id).exists() {
+            self.owned_group_for_process(&process)?;
+        }
         if process.state != "running" {
             self.write_process(&process)?;
             return self.archive_terminal_process(&process);

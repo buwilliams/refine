@@ -367,7 +367,13 @@ where
             process.state = "failed".to_string();
             let _ = supervisor.finish_artifact_handoff(artifact_handoff);
             let process_id = process.id.clone();
-            let _ = supervisor.register(process.clone());
+            if let Err(registration_error) = supervisor.register(process.clone()) {
+                return Err(append_settlement_faults(
+                    error,
+                    Some(registration_error),
+                    None,
+                ));
+            }
             let _ = supervisor.cleanup(&process_id);
             return Err(error);
         }
@@ -378,12 +384,19 @@ where
             process.state = "failed".to_string();
             let _ = supervisor.finish_artifact_handoff(artifact_handoff);
             let process_id = process.id.clone();
-            let _ = supervisor.register(process.clone());
-            let _ = supervisor.cleanup(&process_id);
-            return Err(RefineError::Io(format!(
+            let error = RefineError::Io(format!(
                 "failed to read Goal Agent transcript {}: {error}",
                 stdout_path.display()
-            )));
+            ));
+            if let Err(registration_error) = supervisor.register(process.clone()) {
+                return Err(append_settlement_faults(
+                    error,
+                    Some(registration_error),
+                    None,
+                ));
+            }
+            let _ = supervisor.cleanup(&process_id);
+            return Err(error);
         }
     };
     let result_output = completion_report

@@ -415,3 +415,72 @@ fn completed_pty_keeps_structured_result_when_scope_termination_is_unavailable()
         .unwrap();
     fs::remove_dir_all(root).unwrap();
 }
+
+#[test]
+fn stale_pty_settlement_preserves_replacement_registration_and_descendants() {
+    let _lock = crate::infrastructure::agents::invocation::smoke_ai_env_lock()
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    let (root, launch, _env) = fixture("natural", json!({}));
+    let owner = FileProcessSupervisor::new(&launch.runtime_root);
+    let saved = Arc::new(Mutex::new(None));
+    let evidence = saved.clone();
+    let supervisor = owner.clone();
+    install(
+        &launch.runtime_root,
+        Arc::new(move |stage, process| {
+            if stage != "poll" || evidence.lock().unwrap().is_some() {
+                return Ok(());
+            }
+            wait(|| !Path::new(&format!("/proc/{}", process.pid.unwrap())).exists());
+            let mut replacement = supervisor.owned_groups()?.remove(0);
+            replacement.process.started_at = "replacement registration".into();
+            fs::write(
+                supervisor
+                    .runtime_root
+                    .join("owned-groups")
+                    .join(format!("{}.json", process.id)),
+                serde_json::to_vec(&replacement).unwrap(),
+            )
+            .unwrap();
+            let record = supervisor
+                .processes_dir()
+                .join(format!("{}.json", process.id));
+            let bytes = serde_json::to_vec(&replacement.process).unwrap();
+            fs::write(&record, &bytes).unwrap();
+            *evidence.lock().unwrap() = Some((replacement, record, bytes));
+            Ok(())
+        }),
+    );
+    let error = run_goal_agent(launch, |_| {}).unwrap_err();
+    assert!(
+        error.to_string().contains("registration identity changed"),
+        "{error}"
+    );
+    let (replacement, record, bytes) = saved.lock().unwrap().take().unwrap();
+    assert_eq!(
+        fs::read(record).unwrap(),
+        bytes,
+        "stale error cleanup overwrote replacement"
+    );
+    let child: u32 = fs::read_to_string(root.join("child.pid"))
+        .unwrap()
+        .trim()
+        .parse()
+        .unwrap();
+    assert!(os_process_identity(child).unwrap().is_some());
+    assert_eq!(owner.capacity_processes().unwrap().len(), 1);
+    assert!(Path::new(replacement.process.stdout_path.as_ref().unwrap()).is_file());
+    owner
+        .stop_owned_group(&replacement, Duration::from_secs(2))
+        .unwrap();
+    assert!(os_process_identity(child).unwrap().is_none());
+    assert!(owner.capacity_processes().unwrap().is_empty());
+    HOOKS
+        .get()
+        .unwrap()
+        .lock()
+        .unwrap()
+        .remove(&owner.runtime_root);
+    fs::remove_dir_all(root).unwrap();
+}

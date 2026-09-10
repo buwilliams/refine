@@ -15,6 +15,8 @@ mod assessment;
 mod stop;
 pub use assessment::OwnershipAssessment;
 #[cfg(all(test, target_os = "linux"))]
+mod identity_tests;
+#[cfg(all(test, target_os = "linux"))]
 mod launch_tests;
 #[cfg(all(test, target_os = "linux"))]
 pub(crate) mod test_fixture;
@@ -172,11 +174,27 @@ impl FileProcessSupervisor {
         }
         Ok(processes.into_values().collect())
     }
+    pub(super) fn owned_group_for_process(
+        &self,
+        process: &ManagedProcess,
+    ) -> RefineResult<OwnedGroup> {
+        let bytes = fs::read(self.group_path(&process.id)).map_err(|e| {
+            RefineError::Io(format!(
+                "owned execution evidence unavailable for {}: {e}; exit unverified",
+                process.id
+            ))
+        })?;
+        let group: OwnedGroup = serde_json::from_slice(&bytes)
+            .map_err(|e| RefineError::Serialization(e.to_string()))?;
+        Self::ensure_same_registration(process, &group.process)?;
+        Ok(group)
+    }
     pub fn group_pending(&self, process: &ManagedProcess) -> RefineResult<bool> {
         match fs::read(self.group_path(&process.id)) {
             Ok(bytes) => {
                 let group: OwnedGroup = serde_json::from_slice(&bytes)
                     .map_err(|e| RefineError::Serialization(e.to_string()))?;
+                Self::ensure_same_registration(process, &group.process)?;
                 Ok(self.assess_owned_group(&group)?.pending())
             }
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {

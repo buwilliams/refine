@@ -1,6 +1,35 @@
 //! Registration-time PID identity persistence and validation.
 use super::*;
 impl FileProcessSupervisor {
+    pub(super) fn ensure_same_registration(
+        expected: &ManagedProcess,
+        current: &ManagedProcess,
+    ) -> RefineResult<()> {
+        fn incarnation(process: &ManagedProcess) -> Option<Value> {
+            process
+                .details
+                .as_deref()
+                .and_then(|s| serde_json::from_str::<Value>(s).ok())
+                .and_then(|v| {
+                    v.get("workflow_incarnation")
+                        .filter(|v| !v.is_null())
+                        .cloned()
+                })
+        }
+        if expected.id != current.id
+            || expected.pid != current.pid
+            || expected.owner != current.owner
+            || expected.started_at != current.started_at
+            || incarnation(expected) != incarnation(current)
+        {
+            return Err(RefineError::Conflict(format!(
+                "managed process {} registration identity changed; retain evidence and do not settle or terminate the replacement",
+                expected.id
+            )));
+        }
+        Ok(())
+    }
+
     pub(super) fn write_process_identity(
         &self,
         identity: &ManagedProcessIdentity,
