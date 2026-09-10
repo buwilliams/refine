@@ -3,7 +3,7 @@
   "branch_name": "refine/DR07C216F3E4EC22A57C60BE0B/round-4",
   "candidate_commit": null,
   "created": "2026-09-10T08:26:00Z",
-  "event_generation": 10,
+  "event_generation": 11,
   "feature_id": "00000T130Z0R6J0GJMARY62005",
   "feature_order": 2,
   "id": "DR07C216F3E4EC22A57C60BE0B",
@@ -3985,6 +3985,100 @@
           }
         }
       },
+      "event_results": {
+        "203ae66164f5b0eb88dabc72dddcc45598b1e115b280b36fa35bd2e9364b36a4": {
+          "candidate_commit": null,
+          "results": {
+            "default-plan": {
+              "artifacts": {
+                "plan": {
+                  "checklist": [
+                    {
+                      "description": "Adapt useful ab318054 and interrupted Round-3 changes into this Round's managed workspace. Preserve current engine/admission.rs reservations and Goal/Skill fairness, occurrence-pinned gate assessment, lifecycle invocation handling, and managed-worktree validation. Do not restore retired dispatch paths or overwrite newer Event and workspace implementations. Preserve every prior attempt and reuse source.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "Extend FileProcessSupervisor with one shared Live, Exited, or Unverified ownership assessment. Retain runtime, registration, incarnation, workload identity, descendants, and proof provenance independently of the primary process record. Empty scans, missing identities, legacy confirmed_exit booleans, and later quiescence cannot establish complete exit. Apply the assessment to capacity, replacement, deadline and operation reconciliation, registry retirement, and worktree protection. Deduplicate reservations and process evidence without hiding independent manual work.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "Rework the retained Linux guardian into a cohesive process-launch helper that establishes subreaper ownership before releasing the workload. Use a bounded registration/start handshake and separate workload completion from complete scope exit; avoid the retained nested pre_exec fork protocol. Preserve executable selection, prepared environment, workspace admission, stdio, exit status, cancellation, and limits. Identify helpers through exact registration and OS identity, never process names. Helper loss or incomplete coverage remains Unverified. Platforms without complete coverage retain affected capacity and artifacts and expose the limitation; do not manufacture exit proof.",
+                      "id": "P3"
+                    },
+                    {
+                      "description": "Extract a cohesive attempt runner covering preparation, execution, result construction, and settlement. Capture claim authority immediately after claiming, outside unwind boundaries. Use finished handles as completion fallback so a panic cannot strand an ended attempt. Capture immutable originating failure evidence before settlement; return explicit authoritative failure, verified existing outcome, superseded attempt, or unpersisted evidence. Retry transient writes at most three times with bounded waits and fresh authority checks under the Goal lock. Contain settlement, serialization, storage, and reporting faults while preserving the original error, stage, Goal, Round, claim revision, timestamp, and settlement fault.",
+                      "id": "P4"
+                    },
+                    {
+                      "description": "Replace the pass-long scheduler_error latch with bounded retry scheduling. Keep promotion, Event dispatch, discovery, repository work, and settlement waits outside the ticking controller; bound remaining coordination waits. Retain one admission controller and the existing shared reservation owner. Continue draining completions during errors, invalidate discovery captured before capacity release, and recheck pause, target, eligibility, and capacity before launch. Retain capacity through preparation, execution, settlement, and pending owned descendants.",
+                      "id": "P5"
+                    },
+                    {
+                      "description": "Publish atomic scheduler observations from the actual controller at least every second, including pause and detachment. Bind observations to runtime, worker registration, OS identity, incarnation, node, and target; record tick sequence, completed admission cycle, active attempts, and faults. Extend FileRunnerWorkerService supervision with 30-second startup and silence bounds, bounded target-transition handling, and restart backoff capped at five minutes. Fence replacement, stop only the exact old incarnation, require complete owned-execution exit proof, and accept replacement only after its matching scheduler tick.",
+                      "id": "P6"
+                    },
+                    {
+                      "description": "Expose one fresh Application health assessment through system status, process diagnostics, and FileNextActionsService. Separate daemon reachability and shutdown intent from workflow degradation, including lifecycle_shutdown and port discovery. Surface continuously eligible Todo work waiting over 30 seconds with free capacity, waiting count, last tick, cause, and supported diagnostic/remediation commands. Reuse current eligibility, occurrence-pinned Skill gates, reservations, and ownership assessment to distinguish ordering, retry delay, pause, disabled automation, legitimate waiting, and unavailable evidence.",
+                      "id": "P7"
+                    },
+                    {
+                      "description": "Provide one Application maintain_daemon interface shared with DR74050DA12C5442DF797B8AB6, independently scheduled from admission and worker replacement. Reuse existing process and session deadline mechanisms, original deadlines, activity evidence, Toolbar protection, and human-input exceptions. Reconcile operations only after proven exit and revision revalidation. Keep cleanup independently supervised; isolate individual inspection faults and repository contention while preserving retention delays, dirty-worktree protection, live-use checks, and exact ref-retirement fences.",
+                      "id": "P8"
+                    },
+                    {
+                      "description": "Add deterministic real-process ownership regressions: register a gated leader, launch a setsid child, reap the leader before descendant observation, and independently prove the child remains alive without preloaded witnesses. Exercise actual capacity, replacement, deadline/operation, and cleanup consumers with missing primary registration, unavailable identity, legacy evidence, and helper loss. Assert retained capacity and artifacts, replacement refusal, and eventual release only after trustworthy proof. Preserve overlapping-stop, PID-reuse, quiescence, and survivor-resume coverage; test launch-handshake failures and workload output/exit semantics.",
+                      "id": "P9"
+                    },
+                    {
+                      "description": "Exercise real integration failure plus supersession, preparation faults before and after claim, task/result/settlement/delivery panics, transient and exhausted persistence failures, cancellation, and same-Round/new-Round replacement. Parse evidence by originating Goal and claim and assert every provenance, error, settlement, and persistence field, including structured fallback when storage fails. With the same runner and another active Goal, inject a transient scheduler fault and prove the next independently eligible Goal enters Plan within one one-second poll interval after safe capacity becomes available.",
+                      "id": "P10"
+                    },
+                    {
+                      "description": "Test the actual daemon supervision path with a non-ticking worker and a ticking controller whose admission cycle stalls. Verify bounded detection, replacement exclusion, restart backoff, and replacement-tick readiness while HTTP status and shutdown remain responsive. Cover missing/corrupt observations, wrong incarnation, target changes, termination failure, pause, disabled automation, long-running work, and blocking Skills. Prove deadline maintenance and eligible cleanup progress during admission and recovery faults. Verify explicit unsupported-platform behavior and preserve the Linux/macOS CI contract.",
+                      "id": "P11"
+                    },
+                    {
+                      "description": "Update only affected workflow overview, consistency, execution-ownership, process, and CLI intent contracts. Keep ownership assessment, launch lifecycle, scheduling, settlement evidence, and maintenance in cohesive modules. Through supported Refine supervision, run cargo test --lib <filter> -- --test-threads=1 for worker_liveness, failure_settlement, infrastructure::process::subprocess, infrastructure::process::supervisor, application::workers, application::maintenance::worktrees, application::workflow::health, application::events, application::guidance, and surfaces::web_server::tests::http_transport::runtime. Then run cargo check --all-targets --locked, cargo fmt --all -- --check, cargo test --lib --bins -- --test-threads=1, cargo build --release --locked, and git diff --check. Record exact commands, selected counts, failures, skips, logs, and candidate identity. Reproduce any alleged baseline failure against a270fdaa; carry forward no historical test exclusions.",
+                      "id": "P12"
+                    }
+                  ],
+                  "criticism_resolutions": [
+                    {
+                      "criticism_id": "C1",
+                      "resolution": "Whole-patch replay would regress newer admission, lifecycle Skill, gate, and workspace concepts. The plan adapts retained responsibilities to their current owners. It also monitors completed admission cycles so moving blocked work onto another thread cannot create a falsely healthy scheduler."
+                    },
+                    {
+                      "criticism_id": "F1",
+                      "resolution": "The ownership finding invalidates snapshot-only exit proof across all consumers. The retained guardian addresses ancestry but needs a bounded launch protocol and explicit platform semantics. Select a dedicated Linux subreaper helper within process Infrastructure; avoid requiring new cgroup delegation or a daemon-wide reaper. Unsupported or incomplete coverage remains actionable uncertainty. Linux documents orphan adoption by subreapers, while Rust documents restrictions on pre_exec operations: [Linux subreaper API](https://man7.org/linux/man-pages/man2/PR_SET_CHILD_SUBREAPER.2const.html), [Rust CommandExt](https://doc.rust-lang.org/std/os/unix/process/trait.CommandExt.html)."
+                    },
+                    {
+                      "criticism_id": "F2",
+                      "resolution": "An outer panic catch can preserve loop survival while losing originating evidence. Settlement now owns containment before common evidence finalization, and tests assert complete provenance alongside follow-up admission. Supersession remains an explicit outcome; it never authorizes changing newer Goal intent."
+                    }
+                  ],
+                  "summary": "Restore scheduling resilience on pinned base a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e by strengthening existing owners: WorkflowEngine controls admission and attempt completion, FileWorkItemService fences Goal mutations, and FileProcessSupervisor owns local execution evidence. Preparation already runs outside the controller; remaining risks include the pass-long scheduler_error latch, settlement panics bypassing completion, and supervision accepting process liveness without scheduler progress. Preserve the invariant that semantic authority, local capacity, and proven execution exit are separate. Selectively adapt retained work, correcting its descendant-ownership and settlement-evidence gaps."
+                }
+              },
+              "binding_id": "default-plan",
+              "evidence": [
+                "Verified the pinned Round-4 workspace and branch at a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e; local main matched that commit. Initial and final porcelain status were empty. Working-tree and staged diff checks, plus git diff --check, exited 0.",
+                "Verified retained source HEAD ab318054adf5a5418ee3ae8bec348c98232916f2 and its 28 tracked/untracked status entries. Inspected committed ownership and settlement defects plus interrupted assessment, guardian, evidence-finalization, and regression work read-only.",
+                "Read failed Quality invocation 177db40b9ee753eb9820904dad44b5a3d2b7608618316d841a5ac15ae868bda6 from live automation records. It identifies F1 ownership loss and F2 missing settlement-panic evidence as source findings, not behavioral reproductions. Verified current configuration revision 26.",
+                "Inspected current execution, admission, gates, lifecycle, workspace, process supervision, maintenance, diagnostics, and affected intent. Current execution already prepares Goals in child threads but retains scheduler_error suppression and a completion channel without finished-handle recovery. The superseded-settlement message alone does not establish the historical incident's cause.",
+                "Compared target changes since b47569ad. Newer commits supply shared Goal/Skill reservations, occurrence-pinned gates, and managed-worktree admission. The historical multiple-Plan-Skills fixture has changed on this base, so its earlier exclusion cannot be reused.",
+                "Verified the supervising process chain uses /home/buddy/projects/refine/bin/refine from the serving checkout on port 8082. Existing host/process code supplies identity and tree observations but no general containment backend; the observed cgroup root is not writable.",
+                "Completed observational planning only. No behavioral tests, candidate edits, Goal mutations, merge, push, deployment, or serving-daemon restart were performed. Checklist commands are proposed verification, not reported passes."
+              ],
+              "invocation_id": "203ae66164f5b0eb88dabc72dddcc45598b1e115b280b36fa35bd2e9364b36a4",
+              "outcome": "success",
+              "role": "plan",
+              "summary": "Completed a read-only Round-4 implementation plan, reconciled current owners with retained work, and resolved ownership, settlement-evidence, and replay-design criticisms."
+            }
+          },
+          "source": "workflow.plan.enter",
+          "state": "succeeded"
+        }
+      },
       "failure_at": "",
       "failure_category": "",
       "failure_message": "",
@@ -4004,12 +4098,146 @@
           "round_idx": 3,
           "target_branch": "main"
         },
-        "phase": "plan",
-        "phase_started_at": "2026-09-10T18:06:08Z",
+        "final_plan": {
+          "completed_at": "2026-09-10T18:12:20Z",
+          "git_after": {
+            "branch": "refine/DR07C216F3E4EC22A57C60BE0B/round-4",
+            "head_commit": "a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR07C216F3E4EC22A57C60BE0B/round-4",
+            "head_commit": "a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Adapt useful ab318054 and interrupted Round-3 changes into this Round's managed workspace. Preserve current engine/admission.rs reservations and Goal/Skill fairness, occurrence-pinned gate assessment, lifecycle invocation handling, and managed-worktree validation. Do not restore retired dispatch paths or overwrite newer Event and workspace implementations. Preserve every prior attempt and reuse source.",
+                "id": "workflow.plan.enter:default-plan:P1"
+              },
+              {
+                "description": "Extend FileProcessSupervisor with one shared Live, Exited, or Unverified ownership assessment. Retain runtime, registration, incarnation, workload identity, descendants, and proof provenance independently of the primary process record. Empty scans, missing identities, legacy confirmed_exit booleans, and later quiescence cannot establish complete exit. Apply the assessment to capacity, replacement, deadline and operation reconciliation, registry retirement, and worktree protection. Deduplicate reservations and process evidence without hiding independent manual work.",
+                "id": "workflow.plan.enter:default-plan:P2"
+              },
+              {
+                "description": "Rework the retained Linux guardian into a cohesive process-launch helper that establishes subreaper ownership before releasing the workload. Use a bounded registration/start handshake and separate workload completion from complete scope exit; avoid the retained nested pre_exec fork protocol. Preserve executable selection, prepared environment, workspace admission, stdio, exit status, cancellation, and limits. Identify helpers through exact registration and OS identity, never process names. Helper loss or incomplete coverage remains Unverified. Platforms without complete coverage retain affected capacity and artifacts and expose the limitation; do not manufacture exit proof.",
+                "id": "workflow.plan.enter:default-plan:P3"
+              },
+              {
+                "description": "Extract a cohesive attempt runner covering preparation, execution, result construction, and settlement. Capture claim authority immediately after claiming, outside unwind boundaries. Use finished handles as completion fallback so a panic cannot strand an ended attempt. Capture immutable originating failure evidence before settlement; return explicit authoritative failure, verified existing outcome, superseded attempt, or unpersisted evidence. Retry transient writes at most three times with bounded waits and fresh authority checks under the Goal lock. Contain settlement, serialization, storage, and reporting faults while preserving the original error, stage, Goal, Round, claim revision, timestamp, and settlement fault.",
+                "id": "workflow.plan.enter:default-plan:P4"
+              },
+              {
+                "description": "Replace the pass-long scheduler_error latch with bounded retry scheduling. Keep promotion, Event dispatch, discovery, repository work, and settlement waits outside the ticking controller; bound remaining coordination waits. Retain one admission controller and the existing shared reservation owner. Continue draining completions during errors, invalidate discovery captured before capacity release, and recheck pause, target, eligibility, and capacity before launch. Retain capacity through preparation, execution, settlement, and pending owned descendants.",
+                "id": "workflow.plan.enter:default-plan:P5"
+              },
+              {
+                "description": "Publish atomic scheduler observations from the actual controller at least every second, including pause and detachment. Bind observations to runtime, worker registration, OS identity, incarnation, node, and target; record tick sequence, completed admission cycle, active attempts, and faults. Extend FileRunnerWorkerService supervision with 30-second startup and silence bounds, bounded target-transition handling, and restart backoff capped at five minutes. Fence replacement, stop only the exact old incarnation, require complete owned-execution exit proof, and accept replacement only after its matching scheduler tick.",
+                "id": "workflow.plan.enter:default-plan:P6"
+              },
+              {
+                "description": "Expose one fresh Application health assessment through system status, process diagnostics, and FileNextActionsService. Separate daemon reachability and shutdown intent from workflow degradation, including lifecycle_shutdown and port discovery. Surface continuously eligible Todo work waiting over 30 seconds with free capacity, waiting count, last tick, cause, and supported diagnostic/remediation commands. Reuse current eligibility, occurrence-pinned Skill gates, reservations, and ownership assessment to distinguish ordering, retry delay, pause, disabled automation, legitimate waiting, and unavailable evidence.",
+                "id": "workflow.plan.enter:default-plan:P7"
+              },
+              {
+                "description": "Provide one Application maintain_daemon interface shared with DR74050DA12C5442DF797B8AB6, independently scheduled from admission and worker replacement. Reuse existing process and session deadline mechanisms, original deadlines, activity evidence, Toolbar protection, and human-input exceptions. Reconcile operations only after proven exit and revision revalidation. Keep cleanup independently supervised; isolate individual inspection faults and repository contention while preserving retention delays, dirty-worktree protection, live-use checks, and exact ref-retirement fences.",
+                "id": "workflow.plan.enter:default-plan:P8"
+              },
+              {
+                "description": "Add deterministic real-process ownership regressions: register a gated leader, launch a setsid child, reap the leader before descendant observation, and independently prove the child remains alive without preloaded witnesses. Exercise actual capacity, replacement, deadline/operation, and cleanup consumers with missing primary registration, unavailable identity, legacy evidence, and helper loss. Assert retained capacity and artifacts, replacement refusal, and eventual release only after trustworthy proof. Preserve overlapping-stop, PID-reuse, quiescence, and survivor-resume coverage; test launch-handshake failures and workload output/exit semantics.",
+                "id": "workflow.plan.enter:default-plan:P9"
+              },
+              {
+                "description": "Exercise real integration failure plus supersession, preparation faults before and after claim, task/result/settlement/delivery panics, transient and exhausted persistence failures, cancellation, and same-Round/new-Round replacement. Parse evidence by originating Goal and claim and assert every provenance, error, settlement, and persistence field, including structured fallback when storage fails. With the same runner and another active Goal, inject a transient scheduler fault and prove the next independently eligible Goal enters Plan within one one-second poll interval after safe capacity becomes available.",
+                "id": "workflow.plan.enter:default-plan:P10"
+              },
+              {
+                "description": "Test the actual daemon supervision path with a non-ticking worker and a ticking controller whose admission cycle stalls. Verify bounded detection, replacement exclusion, restart backoff, and replacement-tick readiness while HTTP status and shutdown remain responsive. Cover missing/corrupt observations, wrong incarnation, target changes, termination failure, pause, disabled automation, long-running work, and blocking Skills. Prove deadline maintenance and eligible cleanup progress during admission and recovery faults. Verify explicit unsupported-platform behavior and preserve the Linux/macOS CI contract.",
+                "id": "workflow.plan.enter:default-plan:P11"
+              },
+              {
+                "description": "Update only affected workflow overview, consistency, execution-ownership, process, and CLI intent contracts. Keep ownership assessment, launch lifecycle, scheduling, settlement evidence, and maintenance in cohesive modules. Through supported Refine supervision, run cargo test --lib <filter> -- --test-threads=1 for worker_liveness, failure_settlement, infrastructure::process::subprocess, infrastructure::process::supervisor, application::workers, application::maintenance::worktrees, application::workflow::health, application::events, application::guidance, and surfaces::web_server::tests::http_transport::runtime. Then run cargo check --all-targets --locked, cargo fmt --all -- --check, cargo test --lib --bins -- --test-threads=1, cargo build --release --locked, and git diff --check. Record exact commands, selected counts, failures, skips, logs, and candidate identity. Reproduce any alleged baseline failure against a270fdaa; carry forward no historical test exclusions.",
+                "id": "workflow.plan.enter:default-plan:P12"
+              }
+            ],
+            "summary": "workflow.plan.enter:default-plan: Restore scheduling resilience on pinned base a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e by strengthening existing owners: WorkflowEngine controls admission and attempt completion, FileWorkItemService fences Goal mutations, and FileProcessSupervisor owns local execution evidence. Preparation already runs outside the controller; remaining risks include the pass-long scheduler_error latch, settlement panics bypassing completion, and supervision accepting process liveness without scheduler progress. Preserve the invariant that semantic authority, local capacity, and proven execution exit are separate. Selectively adapt retained work, correcting its descendant-ownership and settlement-evidence gaps."
+          },
+          "started_at": "2026-09-10T18:06:08Z"
+        },
+        "phase": "implement",
+        "phase_started_at": "2026-09-10T18:12:21Z",
+        "proposal": {
+          "completed_at": "2026-09-10T18:12:20Z",
+          "git_after": {
+            "branch": "refine/DR07C216F3E4EC22A57C60BE0B/round-4",
+            "head_commit": "a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR07C216F3E4EC22A57C60BE0B/round-4",
+            "head_commit": "a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Adapt useful ab318054 and interrupted Round-3 changes into this Round's managed workspace. Preserve current engine/admission.rs reservations and Goal/Skill fairness, occurrence-pinned gate assessment, lifecycle invocation handling, and managed-worktree validation. Do not restore retired dispatch paths or overwrite newer Event and workspace implementations. Preserve every prior attempt and reuse source.",
+                "id": "workflow.plan.enter:default-plan:P1"
+              },
+              {
+                "description": "Extend FileProcessSupervisor with one shared Live, Exited, or Unverified ownership assessment. Retain runtime, registration, incarnation, workload identity, descendants, and proof provenance independently of the primary process record. Empty scans, missing identities, legacy confirmed_exit booleans, and later quiescence cannot establish complete exit. Apply the assessment to capacity, replacement, deadline and operation reconciliation, registry retirement, and worktree protection. Deduplicate reservations and process evidence without hiding independent manual work.",
+                "id": "workflow.plan.enter:default-plan:P2"
+              },
+              {
+                "description": "Rework the retained Linux guardian into a cohesive process-launch helper that establishes subreaper ownership before releasing the workload. Use a bounded registration/start handshake and separate workload completion from complete scope exit; avoid the retained nested pre_exec fork protocol. Preserve executable selection, prepared environment, workspace admission, stdio, exit status, cancellation, and limits. Identify helpers through exact registration and OS identity, never process names. Helper loss or incomplete coverage remains Unverified. Platforms without complete coverage retain affected capacity and artifacts and expose the limitation; do not manufacture exit proof.",
+                "id": "workflow.plan.enter:default-plan:P3"
+              },
+              {
+                "description": "Extract a cohesive attempt runner covering preparation, execution, result construction, and settlement. Capture claim authority immediately after claiming, outside unwind boundaries. Use finished handles as completion fallback so a panic cannot strand an ended attempt. Capture immutable originating failure evidence before settlement; return explicit authoritative failure, verified existing outcome, superseded attempt, or unpersisted evidence. Retry transient writes at most three times with bounded waits and fresh authority checks under the Goal lock. Contain settlement, serialization, storage, and reporting faults while preserving the original error, stage, Goal, Round, claim revision, timestamp, and settlement fault.",
+                "id": "workflow.plan.enter:default-plan:P4"
+              },
+              {
+                "description": "Replace the pass-long scheduler_error latch with bounded retry scheduling. Keep promotion, Event dispatch, discovery, repository work, and settlement waits outside the ticking controller; bound remaining coordination waits. Retain one admission controller and the existing shared reservation owner. Continue draining completions during errors, invalidate discovery captured before capacity release, and recheck pause, target, eligibility, and capacity before launch. Retain capacity through preparation, execution, settlement, and pending owned descendants.",
+                "id": "workflow.plan.enter:default-plan:P5"
+              },
+              {
+                "description": "Publish atomic scheduler observations from the actual controller at least every second, including pause and detachment. Bind observations to runtime, worker registration, OS identity, incarnation, node, and target; record tick sequence, completed admission cycle, active attempts, and faults. Extend FileRunnerWorkerService supervision with 30-second startup and silence bounds, bounded target-transition handling, and restart backoff capped at five minutes. Fence replacement, stop only the exact old incarnation, require complete owned-execution exit proof, and accept replacement only after its matching scheduler tick.",
+                "id": "workflow.plan.enter:default-plan:P6"
+              },
+              {
+                "description": "Expose one fresh Application health assessment through system status, process diagnostics, and FileNextActionsService. Separate daemon reachability and shutdown intent from workflow degradation, including lifecycle_shutdown and port discovery. Surface continuously eligible Todo work waiting over 30 seconds with free capacity, waiting count, last tick, cause, and supported diagnostic/remediation commands. Reuse current eligibility, occurrence-pinned Skill gates, reservations, and ownership assessment to distinguish ordering, retry delay, pause, disabled automation, legitimate waiting, and unavailable evidence.",
+                "id": "workflow.plan.enter:default-plan:P7"
+              },
+              {
+                "description": "Provide one Application maintain_daemon interface shared with DR74050DA12C5442DF797B8AB6, independently scheduled from admission and worker replacement. Reuse existing process and session deadline mechanisms, original deadlines, activity evidence, Toolbar protection, and human-input exceptions. Reconcile operations only after proven exit and revision revalidation. Keep cleanup independently supervised; isolate individual inspection faults and repository contention while preserving retention delays, dirty-worktree protection, live-use checks, and exact ref-retirement fences.",
+                "id": "workflow.plan.enter:default-plan:P8"
+              },
+              {
+                "description": "Add deterministic real-process ownership regressions: register a gated leader, launch a setsid child, reap the leader before descendant observation, and independently prove the child remains alive without preloaded witnesses. Exercise actual capacity, replacement, deadline/operation, and cleanup consumers with missing primary registration, unavailable identity, legacy evidence, and helper loss. Assert retained capacity and artifacts, replacement refusal, and eventual release only after trustworthy proof. Preserve overlapping-stop, PID-reuse, quiescence, and survivor-resume coverage; test launch-handshake failures and workload output/exit semantics.",
+                "id": "workflow.plan.enter:default-plan:P9"
+              },
+              {
+                "description": "Exercise real integration failure plus supersession, preparation faults before and after claim, task/result/settlement/delivery panics, transient and exhausted persistence failures, cancellation, and same-Round/new-Round replacement. Parse evidence by originating Goal and claim and assert every provenance, error, settlement, and persistence field, including structured fallback when storage fails. With the same runner and another active Goal, inject a transient scheduler fault and prove the next independently eligible Goal enters Plan within one one-second poll interval after safe capacity becomes available.",
+                "id": "workflow.plan.enter:default-plan:P10"
+              },
+              {
+                "description": "Test the actual daemon supervision path with a non-ticking worker and a ticking controller whose admission cycle stalls. Verify bounded detection, replacement exclusion, restart backoff, and replacement-tick readiness while HTTP status and shutdown remain responsive. Cover missing/corrupt observations, wrong incarnation, target changes, termination failure, pause, disabled automation, long-running work, and blocking Skills. Prove deadline maintenance and eligible cleanup progress during admission and recovery faults. Verify explicit unsupported-platform behavior and preserve the Linux/macOS CI contract.",
+                "id": "workflow.plan.enter:default-plan:P11"
+              },
+              {
+                "description": "Update only affected workflow overview, consistency, execution-ownership, process, and CLI intent contracts. Keep ownership assessment, launch lifecycle, scheduling, settlement evidence, and maintenance in cohesive modules. Through supported Refine supervision, run cargo test --lib <filter> -- --test-threads=1 for worker_liveness, failure_settlement, infrastructure::process::subprocess, infrastructure::process::supervisor, application::workers, application::maintenance::worktrees, application::workflow::health, application::events, application::guidance, and surfaces::web_server::tests::http_transport::runtime. Then run cargo check --all-targets --locked, cargo fmt --all -- --check, cargo test --lib --bins -- --test-threads=1, cargo build --release --locked, and git diff --check. Record exact commands, selected counts, failures, skips, logs, and candidate identity. Reproduce any alleged baseline failure against a270fdaa; carry forward no historical test exclusions.",
+                "id": "workflow.plan.enter:default-plan:P12"
+              }
+            ],
+            "summary": "workflow.plan.enter:default-plan: Restore scheduling resilience on pinned base a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e by strengthening existing owners: WorkflowEngine controls admission and attempt completion, FileWorkItemService fences Goal mutations, and FileProcessSupervisor owns local execution evidence. Preparation already runs outside the controller; remaining risks include the pass-long scheduler_error latch, settlement panics bypassing completion, and supervision accepting process liveness without scheduler progress. Preserve the invariant that semantic authority, local capacity, and proven execution exit are separate. Selectively adapt retained work, correcting its descendant-ownership and settlement-evidence gaps."
+          },
+          "started_at": "2026-09-10T18:06:08Z"
+        },
         "schema_version": 2,
         "started_at": "2026-09-10T18:06:08Z",
         "state": "in_progress",
-        "updated_at": "2026-09-10T18:06:08Z"
+        "updated_at": "2026-09-10T18:12:21Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -4023,7 +4251,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T18:06:08Z",
+      "updated": "2026-09-10T18:12:21Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T18:06:05Z",
         "round_idx": 3,
@@ -4033,9 +4261,9 @@
       "workflow_recovery": null
     }
   ],
-  "status": "plan",
+  "status": "implement",
   "target_branch": "main",
-  "updated": "2026-09-10T18:06:08Z",
+  "updated": "2026-09-10T18:12:21Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:06:37.178169037+00:00",
@@ -4126,7 +4354,16 @@
       "node_id": "default",
       "round_idx": 3,
       "to": "plan"
+    },
+    {
+      "at": "2026-09-10T18:12:21.108191689+00:00",
+      "forced": false,
+      "from": "plan",
+      "generation": 11,
+      "node_id": "default",
+      "round_idx": 3,
+      "to": "implement"
     }
   ],
-  "workflow_revision": 75
+  "workflow_revision": 81
 }
