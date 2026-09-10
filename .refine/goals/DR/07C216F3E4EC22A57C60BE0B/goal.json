@@ -3,7 +3,7 @@
   "branch_name": "refine/DR07C216F3E4EC22A57C60BE0B/round-3",
   "candidate_commit": "ab318054adf5a5418ee3ae8bec348c98232916f2",
   "created": "2026-09-10T08:26:00Z",
-  "event_generation": 6,
+  "event_generation": 7,
   "feature_id": null,
   "feature_order": null,
   "id": "DR07C216F3E4EC22A57C60BE0B",
@@ -2642,6 +2642,92 @@
           }
         }
       },
+      "event_results": {
+        "10c00a3dd9356d58b1edd8d47e2080ed97f8290e3a90206e7507ff8a5ad92967": {
+          "candidate_commit": null,
+          "results": {
+            "default-plan": {
+              "artifacts": {
+                "plan": {
+                  "checklist": [
+                    {
+                      "description": "Introduce one shared ownership assessment distinguishing live work, exit supported by complete ownership proof, and unverified evidence. Retain registration evidence when the leader disappears before identity or descendant observation; treat legacy records without sufficient proof conservatively. Empty scans and later quiescence must never repair an earlier ownership gap.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "Apply that assessment consistently to group_pending, capacity_processes, scheduling load and eligibility, workflow replacement, deadline/operation reconciliation, registry cleanup and worktree protection. Live and unverified ownership retain deduplicated capacity and artifacts even without the primary registration; only proven exit permits release. Surface uncertainty through shared Application health with process identity, reason and supported inspection commands.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "Preserve runtime, worker-incarnation, registration and PID-start identity fences, bounded overlapping-stop coordination, quiescence and survivor resume. Require complete ownership coverage before controlled termination can produce exit proof; retain explicit unhealthy status when coverage is unavailable. Continue deadline and operation maintenance through maintain_daemon, allowing unrelated maintenance to progress.",
+                      "id": "P3"
+                    },
+                    {
+                      "description": "Add a deterministic isolated-leader regression: register before opening the launch gate, launch a setsid child, reap the leader before any descendant observation, and independently verify the child remains alive without pre-populating witnesses. Exercise actual worker recovery, capacity accounting, deadline/operation maintenance and worktree cleanup, both with and without the primary registration; assert replacement refusal and retained evidence, followed by release only with trustworthy proof or continued actionable unhealthy status.",
+                      "id": "P4"
+                    },
+                    {
+                      "description": "Capture immutable originating failure evidence before settlement and contain settlement panics inside failure_settlement before common finalization. Preserve at most three transient persistence attempts, bounded waits and authority revalidation under the Goal lock. Panics produce UnpersistedEvidence containing the settlement fault while retaining the original error, failure stage, Goal, round_idx, claim-time workflow_revision and failure timestamp.",
+                      "id": "P5"
+                    },
+                    {
+                      "description": "Make evidence finalization contain serialization, runtime-write and reporting faults without escaping attempt completion. On storage failure, report the complete structured originating evidence, settlement outcome and write fault through a fallible reporting path; never claim persistence. Preserve the original attempt error and completion delivery without overwriting cancellation, a replacement claim or a newer Round.",
+                      "id": "P6"
+                    },
+                    {
+                      "description": "Extend worker_liveness and failure_settlement tests to select and parse evidence by originating Goal and claim, asserting every identity, error, stage and outcome field. Cover settlement panic, cancellation, same-Round reclamation, newer-Round supersession and unavailable evidence storage, including captured structured fallback output. Retain exact retry counts and prove the next independently eligible Goal enters Plan within one poll interval after capacity is safely available.",
+                      "id": "P7"
+                    },
+                    {
+                      "description": "Update the affected consistency, execution-ownership and process intent contracts to explain unverified ownership and panic evidence; change workflow or CLI intent only if their documented behavior changes. Keep ownership observation, termination and evidence finalization cohesive, extracting responsibility-based modules where needed without unrelated refactoring.",
+                      "id": "P8"
+                    },
+                    {
+                      "description": "Run the requested focused suites, all-target locked compilation, changed-file rustfmt and whitespace checks through supported Refine supervision on the final candidate. Preserve existing stale-candidate, preparation/result, task-panic, termination-race, identity-reuse and independent-maintenance regressions. Record exact commands, nonzero test counts, exit codes and retained logs; distinguish independently established baseline failures and report skipped checks explicitly.",
+                      "id": "P9"
+                    }
+                  ],
+                  "criticism_resolutions": [
+                    {
+                      "criticism_id": "F1",
+                      "resolution": "Changing confirmed_exit alone leaves group_pending and its consumers unsafe. Use one proof-based assessment throughout ownership consumers. Choose the scoped unverified-evidence fallback where complete lifetime ownership cannot be established; faster polling, inherited tokens or quiescence after lost ancestry are insufficient exit proof. This can deliberately retain capacity indefinitely, which must be visible and actionable rather than silently cleared."
+                    },
+                    {
+                      "criticism_id": "F2",
+                      "resolution": "An outer panic catch preserves scheduling but bypasses originating evidence. Move containment ahead of common finalization, preserve claim-time identity outside unwind boundaries, and test exact originating records plus structured storage-failure reporting. Keep panic handling distinct from the bounded transient-write retry policy."
+                    }
+                  ],
+                  "summary": "Correct ownership exit proof and settlement-panic evidence on the retained candidate so uncertain descendants remain protected and Goal failures cannot silently strand scheduling."
+                }
+              },
+              "binding_id": "default-plan",
+              "evidence": [
+                "Verified the pinned workspace is clean at ab318054adf5a5418ee3ae8bec348c98232916f2 on refine/DR07C216F3E4EC22A57C60BE0B/round-3. The preserved Round-2 branch also names this candidate; main names b47569adb8d4c5d1d7335ba91729a3e486a38fe0. The current invocation explicitly uses the retained directory ending round-2, so this plan does not require a new checkout or replay.",
+                "Read the finalized Round-2 plan and failed invocation automation/invocations/177db40b9ee753eb9820904dad44b5a3d2b7608618316d841a5ac15ae868bda6.json from the state worktree. Its failed verdict records F1 and F2; its behavioral checks were not run.",
+                "Source confirms owned_groups.rs:116-124 derives pending ownership directly from scan membership, while lines 192-197 derive confirmed exit from an empty scan. Traced consumers through admission, policy, health, worker recovery, maintenance and worktree protection.",
+                "Source confirms attempt.rs:33-37 catches settlement panics outside the failure_settlement evidence finalizer. The existing worker_liveness panic regression checks subsequent admission without parsing originating failure evidence.",
+                "Read the candidate's design, planning, consistency, execution-ownership, process and relevant workflow/CLI intent. The plan uses focused finding recovery and preserves shared Application policy and Infrastructure mechanisms.",
+                "Read retained baseline log /tmp/refine-quality-r2-refreshed-base-planning.log: it records the multiple_plan_skills_contribute_separate_namespaced_checklists fixture failing on refreshed base with the one-trigger-per-Skill validation error. This is historical evidence, not a behavioral reproduction during this invocation.",
+                "Proposed through Refine supervision: cargo test --lib worker_liveness -- --test-threads=1",
+                "Proposed through Refine supervision: cargo test --lib failure_settlement -- --test-threads=1",
+                "Proposed through Refine supervision: cargo test --lib infrastructure::process::subprocess -- --test-threads=1",
+                "Proposed through Refine supervision: cargo test --lib application::workers -- --test-threads=1",
+                "Proposed through Refine supervision: cargo test --lib application::maintenance::worktrees -- --test-threads=1",
+                "Proposed through Refine supervision: cargo test --lib application::workflow::health -- --test-threads=1",
+                "Proposed through Refine supervision: cargo test --lib surfaces::web_server::tests::http_transport::runtime -- --test-threads=1",
+                "Proposed final checks: cargo check --all-targets --locked; rustfmt --edition 2024 --config skip_children=true --check over all added or modified Rust files; git diff --check.",
+                "Executed git diff --check b47569adb8d4c5d1d7335ba91729a3e486a38fe0 ab318054adf5a5418ee3ae8bec348c98232916f2: exit 0. Final status and staged/working diffs were empty. No files or Git state were changed; no behavioral tests, workflow advancement, deployment or daemon restart were performed."
+              ],
+              "invocation_id": "10c00a3dd9356d58b1edd8d47e2080ed97f8290e3a90206e7507ff8a5ad92967",
+              "outcome": "success",
+              "role": "plan",
+              "summary": "Completed an observational recovery plan for F1 and F2 against the retained candidate, with stable checklist IDs, resolved tradeoffs and proposed verification."
+            }
+          },
+          "source": "workflow.plan.enter",
+          "state": "succeeded"
+        }
+      },
       "failure_at": "",
       "failure_category": "",
       "failure_message": "",
@@ -2661,12 +2747,122 @@
           "round_idx": 2,
           "target_branch": "main"
         },
-        "phase": "plan",
-        "phase_started_at": "2026-09-10T15:33:56Z",
+        "final_plan": {
+          "completed_at": "2026-09-10T15:38:34Z",
+          "git_after": {
+            "branch": "refine/DR07C216F3E4EC22A57C60BE0B/round-3",
+            "head_commit": "ab318054adf5a5418ee3ae8bec348c98232916f2",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR07C216F3E4EC22A57C60BE0B/round-3",
+            "head_commit": "ab318054adf5a5418ee3ae8bec348c98232916f2",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Introduce one shared ownership assessment distinguishing live work, exit supported by complete ownership proof, and unverified evidence. Retain registration evidence when the leader disappears before identity or descendant observation; treat legacy records without sufficient proof conservatively. Empty scans and later quiescence must never repair an earlier ownership gap.",
+                "id": "workflow.plan.enter:default-plan:P1"
+              },
+              {
+                "description": "Apply that assessment consistently to group_pending, capacity_processes, scheduling load and eligibility, workflow replacement, deadline/operation reconciliation, registry cleanup and worktree protection. Live and unverified ownership retain deduplicated capacity and artifacts even without the primary registration; only proven exit permits release. Surface uncertainty through shared Application health with process identity, reason and supported inspection commands.",
+                "id": "workflow.plan.enter:default-plan:P2"
+              },
+              {
+                "description": "Preserve runtime, worker-incarnation, registration and PID-start identity fences, bounded overlapping-stop coordination, quiescence and survivor resume. Require complete ownership coverage before controlled termination can produce exit proof; retain explicit unhealthy status when coverage is unavailable. Continue deadline and operation maintenance through maintain_daemon, allowing unrelated maintenance to progress.",
+                "id": "workflow.plan.enter:default-plan:P3"
+              },
+              {
+                "description": "Add a deterministic isolated-leader regression: register before opening the launch gate, launch a setsid child, reap the leader before any descendant observation, and independently verify the child remains alive without pre-populating witnesses. Exercise actual worker recovery, capacity accounting, deadline/operation maintenance and worktree cleanup, both with and without the primary registration; assert replacement refusal and retained evidence, followed by release only with trustworthy proof or continued actionable unhealthy status.",
+                "id": "workflow.plan.enter:default-plan:P4"
+              },
+              {
+                "description": "Capture immutable originating failure evidence before settlement and contain settlement panics inside failure_settlement before common finalization. Preserve at most three transient persistence attempts, bounded waits and authority revalidation under the Goal lock. Panics produce UnpersistedEvidence containing the settlement fault while retaining the original error, failure stage, Goal, round_idx, claim-time workflow_revision and failure timestamp.",
+                "id": "workflow.plan.enter:default-plan:P5"
+              },
+              {
+                "description": "Make evidence finalization contain serialization, runtime-write and reporting faults without escaping attempt completion. On storage failure, report the complete structured originating evidence, settlement outcome and write fault through a fallible reporting path; never claim persistence. Preserve the original attempt error and completion delivery without overwriting cancellation, a replacement claim or a newer Round.",
+                "id": "workflow.plan.enter:default-plan:P6"
+              },
+              {
+                "description": "Extend worker_liveness and failure_settlement tests to select and parse evidence by originating Goal and claim, asserting every identity, error, stage and outcome field. Cover settlement panic, cancellation, same-Round reclamation, newer-Round supersession and unavailable evidence storage, including captured structured fallback output. Retain exact retry counts and prove the next independently eligible Goal enters Plan within one poll interval after capacity is safely available.",
+                "id": "workflow.plan.enter:default-plan:P7"
+              },
+              {
+                "description": "Update the affected consistency, execution-ownership and process intent contracts to explain unverified ownership and panic evidence; change workflow or CLI intent only if their documented behavior changes. Keep ownership observation, termination and evidence finalization cohesive, extracting responsibility-based modules where needed without unrelated refactoring.",
+                "id": "workflow.plan.enter:default-plan:P8"
+              },
+              {
+                "description": "Run the requested focused suites, all-target locked compilation, changed-file rustfmt and whitespace checks through supported Refine supervision on the final candidate. Preserve existing stale-candidate, preparation/result, task-panic, termination-race, identity-reuse and independent-maintenance regressions. Record exact commands, nonzero test counts, exit codes and retained logs; distinguish independently established baseline failures and report skipped checks explicitly.",
+                "id": "workflow.plan.enter:default-plan:P9"
+              }
+            ],
+            "summary": "workflow.plan.enter:default-plan: Correct ownership exit proof and settlement-panic evidence on the retained candidate so uncertain descendants remain protected and Goal failures cannot silently strand scheduling."
+          },
+          "started_at": "2026-09-10T15:33:56Z"
+        },
+        "phase": "implement",
+        "phase_started_at": "2026-09-10T15:38:34Z",
+        "proposal": {
+          "completed_at": "2026-09-10T15:38:34Z",
+          "git_after": {
+            "branch": "refine/DR07C216F3E4EC22A57C60BE0B/round-3",
+            "head_commit": "ab318054adf5a5418ee3ae8bec348c98232916f2",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR07C216F3E4EC22A57C60BE0B/round-3",
+            "head_commit": "ab318054adf5a5418ee3ae8bec348c98232916f2",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Introduce one shared ownership assessment distinguishing live work, exit supported by complete ownership proof, and unverified evidence. Retain registration evidence when the leader disappears before identity or descendant observation; treat legacy records without sufficient proof conservatively. Empty scans and later quiescence must never repair an earlier ownership gap.",
+                "id": "workflow.plan.enter:default-plan:P1"
+              },
+              {
+                "description": "Apply that assessment consistently to group_pending, capacity_processes, scheduling load and eligibility, workflow replacement, deadline/operation reconciliation, registry cleanup and worktree protection. Live and unverified ownership retain deduplicated capacity and artifacts even without the primary registration; only proven exit permits release. Surface uncertainty through shared Application health with process identity, reason and supported inspection commands.",
+                "id": "workflow.plan.enter:default-plan:P2"
+              },
+              {
+                "description": "Preserve runtime, worker-incarnation, registration and PID-start identity fences, bounded overlapping-stop coordination, quiescence and survivor resume. Require complete ownership coverage before controlled termination can produce exit proof; retain explicit unhealthy status when coverage is unavailable. Continue deadline and operation maintenance through maintain_daemon, allowing unrelated maintenance to progress.",
+                "id": "workflow.plan.enter:default-plan:P3"
+              },
+              {
+                "description": "Add a deterministic isolated-leader regression: register before opening the launch gate, launch a setsid child, reap the leader before any descendant observation, and independently verify the child remains alive without pre-populating witnesses. Exercise actual worker recovery, capacity accounting, deadline/operation maintenance and worktree cleanup, both with and without the primary registration; assert replacement refusal and retained evidence, followed by release only with trustworthy proof or continued actionable unhealthy status.",
+                "id": "workflow.plan.enter:default-plan:P4"
+              },
+              {
+                "description": "Capture immutable originating failure evidence before settlement and contain settlement panics inside failure_settlement before common finalization. Preserve at most three transient persistence attempts, bounded waits and authority revalidation under the Goal lock. Panics produce UnpersistedEvidence containing the settlement fault while retaining the original error, failure stage, Goal, round_idx, claim-time workflow_revision and failure timestamp.",
+                "id": "workflow.plan.enter:default-plan:P5"
+              },
+              {
+                "description": "Make evidence finalization contain serialization, runtime-write and reporting faults without escaping attempt completion. On storage failure, report the complete structured originating evidence, settlement outcome and write fault through a fallible reporting path; never claim persistence. Preserve the original attempt error and completion delivery without overwriting cancellation, a replacement claim or a newer Round.",
+                "id": "workflow.plan.enter:default-plan:P6"
+              },
+              {
+                "description": "Extend worker_liveness and failure_settlement tests to select and parse evidence by originating Goal and claim, asserting every identity, error, stage and outcome field. Cover settlement panic, cancellation, same-Round reclamation, newer-Round supersession and unavailable evidence storage, including captured structured fallback output. Retain exact retry counts and prove the next independently eligible Goal enters Plan within one poll interval after capacity is safely available.",
+                "id": "workflow.plan.enter:default-plan:P7"
+              },
+              {
+                "description": "Update the affected consistency, execution-ownership and process intent contracts to explain unverified ownership and panic evidence; change workflow or CLI intent only if their documented behavior changes. Keep ownership observation, termination and evidence finalization cohesive, extracting responsibility-based modules where needed without unrelated refactoring.",
+                "id": "workflow.plan.enter:default-plan:P8"
+              },
+              {
+                "description": "Run the requested focused suites, all-target locked compilation, changed-file rustfmt and whitespace checks through supported Refine supervision on the final candidate. Preserve existing stale-candidate, preparation/result, task-panic, termination-race, identity-reuse and independent-maintenance regressions. Record exact commands, nonzero test counts, exit codes and retained logs; distinguish independently established baseline failures and report skipped checks explicitly.",
+                "id": "workflow.plan.enter:default-plan:P9"
+              }
+            ],
+            "summary": "workflow.plan.enter:default-plan: Correct ownership exit proof and settlement-panic evidence on the retained candidate so uncertain descendants remain protected and Goal failures cannot silently strand scheduling."
+          },
+          "started_at": "2026-09-10T15:33:56Z"
+        },
         "schema_version": 2,
         "started_at": "2026-09-10T15:33:56Z",
         "state": "in_progress",
-        "updated_at": "2026-09-10T15:33:56Z"
+        "updated_at": "2026-09-10T15:38:34Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -2680,7 +2876,7 @@
       "quality_state": "unclassified",
       "reporter": "Refine",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T15:33:56Z",
+      "updated": "2026-09-10T15:38:34Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T15:33:55Z",
         "round_idx": 2,
@@ -2690,9 +2886,9 @@
       "workflow_recovery": null
     }
   ],
-  "status": "plan",
+  "status": "implement",
   "target_branch": "main",
-  "updated": "2026-09-10T15:33:56Z",
+  "updated": "2026-09-10T15:38:34Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:06:37.178169037+00:00",
@@ -2747,7 +2943,16 @@
       "node_id": "default",
       "round_idx": 2,
       "to": "plan"
+    },
+    {
+      "at": "2026-09-10T15:38:34.322731406+00:00",
+      "forced": false,
+      "from": "plan",
+      "generation": 7,
+      "node_id": "default",
+      "round_idx": 2,
+      "to": "implement"
     }
   ],
-  "workflow_revision": 56
+  "workflow_revision": 62
 }
