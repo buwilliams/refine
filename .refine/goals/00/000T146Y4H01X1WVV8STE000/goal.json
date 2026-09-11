@@ -1,9 +1,9 @@
 {
   "base_commit": "2626d584c9da1e6f27b3c3f0bbec750c6772536f",
   "branch_name": "refine/00000T146Y4H01X1WVV8STE000/round-2",
-  "candidate_commit": null,
+  "candidate_commit": "48502266e7c46fdb6196e5c629698883bd84326a",
   "created": "2026-09-11T14:27:52Z",
-  "event_generation": 8,
+  "event_generation": 10,
   "feature_id": null,
   "feature_order": null,
   "id": "00000T146Y4H01X1WVV8STE000",
@@ -698,49 +698,23 @@
       "created": "2026-09-11T15:08:16Z",
       "event_configuration": {
         "events": {
-          "workflow.implement.enter": {
-            "bindings": [
-              {
-                "enabled": true,
-                "id": "default-implement",
-                "inputs": {},
-                "mode": "blocking",
-                "order": 0,
-                "overrides": null,
-                "scope": {
-                  "node_id": null
-                },
-                "skill_id": "default-implement"
-              }
-            ],
+          "workflow.implement.exit": {
+            "bindings": [],
             "enabled": true,
-            "id": "workflow.implement.enter",
+            "id": "workflow.implement.exit",
             "kind": "system",
-            "name": "Workflow Implement Enter",
+            "name": "Workflow Implement Exit",
             "on_success": null,
             "parameters": [],
             "scope": {
               "node_id": null
             },
-            "source": "workflow.implement.enter"
+            "source": "workflow.implement.exit"
           }
         },
         "revision": 40,
         "schema_version": 2,
-        "skills": {
-          "default-implement": {
-            "enabled": true,
-            "id": "default-implement",
-            "name": "Implement",
-            "parameters": [],
-            "prompt": "## Implementation\n\nImplement the current Goal Round using all accepted plans and attached Skills. Inspect existing code, make the complete change, run appropriate verification, and report evidence for each checklist item. Check the plan's assumptions against the code and keep policy in its shared owner. Prefer one correction that explains the affected behavior over separate fixes at each failing call site. Report evidence-backed plan deviations within the Goal's scope and existing authority. Preserve unrelated changes and historical evidence.\n\n### Intent and architecture\n\nReview Refine's relevant documentation files under Refine's runtime at `<refine-runtime>/docs/intent/***/*.*` as the durable product specification.\n\n### Semantic code organization\n\nKeep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.\n\nIf issues outside the Goal’s scope block progress, investigate and fix them or use an evidence-backed workaround, preserving required checks and documenting what you changed.\n",
-            "provenance": "refine-default-v1",
-            "role": "task",
-            "scope": {
-              "node_id": null
-            }
-          }
-        }
+        "skills": {}
       },
       "event_results": {
         "011945bfc88fdbd240e5b0ab8ac96472aa86fce15e24cab2a32638b732de8a26": {
@@ -808,12 +782,106 @@
           "round_idx": 1,
           "source": "workflow.plan.enter",
           "state": "succeeded"
+        },
+        "1d4210bca153380e3cf4c6c852b29f9c0d20a20a64f04d9eef79eed7e223eba0": {
+          "candidate_commit": null,
+          "generation": 8,
+          "results": {
+            "default-implement": {
+              "artifacts": {
+                "implementation_evidence": {
+                  "checklist": [
+                    {
+                      "evidence": "Carried Round 1 into Round 2. Retained worktree, branch, uncommitted changes and logs remain intact; patch checksum is unchanged.",
+                      "id": "workflow.plan.enter:default-plan:P1",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Implemented Skills, Sites, Settings, New Goal ordering, separate lists, separators and creation/management actions through existing shared owners. Updated intent and help text.",
+                      "id": "workflow.plan.enter:default-plan:P2",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Recorded 21 isolated baseline invocations across both pinned bases and the carried candidate. Six failures reproduced identically; Events passed independently, identifying the lock cascade.",
+                      "id": "workflow.plan.enter:default-plan:P3",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Confirmed historical removal of automatic Quality recovery. Corrected the shared architecture assertion and conflicting intent. Architecture and workflow checks pass.",
+                      "id": "workflow.plan.enter:default-plan:P4",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Preserved OS exec diagnostics through the shared launch handshake, repaired PTY artifact cleanup, and added unwind-safe provider environment restoration with regression coverage.",
+                      "id": "workflow.plan.enter:default-plan:P5",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Corrected persistence fixture ownership and stale capture, redaction and Jira termination expectations while preserving behavioral assertions. Documented additional admission, asynchronous settlement and fixture-cleanup corrections.",
+                      "id": "workflow.plan.enter:default-plan:P6",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Final Rust suite: 1308 passed, zero failed, seven existing ignored. Static surface: 21 passed. Browser suites: 77 passed, zero skipped. Tested source hashes matched before staging.",
+                      "id": "workflow.plan.enter:default-plan:P7",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Read effective workflow Skills. Committed candidate 48502266e7c46fdb6196e5c629698883bd84326a on the Round 2 branch; worktree is clean. Detailed evidence is committed in docs/reports/navigation-round-2.md.",
+                      "id": "workflow.plan.enter:default-plan:P8",
+                      "outcome": "completed"
+                    }
+                  ],
+                  "verification": [
+                    "TMPDIR=/tmp CARGO_TARGET_DIR=\"$PWD/target\" cargo run --manifest-path xtask/Cargo.toml -- test-unit: exit 0; 1308 passed, 0 failed, 7 ignored.",
+                    "TMPDIR=/tmp CARGO_TARGET_DIR=\"$PWD/target\" cargo test --lib surfaces::web_server::tests::static_surface -- --test-threads=1: exit 0; 21 passed.",
+                    "NODE_PATH=/home/buddy/projects/refine/node_modules node --test tests/web_topbar_navigation.test.js tests/web_knowledge_hub.test.js tests/web_node_scope_navigation.test.js tests/web_reporter_onboarding.test.js tests/web_theme.test.js tests/web_screen_render.test.js: exit 0; 77 passed, 0 failed, 0 skipped.",
+                    "git diff --cached --check: passed before commit. git status --porcelain: empty after commit."
+                  ]
+                }
+              },
+              "binding_id": "default-implement",
+              "evidence": [
+                "Candidate: 48502266e7c46fdb6196e5c629698883bd84326a.",
+                "Report: docs/reports/navigation-round-2.md.",
+                "Baseline comparisons, executable provenance, final checks and failed attempts retained in /tmp/refine-nav-round2-evidence/.",
+                "No Goal state changes, approval, merge or push performed."
+              ],
+              "invocation_id": "1d4210bca153380e3cf4c6c852b29f9c0d20a20a64f04d9eef79eed7e223eba0",
+              "outcome": "success",
+              "role": "implement",
+              "summary": "Implemented the navigation changes, resolved verification blockers, and committed the passing candidate for independent Quality and Governance."
+            }
+          },
+          "round_idx": 1,
+          "source": "workflow.implement.enter",
+          "state": "succeeded"
         }
       },
-      "failure_at": "",
-      "failure_category": "",
-      "failure_message": "",
+      "failure_at": "2026-09-11T21:08:04Z",
+      "failure_category": "integration",
+      "failure_message": "candidate refresh conflicted",
       "gate_configurations": {
+        "10:default:workflow.failed.enter": {
+          "events": {
+            "workflow.failed.enter": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.failed.enter",
+              "kind": "system",
+              "name": "Workflow Failed Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.failed.enter"
+            }
+          },
+          "revision": 40,
+          "schema_version": 2,
+          "skills": {}
+        },
         "6:default:workflow.todo.enter": {
           "events": {
             "workflow.todo.enter": {
@@ -977,6 +1045,32 @@
               }
             }
           }
+        },
+        "8:default:workflow.implement.exit": {
+          "events": {
+            "workflow.implement.exit": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.implement.exit",
+              "kind": "system",
+              "name": "Workflow Implement Exit",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.implement.exit"
+            }
+          },
+          "revision": 40,
+          "schema_version": 2,
+          "skills": {}
+        },
+        "8:default:workflow.implement.success": {
+          "events": {},
+          "revision": 40,
+          "schema_version": 2,
+          "skills": {}
         }
       },
       "governance_candidate_commit": "",
@@ -984,7 +1078,12 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "guidance_decision": null,
+      "guidance_decision": {
+        "applied": [],
+        "context_version": 1,
+        "recorded_at": "2026-09-11T21:08:02Z",
+        "skipped": []
+      },
       "implementation_plan": {
         "binding": {
           "base_commit": "2626d584c9da1e6f27b3c3f0bbec750c6772536f",
@@ -995,6 +1094,7 @@
           "round_idx": 1,
           "target_branch": "main"
         },
+        "completed_at": "2026-09-11T21:08:02Z",
         "final_plan": {
           "completed_at": "2026-09-11T19:30:35Z",
           "git_after": {
@@ -1045,6 +1145,61 @@
             "summary": "workflow.plan.enter:default-plan: Carry forward the retained navigation implementation and resolve the Rust blockers through existing architecture and test-isolation owners before independent review."
           },
           "started_at": "2026-09-11T19:28:44Z"
+        },
+        "implementation": {
+          "completed_at": "2026-09-11T21:08:02Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "Carried Round 1 into Round 2. Retained worktree, branch, uncommitted changes and logs remain intact; patch checksum is unchanged.",
+                "id": "workflow.plan.enter:default-plan:P1",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Implemented Skills, Sites, Settings, New Goal ordering, separate lists, separators and creation/management actions through existing shared owners. Updated intent and help text.",
+                "id": "workflow.plan.enter:default-plan:P2",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Recorded 21 isolated baseline invocations across both pinned bases and the carried candidate. Six failures reproduced identically; Events passed independently, identifying the lock cascade.",
+                "id": "workflow.plan.enter:default-plan:P3",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Confirmed historical removal of automatic Quality recovery. Corrected the shared architecture assertion and conflicting intent. Architecture and workflow checks pass.",
+                "id": "workflow.plan.enter:default-plan:P4",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Preserved OS exec diagnostics through the shared launch handshake, repaired PTY artifact cleanup, and added unwind-safe provider environment restoration with regression coverage.",
+                "id": "workflow.plan.enter:default-plan:P5",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Corrected persistence fixture ownership and stale capture, redaction and Jira termination expectations while preserving behavioral assertions. Documented additional admission, asynchronous settlement and fixture-cleanup corrections.",
+                "id": "workflow.plan.enter:default-plan:P6",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Final Rust suite: 1308 passed, zero failed, seven existing ignored. Static surface: 21 passed. Browser suites: 77 passed, zero skipped. Tested source hashes matched before staging.",
+                "id": "workflow.plan.enter:default-plan:P7",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Read effective workflow Skills. Committed candidate 48502266e7c46fdb6196e5c629698883bd84326a on the Round 2 branch; worktree is clean. Detailed evidence is committed in docs/reports/navigation-round-2.md.",
+                "id": "workflow.plan.enter:default-plan:P8",
+                "outcome": "completed"
+              }
+            ],
+            "verification": [
+              "TMPDIR=/tmp CARGO_TARGET_DIR=\"$PWD/target\" cargo run --manifest-path xtask/Cargo.toml -- test-unit: exit 0; 1308 passed, 0 failed, 7 ignored.",
+              "TMPDIR=/tmp CARGO_TARGET_DIR=\"$PWD/target\" cargo test --lib surfaces::web_server::tests::static_surface -- --test-threads=1: exit 0; 21 passed.",
+              "NODE_PATH=/home/buddy/projects/refine/node_modules node --test tests/web_topbar_navigation.test.js tests/web_knowledge_hub.test.js tests/web_node_scope_navigation.test.js tests/web_reporter_onboarding.test.js tests/web_theme.test.js tests/web_screen_render.test.js: exit 0; 77 passed, 0 failed, 0 skipped.",
+              "git diff --cached --check: passed before commit. git status --porcelain: empty after commit."
+            ]
+          },
+          "report": "workflow.implement.enter:default-implement: Implemented the navigation changes, resolved verification blockers, and committed the passing candidate for independent Quality and Governance.",
+          "started_at": "2026-09-11T19:30:36Z"
         },
         "phase": "implement",
         "phase_started_at": "2026-09-11T19:30:36Z",
@@ -1101,11 +1256,11 @@
         },
         "schema_version": 2,
         "started_at": "2026-09-11T19:28:44Z",
-        "state": "in_progress",
-        "updated_at": "2026-09-11T19:30:36Z"
+        "state": "completed",
+        "updated_at": "2026-09-11T21:08:02Z"
       },
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "workflow.implement.enter:default-implement: Implemented the navigation changes, resolved verification blockers, and committed the passing candidate for independent Quality and Governance.",
+      "implementation_reported_at": "2026-09-11T21:08:02Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -1116,20 +1271,56 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-09-11T19:30:36Z",
+      "updated": "2026-09-11T21:08:04Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-11T19:28:42Z",
         "generation": 6,
         "round_idx": 1,
         "workflow_revision": 20
       },
+      "workflow_failure_occurrence": {
+        "generation": 9,
+        "round_idx": 1
+      },
       "workflow_reconciliation": null,
-      "workflow_recovery": null
+      "workflow_recovery": {
+        "automatic_recovery": false,
+        "kind": "integration",
+        "reason": "candidate refresh conflicted",
+        "recorded_at": "2026-09-11T21:08:04Z",
+        "retained_evidence": {
+          "branch": "refine/00000T146Y4H01X1WVV8STE000/round-2",
+          "original_base_commit": "2626d584c9da1e6f27b3c3f0bbec750c6772536f",
+          "original_candidate_commit": "48502266e7c46fdb6196e5c629698883bd84326a",
+          "rebase": {
+            "conflicts": [
+              "src/application/agents/sessions/pty_lifecycle.rs"
+            ],
+            "message": "Auto-merging docs/intent/03-application/01-agents/02-skills.md\nAuto-merging src/application/agents/sessions/mod.rs\nAuto-merging src/application/agents/sessions/pty_lifecycle.rs\nCONFLICT (content): Merge conflict in src/application/agents/sessions/pty_lifecycle.rs\nAuto-merging src/application/agents/sessions/tests.rs\nAuto-merging src/application/workflow/mod.rs\nAuto-merging src/surfaces/web_server/tests/quality_guidance/quality.rs\nRebasing (1/1)\rerror: could not apply 48502266... Add Skills and Sites navigation and repair verification blockers\nhint: Resolve all conflicts manually, mark them as resolved with\nhint: \"git add/rm <conflicted_files>\", then run \"git rebase --continue\".\nhint: You can instead skip this commit: run \"git rebase --skip\".\nhint: To abort and get back to the state before \"git rebase\", run \"git rebase --abort\".\nhint: Disable this message with \"git config set advice.mergeConflict false\"\nCould not apply 48502266... # Add Skills and Sites navigation and repair verification blockers",
+            "ok": false
+          },
+          "rebase_abort": {
+            "conflicts": [],
+            "message": "fatal: There is no merge to abort (MERGE_HEAD missing).\n\nerror: no cherry-pick or revert in progress\nfatal: revert failed",
+            "ok": true
+          },
+          "restored_candidate_head": {
+            "branch": "refine/00000T146Y4H01X1WVV8STE000/round-2",
+            "commit": "48502266e7c46fdb6196e5c629698883bd84326a"
+          },
+          "target_branch": "main",
+          "target_commit": "39dfb90d0fdb4e85719ab233cde87d11c5e561e9",
+          "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T146Y4H01X1WVV8STE000-round-2"
+        },
+        "source_round": 2,
+        "state": "failed",
+        "successor_round": null
+      }
     }
   ],
-  "status": "implement",
+  "status": "failed",
   "target_branch": "main",
-  "updated": "2026-09-11T19:30:36Z",
+  "updated": "2026-09-11T21:08:04Z",
   "workflow_events": [
     {
       "at": "2026-09-11T14:27:52.512340696+00:00",
@@ -1204,7 +1395,27 @@
       "round_idx": 1,
       "to": "implement",
       "workflow_revision": 33
+    },
+    {
+      "at": "2026-09-11T21:08:03.918155486+00:00",
+      "forced": false,
+      "from": "implement",
+      "generation": 9,
+      "node_id": "default",
+      "round_idx": 1,
+      "to": "quality",
+      "workflow_revision": 43
+    },
+    {
+      "at": "2026-09-11T21:08:04.650816170+00:00",
+      "forced": true,
+      "from": "quality",
+      "generation": 10,
+      "node_id": "default",
+      "round_idx": 1,
+      "to": "failed",
+      "workflow_revision": 45
     }
   ],
-  "workflow_revision": 35
+  "workflow_revision": 45
 }
