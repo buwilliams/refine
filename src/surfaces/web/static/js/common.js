@@ -76,31 +76,11 @@ function reviewStateClass(value, passedClass = "done", failedClass = "failed", e
 }
 
 function governanceReviewStatus(round) {
-  const ruleState = normalizeReviewState(round?.rule_state);
-  if (ruleState === "unclassified") {
-    return {
-      visible: false,
-      passed: false,
-      states: {
-        rules: ruleState,
-        product: normalizeReviewState(round?.product_state),
-        constitution: normalizeReviewState(round?.constitution_state),
-        meta: normalizeReviewState(round?.meta_rule_state),
-      },
-    };
-  }
-  const states = {
-    rules: ruleState,
-    product: normalizeReviewState(round?.product_state),
-    constitution: normalizeReviewState(round?.constitution_state),
-    meta: normalizeReviewState(round?.meta_rule_state),
-  };
+  const state = normalizeReviewState(round?.rule_state);
   return {
-    visible: true,
-    passed: states.rules === "passed"
-      && states.product === "passed"
-      && states.constitution === "passed",
-    states,
+    visible: state !== "unclassified",
+    passed: state === "passed",
+    state,
   };
 }
 

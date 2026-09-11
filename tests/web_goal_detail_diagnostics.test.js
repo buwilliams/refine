@@ -31,19 +31,6 @@ function goalDetailRuntime() {
   const context = vm.createContext({
     Set,
     fmtTime: (value) => String(value),
-    governanceReviewStatus: (round) => {
-      const states = {
-        rules: normalizeReviewState(round?.rule_state),
-        product: normalizeReviewState(round?.product_state),
-        constitution: normalizeReviewState(round?.constitution_state),
-        meta: normalizeReviewState(round?.meta_rule_state),
-      };
-      return {
-        visible: states.rules !== "unclassified",
-        passed: Object.values(states).every((state) => state === "passed"),
-        states,
-      };
-    },
     htmlEscape,
     normalizeReviewState,
     reviewStateClass: (value, passedClass = "done") => (
@@ -55,6 +42,7 @@ function goalDetailRuntime() {
     "utf8",
   );
   vm.runInContext(namedFunctionSource(commonSource, "diagnosticDetailsText"), context);
+  vm.runInContext(namedFunctionSource(commonSource, "governanceReviewStatus"), context);
   vm.runInContext(
     fs.readFileSync(
       path.join(__dirname, "../src/surfaces/web/static/js/features/goals-detail.js"),
@@ -205,4 +193,15 @@ test("Implementation Plan renders final checklist, immutable history, outcomes, 
   assert.match(html, /Missing &lt;recovery&gt;/);
   assert.match(html, /Provider &lt;failed&gt; &amp; retained evidence/);
   assert.doesNotMatch(html, /<API>|<recovery>|<failed>/);
+});
+
+test("Governance displays only the AI decision regardless of legacy grades", () => {
+  const runtime = goalDetailRuntime();
+  for (const legacy of [{}, { product_state: "failed", constitution_state: "failed", meta_rule_state: "failed" }]) {
+    const html = runtime.governance({ rule_state: "passed", ...legacy });
+    assert.match(html, /class="status-pill done"[^>]*>passed</);
+    assert.doesNotMatch(html, /product:|constitution:|meta:|rules:/);
+  }
+  const failed = runtime.governance({ rule_state: "failed", product_state: "passed", constitution_state: "passed" });
+  assert.match(failed, /class="status-pill failed"[^>]*>failed</);
 });

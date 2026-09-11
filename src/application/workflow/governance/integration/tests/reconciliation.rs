@@ -133,9 +133,6 @@ impl ReconciliationFixture {
                 "results": []
             },
             "rule_state": "passed",
-            "meta_rule_state": "passed",
-            "product_state": "passed",
-            "constitution_state": "passed",
             "governance_candidate_commit": self.candidate_commit,
             "governance_checked_at": "2026-08-15T00:02:00Z"
         });
@@ -246,6 +243,42 @@ fn already_merged_resolution_allows_shared_target_descendants_and_is_concurrentl
         fixture.descendant_target
     );
     assert_eq!(repeated.evidence["quality_proof_mode"], "normalized");
+}
+
+#[test]
+fn obsolete_governance_grades_do_not_veto_the_ai_decision_and_remain_in_history() {
+    let fixture = ReconciliationFixture::new();
+    let legacy = json!({
+        "product_state": "failed",
+        "constitution_state": "unclassified",
+        "meta_rule_state": "failed"
+    });
+    fixture.create_goal("GOAL-LEGACY-GRADES", json!({}), true);
+    // Seed a record written by an older version. Current APIs no longer write these grades.
+    let path = fixture
+        .refine_dir
+        .join("goals/GO/AL-LEGACY-GRADES/goal.json");
+    let mut stored: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    for (key, value) in legacy.as_object().unwrap() {
+        stored["rounds"][0][key] = value.clone();
+    }
+    fs::write(&path, serde_json::to_vec_pretty(&stored).unwrap()).unwrap();
+    let resolution = fixture
+        .service()
+        .resolve_already_merged_goal("GOAL-LEGACY-GRADES")
+        .unwrap();
+    assert_eq!(
+        resolution.disposition,
+        AlreadyMergedResolutionDisposition::Resolved
+    );
+    assert_eq!(resolution.goal.goal.status, GoalStatus::Review);
+    let detail = fixture
+        .work_items()
+        .show_goal_detail("GOAL-LEGACY-GRADES")
+        .unwrap();
+    for (key, value) in legacy.as_object().unwrap() {
+        assert_eq!(&detail["rounds"][0][key], value);
+    }
 }
 
 #[test]
@@ -388,6 +421,8 @@ fn quality_regeneration_rejects_a_mismatched_managed_checkout() {
 fn mismatched_or_missing_non_quality_gate_evidence_settles_failed_once() {
     let fixture = ReconciliationFixture::new();
     for (goal_id, patch) in [
+        ("GOAL-GOVERNANCE-FAILED", json!({"rule_state": "failed"})),
+        ("GOAL-GOVERNANCE-UNDECIDED", json!({"rule_state": null})),
         (
             "GOAL-GOVERNANCE-MISSING",
             json!({"governance_candidate_commit": ""}),

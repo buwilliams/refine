@@ -85,18 +85,6 @@ pub(super) fn new_round_value(reporter: &str, assignee: &str, prompt: &str) -> V
         Value::String("unclassified".to_string()),
     );
     round.insert(
-        "meta_rule_state".to_string(),
-        Value::String("unclassified".to_string()),
-    );
-    round.insert(
-        "product_state".to_string(),
-        Value::String("unclassified".to_string()),
-    );
-    round.insert(
-        "constitution_state".to_string(),
-        Value::String("unclassified".to_string()),
-    );
-    round.insert(
         "governance_message".to_string(),
         Value::String(String::new()),
     );
@@ -162,9 +150,6 @@ pub(super) fn archive_round_for_retry(round: &mut Value, target: &GoalStatus) ->
     }
     for key in [
         "rule_state",
-        "meta_rule_state",
-        "product_state",
-        "constitution_state",
         "governance_message",
         "governance_details",
         "governance_checked_at",

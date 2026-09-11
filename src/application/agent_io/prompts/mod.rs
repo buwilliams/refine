@@ -47,7 +47,6 @@ prompt_templates! {
     ImportPlanGoal => "imports/plan-goal.md",
     ImportStandaloneGoal => "imports/standalone-goal.md",
     ImportNotes => "imports/notes.md",
-    PostImplementationQuality => "quality/post-implementation.md",
     StructuredOutputRepair => "structured_output/repair.md",
     GoalWorkflowQualityRecovery => "quality/recovery.md",
     QualityDefaultInstructions => "quality/default-instructions.md",
@@ -200,14 +199,6 @@ mod tests {
 
         assert!(loaded.contains("empty of assigned work"));
         assert!(loaded.contains("until the user tells you what they want"));
-    }
-
-    #[test]
-    fn quality_prompt_delegates_judgment_without_supervised_proof() {
-        let loaded = PromptEngine::load(PromptTemplate::PostImplementationQuality);
-
-        assert!(loaded.contains("use your judgment"));
-        assert!(loaded.contains("does not require a test list or execute commands"));
     }
 
     #[test]

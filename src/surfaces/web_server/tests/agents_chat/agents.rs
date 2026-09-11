@@ -321,24 +321,24 @@ fn toolbar_agent_prompts_are_node_first_and_route_changes_through_refine_workflo
     for (profile, prompt) in [("agent", &agent_prompt), ("plan", &plan_prompt)] {
         for required in [
             "Begin with the existing Refine Node",
-            "investigating and managing the current Node",
-            "answering the user's questions",
+            "Investigate and manage the current Node",
+            "answer directly",
             "answer directly when no repository change is needed",
-            "do not modify the repository ad hoc in this session",
-            "new complete Goal",
+            "or modify the repository ad hoc",
+            "complete Goal with metadata",
             "actionable Round",
-            "make it eligible for workflow execution",
-            "without requiring the user to recite lifecycle commands",
-            "continues a failed Goal",
-            "preserve its recorded attempt and retained work",
-            "evidence-preserving recovery Round",
-            "return the Goal to an eligible workflow state",
-            "Honor Refine's confirmation and audit boundaries",
-            "never directly edit durable Goal state",
+            "make it eligible for execution",
+            "do not require the user to recite lifecycle commands",
+            "For failed work",
+            "Preserve earlier attempts and work",
+            "retry the existing Round, redirect, or create a new Round as appropriate",
+            "Never create a Round merely to bypass stale bookkeeping",
+            "Honor confirmation and audit boundaries",
+            "Do not directly edit durable Goal state",
             "conceal failures",
             "approve or merge on the user's behalf",
-            "destructively discard retained work",
-            "begin ongoing supervision unless the user requests it",
+            "discard retained work",
+            "begin ongoing supervision unless requested",
         ] {
             assert!(
                 prompt.contains(required),
@@ -369,9 +369,7 @@ fn toolbar_agent_prompts_are_node_first_and_route_changes_through_refine_workflo
         assert!(
             cli_agent_prompt.contains("Treat Refine as the execution path for repository changes")
         );
-        assert!(
-            cli_agent_prompt.contains("continuing work after an unsuccessful recorded attempt")
-        );
+        assert!(cli_agent_prompt.contains("For failed work"));
         assert!(!cli_agent_prompt.contains("Begin with the existing Refine Node"));
 
         let cli_plan_prompt = crate::surfaces::web_server::work_routes::terminal_profile_prompt(

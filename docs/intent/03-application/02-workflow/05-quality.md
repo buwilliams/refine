@@ -31,3 +31,5 @@ Quality does not maintain an automatic recovery budget. Provider, parsing, test-
 ## Future Direction
 
 Improve reusable diagnostic Skills and candidate-bound evidence while keeping recovery explicit through the shared workflow surfaces.
+
+Quality runs only configured Skills. When no Quality Skill applies, the step succeeds without an agent. Old Quality settings can be retained or converted to Skills during configuration migration; they never dispatch a separate legacy evaluator.

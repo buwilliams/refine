@@ -220,9 +220,6 @@ fi
                 0,
                 &json!({
                     "rule_state": "passed",
-                    "meta_rule_state": "passed",
-                    "product_state": "passed",
-                    "constitution_state": "passed",
                     "governance_candidate_commit": candidate,
                     "governance_checked_at": "2026-08-15T00:02:00Z",
                     "workflow_integration": integration,
@@ -240,6 +237,9 @@ fi
                 tests: Some(vec!["Outcome works".to_string()]),
                 ..QualitySettingsPatch::default()
             })
+            .unwrap();
+        crate::application::events::FileEventService::new(&refine_dir)
+            .config()
             .unwrap();
         let (round_idx, revision, request) = work_items.authored_goal_commitment("GOAL1").unwrap();
         let authority = work_items
@@ -323,6 +323,9 @@ fi
         FileOperationRegistry::new(&self.runtime_root)
             .recover()
             .unwrap()
+            .into_iter()
+            .filter(|operation| operation.owner.starts_with("quality:"))
+            .collect()
     }
 
     fn assert_failed_settlement(&self) -> Value {
@@ -406,7 +409,13 @@ fn assert_first_failure_details(details: &Value, candidate: &str, operation_id: 
         details["quality_proof"]["source_candidate_commit"],
         candidate
     );
-    assert_eq!(details["provider_attempts"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        details["quality_proof"]["skills"]["invocations"]
+            .as_object()
+            .unwrap()
+            .len(),
+        1
+    );
     assert!(
         details["diagnostics"]
             .as_array()

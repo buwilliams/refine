@@ -332,9 +332,6 @@ fn resolution_gate_evidence(detail: &Value, round: &Value) -> Value {
         "quality_details",
         "quality_checked_at",
         "rule_state",
-        "meta_rule_state",
-        "product_state",
-        "constitution_state",
         "governance_candidate_commit",
         "governance_checked_at",
     ] {
@@ -377,14 +374,7 @@ fn validate_resolution_gates(
             "Goal {goal_id} has incomplete or unsuccessful current-Round integration evidence"
         ));
     }
-    if [
-        "rule_state",
-        "meta_rule_state",
-        "product_state",
-        "constitution_state",
-    ]
-    .into_iter()
-    .any(|key| round.get(key).and_then(Value::as_str) != Some("passed"))
+    if round.get("rule_state").and_then(Value::as_str) != Some("passed")
         || round
             .get("governance_candidate_commit")
             .and_then(Value::as_str)

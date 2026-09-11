@@ -212,19 +212,13 @@ impl FileEventService {
                         &pinned.binding.id,
                         &pinned.skill.role,
                     );
-                let observational = pinned.skill.role == "plan"
-                    || pinned.skill.role == "governance"
-                    || invocation
-                        .context
-                        .data
-                        .get("verification_only")
-                        .and_then(Value::as_bool)
-                        == Some(true);
-                let authority = if invocation.context.goal_id.is_some() {
-                    "Do not change Goal state, merge or push."
-                } else {
-                    "Perform only the actions authorized by the Skill instructions and inputs. Use supported Refine commands for Goal changes."
-                };
+                let observational = invocation
+                    .context
+                    .data
+                    .get("verification_only")
+                    .and_then(Value::as_bool)
+                    == Some(true);
+                let authority = "Follow the Skill instructions and current user authorization. Use supported Refine commands for Goal changes. Preserve confirmation boundaries and retained work. A workflow change supersedes this invocation; its old result cannot advance the new work.";
                 let prompt = format!(
                     "{}\n\nAttached Skills:\n{}\n\nParameters:\n{}\n\nPinned context:\n{}\n\nRefine completion contract (supplied by the system):\n{}\nReturn one JSON object matching this contract. {authority} Identity fields must be copied exactly. Use outcome failure for findings and error for execution faults. Use your judgment to decide when to stop and which outcome to report. The summary, evidence, and artifacts fields are optional context; no checklist, test commands, supporting evidence, or recovery proposal is required by Refine. {}",
                     pinned.skill.prompt,

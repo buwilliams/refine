@@ -162,25 +162,7 @@ pub(super) fn push_implementation_plan_summary(lines: &mut Vec<String>, round: &
 }
 
 pub(super) fn push_governance_summary(lines: &mut Vec<String>, round: &Value) {
-    let states = [
-        ("rule_state", "rule"),
-        ("product_state", "product"),
-        ("constitution_state", "constitution"),
-        ("meta_rule_state", "meta-rule"),
-    ]
-    .into_iter()
-    .filter_map(|(key, label)| {
-        nonempty_string(round, key).map(|value| {
-            format!(
-                "{label}={}",
-                truncate_with_marker(value, 128, &format!("{label} governance state"))
-            )
-        })
-    })
-    .collect::<Vec<_>>();
-    if !states.is_empty() {
-        lines.push(format!("Governance states: {}", states.join(", ")));
-    }
+    push_bounded_optional_line(lines, "Governance decision", round, "rule_state", 128);
     push_bounded_optional_line(lines, "Governance result", round, "governance_message", 768);
 
     let details = round

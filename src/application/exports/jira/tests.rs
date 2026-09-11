@@ -249,6 +249,10 @@ fn large_multi_round_goal_is_bounded_auditable_and_csv_round_trips() {
     assert!(description.contains("[shortened: Round 1 requested work;"));
     assert!(description.contains("characters omitted]"));
     assert!(!description.contains("RAW_PROVIDER_OUTPUT_MUST_NOT_BE_REPLAYED"));
+    assert!(description.contains("Governance decision: passed"));
+    for obsolete in ["product=", "constitution=", "meta-rule="] {
+        assert!(!description.contains(obsolete));
+    }
     assert_eq!(
         description
             .matches("Governance action: rule=rule-6")

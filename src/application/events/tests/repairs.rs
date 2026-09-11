@@ -509,3 +509,74 @@ fn every_workflow_role_uses_the_agent_decision_without_required_supporting_field
         }
     }
 }
+
+#[cfg(unix)]
+#[test]
+fn plan_and_governance_skills_may_edit_when_their_instructions_authorize_it() {
+    let _env = crate::infrastructure::agents::invocation::smoke_ai_env_lock()
+        .lock()
+        .unwrap_or_else(|p| p.into_inner());
+    for role in ["plan", "governance"] {
+        let fixture = Fixture::new();
+        fixture.repository();
+        let _restore = provider(
+            &fixture,
+            r#"
+import json,sys,pathlib
+prompt=' '.join(sys.argv[1:])
+assert 'Do not change Goal state, merge or push.' not in prompt
+assert 'This invocation is observational' not in prompt
+assert 'Use supported Refine commands for Goal changes.' in prompt
+result=json.JSONDecoder().raw_decode(prompt.split('Refine completion contract (supplied by the system):\n',1)[1])[0]
+pathlib.Path('authorized-edit.txt').write_text('Skill-authorized change\n')
+result['outcome']='success'
+print(json.dumps(result))
+"#,
+        );
+        let service = fixture.service();
+        let work = crate::application::work_items::FileWorkItemService::new(&service.refine_dir);
+        work.create_goal_summary("Skill-authorized work", Some("GOAL1"))
+            .unwrap();
+        work.append_goal_round_summary("GOAL1", "test", "Edit the requested file")
+            .unwrap();
+        let git = FileGitWorktreeService::new(&fixture.0);
+        let base = git.resolve_commit("HEAD").unwrap();
+        let branch = "refine/GOAL1/round-1";
+        let workspace = git.managed_worktree_path(branch).unwrap();
+        git.ensure_worktree_from_base(branch, &workspace, &base)
+            .unwrap();
+        work.update_goal_git_refs("GOAL1", branch, "main", &base, Some(&base))
+            .unwrap();
+        let mut invocation = prepared(&fixture, &format!("workflow.{role}.enter"));
+        invocation.context.cwd = workspace.clone();
+        invocation.context.workspace = Some(
+            crate::infrastructure::git::worktrees::ManagedWorktree {
+                repository: fixture.0.clone(),
+                path: workspace.clone(),
+                branch: branch.into(),
+                commit: None,
+                allow_rebase: false,
+                registration: None,
+            }
+            .pin()
+            .unwrap(),
+        );
+        invocation.context.candidate_commit = Some(base);
+        invocation.context.goal_id = Some("GOAL1".into());
+        invocation.context.round_idx = Some(0);
+        invocation.bindings[0].skill.prompt =
+            "Edit authorized-edit.txt as needed, then report your decision.".into();
+        service.save_invocation(&invocation).unwrap();
+        let completed = service.execute(&invocation.id, || Ok(())).unwrap();
+        assert_eq!(completed.state, InvocationState::Succeeded, "{completed:?}");
+        assert_eq!(
+            std::fs::read_to_string(workspace.join("authorized-edit.txt")).unwrap(),
+            "Skill-authorized change\n"
+        );
+        assert_eq!(completed.attempts[0]["observational_violation"], false);
+        assert!(
+            super::super::completion::accepted_tree(&completed, &completed.bindings[0].binding.id)
+                .is_some()
+        );
+    }
+}

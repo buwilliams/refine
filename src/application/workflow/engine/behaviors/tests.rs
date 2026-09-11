@@ -60,3 +60,34 @@ fn exhausted_quality_output_repair_keeps_a_distinct_workflow_failure_category() 
 
     assert_eq!(quality_failure_category(&error), "quality_output_contract");
 }
+
+#[cfg(unix)]
+#[test]
+fn publication_rejects_changed_reviewed_content_without_discarding_governance_edits() {
+    use already_merged_quality_failure::{behavior_test_git as git, behavior_test_temp_dir};
+    let root = behavior_test_temp_dir("governance-edits-publication");
+    std::fs::create_dir_all(&root).unwrap();
+    git(&root, &["init", "-b", "main"]);
+    git(&root, &["config", "user.email", "test@example.invalid"]);
+    git(&root, &["config", "user.name", "Test"]);
+    std::fs::write(root.join("app.txt"), "reviewed").unwrap();
+    git(&root, &["add", "app.txt"]);
+    git(&root, &["commit", "-m", "reviewed"]);
+    let reviewed = git(&root, &["rev-parse", "HEAD"]);
+    let service = FileGitWorktreeService::new(&root);
+    verify_reviewed_candidate_before_publication(&service, &reviewed).unwrap();
+    std::fs::write(root.join("app.txt"), "Governance correction").unwrap();
+    assert!(verify_reviewed_candidate_before_publication(&service, &reviewed).is_err());
+    assert_eq!(
+        std::fs::read_to_string(root.join("app.txt")).unwrap(),
+        "Governance correction"
+    );
+    assert_eq!(git(&root, &["rev-parse", "HEAD"]), reviewed);
+    git(&root, &["add", "app.txt"]);
+    assert!(verify_reviewed_candidate_before_publication(&service, &reviewed).is_err());
+    git(&root, &["commit", "-m", "correction"]);
+    assert!(verify_reviewed_candidate_before_publication(&service, &reviewed).is_err());
+    let corrected = git(&root, &["rev-parse", "HEAD"]);
+    verify_reviewed_candidate_before_publication(&service, &corrected).unwrap();
+    std::fs::remove_dir_all(root).unwrap();
+}

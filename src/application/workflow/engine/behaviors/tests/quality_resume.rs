@@ -319,6 +319,9 @@ printf '%s\n' '{"ok":true,"summary":"The candidate passes.","results":[{"test":"
         work_items
             .advance_automated_goal_status("GOAL1", GoalStatus::Quality)
             .unwrap();
+        crate::application::events::FileEventService::new(&refine_dir)
+            .config()
+            .unwrap();
         let (round_idx, revision, request) = work_items.authored_goal_commitment("GOAL1").unwrap();
         let authority = work_items
             .claim_workflow_attempt("GOAL1", GoalStatus::Quality, round_idx, revision, &request)

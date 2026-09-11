@@ -92,9 +92,6 @@ fn workflow_admits_current_round_integration_from_todo_and_stops_resuming() {
                     "evaluation_scope": "isolated_candidate"
                 },
                 "rule_state": "passed",
-                "meta_rule_state": "passed",
-                "product_state": "passed",
-                "constitution_state": "passed",
                 "governance_candidate_commit": candidate,
                 "governance_checked_at": "2026-08-15T00:02:00Z",
                 "workflow_integration": {

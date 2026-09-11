@@ -17,7 +17,7 @@ impl FileEventService {
     ) -> RefineResult<AutomationConfig> {
         with_record_lock(&self.refine_dir, goal_id, || {
             validate()?;
-            let items = FileWorkItemService::new(&self.refine_dir);
+            let items = FileWorkItemService::for_node(&self.refine_dir, node);
             let detail = items.show_goal_detail(goal_id)?;
             let round = detail["rounds"]
                 .as_array()

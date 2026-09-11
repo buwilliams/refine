@@ -993,6 +993,7 @@ impl WorkflowBehavior for WorkflowGovernance {
                     let remote = ctx.git_remote()?;
                     let commit = ctx.require_commit()?.to_string();
                     let worktree_git = ctx.candidate_git()?;
+                    verify_reviewed_candidate_before_publication(&worktree_git, &commit)?;
                     if worktree_git.remote_exists(&remote)? {
                         worktree_git.push(&remote, &branch)?;
                     }
@@ -1538,6 +1539,22 @@ fn evaluate_workflow_governance(
     })
 }
 
+// Skills may edit; publishing must still use the exact code that passed review.
+// Keep this check at the Git side-effect boundary, not as a role-wide editing ban.
+fn verify_reviewed_candidate_before_publication(
+    git: &FileGitWorktreeService,
+    candidate: &str,
+) -> RefineResult<()> {
+    if git.resolve_commit("HEAD")? != candidate
+        || git.observed_worktree_tree()? != git.commit_tree(candidate)?
+    {
+        return Err(RefineError::Conflict(
+            "Candidate changed during Governance; edits were retained. Use workflow controls to review the updated candidate before publication.".into(),
+        ));
+    }
+    Ok(())
+}
+
 fn record_governance(
     ctx: &WorkflowContext<'_>,
     evaluation: &GovernanceEvaluation,
@@ -1553,9 +1570,6 @@ fn record_governance(
         &ctx.goal_id,
         &json!({
             "rule_state": if evaluation.failed { "failed" } else { "passed" },
-            "meta_rule_state": "passed",
-            "product_state": "passed",
-            "constitution_state": "passed",
             "governance_message": message,
             "governance_details": evaluation.details,
             "governance_checked_at": now_timestamp(),

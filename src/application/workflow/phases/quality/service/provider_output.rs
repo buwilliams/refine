@@ -17,74 +17,8 @@ pub(crate) fn is_quality_output_contract_fault(error: &RefineError) -> bool {
         || matches!(
             error,
             RefineError::StructuredOutput(inner)
-                if inner.label() == QualityEvaluationWire::LABEL
+                if inner.label() == "Quality evaluation JSON"
         )
-}
-
-pub(crate) fn record_quality_provider_attempt(
-    request: &QualityCheckRequest,
-    attempt: &QualityProviderAttempt,
-) -> RefineResult<()> {
-    let Some(operation_id) = request
-        .process_metadata
-        .get("operation_id")
-        .and_then(Value::as_str)
-    else {
-        // Direct trait callers have no durable operation. Their returned result still carries
-        // the full attempt history; workflow calls always take the durable path below.
-        return Ok(());
-    };
-    let Some(runtime_root) = request
-        .process_metadata
-        .get("runtime_root")
-        .and_then(Value::as_str)
-    else {
-        return Ok(());
-    };
-    FileOperationRegistry::new(runtime_root).append_log(
-        operation_id,
-        quality_operation_log(
-            &request.owner_id,
-            if attempt.accepted { "info" } else { "warning" },
-            if attempt.accepted {
-                "Quality provider response satisfied the structured output contract"
-            } else {
-                "Quality provider response required structured output repair"
-            },
-            Some(json!({"provider_attempt": attempt})),
-        ),
-    )?;
-    Ok(())
-}
-
-pub(crate) fn parse_quality_provider_output(
-    owner_id: &str,
-    _configured_tests: &[String],
-    output: &str,
-) -> RefineResult<QualityCheckResult> {
-    let evaluation = QualityEvaluationWire::decode(output)?;
-    Ok(QualityCheckResult {
-        owner_id: owner_id.into(),
-        ok: evaluation.ok,
-        summary: evaluation.summary,
-        results: evaluation
-            .results
-            .into_iter()
-            .map(|item| QualityTestResult {
-                test: item.test,
-                status: item.status,
-                evidence: item.evidence,
-                command: item.command,
-                process_id: None,
-                exit_code: None,
-            })
-            .collect(),
-        diagnostics: vec![output.to_string()],
-        candidate_commit: String::new(),
-        checked_at: None,
-        provider_attempts: Vec::new(),
-        skill_evidence: None,
-    })
 }
 
 pub(crate) fn verify_candidate(

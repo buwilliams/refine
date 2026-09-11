@@ -73,8 +73,9 @@ Each selection creates or opens only the requested surface. Repeated Agent selec
 - those toolbar agents route requested repository changes into a new complete,
   eligible Goal rather than implementing outside the workflow;
 - when continuing a failed Goal, those toolbar agents preserve its evidence and
-  retained work, append an evidence-preserving recovery Round, and return the
-  Goal to workflow eligibility through supported Refine interfaces;
+  retained work and choose a supported recovery action using current context and
+  user authorization: retry the existing Round, redirect, or create a new Round
+  when appropriate. A new Round is not a workaround for stale bookkeeping;
 - changing target apps stops live target-scoped interactive terminals before clearing project-specific browser state.
 - Todo List keeps named lists in a compact rail and gives the selected list the
   rest of the workspace. Adding and completing todos are primary actions;

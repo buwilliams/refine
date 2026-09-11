@@ -172,9 +172,6 @@ impl WorkflowQualityTiming {
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct RoundGovernance {
     pub rule_state: Option<String>,
-    pub meta_rule_state: Option<String>,
-    pub product_state: Option<String>,
-    pub constitution_state: Option<String>,
     pub governance_message: Option<String>,
     pub governance_details: Option<JsonObject>,
     pub governance_checked_at: Option<Timestamp>,

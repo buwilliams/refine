@@ -9,6 +9,8 @@ pub use identity::{
     INTEGRATED_TARGET, INTEGRATED_TARGET_RECONCILIATION, ISOLATED_CANDIDATE,
     QualityIdentityCommitment, is_quality_candidate_infrastructure,
 };
+#[cfg(test)]
+pub(crate) use service::quality_failure_summary;
 pub use service::{
     FileQualityService, QualityCheckRequest, QualityCheckResult, QualityOperationResult,
     QualityOperationRunner, QualityProviderAttempt, QualityService, QualityTestResult,
@@ -16,6 +18,4 @@ pub use service::{
 pub(crate) use service::{
     is_quality_harness_fault, is_quality_output_contract_fault, quality_error_summary,
 };
-#[cfg(test)]
-pub(crate) use service::{parse_quality_provider_output, quality_failure_summary};
 pub use types::*;

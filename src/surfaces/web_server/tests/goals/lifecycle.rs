@@ -67,9 +67,6 @@ fn daemon_resolve_merged_action_reaches_shared_terminal_capability() {
                 "evaluation_scope": "isolated_candidate"
             },
             "rule_state": "passed",
-            "meta_rule_state": "passed",
-            "product_state": "passed",
-            "constitution_state": "passed",
             "governance_candidate_commit": candidate,
             "governance_checked_at": "2026-08-15T00:02:00Z"
         });

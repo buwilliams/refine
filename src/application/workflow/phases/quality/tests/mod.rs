@@ -53,6 +53,9 @@ fn quality_operation_metadata(
         Some(&commit),
     )
     .unwrap();
+    crate::application::events::FileEventService::new(refine_dir)
+        .config()
+        .unwrap();
     let workspace = crate::infrastructure::git::worktrees::ManagedWorktree {
         repository: candidate_root.into(),
         path: candidate_root.into(),
@@ -236,6 +239,10 @@ fn goal_quality_fixture(prefix: &str, provider_body: &str) -> GoalQualityFixture
             ..QualitySettingsPatch::default()
         })
         .unwrap();
+    crate::application::events::FileEventService::new(&refine_dir)
+        .config()
+        .unwrap();
+    let smoke_ai = crate::application::events::test_support::adapt_fixture(&smoke_ai);
     GoalQualityFixture {
         temp_root,
         candidate_root,
@@ -407,4 +414,24 @@ fn wait_for_no_operation_process(runtime_root: &PathBuf, operation_id: &str) {
         std::thread::sleep(std::time::Duration::from_millis(10));
     }
     panic!("managed process for operation {operation_id} did not exit");
+}
+
+fn quality_invocation(root: &Path) -> crate::application::events::EventInvocation {
+    fs::read_dir(root.join("automation/invocations"))
+        .unwrap()
+        .filter_map(|entry| {
+            serde_json::from_slice::<crate::application::events::EventInvocation>(
+                &fs::read(entry.unwrap().path()).unwrap(),
+            )
+            .ok()
+        })
+        .find(|inv| inv.event.source.as_deref() == Some("workflow.quality.enter"))
+        .unwrap()
+}
+
+fn disable_quality_skill(root: &Path) {
+    let path = root.join("automation/config.json");
+    let mut config: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    config["skills"]["default-quality"]["enabled"] = json!(false);
+    fs::write(path, serde_json::to_vec(&config).unwrap()).unwrap();
 }

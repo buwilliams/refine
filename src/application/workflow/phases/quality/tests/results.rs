@@ -175,7 +175,12 @@ fn quality_service_preserves_the_agent_decision_and_optional_report() {
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     let previous = std::env::var_os("REFINE_SMOKE_AI_PATH");
-    unsafe { std::env::set_var("REFINE_SMOKE_AI_PATH", &smoke_ai) };
+    unsafe {
+        std::env::set_var(
+            "REFINE_SMOKE_AI_PATH",
+            crate::application::events::test_support::adapt_fixture(&smoke_ai),
+        )
+    };
     let service = FileQualityService::with_runtime_root(&refine_dir, &runtime_root);
     service
         .save_settings(QualitySettingsPatch {
@@ -214,10 +219,16 @@ fn quality_service_preserves_the_agent_decision_and_optional_report() {
         })
         .unwrap();
     assert!(result.ok, "{result:#?}");
-    assert_eq!(result.summary, "Both checks passed.");
-    assert_eq!(result.results.len(), 2);
-    assert_eq!(result.results[0].test, "Dashboard loads");
-    assert_eq!(result.results[0].command, "printf dashboard-ok");
+    assert_eq!(result.results.len(), 1);
+    let invocation = quality_invocation(&refine_dir);
+    let report = &invocation.results["default-quality"];
+    assert_eq!(report.summary, "Both checks passed.");
+    assert_eq!(report.artifacts["tests"].as_array().unwrap().len(), 2);
+    assert_eq!(report.artifacts["tests"][0]["test"], "Dashboard loads");
+    assert_eq!(
+        report.artifacts["tests"][0]["command"],
+        "printf dashboard-ok"
+    );
     assert!(result.results[0].process_id.is_none());
     assert_eq!(result.results[0].exit_code, None);
 
@@ -254,20 +265,6 @@ fn quality_service_preserves_the_agent_decision_and_optional_report() {
     }
 
     fs::remove_dir_all(temp_root).unwrap();
-}
-
-#[test]
-fn quality_evaluation_keeps_agent_selected_details() {
-    let result = parse_quality_provider_output(
-        "GOAL1",
-        &["Configured outcome".to_string()],
-        r#"{"ok":true,"summary":"Done","results":[{"test":"Configured outcome","status":"passed","evidence":"Observed","command":"printf configured"},{"test":"Unconfigured browser claim","status":"passed","evidence":"Claimed only","command":"npm test"}]}"#,
-    )
-    .unwrap();
-
-    assert!(result.ok);
-    assert_eq!(result.results.len(), 2);
-    assert_eq!(result.results[0].status, "passed");
 }
 
 #[test]
@@ -343,7 +340,12 @@ fn quality_does_not_override_the_decision_by_executing_a_reported_command() {
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     let previous = std::env::var_os("REFINE_SMOKE_AI_PATH");
-    unsafe { std::env::set_var("REFINE_SMOKE_AI_PATH", &smoke_ai) };
+    unsafe {
+        std::env::set_var(
+            "REFINE_SMOKE_AI_PATH",
+            crate::application::events::test_support::adapt_fixture(&smoke_ai),
+        )
+    };
     let service = FileQualityService::with_runtime_root(&refine_dir, &runtime_root);
     service
         .save_settings(QualitySettingsPatch {
@@ -416,7 +418,12 @@ fn quality_keeps_shell_commands_as_report_text() {
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     let previous = std::env::var_os("REFINE_SMOKE_AI_PATH");
-    unsafe { std::env::set_var("REFINE_SMOKE_AI_PATH", &smoke_ai) };
+    unsafe {
+        std::env::set_var(
+            "REFINE_SMOKE_AI_PATH",
+            crate::application::events::test_support::adapt_fixture(&smoke_ai),
+        )
+    };
     let service = FileQualityService::with_runtime_root(&refine_dir, &runtime_root);
     service
         .save_settings(QualitySettingsPatch {
@@ -524,7 +531,12 @@ fn quality_preserves_the_agent_explanation() {
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     let previous = std::env::var_os("REFINE_SMOKE_AI_PATH");
-    unsafe { std::env::set_var("REFINE_SMOKE_AI_PATH", &smoke_ai) };
+    unsafe {
+        std::env::set_var(
+            "REFINE_SMOKE_AI_PATH",
+            crate::application::events::test_support::adapt_fixture(&smoke_ai),
+        )
+    };
     let service = FileQualityService::with_runtime_root(&refine_dir, &runtime_root);
     service
         .save_settings(QualitySettingsPatch {
@@ -562,10 +574,10 @@ fn quality_preserves_the_agent_explanation() {
     assert!(result.ok, "{result:#?}");
     assert_eq!(result.results[0].status, "passed");
     assert_eq!(result.results[0].exit_code, None);
-    assert!(
-        result.results[0]
-            .evidence
-            .contains("no match is the passing predicate")
+    let invocation = quality_invocation(&refine_dir);
+    assert_eq!(
+        invocation.results["default-quality"].artifacts["tests"][0]["evidence"],
+        "no match is the passing predicate"
     );
     restore_smoke_ai(previous);
     fs::remove_dir_all(temp_root).unwrap();
@@ -602,7 +614,12 @@ fn quality_detects_candidate_mutation_and_preserves_it() {
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     let previous = std::env::var_os("REFINE_SMOKE_AI_PATH");
-    unsafe { std::env::set_var("REFINE_SMOKE_AI_PATH", &smoke_ai) };
+    unsafe {
+        std::env::set_var(
+            "REFINE_SMOKE_AI_PATH",
+            crate::application::events::test_support::adapt_fixture(&smoke_ai),
+        )
+    };
     let service = FileQualityService::with_runtime_root(&refine_dir, &runtime_root);
     service
         .save_settings(QualitySettingsPatch {

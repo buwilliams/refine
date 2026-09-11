@@ -962,15 +962,12 @@ function renderGovernanceSummary(round) {
     return "";
   }
   const actions = round.governance_rule_actions || [];
-  const states = governance.states;
+  const state = governance.state;
   return `
     <div class="card" style="margin:0 0 14px" data-testid="goal-governance-summary">
       <h3>Governance</h3>
       <div class="row" style="gap:8px;flex-wrap:wrap">
-        <span class="status-pill ${reviewStateClass(states.rules)}" data-testid="goal-governance-rules">rules: ${htmlEscape(states.rules)}</span>
-        <span class="status-pill ${reviewStateClass(states.product)}" data-testid="goal-governance-product">product: ${htmlEscape(states.product)}</span>
-        <span class="status-pill ${reviewStateClass(states.constitution)}" data-testid="goal-governance-constitution">constitution: ${htmlEscape(states.constitution)}</span>
-        <span class="status-pill ${reviewStateClass(states.meta)}" data-testid="goal-governance-meta">meta: ${htmlEscape(states.meta)}</span>
+        <span class="status-pill ${reviewStateClass(state)}" data-testid="goal-governance-decision">${htmlEscape(state)}</span>
       </div>
       ${round.governance_message ? `<p style="margin-bottom:6px" data-testid="goal-governance-message">${htmlEscape(round.governance_message)}</p>` : ""}
       ${round.governance_details ? `<details data-testid="goal-governance-details"><summary>Details</summary><pre>${htmlEscape(diagnosticDetailsText(round.governance_details))}</pre></details>` : ""}

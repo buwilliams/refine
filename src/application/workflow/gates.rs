@@ -65,7 +65,7 @@ impl EventInvocation {
             );
             return Err(
                 if matches!(self.execution_error(), RefineError::Serialization(_)) {
-                    RefineError::Serialization(message)
+                    RefineError::Serialization(format!("Skill output contract failed: {message}"))
                 } else {
                     RefineError::Degraded(message)
                 },

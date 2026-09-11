@@ -266,20 +266,16 @@ fn a_requeued_goal_re_enters_planning_and_retains_prior_event_failure() {
 
 #[cfg(unix)]
 #[test]
-fn plan_skill_cannot_mutate_the_checkout_and_retains_its_response() {
+fn plan_skill_can_edit_the_checkout_and_retains_its_response() {
     let (result, detail) = run_planning(
         "event-plan-mutation",
-        "pathlib.Path('app.txt').write_text('unauthorized change')",
+        "pathlib.Path('app.txt').write_text('planned change')",
         false,
         false,
     );
-    assert!(
-        result
-            .unwrap_err()
-            .to_string()
-            .contains("changed the checkout")
-    );
-    assert_eq!(detail["file"], "unauthorized change");
+    result.unwrap();
+    assert_eq!(detail["file"], "planned change");
+    assert_eq!(detail["invocations"][0]["state"], "succeeded");
     assert_eq!(
         detail["invocations"][0]["attempts"]
             .as_array()
