@@ -90,11 +90,50 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "succeeded",
+  "results": {
+    "trigger-2748a40c-20f1-4533-851a-d3d752e56013": {
+      "invocation_id": "c9331d3b16b29c019e6bc0664c937954e8b66b2396098e012d5ebffe49d5e4ee",
+      "binding_id": "trigger-2748a40c-20f1-4533-851a-d3d752e56013",
+      "role": "task",
+      "outcome": "success",
+      "summary": "No new email requests were found. No Goals were imported or recovered, and no errors occurred.",
+      "evidence": [
+        "The prescribed fetch command exited with code 0.",
+        "JSON result: fetched_count=0, batch_limit=25, goal_ids=[], errors=[].",
+        "No further batch was required; the result did not indicate more mail."
+      ],
+      "artifacts": {}
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "trigger-2748a40c-20f1-4533-851a-d3d752e56013",
+      "checkout": {
+        "observation": {
+          "branch": "main",
+          "head_commit": "2626d584c9da1e6f27b3c3f0bbec750c6772536f",
+          "status_porcelain": []
+        },
+        "tree": "b7cbd297b127cc38cfa3a68d79e28323ffe160fd"
+      },
+      "checkout_recorded": true,
+      "diagnostic": null,
+      "observational_violation": false,
+      "operation_id": null,
+      "process_id": "proc-1789154942395-3361441-82",
+      "prompt_bytes": 2129,
+      "provider_session_id": null,
+      "purpose": "work",
+      "raw_output": "{\n  \"artifacts\": {},\n  \"binding_id\": \"trigger-2748a40c-20f1-4533-851a-d3d752e56013\",\n  \"evidence\": [\n    \"The prescribed fetch command exited with code 0.\",\n    \"JSON result: fetched_count=0, batch_limit=25, goal_ids=[], errors=[].\",\n    \"No further batch was required; the result did not indicate more mail.\"\n  ],\n  \"invocation_id\": \"c9331d3b16b29c019e6bc0664c937954e8b66b2396098e012d5ebffe49d5e4ee\",\n  \"outcome\": \"success\",\n  \"role\": \"task\",\n  \"summary\": \"No new email requests were found. No Goals were imported or recovered, and no errors occurred.\"\n}\n",
+      "received_at": "2026-09-11T19:29:27.253055235+00:00",
+      "started_at": "2026-09-11T19:29:02.389620208+00:00",
+      "workflow_revision": null
+    }
+  ],
   "created_at": "2026-09-11T19:28:51.396037825+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-11T19:29:27.296295810+00:00",
   "error": null,
   "action_applied": false
 }
