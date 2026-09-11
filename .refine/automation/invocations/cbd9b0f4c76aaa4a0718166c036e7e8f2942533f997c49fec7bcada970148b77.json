@@ -266,11 +266,90 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "succeeded",
+  "results": {
+    "default-quality": {
+      "invocation_id": "cbd9b0f4c76aaa4a0718166c036e7e8f2942533f997c49fec7bcada970148b77",
+      "binding_id": "default-quality",
+      "role": "quality",
+      "outcome": "success",
+      "summary": "Quality passed for the unchanged pinned candidate: 139 tests passed with zero skips, plus syntax and diff checks.",
+      "evidence": [
+        "Independently reviewed the finalized plan, candidate diff, terminal intent and affected keyboard, history and lifecycle callers. No actionable defects found.",
+        "Selection ownership remains in terminal-clipboard.js; toolbar lifecycle uses shared helpers. Existing regression coverage was sufficient; no corrections were needed.",
+        "Final HEAD is 868a903cd3f5d364d01b50b57294a0cfd1c7843a and the worktree is clean.",
+        "Browser verification used Chromium; Firefox, WebKit and deployment-specific browser policies were not tested."
+      ],
+      "artifacts": {
+        "tests": [
+          {
+            "command": "node --test tests/web_terminal_clipboard.test.js tests/web_terminal_keyboard.test.js",
+            "evidence": "Exit 0: 30 passed, zero failures or skips.",
+            "status": "passed",
+            "test": "Shared selection invalidation, copy generation fencing, paste and interruption behavior."
+          },
+          {
+            "command": "NODE_PATH=/tmp/refine-hub-browser/node_modules node --test tests/web_terminal_clipboard_browser.test.js tests/web_terminal_copy_lifecycle_browser.test.js tests/web_terminal_copy_recovery_browser.test.js tests/web_terminal_paste_browser.test.js tests/web_terminal_keyboard_browser.test.js tests/web_terminal_selection_browser.test.js > /tmp/DRDE557-quality-browser.log 2>&1",
+            "evidence": "Exit 0: 64 Chromium tests passed, zero failures or skips. Verified insecure HTTP, trusted native clipboard events, SGR-cleared selection, recovery, lifecycle boundaries and exactly-once bracketed paste.",
+            "status": "passed",
+            "test": "Real browser clipboard and terminal lifecycle behavior."
+          },
+          {
+            "command": "node --test tests/web_supervisor_toolbar.test.js > /tmp/DRDE557-quality-toolbar.log 2>&1",
+            "evidence": "Exit 0: 38 passed, zero failures or skips.",
+            "status": "passed",
+            "test": "Toolbar session, renderer and tab lifecycle."
+          },
+          {
+            "command": "node --test tests/web_goal_log_tail.test.js",
+            "evidence": "Exit 0: 7 passed, zero failures or skips.",
+            "status": "passed",
+            "test": "Related Goal history and stream behavior."
+          },
+          {
+            "command": "git diff --name-only f46f8710af32b77d13cec54853bcc4cf3fb728a9 HEAD -- '*.js' | xargs -r -n 1 node --check",
+            "evidence": "Exit 0 for all changed JavaScript files.",
+            "status": "passed",
+            "test": "JavaScript syntax."
+          },
+          {
+            "command": "git diff --check f46f8710af32b77d13cec54853bcc4cf3fb728a9 HEAD",
+            "evidence": "Exit 0; no whitespace errors.",
+            "status": "passed",
+            "test": "Candidate diff integrity."
+          }
+        ]
+      }
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "default-quality",
+      "checkout": {
+        "observation": {
+          "branch": "refine/DRDE557BD8B3E01883A74CEDA5/round-1",
+          "head_commit": "868a903cd3f5d364d01b50b57294a0cfd1c7843a",
+          "status_porcelain": []
+        },
+        "tree": "a51d1633e68621dccd0341b854bcf95f5d7f7494"
+      },
+      "checkout_recorded": true,
+      "diagnostic": null,
+      "observational_violation": false,
+      "operation_id": null,
+      "process_id": "proc-1789131093025-1100349-2507",
+      "prompt_bytes": 32824,
+      "provider_session_id": null,
+      "purpose": "work",
+      "raw_output": "{\n  \"artifacts\": {\n    \"tests\": [\n      {\n        \"command\": \"node --test tests/web_terminal_clipboard.test.js tests/web_terminal_keyboard.test.js\",\n        \"evidence\": \"Exit 0: 30 passed, zero failures or skips.\",\n        \"status\": \"passed\",\n        \"test\": \"Shared selection invalidation, copy generation fencing, paste and interruption behavior.\"\n      },\n      {\n        \"command\": \"NODE_PATH=/tmp/refine-hub-browser/node_modules node --test tests/web_terminal_clipboard_browser.test.js tests/web_terminal_copy_lifecycle_browser.test.js tests/web_terminal_copy_recovery_browser.test.js tests/web_terminal_paste_browser.test.js tests/web_terminal_keyboard_browser.test.js tests/web_terminal_selection_browser.test.js > /tmp/DRDE557-quality-browser.log 2>&1\",\n        \"evidence\": \"Exit 0: 64 Chromium tests passed, zero failures or skips. Verified insecure HTTP, trusted native clipboard events, SGR-cleared selection, recovery, lifecycle boundaries and exactly-once bracketed paste.\",\n        \"status\": \"passed\",\n        \"test\": \"Real browser clipboard and terminal lifecycle behavior.\"\n      },\n      {\n        \"command\": \"node --test tests/web_supervisor_toolbar.test.js > /tmp/DRDE557-quality-toolbar.log 2>&1\",\n        \"evidence\": \"Exit 0: 38 passed, zero failures or skips.\",\n        \"status\": \"passed\",\n        \"test\": \"Toolbar session, renderer and tab lifecycle.\"\n      },\n      {\n        \"command\": \"node --test tests/web_goal_log_tail.test.js\",\n        \"evidence\": \"Exit 0: 7 passed, zero failures or skips.\",\n        \"status\": \"passed\",\n        \"test\": \"Related Goal history and stream behavior.\"\n      },\n      {\n        \"command\": \"git diff --name-only f46f8710af32b77d13cec54853bcc4cf3fb728a9 HEAD -- '*.js' | xargs -r -n 1 node --check\",\n        \"evidence\": \"Exit 0 for all changed JavaScript files.\",\n        \"status\": \"passed\",\n        \"test\": \"JavaScript syntax.\"\n      },\n      {\n        \"command\": \"git diff --check f46f8710af32b77d13cec54853bcc4cf3fb728a9 HEAD\",\n        \"evidence\": \"Exit 0; no whitespace errors.\",\n        \"status\": \"passed\",\n        \"test\": \"Candidate diff integrity.\"\n      }\n    ]\n  },\n  \"binding_id\": \"default-quality\",\n  \"evidence\": [\n    \"Independently reviewed the finalized plan, candidate diff, terminal intent and affected keyboard, history and lifecycle callers. No actionable defects found.\",\n    \"Selection ownership remains in terminal-clipboard.js; toolbar lifecycle uses shared helpers. Existing regression coverage was sufficient; no corrections were needed.\",\n    \"Final HEAD is 868a903cd3f5d364d01b50b57294a0cfd1c7843a and the worktree is clean.\",\n    \"Browser verification used Chromium; Firefox, WebKit and deployment-specific browser policies were not tested.\"\n  ],\n  \"invocation_id\": \"cbd9b0f4c76aaa4a0718166c036e7e8f2942533f997c49fec7bcada970148b77\",\n  \"outcome\": \"success\",\n  \"role\": \"quality\",\n  \"summary\": \"Quality passed for the unchanged pinned candidate: 139 tests passed with zero skips, plus syntax and diff checks.\"\n}\n",
+      "received_at": "2026-09-11T12:53:47.496735241+00:00",
+      "started_at": "2026-09-11T12:51:33.009089220+00:00",
+      "workflow_revision": 2
+    }
+  ],
   "created_at": "2026-09-11T12:51:32.587430597+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-11T12:53:47.946724322+00:00",
   "error": null,
   "action_applied": false
 }
