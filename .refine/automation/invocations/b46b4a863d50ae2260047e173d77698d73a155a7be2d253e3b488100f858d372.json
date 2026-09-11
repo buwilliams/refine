@@ -1321,7 +1321,7 @@
     },
     "metadata": {
       "behavior": "EventSkill",
-      "event_operation_id": "1a08d559c28113c7697",
+      "event_operation_id": "1a08ff3986232d72",
       "goal_id": "DR74050DA12C5442DF797B8AB6",
       "kind": "workflow",
       "node_id": "default",
