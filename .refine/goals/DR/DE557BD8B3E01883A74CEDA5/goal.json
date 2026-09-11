@@ -1,9 +1,9 @@
 {
   "base_commit": "f46f8710af32b77d13cec54853bcc4cf3fb728a9",
   "branch_name": "refine/DRDE557BD8B3E01883A74CEDA5/round-1",
-  "candidate_commit": null,
+  "candidate_commit": "868a903cd3f5d364d01b50b57294a0cfd1c7843a",
   "created": "2026-09-11T12:39:44Z",
-  "event_generation": 4,
+  "event_generation": 5,
   "feature_id": null,
   "feature_order": null,
   "id": "DRDE557BD8B3E01883A74CEDA5",
@@ -46,11 +46,11 @@
       "created": "2026-09-11T12:39:44Z",
       "event_configuration": {
         "events": {
-          "workflow.implement.enter": {
+          "workflow.quality.enter": {
             "bindings": [
               {
                 "enabled": true,
-                "id": "default-implement",
+                "id": "default-quality",
                 "inputs": {},
                 "mode": "blocking",
                 "order": 0,
@@ -58,30 +58,30 @@
                 "scope": {
                   "node_id": null
                 },
-                "skill_id": "default-implement"
+                "skill_id": "default-quality"
               }
             ],
             "enabled": true,
-            "id": "workflow.implement.enter",
+            "id": "workflow.quality.enter",
             "kind": "system",
-            "name": "Workflow Implement Enter",
+            "name": "Workflow Quality Enter",
             "on_success": null,
             "parameters": [],
             "scope": {
               "node_id": null
             },
-            "source": "workflow.implement.enter"
+            "source": "workflow.quality.enter"
           }
         },
-        "revision": 26,
+        "revision": 27,
         "schema_version": 2,
         "skills": {
-          "default-implement": {
+          "default-quality": {
             "enabled": true,
-            "id": "default-implement",
-            "name": "Implement",
+            "id": "default-quality",
+            "name": "Quality",
             "parameters": [],
-            "prompt": "## Implement\n\nImplement the current Goal Round using every accepted plan and attached Skill. Inspect existing code, make the complete change, run appropriate verification, and report evidence for each checklist item. Check the plan's assumptions against the code and keep policy in its shared owner. Prefer one correction that explains the affected behavior over separate fixes at each failing call site. Report evidence-backed plan deviations within the Goal's scope and existing authority. Preserve unrelated changes and historical evidence. Refine owns candidate commits, workflow advancement, Quality, Governance and integration.\n\n## Intent and architecture\n\nApplicability: Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract.\n\nUse the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Model, Application, Infrastructure, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.\n\nFor this project on the current Default node, /home/buddy/projects/refine-next is the target development checkout and /home/buddy/projects/refine is the serving Refine installation. Use the invocation's pinned workspace (the managed Goal Round worktree when supplied) for code changes and verification, and read the relevant intent from that candidate. Verify paths from the current invocation and runtime before operating on another node. Source promotion and restarting the serving installation are separate operator actions; an ordinary implementation or Quality run should not deploy its candidate or restart the daemon that is supervising it.\n\n## Cohesive code files\n\nApplicability: Apply whenever an agent adds or changes code files in any language.\n\nKeep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.\n",
+            "prompt": "## Quality review\n\nIndependently review the finalized plans and candidate implementation. Select or add meaningful tests, correct defects when needed, and run the relevant checks. Report actual commands, results and findings. Refine verifies the exact candidate and supervises evaluation commands.\n\n## Required behavior\n\nPreserve the relevant Goal and docs/intent product behavior. Keep Model, Application, Infrastructure, and Surfaces coherent; shared capabilities authoritative; local state and evidence inspectable and recoverable; and affected surfaces semantically consistent.\n\n## Review and verification\n\nJudge the candidate against the Goal and only the relevant docs/intent pages. Use the smallest deterministic checks that cover the affected behavior, adding or adjusting behavior-focused tests only when evidence is missing. Scale integration and failure-path checks to actual risk. Test the governing invariant through the affected real entry paths and lifecycle boundaries. Look for cases that could disprove the implementation's assumptions, including relevant callers outside the changed files. Group findings with a common cause into one coherent recovery request. Report exact commands, results, and remaining uncertainty. Do not require unrelated tests, documentation, refactors, or cleanup; documentation is relevant only when product intent or an architectural contract changes.\n\n## Acceptance checks\n\n- The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks.\n\n## Intent and architecture\n\nApplicability: Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract.\n\nUse the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Model, Application, Infrastructure, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.\n\nFor this project on the current Default node, /home/buddy/projects/refine-next is the target development checkout and /home/buddy/projects/refine is the serving Refine installation. Use the invocation's pinned workspace (the managed Goal Round worktree when supplied) for code changes and verification, and read the relevant intent from that candidate. Verify paths from the current invocation and runtime before operating on another node. Source promotion and restarting the serving installation are separate operator actions; an ordinary implementation or Quality run should not deploy its candidate or restart the daemon that is supervising it.\n\n## Cohesive code files\n\nApplicability: Apply whenever an agent adds or changes code files in any language.\n\nKeep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.\n",
             "provenance": "refine-default-v1",
             "role": "task",
             "scope": {
@@ -170,6 +170,72 @@
             }
           },
           "source": "workflow.plan.enter",
+          "state": "succeeded"
+        },
+        "98356805c387ca8e17efb126b4e131e3a4a4a03329e4adbcad12eaa9bbd56741": {
+          "candidate_commit": null,
+          "results": {
+            "default-implement": {
+              "artifacts": {
+                "implementation_evidence": {
+                  "checklist": [
+                    {
+                      "evidence": "Recorded the failing selection-loss regression in /tmp/DRDE557-selection-before.log. Passing regressions now cover Copy selection, native Copy, and real SGR reporting that clears live selection while preserving captured text.",
+                      "id": "workflow.plan.enter:default-plan:P1",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "terminal-clipboard.js owns transient renderer/session-bound snapshots, prefers live text, and keeps copy attempts and recovery text separate. Browser tests verify retention through output and remounts.",
+                      "id": "workflow.plan.enter:default-plan:P2",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Snapshots invalidate on primary pointer gestures, nonmodifier non-copy keys, accepted paste, replacement, and disposal. Tests verify modifier preservation, failed-copy recovery, and delayed success preserving newer selections.",
+                      "id": "workflow.plan.enter:default-plan:P3",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Toolbar lifecycle calls clipboard-owned reset helpers. Browser tests verify retained renderer identity and viewport, deferred history release, automatic-start suppression release, and explicit Restart cleanup.",
+                      "id": "workflow.plan.enter:default-plan:P4",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "All six profiles pass invalidation/interruption fixtures. Coverage includes typing, Enter, Backspace, Escape, navigation, paste, copy consumption, replacement, tab switching, exit, restart, and disposal. Selected copy emits no interruption; invalidated or consumed snapshots permit exactly one.",
+                      "id": "workflow.plan.enter:default-plan:P5",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Chromium used http://refine-clipboard.test routed locally without secure-origin overrides. Tests assert isSecureContext=false and navigator.clipboard absent, trusted native copy/paste, Copy fallback, manual recovery, and exactly-once bracketed paste. Existing Shift/Option-drag and ordinary mouse-report tests pass.",
+                      "id": "workflow.plan.enter:default-plan:P6",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Updated only the terminal intent page. All requested tests executed without skips; syntax and diff checks passed. Clipboard owner is 348 lines and the new browser test is 119 lines. Toolbar changes remain limited to lifecycle integration.",
+                      "id": "workflow.plan.enter:default-plan:P7",
+                      "outcome": "completed"
+                    }
+                  ],
+                  "verification": [
+                    "node --test tests/web_terminal_clipboard.test.js tests/web_terminal_keyboard.test.js — 30 passed, 0 failed, 0 skipped; /tmp/DRDE557-unit.log",
+                    "NODE_PATH=/home/buddy/projects/refine/node_modules node --test tests/web_terminal_clipboard_browser.test.js tests/web_terminal_copy_lifecycle_browser.test.js tests/web_terminal_copy_recovery_browser.test.js tests/web_terminal_paste_browser.test.js tests/web_terminal_keyboard_browser.test.js tests/web_terminal_selection_browser.test.js — 64 passed, 0 failed, 0 skipped; /tmp/DRDE557-browser-verified.log",
+                    "node --test tests/web_supervisor_toolbar.test.js tests/web_goal_log_tail.test.js — 45 passed, 0 failed, 0 skipped; /tmp/DRDE557-toolbar.log",
+                    "node --check executed separately on all seven changed or added JavaScript files — passed.",
+                    "git diff --check — passed."
+                  ]
+                }
+              },
+              "binding_id": "default-implement",
+              "evidence": [
+                "Plan deviation: mouse-up alone did not reproduce clearing in the vendored xterm; SGR all-motion reporting did. Repeated selection at identical coordinates also omitted the nonempty selection-change event, requiring clipboard-owned pointer-release capture. Browser tests verify both observations.",
+                "The pinned worktree began clean at f46f8710af32b77d13cec54853bcc4cf3fb728a9. Changes remain uncommitted. No Goal-state changes, commits, merges, pushes, deployments, or daemon restarts occurred."
+              ],
+              "invocation_id": "98356805c387ca8e17efb126b4e131e3a4a4a03329e4adbcad12eaa9bbd56741",
+              "outcome": "success",
+              "role": "implement",
+              "summary": "Implemented renderer-bound selection snapshots with explicit invalidation, generation-safe copy consumption, and toolbar lifecycle integration. Verification passed: 30 focused tests, 64 Chromium tests, and 45 toolbar/history tests."
+            }
+          },
+          "source": "workflow.implement.enter",
           "state": "succeeded"
         }
       },
@@ -360,6 +426,78 @@
               }
             }
           }
+        },
+        "4:default:workflow.implement.exit": {
+          "events": {
+            "workflow.implement.exit": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.implement.exit",
+              "kind": "system",
+              "name": "Workflow Implement Exit",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.implement.exit"
+            }
+          },
+          "revision": 27,
+          "schema_version": 2,
+          "skills": {}
+        },
+        "4:default:workflow.implement.success": {
+          "events": {},
+          "revision": 27,
+          "schema_version": 2,
+          "skills": {}
+        },
+        "5:default:workflow.quality.enter": {
+          "events": {
+            "workflow.quality.enter": {
+              "bindings": [
+                {
+                  "enabled": true,
+                  "id": "default-quality",
+                  "inputs": {},
+                  "mode": "blocking",
+                  "order": 0,
+                  "overrides": null,
+                  "scope": {
+                    "node_id": null
+                  },
+                  "skill_id": "default-quality"
+                }
+              ],
+              "enabled": true,
+              "id": "workflow.quality.enter",
+              "kind": "system",
+              "name": "Workflow Quality Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.quality.enter"
+            }
+          },
+          "revision": 27,
+          "schema_version": 2,
+          "skills": {
+            "default-quality": {
+              "enabled": true,
+              "id": "default-quality",
+              "name": "Quality",
+              "parameters": [],
+              "prompt": "## Quality review\n\nIndependently review the finalized plans and candidate implementation. Select or add meaningful tests, correct defects when needed, and run the relevant checks. Report actual commands, results and findings. Refine verifies the exact candidate and supervises evaluation commands.\n\n## Required behavior\n\nPreserve the relevant Goal and docs/intent product behavior. Keep Model, Application, Infrastructure, and Surfaces coherent; shared capabilities authoritative; local state and evidence inspectable and recoverable; and affected surfaces semantically consistent.\n\n## Review and verification\n\nJudge the candidate against the Goal and only the relevant docs/intent pages. Use the smallest deterministic checks that cover the affected behavior, adding or adjusting behavior-focused tests only when evidence is missing. Scale integration and failure-path checks to actual risk. Test the governing invariant through the affected real entry paths and lifecycle boundaries. Look for cases that could disprove the implementation's assumptions, including relevant callers outside the changed files. Group findings with a common cause into one coherent recovery request. Report exact commands, results, and remaining uncertainty. Do not require unrelated tests, documentation, refactors, or cleanup; documentation is relevant only when product intent or an architectural contract changes.\n\n## Acceptance checks\n\n- The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks.\n\n## Intent and architecture\n\nApplicability: Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract.\n\nUse the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Model, Application, Infrastructure, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.\n\nFor this project on the current Default node, /home/buddy/projects/refine-next is the target development checkout and /home/buddy/projects/refine is the serving Refine installation. Use the invocation's pinned workspace (the managed Goal Round worktree when supplied) for code changes and verification, and read the relevant intent from that candidate. Verify paths from the current invocation and runtime before operating on another node. Source promotion and restarting the serving installation are separate operator actions; an ordinary implementation or Quality run should not deploy its candidate or restart the daemon that is supervising it.\n\n## Cohesive code files\n\nApplicability: Apply whenever an agent adds or changes code files in any language.\n\nKeep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.\n",
+              "provenance": "refine-default-v1",
+              "role": "task",
+              "scope": {
+                "node_id": null
+              }
+            }
+          }
         }
       },
       "governance_candidate_commit": "",
@@ -367,7 +505,12 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "guidance_decision": null,
+      "guidance_decision": {
+        "applied": [],
+        "context_version": 1,
+        "recorded_at": "2026-09-11T12:51:31Z",
+        "skipped": []
+      },
       "implementation_plan": {
         "binding": {
           "base_commit": "f46f8710af32b77d13cec54853bcc4cf3fb728a9",
@@ -378,6 +521,7 @@
           "round_idx": 0,
           "target_branch": "main"
         },
+        "completed_at": "2026-09-11T12:51:30Z",
         "final_plan": {
           "completed_at": "2026-09-11T12:41:52Z",
           "git_after": {
@@ -424,6 +568,57 @@
             "summary": "workflow.plan.enter:default-plan: Retain terminal selection text across mouse-report clearing, with explicit invalidation that preserves interruption, paste, and renderer lifecycle behavior."
           },
           "started_at": "2026-09-11T12:39:47Z"
+        },
+        "implementation": {
+          "completed_at": "2026-09-11T12:51:30Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "Recorded the failing selection-loss regression in /tmp/DRDE557-selection-before.log. Passing regressions now cover Copy selection, native Copy, and real SGR reporting that clears live selection while preserving captured text.",
+                "id": "workflow.plan.enter:default-plan:P1",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "terminal-clipboard.js owns transient renderer/session-bound snapshots, prefers live text, and keeps copy attempts and recovery text separate. Browser tests verify retention through output and remounts.",
+                "id": "workflow.plan.enter:default-plan:P2",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Snapshots invalidate on primary pointer gestures, nonmodifier non-copy keys, accepted paste, replacement, and disposal. Tests verify modifier preservation, failed-copy recovery, and delayed success preserving newer selections.",
+                "id": "workflow.plan.enter:default-plan:P3",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Toolbar lifecycle calls clipboard-owned reset helpers. Browser tests verify retained renderer identity and viewport, deferred history release, automatic-start suppression release, and explicit Restart cleanup.",
+                "id": "workflow.plan.enter:default-plan:P4",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "All six profiles pass invalidation/interruption fixtures. Coverage includes typing, Enter, Backspace, Escape, navigation, paste, copy consumption, replacement, tab switching, exit, restart, and disposal. Selected copy emits no interruption; invalidated or consumed snapshots permit exactly one.",
+                "id": "workflow.plan.enter:default-plan:P5",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Chromium used http://refine-clipboard.test routed locally without secure-origin overrides. Tests assert isSecureContext=false and navigator.clipboard absent, trusted native copy/paste, Copy fallback, manual recovery, and exactly-once bracketed paste. Existing Shift/Option-drag and ordinary mouse-report tests pass.",
+                "id": "workflow.plan.enter:default-plan:P6",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Updated only the terminal intent page. All requested tests executed without skips; syntax and diff checks passed. Clipboard owner is 348 lines and the new browser test is 119 lines. Toolbar changes remain limited to lifecycle integration.",
+                "id": "workflow.plan.enter:default-plan:P7",
+                "outcome": "completed"
+              }
+            ],
+            "verification": [
+              "node --test tests/web_terminal_clipboard.test.js tests/web_terminal_keyboard.test.js — 30 passed, 0 failed, 0 skipped; /tmp/DRDE557-unit.log",
+              "NODE_PATH=/home/buddy/projects/refine/node_modules node --test tests/web_terminal_clipboard_browser.test.js tests/web_terminal_copy_lifecycle_browser.test.js tests/web_terminal_copy_recovery_browser.test.js tests/web_terminal_paste_browser.test.js tests/web_terminal_keyboard_browser.test.js tests/web_terminal_selection_browser.test.js — 64 passed, 0 failed, 0 skipped; /tmp/DRDE557-browser-verified.log",
+              "node --test tests/web_supervisor_toolbar.test.js tests/web_goal_log_tail.test.js — 45 passed, 0 failed, 0 skipped; /tmp/DRDE557-toolbar.log",
+              "node --check executed separately on all seven changed or added JavaScript files — passed.",
+              "git diff --check — passed."
+            ]
+          },
+          "report": "workflow.implement.enter:default-implement: Implemented renderer-bound selection snapshots with explicit invalidation, generation-safe copy consumption, and toolbar lifecycle integration. Verification passed: 30 focused tests, 64 Chromium tests, and 45 toolbar/history tests.",
+          "started_at": "2026-09-11T12:41:52Z"
         },
         "phase": "implement",
         "phase_started_at": "2026-09-11T12:41:52Z",
@@ -476,11 +671,11 @@
         },
         "schema_version": 2,
         "started_at": "2026-09-11T12:39:47Z",
-        "state": "in_progress",
-        "updated_at": "2026-09-11T12:41:52Z"
+        "state": "completed",
+        "updated_at": "2026-09-11T12:51:30Z"
       },
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "workflow.implement.enter:default-implement: Implemented renderer-bound selection snapshots with explicit invalidation, generation-safe copy consumption, and toolbar lifecycle integration. Verification passed: 30 focused tests, 64 Chromium tests, and 45 toolbar/history tests.",
+      "implementation_reported_at": "2026-09-11T12:51:30Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -491,7 +686,7 @@
       "quality_state": "unclassified",
       "reporter": "buddy.williams@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-09-11T12:41:53Z",
+      "updated": "2026-09-11T12:51:32Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-11T12:39:46Z",
         "round_idx": 0,
@@ -501,9 +696,9 @@
       "workflow_recovery": null
     }
   ],
-  "status": "implement",
+  "status": "quality",
   "target_branch": "main",
-  "updated": "2026-09-11T12:41:53Z",
+  "updated": "2026-09-11T12:51:32Z",
   "workflow_events": [
     {
       "at": "2026-09-11T12:39:44.857489461+00:00",
@@ -540,7 +735,16 @@
       "node_id": "default",
       "round_idx": 0,
       "to": "implement"
+    },
+    {
+      "at": "2026-09-11T12:51:31.801154811+00:00",
+      "forced": false,
+      "from": "implement",
+      "generation": 5,
+      "node_id": "default",
+      "round_idx": 0,
+      "to": "quality"
     }
   ],
-  "workflow_revision": 17
+  "workflow_revision": 26
 }
