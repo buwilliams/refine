@@ -232,11 +232,57 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "succeeded",
+  "results": {
+    "default-governance": {
+      "invocation_id": "450ff08d43907541d4cb1508991f691ad9dd0534b10b28e93e6e3444ce542956",
+      "binding_id": "default-governance",
+      "role": "governance",
+      "outcome": "success",
+      "summary": "No Governance violations found in the pinned candidate. Architecture, documentation scope, and terminal behavior are supported by inspection and 94 passing tests.",
+      "evidence": [
+        "Reviewed candidate 868a903cd3f5d364d01b50b57294a0cfd1c7843a against base f46f8710af32b77d13cec54853bcc4cf3fb728a9 and docs/intent/01-design.md.",
+        "Selection policy extends the existing browser clipboard owner; toolbar changes delegate lifecycle cleanup. The clipboard module remains cohesive at 348 lines. Documentation changes are confined to the planned terminal intent document.",
+        "Ran node --test tests/web_terminal_clipboard.test.js tests/web_terminal_keyboard.test.js: 30 passed, zero skips.",
+        "Ran the selection, clipboard, copy-lifecycle, copy-recovery, paste, and keyboard browser suites with NODE_PATH=/tmp/refine-hub-browser/node_modules: 64 passed, zero skips. Coverage includes non-secure HTTP without navigator.clipboard, SGR-cleared selection, trusted native copy/paste, recovery, lifecycle fencing, and interruption semantics.",
+        "All seven changed JavaScript files passed node --check; the candidate diff passed git diff --check.",
+        "Final HEAD remains the pinned candidate and Git status is clean. No files, Git state, or Goal state were changed."
+      ],
+      "artifacts": {
+        "recovery_analysis": null,
+        "recovery_round_prompt": null,
+        "violations": []
+      }
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "default-governance",
+      "checkout": {
+        "observation": {
+          "branch": "refine/DRDE557BD8B3E01883A74CEDA5/round-1",
+          "head_commit": "868a903cd3f5d364d01b50b57294a0cfd1c7843a",
+          "status_porcelain": []
+        },
+        "tree": "a51d1633e68621dccd0341b854bcf95f5d7f7494"
+      },
+      "checkout_recorded": true,
+      "diagnostic": null,
+      "observational_violation": false,
+      "operation_id": null,
+      "process_id": "proc-1789131282254-1100349-3302",
+      "prompt_bytes": 27722,
+      "provider_session_id": null,
+      "purpose": "work",
+      "raw_output": "{\n  \"artifacts\": {\n    \"recovery_analysis\": null,\n    \"recovery_round_prompt\": null,\n    \"violations\": []\n  },\n  \"binding_id\": \"default-governance\",\n  \"evidence\": [\n    \"Reviewed candidate 868a903cd3f5d364d01b50b57294a0cfd1c7843a against base f46f8710af32b77d13cec54853bcc4cf3fb728a9 and docs/intent/01-design.md.\",\n    \"Selection policy extends the existing browser clipboard owner; toolbar changes delegate lifecycle cleanup. The clipboard module remains cohesive at 348 lines. Documentation changes are confined to the planned terminal intent document.\",\n    \"Ran node --test tests/web_terminal_clipboard.test.js tests/web_terminal_keyboard.test.js: 30 passed, zero skips.\",\n    \"Ran the selection, clipboard, copy-lifecycle, copy-recovery, paste, and keyboard browser suites with NODE_PATH=/tmp/refine-hub-browser/node_modules: 64 passed, zero skips. Coverage includes non-secure HTTP without navigator.clipboard, SGR-cleared selection, trusted native copy/paste, recovery, lifecycle fencing, and interruption semantics.\",\n    \"All seven changed JavaScript files passed node --check; the candidate diff passed git diff --check.\",\n    \"Final HEAD remains the pinned candidate and Git status is clean. No files, Git state, or Goal state were changed.\"\n  ],\n  \"invocation_id\": \"450ff08d43907541d4cb1508991f691ad9dd0534b10b28e93e6e3444ce542956\",\n  \"outcome\": \"success\",\n  \"role\": \"governance\",\n  \"summary\": \"No Governance violations found in the pinned candidate. Architecture, documentation scope, and terminal behavior are supported by inspection and 94 passing tests.\"\n}\n",
+      "received_at": "2026-09-11T12:56:51.237285444+00:00",
+      "started_at": "2026-09-11T12:54:42.237402164+00:00",
+      "workflow_revision": 2
+    }
+  ],
   "created_at": "2026-09-11T12:54:41.795729940+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-11T12:56:51.659307020+00:00",
   "error": null,
   "action_applied": false
 }
