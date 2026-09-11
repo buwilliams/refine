@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "revision": 31,
+  "revision": 32,
   "skills": {
     "default-governance": {
       "id": "default-governance",
@@ -29,7 +29,7 @@
     "default-plan": {
       "id": "default-plan",
       "name": "Plan",
-      "prompt": "## Plan\n\nProduce a complete, concise implementation plan for the current Goal Round. Choose the planning method appropriate to the work. For behavior changes, identify the underlying cause, governing concept or invariant, and existing owner before listing edits. Prefer strengthening an existing concept; introduce one only when it clarifies the behavior and reduces special cases. Do not change repository files. \n\n## Outcome\n\nReturn an actionable plan with stable checklist IDs and meaningful verification.\n\nExample:\nTask #1 - short description of the work (what) and the rationale (why)\nTask #2 - short description of the work (what) and the rationale (why)\n(etc.)\n\n## Intent and architecture\n\nUse the Goal and the relevant docs/source code files under Refine's runtime at <refine-runtime>/docs/intent/ as the durable product specification.",
+      "prompt": "## Plan\n\nProduce a complete, concise implementation plan for the current Goal Round. Choose the planning method appropriate to the work. For behavior changes, identify the underlying cause, governing concept or invariant, and existing owner before listing edits. Prefer strengthening an existing concept; introduce one only when it clarifies the behavior and reduces special cases. Do not change repository files. \n\n### Format\n\nReturn an actionable plan with stable checklist IDs and meaningful verification.\n\nExample:\nTask #1 - short description of the work (what) and the rationale (why)\nTask #2 - short description of the work (what) and the rationale (why)\n(etc.)\n\n### Intent and architecture\n\nUse the Goal and the relevant docs/source code files under Refine's runtime at <refine-runtime>/docs/intent/ as the durable product specification.",
       "role": "task",
       "enabled": true,
       "scope": {
