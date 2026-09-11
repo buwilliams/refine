@@ -3,7 +3,7 @@
   "branch_name": "refine/DRDE557BD8B3E01883A74CEDA5/round-1",
   "candidate_commit": null,
   "created": "2026-09-11T12:39:44Z",
-  "event_generation": 3,
+  "event_generation": 4,
   "feature_id": null,
   "feature_order": null,
   "id": "DRDE557BD8B3E01883A74CEDA5",
@@ -46,11 +46,11 @@
       "created": "2026-09-11T12:39:44Z",
       "event_configuration": {
         "events": {
-          "workflow.plan.enter": {
+          "workflow.implement.enter": {
             "bindings": [
               {
                 "enabled": true,
-                "id": "default-plan",
+                "id": "default-implement",
                 "inputs": {},
                 "mode": "blocking",
                 "order": 0,
@@ -58,36 +58,119 @@
                 "scope": {
                   "node_id": null
                 },
-                "skill_id": "default-plan"
+                "skill_id": "default-implement"
               }
             ],
             "enabled": true,
-            "id": "workflow.plan.enter",
+            "id": "workflow.implement.enter",
             "kind": "system",
-            "name": "Workflow Plan Enter",
+            "name": "Workflow Implement Enter",
             "on_success": null,
             "parameters": [],
             "scope": {
               "node_id": null
             },
-            "source": "workflow.plan.enter"
+            "source": "workflow.implement.enter"
           }
         },
         "revision": 26,
         "schema_version": 2,
         "skills": {
-          "default-plan": {
+          "default-implement": {
             "enabled": true,
-            "id": "default-plan",
-            "name": "Plan",
+            "id": "default-implement",
+            "name": "Implement",
             "parameters": [],
-            "prompt": "## Plan\n\nProduce a complete, concise implementation plan for the current Goal Round. Inspect the repository and applicable context, resolve assumptions, consider alternatives and critique your proposed solution before finalizing it. Choose the planning method appropriate to the work. For behavior changes, identify the underlying cause, governing concept or invariant, and existing owner before listing edits. Prefer strengthening an existing concept; introduce one only when it clarifies the behavior and reduces special cases. For a scoped finding recovery Round, use the finding as evidence, reconsider whether the accepted approach explains the failure, and plan a coherent correction against the retained candidate. Inspect relevant changes on the current target branch to avoid duplicating or contradicting concepts it already provides; keep the assigned candidate unchanged. Do not change repository files. Return an actionable plan with stable checklist IDs and meaningful verification.\n\n## Intent and architecture\n\nApplicability: Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract.\n\nUse the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Model, Application, Infrastructure, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.\n\nFor this project on the current Default node, /home/buddy/projects/refine-next is the target development checkout and /home/buddy/projects/refine is the serving Refine installation. Use the invocation's pinned workspace (the managed Goal Round worktree when supplied) for code changes and verification, and read the relevant intent from that candidate. Verify paths from the current invocation and runtime before operating on another node. Source promotion and restarting the serving installation are separate operator actions; an ordinary implementation or Quality run should not deploy its candidate or restart the daemon that is supervising it.\n\n## Cohesive code files\n\nApplicability: Apply whenever an agent adds or changes code files in any language.\n\nKeep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.\n",
+            "prompt": "## Implement\n\nImplement the current Goal Round using every accepted plan and attached Skill. Inspect existing code, make the complete change, run appropriate verification, and report evidence for each checklist item. Check the plan's assumptions against the code and keep policy in its shared owner. Prefer one correction that explains the affected behavior over separate fixes at each failing call site. Report evidence-backed plan deviations within the Goal's scope and existing authority. Preserve unrelated changes and historical evidence. Refine owns candidate commits, workflow advancement, Quality, Governance and integration.\n\n## Intent and architecture\n\nApplicability: Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract.\n\nUse the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Model, Application, Infrastructure, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.\n\nFor this project on the current Default node, /home/buddy/projects/refine-next is the target development checkout and /home/buddy/projects/refine is the serving Refine installation. Use the invocation's pinned workspace (the managed Goal Round worktree when supplied) for code changes and verification, and read the relevant intent from that candidate. Verify paths from the current invocation and runtime before operating on another node. Source promotion and restarting the serving installation are separate operator actions; an ordinary implementation or Quality run should not deploy its candidate or restart the daemon that is supervising it.\n\n## Cohesive code files\n\nApplicability: Apply whenever an agent adds or changes code files in any language.\n\nKeep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.\n",
             "provenance": "refine-default-v1",
             "role": "task",
             "scope": {
               "node_id": null
             }
           }
+        }
+      },
+      "event_results": {
+        "933d0b14d35c0973f9644d876c6a98dd98ed765eb5e8956c8d0dc96f1791f967": {
+          "candidate_commit": null,
+          "results": {
+            "default-plan": {
+              "artifacts": {
+                "plan": {
+                  "checklist": [
+                    {
+                      "description": "Add a failing regression using the existing clipboard harness: record a nonempty selection, clear xterm’s live selection without keyboard input, then verify Copy selection and native Copy still receive the captured text. Extend real-xterm browser coverage to reproduce selection loss with SGR mouse reporting, recording selection changes and PTY input; distinguish this from ordinary unmodified dragging, which intentionally belongs to the TUI.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "Strengthen terminal-clipboard.js as the existing clipboard owner. Store one transient selection snapshot bound to the originating renderer, refresh it on nonempty selection changes, and let terminalSelection() prefer live text before the snapshot. Retain the snapshot through mouse-report clearing, output updates, and renderer remounts. Keep clipboard attempts and their recovery text separate from selection state.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "Define and implement snapshot invalidation through shared clipboard/keyboard hooks: clear on a new pointer selection gesture, nonmodifier terminal keyboard interaction other than copy, accepted paste, and renderer/session replacement or tab disposal. Do not clear indiscriminately from onData, which includes mouse reports. Preserve snapshots for retained output after exit/disconnection and tab switching. On successful copy, consume only the snapshot generation captured by that attempt, preserving any newer selection and existing visible-selection behavior; failed copies retain recovery text.",
+                      "id": "P3"
+                    },
+                    {
+                      "description": "Integrate snapshot lifetime with toolbar.js lifecycle and terminalPreservesCopy(), using small clipboard-owned helpers rather than another toolbar policy family. Verify that returning to selected retained output preserves the renderer and scroll position, while invalidation releases deferred history replay and automatic-start suppression. Keep native clipboard events, async fallback fencing, bracketed paste, and ordinary TUI mouse input intact.",
+                      "id": "P4"
+                    },
+                    {
+                      "description": "Add focused tests for snapshot replacement, modifier-only release, typing, Enter, Backspace, Escape, navigation, paste, copy success/failure, delayed success after a newer selection, tab switching, exit, restart, and renderer replacement. Assert Ctrl+C emits one interruption after the snapshot is invalidated or consumed with no live selection; selected copy emits none. Cover all shared terminal profiles through existing parameterized fixtures.",
+                      "id": "P5"
+                    },
+                    {
+                      "description": "Extend the browser fixture to support a non-loopback HTTP hostname routed to its local test server without secure-origin overrides. Assert isSecureContext is false and navigator.clipboard is absent. Exercise trusted native copy/paste, mouse-cleared selection, Copy control fallback, and manual recovery; verify exactly-once bracketed paste independently of selection caching. Retain Shift/Option-drag and ordinary mouse-report assertions.",
+                      "id": "P6"
+                    },
+                    {
+                      "description": "Update only docs/intent/05-surfaces/03-browser/19-terminal.md to explain retained selection text and its invalidation. Run node --test tests/web_terminal_clipboard.test.js tests/web_terminal_keyboard.test.js, then the clipboard, copy-lifecycle, copy-recovery, paste, and keyboard browser test files with resolvable Playwright and installed Chromium. Require actual browser execution, not skips. Run node --check on changed JavaScript and git diff --check; compare any wider-suite failures against f46f8710af32b77d13cec54853bcc4cf3fb728a9. Keep new files cohesive and review structure near 500 lines.",
+                      "id": "P7"
+                    }
+                  ],
+                  "criticism_resolutions": [
+                    {
+                      "criticism_id": "C1",
+                      "resolution": "The report’s claim that existing tests only use plain terminals is outdated: this candidate already tests SGR capture and forced selection. Target the missing selection-loss sequence and actual insecure-origin coverage instead of duplicating those tests."
+                    },
+                    {
+                      "criticism_id": "C2",
+                      "resolution": "An unconditional lastSelection fallback cleared only by printable keys and Enter can intercept Ctrl+C after navigation or paste and survive renderer replacement. Use explicit selection lifetime and identity rules within the existing clipboard owner."
+                    },
+                    {
+                      "criticism_id": "C3",
+                      "resolution": "Clearing cached text unconditionally on async copy success can erase a newer selection. Bind consumption to the selection generation captured by the existing fenced copy attempt."
+                    },
+                    {
+                      "criticism_id": "C4",
+                      "resolution": "Selection retention does not repair paste transport. Preserve and verify the already implemented native paste path independently. Requiring HTTPS, disabling TUI mouse tracking, patching vendored xterm, or adding provider-specific handlers would either miss the reported environment or contradict shared terminal behavior."
+                    },
+                    {
+                      "criticism_id": "C5",
+                      "resolution": "Selection also controls history replay, scrolling, and automatic session start through terminalPreservesCopy(). Test those effects explicitly so a retained snapshot cannot indefinitely preserve obsolete interaction state."
+                    }
+                  ],
+                  "summary": "Retain terminal selection text across mouse-report clearing, with explicit invalidation that preserves interruption, paste, and renderer lifecycle behavior."
+                }
+              },
+              "binding_id": "default-plan",
+              "evidence": [
+                "Pinned workspace HEAD, local main, and origin/main all resolved to f46f8710af32b77d13cec54853bcc4cf3fb728a9. Git status was clean; no repository files or Git state were changed.",
+                "terminal-clipboard.js reads only live hasSelection()/getSelection(); its selection-change listener only refreshes controls. Native clipboard events, async fallbacks, manual recovery, and copy-attempt identity fencing already exist.",
+                "Vendored xterm contains an onUserInput listener that clears an existing selection. Its mousedown routing honors shouldForceSelection before sending application mouse input. The precise reported mouse-release sequence remains to be reproduced in a browser.",
+                "An observational harness probe selecting text and then clearing selection returned no native copied data; Ctrl+C was accepted by the terminal.",
+                "Clipboard history includes b4a63709 plus subsequent d87cffb0 and f0a9d843 corrections. The reported e99fdaf8 object is unavailable locally, so its implementation was not independently inspected.",
+                "Inspected Terminal and Toolbar intent and toolbar renderer/reset/history-replay ownership. The governing invariant is that user-selected output remains copyable across incidental renderer selection loss, while subsequent terminal interaction restores normal input semantics.",
+                "node --test tests/web_terminal_clipboard.test.js tests/web_terminal_keyboard.test.js passed 22 tests with no failures or skips.",
+                "node --test tests/web_terminal_clipboard_browser.test.js skipped all 25 tests because its loader could not resolve an available Playwright Chromium setup. No browser pass or live-server reproduction is claimed."
+              ],
+              "invocation_id": "933d0b14d35c0973f9644d876c6a98dd98ed765eb5e8956c8d0dc96f1791f967",
+              "outcome": "success",
+              "role": "plan",
+              "summary": "Completed a read-only, source-backed implementation plan with selection-lifetime rules, critique resolutions, and proposed verification against the unchanged pinned candidate."
+            }
+          },
+          "source": "workflow.plan.enter",
+          "state": "succeeded"
         }
       },
       "failure_at": "",
@@ -205,6 +288,78 @@
               }
             }
           }
+        },
+        "3:default:workflow.plan.exit": {
+          "events": {
+            "workflow.plan.exit": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.plan.exit",
+              "kind": "system",
+              "name": "Workflow Plan Exit",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.plan.exit"
+            }
+          },
+          "revision": 26,
+          "schema_version": 2,
+          "skills": {}
+        },
+        "3:default:workflow.plan.success": {
+          "events": {},
+          "revision": 26,
+          "schema_version": 2,
+          "skills": {}
+        },
+        "4:default:workflow.implement.enter": {
+          "events": {
+            "workflow.implement.enter": {
+              "bindings": [
+                {
+                  "enabled": true,
+                  "id": "default-implement",
+                  "inputs": {},
+                  "mode": "blocking",
+                  "order": 0,
+                  "overrides": null,
+                  "scope": {
+                    "node_id": null
+                  },
+                  "skill_id": "default-implement"
+                }
+              ],
+              "enabled": true,
+              "id": "workflow.implement.enter",
+              "kind": "system",
+              "name": "Workflow Implement Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.implement.enter"
+            }
+          },
+          "revision": 26,
+          "schema_version": 2,
+          "skills": {
+            "default-implement": {
+              "enabled": true,
+              "id": "default-implement",
+              "name": "Implement",
+              "parameters": [],
+              "prompt": "## Implement\n\nImplement the current Goal Round using every accepted plan and attached Skill. Inspect existing code, make the complete change, run appropriate verification, and report evidence for each checklist item. Check the plan's assumptions against the code and keep policy in its shared owner. Prefer one correction that explains the affected behavior over separate fixes at each failing call site. Report evidence-backed plan deviations within the Goal's scope and existing authority. Preserve unrelated changes and historical evidence. Refine owns candidate commits, workflow advancement, Quality, Governance and integration.\n\n## Intent and architecture\n\nApplicability: Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract.\n\nUse the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Model, Application, Infrastructure, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.\n\nFor this project on the current Default node, /home/buddy/projects/refine-next is the target development checkout and /home/buddy/projects/refine is the serving Refine installation. Use the invocation's pinned workspace (the managed Goal Round worktree when supplied) for code changes and verification, and read the relevant intent from that candidate. Verify paths from the current invocation and runtime before operating on another node. Source promotion and restarting the serving installation are separate operator actions; an ordinary implementation or Quality run should not deploy its candidate or restart the daemon that is supervising it.\n\n## Cohesive code files\n\nApplicability: Apply whenever an agent adds or changes code files in any language.\n\nKeep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.\n",
+              "provenance": "refine-default-v1",
+              "role": "task",
+              "scope": {
+                "node_id": null
+              }
+            }
+          }
         }
       },
       "governance_candidate_commit": "",
@@ -223,12 +378,106 @@
           "round_idx": 0,
           "target_branch": "main"
         },
-        "phase": "plan",
-        "phase_started_at": "2026-09-11T12:39:47Z",
+        "final_plan": {
+          "completed_at": "2026-09-11T12:41:52Z",
+          "git_after": {
+            "branch": "refine/DRDE557BD8B3E01883A74CEDA5/round-1",
+            "head_commit": "f46f8710af32b77d13cec54853bcc4cf3fb728a9",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DRDE557BD8B3E01883A74CEDA5/round-1",
+            "head_commit": "f46f8710af32b77d13cec54853bcc4cf3fb728a9",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Add a failing regression using the existing clipboard harness: record a nonempty selection, clear xterm’s live selection without keyboard input, then verify Copy selection and native Copy still receive the captured text. Extend real-xterm browser coverage to reproduce selection loss with SGR mouse reporting, recording selection changes and PTY input; distinguish this from ordinary unmodified dragging, which intentionally belongs to the TUI.",
+                "id": "workflow.plan.enter:default-plan:P1"
+              },
+              {
+                "description": "Strengthen terminal-clipboard.js as the existing clipboard owner. Store one transient selection snapshot bound to the originating renderer, refresh it on nonempty selection changes, and let terminalSelection() prefer live text before the snapshot. Retain the snapshot through mouse-report clearing, output updates, and renderer remounts. Keep clipboard attempts and their recovery text separate from selection state.",
+                "id": "workflow.plan.enter:default-plan:P2"
+              },
+              {
+                "description": "Define and implement snapshot invalidation through shared clipboard/keyboard hooks: clear on a new pointer selection gesture, nonmodifier terminal keyboard interaction other than copy, accepted paste, and renderer/session replacement or tab disposal. Do not clear indiscriminately from onData, which includes mouse reports. Preserve snapshots for retained output after exit/disconnection and tab switching. On successful copy, consume only the snapshot generation captured by that attempt, preserving any newer selection and existing visible-selection behavior; failed copies retain recovery text.",
+                "id": "workflow.plan.enter:default-plan:P3"
+              },
+              {
+                "description": "Integrate snapshot lifetime with toolbar.js lifecycle and terminalPreservesCopy(), using small clipboard-owned helpers rather than another toolbar policy family. Verify that returning to selected retained output preserves the renderer and scroll position, while invalidation releases deferred history replay and automatic-start suppression. Keep native clipboard events, async fallback fencing, bracketed paste, and ordinary TUI mouse input intact.",
+                "id": "workflow.plan.enter:default-plan:P4"
+              },
+              {
+                "description": "Add focused tests for snapshot replacement, modifier-only release, typing, Enter, Backspace, Escape, navigation, paste, copy success/failure, delayed success after a newer selection, tab switching, exit, restart, and renderer replacement. Assert Ctrl+C emits one interruption after the snapshot is invalidated or consumed with no live selection; selected copy emits none. Cover all shared terminal profiles through existing parameterized fixtures.",
+                "id": "workflow.plan.enter:default-plan:P5"
+              },
+              {
+                "description": "Extend the browser fixture to support a non-loopback HTTP hostname routed to its local test server without secure-origin overrides. Assert isSecureContext is false and navigator.clipboard is absent. Exercise trusted native copy/paste, mouse-cleared selection, Copy control fallback, and manual recovery; verify exactly-once bracketed paste independently of selection caching. Retain Shift/Option-drag and ordinary mouse-report assertions.",
+                "id": "workflow.plan.enter:default-plan:P6"
+              },
+              {
+                "description": "Update only docs/intent/05-surfaces/03-browser/19-terminal.md to explain retained selection text and its invalidation. Run node --test tests/web_terminal_clipboard.test.js tests/web_terminal_keyboard.test.js, then the clipboard, copy-lifecycle, copy-recovery, paste, and keyboard browser test files with resolvable Playwright and installed Chromium. Require actual browser execution, not skips. Run node --check on changed JavaScript and git diff --check; compare any wider-suite failures against f46f8710af32b77d13cec54853bcc4cf3fb728a9. Keep new files cohesive and review structure near 500 lines.",
+                "id": "workflow.plan.enter:default-plan:P7"
+              }
+            ],
+            "summary": "workflow.plan.enter:default-plan: Retain terminal selection text across mouse-report clearing, with explicit invalidation that preserves interruption, paste, and renderer lifecycle behavior."
+          },
+          "started_at": "2026-09-11T12:39:47Z"
+        },
+        "phase": "implement",
+        "phase_started_at": "2026-09-11T12:41:52Z",
+        "proposal": {
+          "completed_at": "2026-09-11T12:41:52Z",
+          "git_after": {
+            "branch": "refine/DRDE557BD8B3E01883A74CEDA5/round-1",
+            "head_commit": "f46f8710af32b77d13cec54853bcc4cf3fb728a9",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DRDE557BD8B3E01883A74CEDA5/round-1",
+            "head_commit": "f46f8710af32b77d13cec54853bcc4cf3fb728a9",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Add a failing regression using the existing clipboard harness: record a nonempty selection, clear xterm’s live selection without keyboard input, then verify Copy selection and native Copy still receive the captured text. Extend real-xterm browser coverage to reproduce selection loss with SGR mouse reporting, recording selection changes and PTY input; distinguish this from ordinary unmodified dragging, which intentionally belongs to the TUI.",
+                "id": "workflow.plan.enter:default-plan:P1"
+              },
+              {
+                "description": "Strengthen terminal-clipboard.js as the existing clipboard owner. Store one transient selection snapshot bound to the originating renderer, refresh it on nonempty selection changes, and let terminalSelection() prefer live text before the snapshot. Retain the snapshot through mouse-report clearing, output updates, and renderer remounts. Keep clipboard attempts and their recovery text separate from selection state.",
+                "id": "workflow.plan.enter:default-plan:P2"
+              },
+              {
+                "description": "Define and implement snapshot invalidation through shared clipboard/keyboard hooks: clear on a new pointer selection gesture, nonmodifier terminal keyboard interaction other than copy, accepted paste, and renderer/session replacement or tab disposal. Do not clear indiscriminately from onData, which includes mouse reports. Preserve snapshots for retained output after exit/disconnection and tab switching. On successful copy, consume only the snapshot generation captured by that attempt, preserving any newer selection and existing visible-selection behavior; failed copies retain recovery text.",
+                "id": "workflow.plan.enter:default-plan:P3"
+              },
+              {
+                "description": "Integrate snapshot lifetime with toolbar.js lifecycle and terminalPreservesCopy(), using small clipboard-owned helpers rather than another toolbar policy family. Verify that returning to selected retained output preserves the renderer and scroll position, while invalidation releases deferred history replay and automatic-start suppression. Keep native clipboard events, async fallback fencing, bracketed paste, and ordinary TUI mouse input intact.",
+                "id": "workflow.plan.enter:default-plan:P4"
+              },
+              {
+                "description": "Add focused tests for snapshot replacement, modifier-only release, typing, Enter, Backspace, Escape, navigation, paste, copy success/failure, delayed success after a newer selection, tab switching, exit, restart, and renderer replacement. Assert Ctrl+C emits one interruption after the snapshot is invalidated or consumed with no live selection; selected copy emits none. Cover all shared terminal profiles through existing parameterized fixtures.",
+                "id": "workflow.plan.enter:default-plan:P5"
+              },
+              {
+                "description": "Extend the browser fixture to support a non-loopback HTTP hostname routed to its local test server without secure-origin overrides. Assert isSecureContext is false and navigator.clipboard is absent. Exercise trusted native copy/paste, mouse-cleared selection, Copy control fallback, and manual recovery; verify exactly-once bracketed paste independently of selection caching. Retain Shift/Option-drag and ordinary mouse-report assertions.",
+                "id": "workflow.plan.enter:default-plan:P6"
+              },
+              {
+                "description": "Update only docs/intent/05-surfaces/03-browser/19-terminal.md to explain retained selection text and its invalidation. Run node --test tests/web_terminal_clipboard.test.js tests/web_terminal_keyboard.test.js, then the clipboard, copy-lifecycle, copy-recovery, paste, and keyboard browser test files with resolvable Playwright and installed Chromium. Require actual browser execution, not skips. Run node --check on changed JavaScript and git diff --check; compare any wider-suite failures against f46f8710af32b77d13cec54853bcc4cf3fb728a9. Keep new files cohesive and review structure near 500 lines.",
+                "id": "workflow.plan.enter:default-plan:P7"
+              }
+            ],
+            "summary": "workflow.plan.enter:default-plan: Retain terminal selection text across mouse-report clearing, with explicit invalidation that preserves interruption, paste, and renderer lifecycle behavior."
+          },
+          "started_at": "2026-09-11T12:39:47Z"
+        },
         "schema_version": 2,
         "started_at": "2026-09-11T12:39:47Z",
         "state": "in_progress",
-        "updated_at": "2026-09-11T12:39:47Z"
+        "updated_at": "2026-09-11T12:41:52Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -242,7 +491,7 @@
       "quality_state": "unclassified",
       "reporter": "buddy.williams@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-09-11T12:39:48Z",
+      "updated": "2026-09-11T12:41:53Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-11T12:39:46Z",
         "round_idx": 0,
@@ -252,9 +501,9 @@
       "workflow_recovery": null
     }
   ],
-  "status": "plan",
+  "status": "implement",
   "target_branch": "main",
-  "updated": "2026-09-11T12:39:48Z",
+  "updated": "2026-09-11T12:41:53Z",
   "workflow_events": [
     {
       "at": "2026-09-11T12:39:44.857489461+00:00",
@@ -282,7 +531,16 @@
       "node_id": "default",
       "round_idx": 0,
       "to": "plan"
+    },
+    {
+      "at": "2026-09-11T12:41:52.682654779+00:00",
+      "forced": false,
+      "from": "plan",
+      "generation": 4,
+      "node_id": "default",
+      "round_idx": 0,
+      "to": "implement"
     }
   ],
-  "workflow_revision": 10
+  "workflow_revision": 17
 }

@@ -183,11 +183,111 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "succeeded",
+  "results": {
+    "default-plan": {
+      "invocation_id": "933d0b14d35c0973f9644d876c6a98dd98ed765eb5e8956c8d0dc96f1791f967",
+      "binding_id": "default-plan",
+      "role": "plan",
+      "outcome": "success",
+      "summary": "Completed a read-only, source-backed implementation plan with selection-lifetime rules, critique resolutions, and proposed verification against the unchanged pinned candidate.",
+      "evidence": [
+        "Pinned workspace HEAD, local main, and origin/main all resolved to f46f8710af32b77d13cec54853bcc4cf3fb728a9. Git status was clean; no repository files or Git state were changed.",
+        "terminal-clipboard.js reads only live hasSelection()/getSelection(); its selection-change listener only refreshes controls. Native clipboard events, async fallbacks, manual recovery, and copy-attempt identity fencing already exist.",
+        "Vendored xterm contains an onUserInput listener that clears an existing selection. Its mousedown routing honors shouldForceSelection before sending application mouse input. The precise reported mouse-release sequence remains to be reproduced in a browser.",
+        "An observational harness probe selecting text and then clearing selection returned no native copied data; Ctrl+C was accepted by the terminal.",
+        "Clipboard history includes b4a63709 plus subsequent d87cffb0 and f0a9d843 corrections. The reported e99fdaf8 object is unavailable locally, so its implementation was not independently inspected.",
+        "Inspected Terminal and Toolbar intent and toolbar renderer/reset/history-replay ownership. The governing invariant is that user-selected output remains copyable across incidental renderer selection loss, while subsequent terminal interaction restores normal input semantics.",
+        "node --test tests/web_terminal_clipboard.test.js tests/web_terminal_keyboard.test.js passed 22 tests with no failures or skips.",
+        "node --test tests/web_terminal_clipboard_browser.test.js skipped all 25 tests because its loader could not resolve an available Playwright Chromium setup. No browser pass or live-server reproduction is claimed."
+      ],
+      "artifacts": {
+        "plan": {
+          "checklist": [
+            {
+              "description": "Add a failing regression using the existing clipboard harness: record a nonempty selection, clear xterm’s live selection without keyboard input, then verify Copy selection and native Copy still receive the captured text. Extend real-xterm browser coverage to reproduce selection loss with SGR mouse reporting, recording selection changes and PTY input; distinguish this from ordinary unmodified dragging, which intentionally belongs to the TUI.",
+              "id": "P1"
+            },
+            {
+              "description": "Strengthen terminal-clipboard.js as the existing clipboard owner. Store one transient selection snapshot bound to the originating renderer, refresh it on nonempty selection changes, and let terminalSelection() prefer live text before the snapshot. Retain the snapshot through mouse-report clearing, output updates, and renderer remounts. Keep clipboard attempts and their recovery text separate from selection state.",
+              "id": "P2"
+            },
+            {
+              "description": "Define and implement snapshot invalidation through shared clipboard/keyboard hooks: clear on a new pointer selection gesture, nonmodifier terminal keyboard interaction other than copy, accepted paste, and renderer/session replacement or tab disposal. Do not clear indiscriminately from onData, which includes mouse reports. Preserve snapshots for retained output after exit/disconnection and tab switching. On successful copy, consume only the snapshot generation captured by that attempt, preserving any newer selection and existing visible-selection behavior; failed copies retain recovery text.",
+              "id": "P3"
+            },
+            {
+              "description": "Integrate snapshot lifetime with toolbar.js lifecycle and terminalPreservesCopy(), using small clipboard-owned helpers rather than another toolbar policy family. Verify that returning to selected retained output preserves the renderer and scroll position, while invalidation releases deferred history replay and automatic-start suppression. Keep native clipboard events, async fallback fencing, bracketed paste, and ordinary TUI mouse input intact.",
+              "id": "P4"
+            },
+            {
+              "description": "Add focused tests for snapshot replacement, modifier-only release, typing, Enter, Backspace, Escape, navigation, paste, copy success/failure, delayed success after a newer selection, tab switching, exit, restart, and renderer replacement. Assert Ctrl+C emits one interruption after the snapshot is invalidated or consumed with no live selection; selected copy emits none. Cover all shared terminal profiles through existing parameterized fixtures.",
+              "id": "P5"
+            },
+            {
+              "description": "Extend the browser fixture to support a non-loopback HTTP hostname routed to its local test server without secure-origin overrides. Assert isSecureContext is false and navigator.clipboard is absent. Exercise trusted native copy/paste, mouse-cleared selection, Copy control fallback, and manual recovery; verify exactly-once bracketed paste independently of selection caching. Retain Shift/Option-drag and ordinary mouse-report assertions.",
+              "id": "P6"
+            },
+            {
+              "description": "Update only docs/intent/05-surfaces/03-browser/19-terminal.md to explain retained selection text and its invalidation. Run node --test tests/web_terminal_clipboard.test.js tests/web_terminal_keyboard.test.js, then the clipboard, copy-lifecycle, copy-recovery, paste, and keyboard browser test files with resolvable Playwright and installed Chromium. Require actual browser execution, not skips. Run node --check on changed JavaScript and git diff --check; compare any wider-suite failures against f46f8710af32b77d13cec54853bcc4cf3fb728a9. Keep new files cohesive and review structure near 500 lines.",
+              "id": "P7"
+            }
+          ],
+          "criticism_resolutions": [
+            {
+              "criticism_id": "C1",
+              "resolution": "The report’s claim that existing tests only use plain terminals is outdated: this candidate already tests SGR capture and forced selection. Target the missing selection-loss sequence and actual insecure-origin coverage instead of duplicating those tests."
+            },
+            {
+              "criticism_id": "C2",
+              "resolution": "An unconditional lastSelection fallback cleared only by printable keys and Enter can intercept Ctrl+C after navigation or paste and survive renderer replacement. Use explicit selection lifetime and identity rules within the existing clipboard owner."
+            },
+            {
+              "criticism_id": "C3",
+              "resolution": "Clearing cached text unconditionally on async copy success can erase a newer selection. Bind consumption to the selection generation captured by the existing fenced copy attempt."
+            },
+            {
+              "criticism_id": "C4",
+              "resolution": "Selection retention does not repair paste transport. Preserve and verify the already implemented native paste path independently. Requiring HTTPS, disabling TUI mouse tracking, patching vendored xterm, or adding provider-specific handlers would either miss the reported environment or contradict shared terminal behavior."
+            },
+            {
+              "criticism_id": "C5",
+              "resolution": "Selection also controls history replay, scrolling, and automatic session start through terminalPreservesCopy(). Test those effects explicitly so a retained snapshot cannot indefinitely preserve obsolete interaction state."
+            }
+          ],
+          "summary": "Retain terminal selection text across mouse-report clearing, with explicit invalidation that preserves interruption, paste, and renderer lifecycle behavior."
+        }
+      }
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "default-plan",
+      "checkout": {
+        "observation": {
+          "branch": "refine/DRDE557BD8B3E01883A74CEDA5/round-1",
+          "head_commit": "f46f8710af32b77d13cec54853bcc4cf3fb728a9",
+          "status_porcelain": []
+        },
+        "tree": "d0a865224eb594442472f9853182ab233f7dede5"
+      },
+      "checkout_recorded": true,
+      "diagnostic": null,
+      "observational_violation": false,
+      "operation_id": null,
+      "process_id": "proc-1789130389002-1100349-102",
+      "prompt_bytes": 23296,
+      "provider_session_id": null,
+      "purpose": "work",
+      "raw_output": "{\n  \"artifacts\": {\n    \"plan\": {\n      \"summary\": \"Retain terminal selection text across mouse-report clearing, with explicit invalidation that preserves interruption, paste, and renderer lifecycle behavior.\",\n      \"checklist\": [\n        {\n          \"id\": \"P1\",\n          \"description\": \"Add a failing regression using the existing clipboard harness: record a nonempty selection, clear xterm’s live selection without keyboard input, then verify Copy selection and native Copy still receive the captured text. Extend real-xterm browser coverage to reproduce selection loss with SGR mouse reporting, recording selection changes and PTY input; distinguish this from ordinary unmodified dragging, which intentionally belongs to the TUI.\"\n        },\n        {\n          \"id\": \"P2\",\n          \"description\": \"Strengthen terminal-clipboard.js as the existing clipboard owner. Store one transient selection snapshot bound to the originating renderer, refresh it on nonempty selection changes, and let terminalSelection() prefer live text before the snapshot. Retain the snapshot through mouse-report clearing, output updates, and renderer remounts. Keep clipboard attempts and their recovery text separate from selection state.\"\n        },\n        {\n          \"id\": \"P3\",\n          \"description\": \"Define and implement snapshot invalidation through shared clipboard/keyboard hooks: clear on a new pointer selection gesture, nonmodifier terminal keyboard interaction other than copy, accepted paste, and renderer/session replacement or tab disposal. Do not clear indiscriminately from onData, which includes mouse reports. Preserve snapshots for retained output after exit/disconnection and tab switching. On successful copy, consume only the snapshot generation captured by that attempt, preserving any newer selection and existing visible-selection behavior; failed copies retain recovery text.\"\n        },\n        {\n          \"id\": \"P4\",\n          \"description\": \"Integrate snapshot lifetime with toolbar.js lifecycle and terminalPreservesCopy(), using small clipboard-owned helpers rather than another toolbar policy family. Verify that returning to selected retained output preserves the renderer and scroll position, while invalidation releases deferred history replay and automatic-start suppression. Keep native clipboard events, async fallback fencing, bracketed paste, and ordinary TUI mouse input intact.\"\n        },\n        {\n          \"id\": \"P5\",\n          \"description\": \"Add focused tests for snapshot replacement, modifier-only release, typing, Enter, Backspace, Escape, navigation, paste, copy success/failure, delayed success after a newer selection, tab switching, exit, restart, and renderer replacement. Assert Ctrl+C emits one interruption after the snapshot is invalidated or consumed with no live selection; selected copy emits none. Cover all shared terminal profiles through existing parameterized fixtures.\"\n        },\n        {\n          \"id\": \"P6\",\n          \"description\": \"Extend the browser fixture to support a non-loopback HTTP hostname routed to its local test server without secure-origin overrides. Assert isSecureContext is false and navigator.clipboard is absent. Exercise trusted native copy/paste, mouse-cleared selection, Copy control fallback, and manual recovery; verify exactly-once bracketed paste independently of selection caching. Retain Shift/Option-drag and ordinary mouse-report assertions.\"\n        },\n        {\n          \"id\": \"P7\",\n          \"description\": \"Update only docs/intent/05-surfaces/03-browser/19-terminal.md to explain retained selection text and its invalidation. Run node --test tests/web_terminal_clipboard.test.js tests/web_terminal_keyboard.test.js, then the clipboard, copy-lifecycle, copy-recovery, paste, and keyboard browser test files with resolvable Playwright and installed Chromium. Require actual browser execution, not skips. Run node --check on changed JavaScript and git diff --check; compare any wider-suite failures against f46f8710af32b77d13cec54853bcc4cf3fb728a9. Keep new files cohesive and review structure near 500 lines.\"\n        }\n      ],\n      \"criticism_resolutions\": [\n        {\n          \"criticism_id\": \"C1\",\n          \"resolution\": \"The report’s claim that existing tests only use plain terminals is outdated: this candidate already tests SGR capture and forced selection. Target the missing selection-loss sequence and actual insecure-origin coverage instead of duplicating those tests.\"\n        },\n        {\n          \"criticism_id\": \"C2\",\n          \"resolution\": \"An unconditional lastSelection fallback cleared only by printable keys and Enter can intercept Ctrl+C after navigation or paste and survive renderer replacement. Use explicit selection lifetime and identity rules within the existing clipboard owner.\"\n        },\n        {\n          \"criticism_id\": \"C3\",\n          \"resolution\": \"Clearing cached text unconditionally on async copy success can erase a newer selection. Bind consumption to the selection generation captured by the existing fenced copy attempt.\"\n        },\n        {\n          \"criticism_id\": \"C4\",\n          \"resolution\": \"Selection retention does not repair paste transport. Preserve and verify the already implemented native paste path independently. Requiring HTTPS, disabling TUI mouse tracking, patching vendored xterm, or adding provider-specific handlers would either miss the reported environment or contradict shared terminal behavior.\"\n        },\n        {\n          \"criticism_id\": \"C5\",\n          \"resolution\": \"Selection also controls history replay, scrolling, and automatic session start through terminalPreservesCopy(). Test those effects explicitly so a retained snapshot cannot indefinitely preserve obsolete interaction state.\"\n        }\n      ]\n    }\n  },\n  \"binding_id\": \"default-plan\",\n  \"evidence\": [\n    \"Pinned workspace HEAD, local main, and origin/main all resolved to f46f8710af32b77d13cec54853bcc4cf3fb728a9. Git status was clean; no repository files or Git state were changed.\",\n    \"terminal-clipboard.js reads only live hasSelection()/getSelection(); its selection-change listener only refreshes controls. Native clipboard events, async fallbacks, manual recovery, and copy-attempt identity fencing already exist.\",\n    \"Vendored xterm contains an onUserInput listener that clears an existing selection. Its mousedown routing honors shouldForceSelection before sending application mouse input. The precise reported mouse-release sequence remains to be reproduced in a browser.\",\n    \"An observational harness probe selecting text and then clearing selection returned no native copied data; Ctrl+C was accepted by the terminal.\",\n    \"Clipboard history includes b4a63709 plus subsequent d87cffb0 and f0a9d843 corrections. The reported e99fdaf8 object is unavailable locally, so its implementation was not independently inspected.\",\n    \"Inspected Terminal and Toolbar intent and toolbar renderer/reset/history-replay ownership. The governing invariant is that user-selected output remains copyable across incidental renderer selection loss, while subsequent terminal interaction restores normal input semantics.\",\n    \"node --test tests/web_terminal_clipboard.test.js tests/web_terminal_keyboard.test.js passed 22 tests with no failures or skips.\",\n    \"node --test tests/web_terminal_clipboard_browser.test.js skipped all 25 tests because its loader could not resolve an available Playwright Chromium setup. No browser pass or live-server reproduction is claimed.\"\n  ],\n  \"invocation_id\": \"933d0b14d35c0973f9644d876c6a98dd98ed765eb5e8956c8d0dc96f1791f967\",\n  \"outcome\": \"success\",\n  \"role\": \"plan\",\n  \"summary\": \"Completed a read-only, source-backed implementation plan with selection-lifetime rules, critique resolutions, and proposed verification against the unchanged pinned candidate.\"\n}\n",
+      "received_at": "2026-09-11T12:41:51.325426646+00:00",
+      "started_at": "2026-09-11T12:39:48.984738961+00:00",
+      "workflow_revision": 2
+    }
+  ],
   "created_at": "2026-09-11T12:39:48.526931862+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-11T12:41:51.744223338+00:00",
   "error": null,
   "action_applied": false
 }
