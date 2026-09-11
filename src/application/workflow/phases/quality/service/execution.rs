@@ -212,16 +212,16 @@ impl QualityService for FileQualityService {
     }
 
     fn gate(&self, owner_id: &str) -> RefineResult<QualityCheckResult> {
-        let settings = self.load_settings()?;
+        let config =
+            crate::application::events::FileEventService::new(&self.refine_dir).config()?;
         Ok(QualityCheckResult {
             owner_id: owner_id.to_string(),
             ok: true,
             summary: "Quality evaluates every Goal candidate.".to_string(),
             results: Vec::new(),
             diagnostics: vec![format!(
-                "Quality is active with {} plain-text test(s) and {} migrated command(s).",
-                settings.tests.len(),
-                settings.legacy_commands.len()
+                "Quality is managed through Skills (configuration revision {}).",
+                config.revision
             )],
             candidate_commit: String::new(),
             checked_at: None,

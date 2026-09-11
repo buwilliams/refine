@@ -105,11 +105,13 @@ impl FileEventService {
     pub fn config(&self) -> RefineResult<Arc<AutomationConfig>> {
         let store = AutomationStore::new(&self.refine_dir);
         let config = store.initialize(|| super::migration::migrate(&self.refine_dir))?;
-        if config.schema_version < SCHEMA_VERSION {
-            store.upgrade(super::migration::single_trigger_skills)
+        let config = if config.schema_version < SCHEMA_VERSION {
+            store.upgrade(super::migration::single_trigger_skills)?
         } else {
-            Ok(config)
-        }
+            config
+        };
+        super::migration::retire_settings(&self.refine_dir)?;
+        Ok(config)
     }
     pub fn catalog(&self) -> Value {
         json!({"sources": system_catalog(), "custom_source": CUSTOM_EVENT_ID, "roles": WORKFLOW_STEPS.iter().copied().chain(std::iter::once("task")).collect::<Vec<_>>()})

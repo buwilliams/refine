@@ -226,7 +226,8 @@ fn quality_service_uses_agent_to_evaluate_every_plain_text_test() {
 
     let gate = service.gate("GOAL1").unwrap();
     assert!(gate.ok);
-    assert!(gate.diagnostics[0].contains("2 plain-text test(s)"));
+    assert!(gate.diagnostics[0].contains("managed through Skills"));
+    assert!(!refine_dir.join(SETTINGS_FILE).exists());
     assert!(service.screenshots("GOAL1").unwrap().is_empty());
 
     let baseline = temp_root.join("baseline.txt");

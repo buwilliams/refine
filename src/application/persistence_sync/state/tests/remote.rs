@@ -340,3 +340,51 @@ fn sync_uses_the_configured_git_remote() {
     assert!(!fixture.a.join(".refine").exists());
     assert!(!git_stdout(&fixture.a, &["ls-remote", "upstream", REFINE_STATE_REF]).is_empty());
 }
+
+#[test]
+fn sync_retires_migrated_settings_and_replicates_their_archive() {
+    let fixture = SyncFixture::new("retired-settings");
+    let root = prepare_refine_dir(&fixture.a).unwrap();
+    let events = crate::application::events::FileEventService::new(&root);
+    let config = events.config().unwrap();
+    // Simulate a previously upgraded store whose old files were never retired.
+    fs::write(
+        root.join("governance.json"),
+        "{\"constitution\":\"old rules\"}",
+    )
+    .unwrap();
+    let synced = fixture.service(&fixture.a).sync().unwrap();
+    assert!(synced.ok && synced.pushed, "{synced:?}");
+    assert!(!root.join("governance.json").exists());
+    assert!(
+        !state_worktree_for_target_root(&fixture.a)
+            .unwrap()
+            .join(".refine/governance.json")
+            .exists()
+    );
+    assert!(fixture.service(&fixture.b).sync().unwrap().ok);
+    let other = prepare_refine_dir(&fixture.b).unwrap();
+    assert!(!other.join("governance.json").exists());
+    assert_eq!(
+        fs::read_dir(other.join("automation/retired-settings/governance.json"))
+            .unwrap()
+            .count(),
+        1
+    );
+    // Reintroduced settings from an older writer are archived as a second version.
+    fs::write(
+        other.join("governance.json"),
+        "{\"constitution\":\"older node edit\"}",
+    )
+    .unwrap();
+    assert!(fixture.service(&fixture.b).sync().unwrap().ok);
+    assert!(fixture.service(&fixture.a).sync().unwrap().ok);
+    assert_eq!(*events.config().unwrap(), *config);
+    assert_eq!(
+        fs::read_dir(root.join("automation/retired-settings/governance.json"))
+            .unwrap()
+            .count(),
+        2
+    );
+    assert!(!fixture.service(&fixture.a).sync().unwrap().committed);
+}

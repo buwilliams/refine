@@ -239,3 +239,74 @@ pub(super) fn single_trigger_skills(config: &mut AutomationConfig) -> RefineResu
     config.schema_version = SCHEMA_VERSION;
     config.validate().map_err(RefineError::InvalidInput)
 }
+
+/// Retire configuration only after Skills have been durably installed. Keep exact
+/// source text in content-addressed archives, including files reintroduced by an
+/// older node. Archives are evidence, never configuration inputs.
+pub(crate) fn retire_settings(root: &Path) -> RefineResult<Vec<String>> {
+    const SOURCES: [&str; 4] = [
+        "governance.json",
+        "guidance.json",
+        "quality/settings.json",
+        "quality/legacy-command-transition.json",
+    ];
+    if !root.join("automation/config.json").exists()
+        || !SOURCES.iter().any(|name| root.join(name).exists())
+    {
+        return Ok(Vec::new());
+    }
+    crate::infrastructure::process::supervisor::coordination::with_record_lock(
+        root,
+        "automation-config",
+        || {
+            use sha2::{Digest, Sha256};
+            // A corrupt or incomplete Skills document must never authorize deletion.
+            crate::infrastructure::storage::automation::AutomationStore::new(root).load()?;
+            let mut removed = Vec::new();
+            for name in SOURCES {
+                let path = root.join(name);
+                let content = match std::fs::read_to_string(&path) {
+                    Ok(content) => content,
+                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
+                    Err(error) => return Err(RefineError::Io(error.to_string())),
+                };
+                let digest = format!("{:x}", Sha256::digest(content.as_bytes()));
+                let archive = root
+                    .join("automation/retired-settings")
+                    .join(name)
+                    .join(format!("{digest}.json"));
+                let snapshot = json!({"schema_version": 1, "source": name, "content": content});
+                if archive.exists() {
+                    if read_json::<Value>(&archive)? != snapshot {
+                        return Err(RefineError::Conflict(format!(
+                            "Retired settings archive differs: {}",
+                            archive.display()
+                        )));
+                    }
+                } else {
+                    write_json(&archive, &snapshot)?;
+                }
+                // Do not discard a write made while the archive was being installed.
+                if std::fs::read_to_string(&path).map_err(|e| RefineError::Io(e.to_string()))?
+                    != content
+                {
+                    return Err(RefineError::Conflict(format!(
+                        "Legacy settings changed during retirement: {name}"
+                    )));
+                }
+                std::fs::remove_file(&path).map_err(|e| RefineError::Io(e.to_string()))?;
+                removed.push(name.to_string());
+            }
+            match std::fs::remove_dir(root.join("quality")) {
+                Ok(()) => {}
+                Err(error)
+                    if matches!(
+                        error.kind(),
+                        std::io::ErrorKind::NotFound | std::io::ErrorKind::DirectoryNotEmpty
+                    ) => {}
+                Err(error) => return Err(RefineError::Io(error.to_string())),
+            }
+            Ok(removed)
+        },
+    )
+}

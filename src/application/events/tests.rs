@@ -1148,3 +1148,106 @@ fn single_trigger_save_rejects_multiple_and_derives_the_workflow_result_contract
 }
 
 mod repairs;
+
+#[test]
+fn migrated_settings_are_archived_retired_and_cannot_regain_authority() {
+    let fixture = Fixture::new();
+    let service = fixture.service();
+    std::fs::create_dir_all(service.refine_dir.join("quality")).unwrap();
+    let governance = "{\"constitution\":\"Preserve user work\"}\n";
+    std::fs::write(service.refine_dir.join("governance.json"), governance).unwrap();
+    std::fs::write(
+        service
+            .refine_dir
+            .join("quality/legacy-command-transition.json"),
+        "{\"old\":true}",
+    )
+    .unwrap();
+    let config = service.config().unwrap();
+    assert!(
+        config.skills["default-governance"]
+            .prompt
+            .contains("Preserve user work")
+    );
+    for name in [
+        "governance.json",
+        "guidance.json",
+        "quality/settings.json",
+        "quality/legacy-command-transition.json",
+    ] {
+        assert!(!service.refine_dir.join(name).exists(), "{name}");
+    }
+    let archives = service
+        .refine_dir
+        .join("automation/retired-settings/governance.json");
+    let snapshot = std::fs::read_dir(&archives)
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap()
+        .path();
+    let saved: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(snapshot).unwrap()).unwrap();
+    assert_eq!(saved["content"], governance);
+    let quality =
+        crate::application::workflow::phases::quality::FileQualityService::new(&service.refine_dir);
+    assert!(
+        quality
+            .load_settings()
+            .unwrap_err()
+            .to_string()
+            .contains("Skills")
+    );
+    assert!(
+        quality
+            .save_settings(Default::default())
+            .unwrap_err()
+            .to_string()
+            .contains("Skills")
+    );
+    assert!(!service.refine_dir.join("quality/settings.json").exists());
+    // An older node can reintroduce a source. Preserve that version too, without
+    // overwriting either the current Skill or the original migration evidence.
+    std::fs::write(
+        service.refine_dir.join("governance.json"),
+        "{\"constitution\":\"Old node edit\"}",
+    )
+    .unwrap();
+    assert_eq!(*service.config().unwrap(), *config);
+    assert!(!service.refine_dir.join("governance.json").exists());
+    assert_eq!(std::fs::read_dir(archives).unwrap().count(), 2);
+    assert!(
+        super::migration::retire_settings(&service.refine_dir)
+            .unwrap()
+            .is_empty()
+    );
+}
+
+#[test]
+fn settings_retirement_requires_valid_skills_and_successful_archival() {
+    let fixture = Fixture::new();
+    let service = fixture.service();
+    std::fs::create_dir_all(&service.refine_dir).unwrap();
+    let source = service.refine_dir.join("governance.json");
+    std::fs::write(&source, "{}").unwrap();
+    assert!(
+        super::migration::retire_settings(&service.refine_dir)
+            .unwrap()
+            .is_empty()
+    );
+    assert!(source.exists());
+    service.config().unwrap();
+    std::fs::write(&source, "{\"changed\":true}").unwrap();
+    let archive = service.refine_dir.join("automation/retired-settings");
+    std::fs::remove_dir_all(&archive).unwrap();
+    std::fs::write(&archive, "blocked").unwrap();
+    assert!(super::migration::retire_settings(&service.refine_dir).is_err());
+    assert_eq!(
+        std::fs::read_to_string(&source).unwrap(),
+        "{\"changed\":true}"
+    );
+    std::fs::remove_file(archive).unwrap();
+    std::fs::write(service.refine_dir.join("automation/config.json"), "invalid").unwrap();
+    assert!(super::migration::retire_settings(&service.refine_dir).is_err());
+    assert!(source.exists());
+}

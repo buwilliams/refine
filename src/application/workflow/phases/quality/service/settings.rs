@@ -66,6 +66,11 @@ impl FileQualityService {
     }
 
     fn read_stored_settings(&self) -> RefineResult<StoredQualitySettings> {
+        if self.refine_dir.join("automation/config.json").exists() {
+            return Err(RefineError::InvalidInput(
+                "Quality configuration is managed through Skills".into(),
+            ));
+        }
         let path = self.settings_path();
         let existed = path.exists();
         let mut stored = if existed {
@@ -99,7 +104,12 @@ impl FileQualityService {
                 // Stage imported state without advancing the migration marker. If Node cleanup or
                 // the final write fails, retry sees both the staged commands and remaining legacy
                 // state, so enforced Quality cannot disappear between attempts.
-                self.write_stored_settings(&stored)?;
+                // Fresh projects have no standalone Quality configuration to migrate.
+                // Do not manufacture one merely to archive and retire it into durable state.
+                let persist = existed || !stored.legacy_commands.is_empty();
+                if persist {
+                    self.write_stored_settings(&stored)?;
+                }
                 #[cfg(test)]
                 if self.migration_failure_after_stage {
                     return Err(RefineError::Io(
@@ -115,7 +125,11 @@ impl FileQualityService {
                     node_service.save_registry(&registry)?;
                 }
                 stored.migration_version = SETTINGS_MIGRATION_VERSION;
-                self.write_stored_settings(&stored)
+                if persist {
+                    self.write_stored_settings(&stored)
+                } else {
+                    Ok(())
+                }
             })?;
         }
         Ok(stored.normalized())

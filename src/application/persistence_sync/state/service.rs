@@ -282,6 +282,7 @@ impl FileGitSyncService {
         // a commit; a record the daemon advances after this point is simply
         // the next pass's delta. (A decision-settled join re-reads once after
         // its own authorized hydration, below.)
+        crate::application::events::migration::retire_settings(&live_refine)?;
         let mut live = durable_state_map(&live_refine)?;
 
         // Joining an existing fleet: the remote branch exists but this node
