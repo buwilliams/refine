@@ -3,7 +3,7 @@
   "branch_name": "refine/00000T146Y4H01X1WVV8STE000/round-2",
   "candidate_commit": null,
   "created": "2026-09-11T14:27:52Z",
-  "event_generation": 7,
+  "event_generation": 8,
   "feature_id": null,
   "feature_order": null,
   "id": "00000T146Y4H01X1WVV8STE000",
@@ -698,11 +698,11 @@
       "created": "2026-09-11T15:08:16Z",
       "event_configuration": {
         "events": {
-          "workflow.plan.enter": {
+          "workflow.implement.enter": {
             "bindings": [
               {
                 "enabled": true,
-                "id": "default-plan",
+                "id": "default-implement",
                 "inputs": {},
                 "mode": "blocking",
                 "order": 0,
@@ -710,36 +710,104 @@
                 "scope": {
                   "node_id": null
                 },
-                "skill_id": "default-plan"
+                "skill_id": "default-implement"
               }
             ],
             "enabled": true,
-            "id": "workflow.plan.enter",
+            "id": "workflow.implement.enter",
             "kind": "system",
-            "name": "Workflow Plan Enter",
+            "name": "Workflow Implement Enter",
             "on_success": null,
             "parameters": [],
             "scope": {
               "node_id": null
             },
-            "source": "workflow.plan.enter"
+            "source": "workflow.implement.enter"
           }
         },
         "revision": 40,
         "schema_version": 2,
         "skills": {
-          "default-plan": {
+          "default-implement": {
             "enabled": true,
-            "id": "default-plan",
-            "name": "Plan",
+            "id": "default-implement",
+            "name": "Implement",
             "parameters": [],
-            "prompt": "## Plan\n\nProduce a complete, concise implementation plan for the current Goal Round. Choose the planning method appropriate to the work. For behavior changes, identify the underlying cause, governing concept or invariant, and existing owner before listing edits. Prefer strengthening an existing concept; introduce one only when it clarifies the behavior and reduces special cases. Do not change repository files. \n\n### Guidance\n\n- Thrashing is a real danger with AI agents. To mitigate this, consider if the Goal is merely a symptom of a missing or misused concept in the target app architecture. Feel free to explore other Goals to determine if they have additional insights into this question.\n- Over- or under-specificity can also cause undesirable implementation outcomes. Ensure that the plan has the information it needs for effective implementation, but not unnecessary details.\n- Always use plain language.\n\n### Format\n\nReturn an actionable plan with stable checklist IDs and meaningful verification.\n\nExample:\nTask #1 - short description of the work (what) and the rationale (why)\nTask #2 - short description of the work (what) and the rationale (why)\n(etc.)\n\n### Intent and architecture\n\nReview Refine's relevant documentation files under Refine's runtime at `<refine-runtime>/docs/intent/***/*.*` as the durable product specification.",
+            "prompt": "## Implementation\n\nImplement the current Goal Round using all accepted plans and attached Skills. Inspect existing code, make the complete change, run appropriate verification, and report evidence for each checklist item. Check the plan's assumptions against the code and keep policy in its shared owner. Prefer one correction that explains the affected behavior over separate fixes at each failing call site. Report evidence-backed plan deviations within the Goal's scope and existing authority. Preserve unrelated changes and historical evidence.\n\n### Intent and architecture\n\nReview Refine's relevant documentation files under Refine's runtime at `<refine-runtime>/docs/intent/***/*.*` as the durable product specification.\n\n### Semantic code organization\n\nKeep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.\n\nIf issues outside the Goal’s scope block progress, investigate and fix them or use an evidence-backed workaround, preserving required checks and documenting what you changed.\n",
             "provenance": "refine-default-v1",
             "role": "task",
             "scope": {
               "node_id": null
             }
           }
+        }
+      },
+      "event_results": {
+        "011945bfc88fdbd240e5b0ab8ac96472aa86fce15e24cab2a32638b732de8a26": {
+          "candidate_commit": null,
+          "generation": 7,
+          "results": {
+            "default-plan": {
+              "artifacts": {
+                "plan": {
+                  "checklist": [
+                    {
+                      "description": "Preserve and carry forward Round 1. Inventory its tracked changes, untracked navigation test, branch, and evidence; apply only the relevant implementation delta onto Round 2 base 2626d584c9da1e6f27b3c3f0bbec750c6772536f. Resolve differences against the newer base without overwriting newer behavior. Leave the retained worktree and logs intact.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "Complete the navigation contract using existing owners. The underlying problem is that independent Skills and Sites entry points are grouped under Controls. Keep placement in index.html, shared dropdown behavior in common.js, shared styling in base.css, and list/action ownership in settings_skills.js and knowledge-hub.js. Verify right-aligned order Skills, Sites, Settings, New Goal; exclusive list placement; and a separator before New Skill/Manage Skills or New Site/Manage Sites. Preserve existing creation dialogs, management routes, Skill eligibility and input preflight, Site URLs, and Node/Reporter controls. Carry forward matching intent and help-text updates.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "Establish a reproducible failure baseline. Run each of the seven remaining Rust tests by exact name in separate processes on isolated checkouts of original base 9c1be94cf6421854a1c6693b7403b57d8f7576b2 and Round 2 base, then on the carried candidate. Use cargo test --lib <fully-qualified-test-name> -- --exact --nocapture --test-threads=1. Record executable provenance, relevant environment, exit codes, and failure identity. Separate independent failures from the shared-lock cascade; unchanged source alone does not prove baseline equivalence.",
+                      "id": "P3"
+                    },
+                    {
+                      "description": "Correct the obsolete architecture expectation through its existing owner, src/architecture_tests.rs. Trace removal of workflow/recovery/quality against current workflow modules and runtime intent: Quality now uses explicit Error handling rather than automatic recovery Rounds. Replace the obsolete directory requirement with assertions for the actual supported responsibility after confirming history; do not recreate an empty directory or restore removed recovery behavior. Reconcile directly conflicting recovery documentation and verify architecture tests plus relevant workflow tests.",
+                      "id": "P4"
+                    },
+                    {
+                      "description": "Repair the launch failure and environment-isolation cause behind the shared-lock cascade. Trace why the missing interpreter becomes exit 125 instead of the original OS error through the existing agent invocation and process-supervision owners. Preserve launch diagnostics and command/prompt cleanup. Make shared test environment restoration unwind-safe: the current test restores REFINE_SMOKE_AI_PATH only after assertions, so a panic can leak state and poison the lock used by the Events test. Verify both tests independently and together; merely tolerating a poisoned lock is insufficient.",
+                      "id": "P5"
+                    },
+                    {
+                      "description": "Resolve the other four Rust failures against their governing invariants. Trace persistence-sync's unexpected run/ directory to runtime-path and repository-state ownership. For capture and redaction, distinguish valid structured launch-scope evidence from stale assertions while preserving replacement-registration fencing, process survival, and secret removal. Trace the Jira release-worker operation remaining Interrupted through existing operation settlement and orphan-exit ownership. Fix established production defects or strengthen stale tests to assert behavior. Use an environment workaround only with reproducible evidence that the same required behavior remains checked.",
+                      "id": "P6"
+                    },
+                    {
+                      "description": "Verify the resulting candidate. Run cargo run --manifest-path xtask/Cargo.toml -- test-unit and cargo test --lib surfaces::web_server::tests::static_surface -- --test-threads=1. Run node --test tests/web_topbar_navigation.test.js tests/web_knowledge_hub.test.js tests/web_node_scope_navigation.test.js tests/web_reporter_onboarding.test.js tests/web_theme.test.js, plus the changed web_screen_render suite. Ensure browser tests execute without skips. Cover all four create/manage actions, empty/error lists, refresh and stale-response handling, Skill launch, Site opening, keyboard dismissal, menu exclusivity, light/dark themes, and long-list/desktop/narrow layouts. Preserve the corrected main-padding assertion. Run additional checks required by the effective workflow Skills; report failures and ignored tests explicitly.",
+                      "id": "P7"
+                    },
+                    {
+                      "description": "Prepare the normal workflow handoff. Read the effective updated Implementation, Quality, and Governance Skill requirements before execution. Record evidence for every checklist ID, baseline comparisons, fixes, justified workarounds, and remaining limitations. Commit the scoped implementation on the Round 2 branch and report its exact candidate identity for independent Quality and Governance. Historical passes do not certify the new candidate; do not manually advance Goal state, approve, merge, or push.",
+                      "id": "P8"
+                    }
+                  ],
+                  "criticism_resolutions": [],
+                  "summary": "Carry forward the retained navigation implementation and resolve the Rust blockers through existing architecture and test-isolation owners before independent review."
+                }
+              },
+              "binding_id": "default-plan",
+              "evidence": [
+                "Round 2 HEAD is 2626d584c9da1e6f27b3c3f0bbec750c6772536f; git status was clean before and after inspection. No files or Git state were changed.",
+                "Round 1 retains 15 modified tracked files and untracked tests/web_topbar_navigation.test.js. Its inspected diff contains dedicated dropdown listeners, separated create/manage actions, error-state actions, and responsive shared menu styling.",
+                "/tmp/refine-nav-unit.log records 1288 passed, eight failed, and seven ignored. One failure is the static main-padding assertion; the retained CSS now contains that expected block. The pinned context reports a later corrected static run of 21 passes and five JavaScript suites with 40 passes and zero skips; these were not rerun during planning.",
+                "The seven remaining failing test files have no changes between original base 9c1be94cf6421854a1c6693b7403b57d8f7576b2 and Round 2 HEAD. Runtime baseline reproduction remains proposed work.",
+                "src/architecture_tests.rs still requires application/workflow/recovery/quality, while recovery/mod.rs has no quality module. Runtime docs/intent/03-application/02-workflow/05-quality.md specifies explicit recovery without an automatic recovery budget.",
+                "The early-exec test holds smoke_ai_env_lock, modifies REFINE_SMOKE_AI_PATH, and asserts original OS-error reporting before restoring the environment. The Events failure acquires that same lock with unwrap; the log reports PoisonError.",
+                "Reviewed navigation, Skills, Knowledge Hub, Implementation, Quality, and Governance intent under /home/buddy/projects/refine/docs/intent. Updated effective workflow Skill prompts were not verified during this inspection and are an explicit implementation prerequisite.",
+                "Memory informed the diagnostic approach only; current source and logs supplied the findings. "
+              ],
+              "invocation_id": "011945bfc88fdbd240e5b0ab8ac96472aa86fce15e24cab2a32638b732de8a26",
+              "outcome": "success",
+              "role": "plan",
+              "summary": "Produced an observational recovery plan with stable checklist IDs, verified source findings, and proposed candidate-bound checks; no implementation or test pass is claimed."
+            }
+          },
+          "round_idx": 1,
+          "source": "workflow.plan.enter",
+          "state": "succeeded"
         }
       },
       "failure_at": "",
@@ -837,6 +905,78 @@
               }
             }
           }
+        },
+        "7:default:workflow.plan.exit": {
+          "events": {
+            "workflow.plan.exit": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.plan.exit",
+              "kind": "system",
+              "name": "Workflow Plan Exit",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.plan.exit"
+            }
+          },
+          "revision": 40,
+          "schema_version": 2,
+          "skills": {}
+        },
+        "7:default:workflow.plan.success": {
+          "events": {},
+          "revision": 40,
+          "schema_version": 2,
+          "skills": {}
+        },
+        "8:default:workflow.implement.enter": {
+          "events": {
+            "workflow.implement.enter": {
+              "bindings": [
+                {
+                  "enabled": true,
+                  "id": "default-implement",
+                  "inputs": {},
+                  "mode": "blocking",
+                  "order": 0,
+                  "overrides": null,
+                  "scope": {
+                    "node_id": null
+                  },
+                  "skill_id": "default-implement"
+                }
+              ],
+              "enabled": true,
+              "id": "workflow.implement.enter",
+              "kind": "system",
+              "name": "Workflow Implement Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.implement.enter"
+            }
+          },
+          "revision": 40,
+          "schema_version": 2,
+          "skills": {
+            "default-implement": {
+              "enabled": true,
+              "id": "default-implement",
+              "name": "Implement",
+              "parameters": [],
+              "prompt": "## Implementation\n\nImplement the current Goal Round using all accepted plans and attached Skills. Inspect existing code, make the complete change, run appropriate verification, and report evidence for each checklist item. Check the plan's assumptions against the code and keep policy in its shared owner. Prefer one correction that explains the affected behavior over separate fixes at each failing call site. Report evidence-backed plan deviations within the Goal's scope and existing authority. Preserve unrelated changes and historical evidence.\n\n### Intent and architecture\n\nReview Refine's relevant documentation files under Refine's runtime at `<refine-runtime>/docs/intent/***/*.*` as the durable product specification.\n\n### Semantic code organization\n\nKeep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.\n\nIf issues outside the Goal’s scope block progress, investigate and fix them or use an evidence-backed workaround, preserving required checks and documenting what you changed.\n",
+              "provenance": "refine-default-v1",
+              "role": "task",
+              "scope": {
+                "node_id": null
+              }
+            }
+          }
         }
       },
       "governance_candidate_commit": "",
@@ -855,12 +995,114 @@
           "round_idx": 1,
           "target_branch": "main"
         },
-        "phase": "plan",
-        "phase_started_at": "2026-09-11T19:28:44Z",
+        "final_plan": {
+          "completed_at": "2026-09-11T19:30:35Z",
+          "git_after": {
+            "branch": "refine/00000T146Y4H01X1WVV8STE000/round-2",
+            "head_commit": "2626d584c9da1e6f27b3c3f0bbec750c6772536f",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000T146Y4H01X1WVV8STE000/round-2",
+            "head_commit": "2626d584c9da1e6f27b3c3f0bbec750c6772536f",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Preserve and carry forward Round 1. Inventory its tracked changes, untracked navigation test, branch, and evidence; apply only the relevant implementation delta onto Round 2 base 2626d584c9da1e6f27b3c3f0bbec750c6772536f. Resolve differences against the newer base without overwriting newer behavior. Leave the retained worktree and logs intact.",
+                "id": "workflow.plan.enter:default-plan:P1"
+              },
+              {
+                "description": "Complete the navigation contract using existing owners. The underlying problem is that independent Skills and Sites entry points are grouped under Controls. Keep placement in index.html, shared dropdown behavior in common.js, shared styling in base.css, and list/action ownership in settings_skills.js and knowledge-hub.js. Verify right-aligned order Skills, Sites, Settings, New Goal; exclusive list placement; and a separator before New Skill/Manage Skills or New Site/Manage Sites. Preserve existing creation dialogs, management routes, Skill eligibility and input preflight, Site URLs, and Node/Reporter controls. Carry forward matching intent and help-text updates.",
+                "id": "workflow.plan.enter:default-plan:P2"
+              },
+              {
+                "description": "Establish a reproducible failure baseline. Run each of the seven remaining Rust tests by exact name in separate processes on isolated checkouts of original base 9c1be94cf6421854a1c6693b7403b57d8f7576b2 and Round 2 base, then on the carried candidate. Use cargo test --lib <fully-qualified-test-name> -- --exact --nocapture --test-threads=1. Record executable provenance, relevant environment, exit codes, and failure identity. Separate independent failures from the shared-lock cascade; unchanged source alone does not prove baseline equivalence.",
+                "id": "workflow.plan.enter:default-plan:P3"
+              },
+              {
+                "description": "Correct the obsolete architecture expectation through its existing owner, src/architecture_tests.rs. Trace removal of workflow/recovery/quality against current workflow modules and runtime intent: Quality now uses explicit Error handling rather than automatic recovery Rounds. Replace the obsolete directory requirement with assertions for the actual supported responsibility after confirming history; do not recreate an empty directory or restore removed recovery behavior. Reconcile directly conflicting recovery documentation and verify architecture tests plus relevant workflow tests.",
+                "id": "workflow.plan.enter:default-plan:P4"
+              },
+              {
+                "description": "Repair the launch failure and environment-isolation cause behind the shared-lock cascade. Trace why the missing interpreter becomes exit 125 instead of the original OS error through the existing agent invocation and process-supervision owners. Preserve launch diagnostics and command/prompt cleanup. Make shared test environment restoration unwind-safe: the current test restores REFINE_SMOKE_AI_PATH only after assertions, so a panic can leak state and poison the lock used by the Events test. Verify both tests independently and together; merely tolerating a poisoned lock is insufficient.",
+                "id": "workflow.plan.enter:default-plan:P5"
+              },
+              {
+                "description": "Resolve the other four Rust failures against their governing invariants. Trace persistence-sync's unexpected run/ directory to runtime-path and repository-state ownership. For capture and redaction, distinguish valid structured launch-scope evidence from stale assertions while preserving replacement-registration fencing, process survival, and secret removal. Trace the Jira release-worker operation remaining Interrupted through existing operation settlement and orphan-exit ownership. Fix established production defects or strengthen stale tests to assert behavior. Use an environment workaround only with reproducible evidence that the same required behavior remains checked.",
+                "id": "workflow.plan.enter:default-plan:P6"
+              },
+              {
+                "description": "Verify the resulting candidate. Run cargo run --manifest-path xtask/Cargo.toml -- test-unit and cargo test --lib surfaces::web_server::tests::static_surface -- --test-threads=1. Run node --test tests/web_topbar_navigation.test.js tests/web_knowledge_hub.test.js tests/web_node_scope_navigation.test.js tests/web_reporter_onboarding.test.js tests/web_theme.test.js, plus the changed web_screen_render suite. Ensure browser tests execute without skips. Cover all four create/manage actions, empty/error lists, refresh and stale-response handling, Skill launch, Site opening, keyboard dismissal, menu exclusivity, light/dark themes, and long-list/desktop/narrow layouts. Preserve the corrected main-padding assertion. Run additional checks required by the effective workflow Skills; report failures and ignored tests explicitly.",
+                "id": "workflow.plan.enter:default-plan:P7"
+              },
+              {
+                "description": "Prepare the normal workflow handoff. Read the effective updated Implementation, Quality, and Governance Skill requirements before execution. Record evidence for every checklist ID, baseline comparisons, fixes, justified workarounds, and remaining limitations. Commit the scoped implementation on the Round 2 branch and report its exact candidate identity for independent Quality and Governance. Historical passes do not certify the new candidate; do not manually advance Goal state, approve, merge, or push.",
+                "id": "workflow.plan.enter:default-plan:P8"
+              }
+            ],
+            "summary": "workflow.plan.enter:default-plan: Carry forward the retained navigation implementation and resolve the Rust blockers through existing architecture and test-isolation owners before independent review."
+          },
+          "started_at": "2026-09-11T19:28:44Z"
+        },
+        "phase": "implement",
+        "phase_started_at": "2026-09-11T19:30:36Z",
+        "proposal": {
+          "completed_at": "2026-09-11T19:30:35Z",
+          "git_after": {
+            "branch": "refine/00000T146Y4H01X1WVV8STE000/round-2",
+            "head_commit": "2626d584c9da1e6f27b3c3f0bbec750c6772536f",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000T146Y4H01X1WVV8STE000/round-2",
+            "head_commit": "2626d584c9da1e6f27b3c3f0bbec750c6772536f",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Preserve and carry forward Round 1. Inventory its tracked changes, untracked navigation test, branch, and evidence; apply only the relevant implementation delta onto Round 2 base 2626d584c9da1e6f27b3c3f0bbec750c6772536f. Resolve differences against the newer base without overwriting newer behavior. Leave the retained worktree and logs intact.",
+                "id": "workflow.plan.enter:default-plan:P1"
+              },
+              {
+                "description": "Complete the navigation contract using existing owners. The underlying problem is that independent Skills and Sites entry points are grouped under Controls. Keep placement in index.html, shared dropdown behavior in common.js, shared styling in base.css, and list/action ownership in settings_skills.js and knowledge-hub.js. Verify right-aligned order Skills, Sites, Settings, New Goal; exclusive list placement; and a separator before New Skill/Manage Skills or New Site/Manage Sites. Preserve existing creation dialogs, management routes, Skill eligibility and input preflight, Site URLs, and Node/Reporter controls. Carry forward matching intent and help-text updates.",
+                "id": "workflow.plan.enter:default-plan:P2"
+              },
+              {
+                "description": "Establish a reproducible failure baseline. Run each of the seven remaining Rust tests by exact name in separate processes on isolated checkouts of original base 9c1be94cf6421854a1c6693b7403b57d8f7576b2 and Round 2 base, then on the carried candidate. Use cargo test --lib <fully-qualified-test-name> -- --exact --nocapture --test-threads=1. Record executable provenance, relevant environment, exit codes, and failure identity. Separate independent failures from the shared-lock cascade; unchanged source alone does not prove baseline equivalence.",
+                "id": "workflow.plan.enter:default-plan:P3"
+              },
+              {
+                "description": "Correct the obsolete architecture expectation through its existing owner, src/architecture_tests.rs. Trace removal of workflow/recovery/quality against current workflow modules and runtime intent: Quality now uses explicit Error handling rather than automatic recovery Rounds. Replace the obsolete directory requirement with assertions for the actual supported responsibility after confirming history; do not recreate an empty directory or restore removed recovery behavior. Reconcile directly conflicting recovery documentation and verify architecture tests plus relevant workflow tests.",
+                "id": "workflow.plan.enter:default-plan:P4"
+              },
+              {
+                "description": "Repair the launch failure and environment-isolation cause behind the shared-lock cascade. Trace why the missing interpreter becomes exit 125 instead of the original OS error through the existing agent invocation and process-supervision owners. Preserve launch diagnostics and command/prompt cleanup. Make shared test environment restoration unwind-safe: the current test restores REFINE_SMOKE_AI_PATH only after assertions, so a panic can leak state and poison the lock used by the Events test. Verify both tests independently and together; merely tolerating a poisoned lock is insufficient.",
+                "id": "workflow.plan.enter:default-plan:P5"
+              },
+              {
+                "description": "Resolve the other four Rust failures against their governing invariants. Trace persistence-sync's unexpected run/ directory to runtime-path and repository-state ownership. For capture and redaction, distinguish valid structured launch-scope evidence from stale assertions while preserving replacement-registration fencing, process survival, and secret removal. Trace the Jira release-worker operation remaining Interrupted through existing operation settlement and orphan-exit ownership. Fix established production defects or strengthen stale tests to assert behavior. Use an environment workaround only with reproducible evidence that the same required behavior remains checked.",
+                "id": "workflow.plan.enter:default-plan:P6"
+              },
+              {
+                "description": "Verify the resulting candidate. Run cargo run --manifest-path xtask/Cargo.toml -- test-unit and cargo test --lib surfaces::web_server::tests::static_surface -- --test-threads=1. Run node --test tests/web_topbar_navigation.test.js tests/web_knowledge_hub.test.js tests/web_node_scope_navigation.test.js tests/web_reporter_onboarding.test.js tests/web_theme.test.js, plus the changed web_screen_render suite. Ensure browser tests execute without skips. Cover all four create/manage actions, empty/error lists, refresh and stale-response handling, Skill launch, Site opening, keyboard dismissal, menu exclusivity, light/dark themes, and long-list/desktop/narrow layouts. Preserve the corrected main-padding assertion. Run additional checks required by the effective workflow Skills; report failures and ignored tests explicitly.",
+                "id": "workflow.plan.enter:default-plan:P7"
+              },
+              {
+                "description": "Prepare the normal workflow handoff. Read the effective updated Implementation, Quality, and Governance Skill requirements before execution. Record evidence for every checklist ID, baseline comparisons, fixes, justified workarounds, and remaining limitations. Commit the scoped implementation on the Round 2 branch and report its exact candidate identity for independent Quality and Governance. Historical passes do not certify the new candidate; do not manually advance Goal state, approve, merge, or push.",
+                "id": "workflow.plan.enter:default-plan:P8"
+              }
+            ],
+            "summary": "workflow.plan.enter:default-plan: Carry forward the retained navigation implementation and resolve the Rust blockers through existing architecture and test-isolation owners before independent review."
+          },
+          "started_at": "2026-09-11T19:28:44Z"
+        },
         "schema_version": 2,
         "started_at": "2026-09-11T19:28:44Z",
         "state": "in_progress",
-        "updated_at": "2026-09-11T19:28:44Z"
+        "updated_at": "2026-09-11T19:30:36Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -874,7 +1116,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-09-11T19:28:45Z",
+      "updated": "2026-09-11T19:30:36Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-11T19:28:42Z",
         "generation": 6,
@@ -885,9 +1127,9 @@
       "workflow_recovery": null
     }
   ],
-  "status": "plan",
+  "status": "implement",
   "target_branch": "main",
-  "updated": "2026-09-11T19:28:45Z",
+  "updated": "2026-09-11T19:30:36Z",
   "workflow_events": [
     {
       "at": "2026-09-11T14:27:52.512340696+00:00",
@@ -952,7 +1194,17 @@
       "round_idx": 1,
       "to": "plan",
       "workflow_revision": 24
+    },
+    {
+      "at": "2026-09-11T19:30:36.020396048+00:00",
+      "forced": false,
+      "from": "plan",
+      "generation": 8,
+      "node_id": "default",
+      "round_idx": 1,
+      "to": "implement",
+      "workflow_revision": 33
     }
   ],
-  "workflow_revision": 28
+  "workflow_revision": 35
 }
