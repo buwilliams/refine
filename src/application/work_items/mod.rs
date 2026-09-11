@@ -18,3 +18,5 @@ pub(crate) enum FailureSettlement {
     SupersededAttempt,
     UnpersistedEvidence(String),
 }
+
+pub use service::WorkflowControl;

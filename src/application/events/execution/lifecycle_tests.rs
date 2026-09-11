@@ -5,6 +5,7 @@ use crate::infrastructure::git::worktrees::FileGitWorktreeService;
 use crate::infrastructure::storage::automation::{read_json, write_json};
 use std::fs;
 use std::path::PathBuf;
+mod outcomes;
 mod support;
 mod terminal;
 use support::*;
@@ -34,7 +35,7 @@ fn fresh_goal_backlog_exit_skill_remains_runnable_before_round_materialization()
     );
     let result = f.execute(&invocation);
     assert_eq!(result.state, InvocationState::Succeeded, "{result:?}");
-    assert_eq!(result.attempts.len(), 2);
+    assert_eq!(result.attempts.len(), 1);
     f.dispatch();
     assert_eq!(
         f.work().show_goal_detail("FRESH").unwrap()["status"],
@@ -110,7 +111,7 @@ fn preplan_enter_exit_bindings_execute_blocking_and_background_without_candidate
 }
 
 #[test]
-fn ordered_bindings_repairs_and_repeated_dispatch_reuse_one_registered_checkout() {
+fn ordered_bindings_and_repeated_dispatch_reuse_one_registered_checkout() {
     let f = Fixture::new();
     let _smoke = SmokeSkill::install(&f.service, &f.temp);
     f.gate("workflow.backlog.exit", BindingMode::Blocking);
@@ -139,7 +140,7 @@ fn ordered_bindings_repairs_and_repeated_dispatch_reuse_one_registered_checkout(
     assert_eq!(invocation, f.invocation("workflow.backlog.exit"));
     let result = f.execute(&invocation);
     assert_eq!(result.state, InvocationState::Succeeded, "{result:?}");
-    assert_eq!(result.attempts.len(), 4);
+    assert_eq!(result.attempts.len(), 2);
     assert_eq!(result.results.len(), 2);
     let launches = fs::read(invocation.context.cwd.join("launches.txt")).unwrap();
     let restarted =
@@ -198,17 +199,17 @@ fn disabled_context_only_and_missing_inputs_create_no_checkout() {
                 .unwrap();
         }
         f.dispatch();
-        if variant != "disabled" {
+        if variant == "missing" {
             let invocation = f.invocation("workflow.backlog.exit");
             assert!(invocation.context.workspace.is_none());
-            if variant == "context" {
-                assert_eq!(
-                    f.service.execute(&invocation.id, || Ok(())).unwrap().state,
-                    InvocationState::Succeeded
-                );
-            } else {
-                assert_eq!(invocation.state, InvocationState::Error);
-            }
+            assert_eq!(invocation.state, InvocationState::Error);
+        } else {
+            assert!(
+                f.service.goal_invocations("FRESH", 0, 100).unwrap()["items"]
+                    .as_array()
+                    .unwrap()
+                    .is_empty()
+            );
         }
         assert!(!f.primary.join(".git/refine-worktrees").exists());
         assert_eq!(before, f.snapshot());
@@ -272,3 +273,38 @@ mod recovery;
 mod workflow;
 
 mod semantics;
+
+#[test]
+fn malformed_lifecycle_completion_fails_once_without_repairing() {
+    let f = Fixture::new();
+    let _smoke = SmokeSkill::install(&f.service, &f.temp);
+    let script = f.temp.join("lifecycle-smoke.py");
+    let source = fs::read_to_string(&script).unwrap();
+    fs::write(
+        &script,
+        source.replace(
+            "print(json.dumps(result))\n",
+            "result['extra_field'] = 'invalid completion'\nprint(json.dumps(result))\n",
+        ),
+    )
+    .unwrap();
+    f.gate("workflow.backlog.exit", BindingMode::Blocking);
+    f.request_todo();
+    f.dispatch();
+    let invocation = f.invocation("workflow.backlog.exit");
+    let result = f.execute(&invocation);
+    assert_eq!(result.state, InvocationState::Error, "{result:?}");
+    assert_eq!(result.attempts.len(), 1);
+    assert_eq!(
+        fs::read_to_string(invocation.context.cwd.join("launches.txt"))
+            .unwrap()
+            .lines()
+            .count(),
+        1
+    );
+    f.dispatch();
+    assert_eq!(
+        f.work().show_goal_detail("FRESH").unwrap()["status"],
+        "failed"
+    );
+}

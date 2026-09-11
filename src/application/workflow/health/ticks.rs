@@ -87,7 +87,7 @@ pub(crate) fn scheduler_tick(
             observation.completed_cycle_ms = Some(now);
         }
         observation.active_attempts = active.clone();
-        observation.retry_delays = target_for_retry(root, observation.target_root.as_deref());
+        observation.retry_delays.clear();
         if completed || failure.is_some() {
             observation.failure = failure.map(str::to_string);
         }
@@ -96,15 +96,6 @@ pub(crate) fn scheduler_tick(
     if let Err(error) = result {
         eprintln!("refine scheduler observation: {error}");
     }
-}
-
-fn target_for_retry(root: &Path, target: Option<&Path>) -> std::collections::BTreeMap<String, i64> {
-    target
-        .map(|target| {
-            crate::application::workflow::WorkflowEngine::with_target_root(root, target)
-                .retry_observations()
-        })
-        .unwrap_or_default()
 }
 
 #[cfg(test)]

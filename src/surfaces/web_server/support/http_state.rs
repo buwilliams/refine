@@ -21,6 +21,7 @@ pub(in crate::surfaces::web_server) fn normalize_api_path(path: &str) -> String 
         "/api/event-definitions",
         "/api/skills",
         "/api/event-invocations",
+        "/api/hub",
         "/api/next",
     ]
     .iter()

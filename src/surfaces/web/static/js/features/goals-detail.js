@@ -353,6 +353,7 @@ function drawGoalDetail(goal) {
           <details class="nav-menu goal-action-menu" id="goal-action-menu"${actionMenuOpen ? " open" : ""}>
             <summary class="btn goal-action-more" aria-label="More Goal actions" data-testid="goal-action-menu-toggle"></summary>
             <div class="nav-menu-panel goal-action-panel">
+              <button class="nav-menu-item" type="button" id="btn-workflow-control">Control workflow outcome</button>
               <button class="nav-menu-item" type="button" id="btn-watch-logs" data-testid="goal-action-watch-logs">Watch Logs</button>
               <button class="nav-menu-item" type="button" id="btn-reporter" data-testid="goal-action-reporter">Reporter</button>
               <button class="nav-menu-item" type="button" id="btn-assignee" data-testid="goal-action-assignee">Assignee</button>
@@ -374,6 +375,7 @@ function drawGoalDetail(goal) {
         ${goal.branch_name ? ` · branch <code>${goal.branch_name}</code>` : ""}
       </div>
       ${renderGoalFeatureAssociation(goal)}
+      ${typeof renderWorkflowOutcome === "function" ? renderWorkflowOutcome(goal) : ""}
 
       ${failureBanner ? `
         <div class="banner ${failureBanner.severity}" data-testid="goal-failure-banner">
@@ -508,6 +510,7 @@ function bindGoalDetailControls() {
     closeGoalActionMenu();
     await openGoalAssigneeModal(liveGoal());
   });
+  bindOnce($("#btn-workflow-control"), "click", () => openWorkflowControl(liveGoal()).catch(showActionError));
   bindOnce($("#btn-rename"), "click", async () => {
     closeGoalActionMenu();
     const name = await modalPrompt("New name", liveGoal().name,

@@ -67,6 +67,7 @@ function hydrateNodeSelector(project, registry) {
 
 function nodeContextDirtySurfaces() {
   const dirty = [];
+  if (typeof hubEditor !== "undefined" && hubEditor?.isConnected && hubEditor.dataset.nodeContextDirty === "true") dirty.push({label: hubEditor.dataset.nodeContextLabel || "Knowledge Hub", root: hubEditor});
   if (typeof automationEditor !== "undefined" && automationEditor?.dataset.nodeContextDirty === "true") dirty.push({label: "Events or Skills", root: automationEditor});
   const newGoal = document.querySelector("[data-testid='new-goal-modal']");
   const newGoalPrompt = newGoal?.querySelector("[data-testid='new-goal-prompt']");
@@ -111,6 +112,7 @@ async function confirmLocalNodeContextDiscard() {
 }
 
 async function discardLocalNodeContextSurfaces() {
+  if (typeof hubEditor !== "undefined") hubEditor?._close();
   if (typeof automationEditor !== "undefined") automationEditor?._close();
   if (typeof automationHistory !== "undefined") automationHistory?._close();
   if (typeof _discardNewGoalForNodeSwitch === "function") _discardNewGoalForNodeSwitch();
@@ -138,6 +140,7 @@ function preserveExternalDirtySurfaces(dirty) {
 
 function closeCleanNodeContextModals() {
   const dirtyRoots = new Set(nodeContextDirtySurfaces().map((item) => item.root).filter(Boolean));
+  if (typeof hubEditor !== "undefined" && hubEditor && !dirtyRoots.has(hubEditor)) hubEditor._close();
   if (typeof automationEditor !== "undefined" && automationEditor && !dirtyRoots.has(automationEditor)) automationEditor._close();
   if (typeof automationHistory !== "undefined") automationHistory?._close();
   if (typeof _newGoalModalOpen !== "undefined" && _newGoalModalOpen

@@ -2,7 +2,6 @@ use super::*;
 use serde_json::json;
 
 use super::workflow_attempts::{goal_status, require_current_attempt};
-use crate::application::agent_io::prompts::{PromptTemplate, render};
 
 impl FileWorkItemService {
     /// Repin a Goal's base and candidate onto a refreshed replacement.
@@ -136,7 +135,7 @@ impl FileWorkItemService {
     /// and the queued Round is identical either way — an `integration` retry
     /// that replays from a fresh base.
     #[allow(clippy::too_many_arguments)]
-    pub(crate) fn queue_integration_recovery_summary(
+    pub(crate) fn settle_integration_failure_summary(
         &self,
         goal_id: &str,
         authority: WorkflowAttemptAuthority,
@@ -144,7 +143,6 @@ impl FileWorkItemService {
         node_id: &str,
         reason: &str,
         retained_evidence: Value,
-        max_automatic_round_retries: u32,
     ) -> RefineResult<GoalSummaryProjection> {
         let _goal_lock = self.acquire_goal_mutation_lock(goal_id)?;
         let current = self.show_goal_summary(goal_id)?;
@@ -175,81 +173,23 @@ impl FileWorkItemService {
                 "Goal {goal_id} Round changed before integration recovery"
             )));
         }
-        // `require_current_attempt` above proved the trailing Round carries
-        // this caller's claim, so the claim alone must not disqualify reuse.
-        let reuse_inert = last_round_is_unstarted_recovery(rounds, Some(authority));
-        let current_attempt = rounds[authority.round_idx]
-            .get("automatic_retry")
-            .and_then(|retry| retry.get("attempt"))
-            .and_then(Value::as_u64)
-            .and_then(|attempt| u32::try_from(attempt).ok())
-            .unwrap_or(0);
-        let exhausted = current_attempt >= max_automatic_round_retries;
-        let next_attempt = current_attempt.saturating_add(1);
-        let now = now_timestamp();
-        let recovery = json!({
-            "state": if exhausted { "exhausted" } else { "queued" },
-            "kind": "integration",
-            "reason": reason,
-            "source_round": authority.round_idx + 1,
-            "successor_round": if exhausted {
-                Value::Null
-            } else {
-                json!(successor_round_number(authority.round_idx, reuse_inert))
-            },
-            "attempt": if exhausted { current_attempt } else { next_attempt },
-            "max_automatic_round_retries": max_automatic_round_retries,
-            "workflow_revision": authority.workflow_revision,
-            "node_id": node_id,
-            "retained_evidence": retained_evidence,
-            "recorded_at": now
+        // A refresh failure records its evidence in the originating attempt. Only
+        // an explicit workflow decision may authorize another Round.
+        rounds[authority.round_idx]["workflow_recovery"] = json!({
+            "state": "failed", "kind": "integration", "reason": reason,
+            "source_round": authority.round_idx + 1, "successor_round": null,
+            "retained_evidence": retained_evidence, "recorded_at": now_timestamp(),
+            "automatic_recovery": false
         });
-        let source = rounds[authority.round_idx].as_object_mut().ok_or_else(|| {
-            RefineError::Serialization("source Round is not an object".to_string())
-        })?;
-        source.insert("workflow_recovery".to_string(), recovery.clone());
-        source.insert("workflow_attempt_authority".to_string(), Value::Null);
-        source.insert("updated".to_string(), json!(&now));
-
-        if exhausted {
-            source.insert(
-                "failure_category".to_string(),
-                json!("integration_retry_exhausted"),
-            );
-            source.insert(
-                "failure_message".to_string(),
-                json!(format!(
-                    "Integration recovery remained necessary after {max_automatic_round_retries} automatic recovery Rounds: {reason}"
-                )),
-            );
-            source.insert("failure_at".to_string(), json!(&now));
-            object.insert("status".to_string(), json!(GoalStatus::Failed.as_str()));
-            object.insert("updated".to_string(), json!(&now));
-            write_json_atomically(&goal_path, &value)?;
-            return self.show_goal_summary(goal_id);
-        }
-
-        let encoded_evidence = serde_json::to_string_pretty(&recovery).map_err(|error| {
-            RefineError::Serialization(format!(
-                "failed to encode integration recovery evidence: {error}"
-            ))
-        })?;
-        let prompt = render(
-            PromptTemplate::GoalWorkflowRecoverIntegration,
-            &[("reason", reason), ("evidence", &encoded_evidence)],
-        );
-        let mut successor = new_round_value("Refine", "Refine", &prompt);
-        successor["workflow_recovery"] = recovery;
-        successor["automatic_retry"] = json!({
-            "kind": "integration",
-            "source_round": authority.round_idx + 1,
-            "attempt": next_attempt,
-            "generated_at": now
-        });
-        append_or_reuse_recovery_round(rounds, successor, reuse_inert);
-        object.insert("status".to_string(), json!(GoalStatus::Todo.as_str()));
-        object.insert("updated".to_string(), json!(&now));
         write_json_atomically(&goal_path, &value)?;
+        drop(_goal_lock);
+        self.settle_workflow_attempt_failure(
+            goal_id,
+            authority,
+            "integration",
+            reason,
+            &now_timestamp(),
+        )?;
         self.show_goal_summary(goal_id)
     }
 }

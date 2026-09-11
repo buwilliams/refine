@@ -42,6 +42,8 @@ confirmation; concurrent clients converge on the same operation and attempt.
 
 The Controls Skills section uses the same section labels and menu rows as the rest of Controls. Enabled Custom Skills are followed by **Add skill...**, which opens the New Skill modal without leaving the current screen. Running a Skill opens an agent tab after any required inputs are collected.
 
+Controls also contains **Knowledge Hub**, listing sites for the attached app with **Add site...** and **Manage Knowledge Hub...** actions. Opening a site uses a new tab. Sites use the same Refine web server: published sites at `/hub/sites/<site>/` and drafts at `/hub/preview/<site>/`. Hosting shares the installation's existing access boundary; publication selects the asset manifest and read-only collections, not a separate listener or account system.
+
 ## Future Direction
 
 Future navigation may become more command-palette and agent-driven. As agents take over more work, nav should help people jump to exceptions, evidence, pending review, active processes, and high-risk changes.

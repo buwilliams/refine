@@ -1,7 +1,7 @@
 use super::*;
 
 #[test]
-fn file_automation_fails_after_the_governance_recovery_budget_is_exhausted() {
+fn governance_finding_fails_without_automatic_recovery() {
     let temp_root = unique_temp_dir("automation-governance");
     let target_root = temp_root.clone();
     let refine_dir = test_refine_dir(&target_root);
@@ -87,15 +87,13 @@ fn file_automation_fails_after_the_governance_recovery_budget_is_exhausted() {
     let automation = WorkflowEngine::with_target_root(&runtime_root, &target_root);
     let error = automation.evaluate_workflow().unwrap_err();
     assert!(
-        error
-            .to_string()
-            .contains("Governance findings remain after 5 automatic recovery Rounds"),
+        error.to_string().contains("Do not append smoke markers."),
         "{error}"
     );
     let goal = work_items.show_goal_detail("GOAL1").unwrap();
     assert_eq!(goal["status"], "failed");
-    assert_eq!(goal["rounds"].as_array().unwrap().len(), 6);
-    let latest = &goal["rounds"][5];
+    assert_eq!(goal["rounds"].as_array().unwrap().len(), 1);
+    let latest = &goal["rounds"][0];
     assert_eq!(latest["rule_state"], "failed");
     assert_eq!(latest["quality_state"], "passed");
     assert!(
@@ -107,10 +105,10 @@ fn file_automation_fails_after_the_governance_recovery_budget_is_exhausted() {
     assert_eq!(latest["governance_details"]["phase"], "post_implementation");
     assert_eq!(
         latest["governance_rule_actions"][0]["rule_id"],
-        "workflow.governance.enter:default-governance:rule-6"
+        "workflow.governance.enter:default-governance:rule-1"
     );
-    assert_eq!(goal["rounds"][5]["automatic_retry"]["attempt"], 5);
-    assert_eq!(goal["rounds"][5]["automatic_retry"]["kind"], "governance");
+    assert!(latest["automatic_retry"].is_null());
+    assert!(latest["automatic_retry"].is_null());
     unsafe {
         if let Some(previous) = previous_smoke_ai {
             std::env::set_var("REFINE_SMOKE_AI_PATH", previous);
@@ -123,7 +121,7 @@ fn file_automation_fails_after_the_governance_recovery_budget_is_exhausted() {
 }
 
 #[test]
-fn file_automation_stops_early_when_consecutive_governance_findings_are_identical() {
+fn governance_finding_cannot_relaunch_on_later_scheduler_passes() {
     let temp_root = unique_temp_dir("automation-governance-repeat");
     let target_root = temp_root.clone();
     let refine_dir = test_refine_dir(&target_root);
@@ -204,18 +202,16 @@ fn file_automation_stops_early_when_consecutive_governance_findings_are_identica
     let automation = WorkflowEngine::with_target_root(&runtime_root, &target_root);
     let error = automation.evaluate_workflow().unwrap_err();
     assert!(
-        error
-            .to_string()
-            .contains("identical findings; automatic retries were stopped early"),
+        error.to_string().contains("Do not append smoke markers."),
         "{error}"
     );
     let goal = work_items.show_goal_detail("GOAL1").unwrap();
     assert_eq!(goal["status"], "failed");
-    assert_eq!(goal["rounds"].as_array().unwrap().len(), 2);
-    let latest = &goal["rounds"][1];
-    assert_eq!(latest["automatic_retry"]["kind"], "governance");
-    assert_eq!(latest["automatic_retry"]["attempt"], 1);
-    assert_eq!(latest["failure_category"], "governance_retry_exhausted");
+    assert_eq!(goal["rounds"].as_array().unwrap().len(), 1);
+    let latest = &goal["rounds"][0];
+    assert!(latest["automatic_retry"].is_null());
+    assert!(latest["automatic_retry"].is_null());
+    assert!(automation.evaluate_workflow().unwrap().steps.is_empty());
     unsafe {
         if let Some(previous) = previous_smoke_ai {
             std::env::set_var("REFINE_SMOKE_AI_PATH", previous);

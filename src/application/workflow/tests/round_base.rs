@@ -521,20 +521,19 @@ fn a_stale_candidate_against_an_advanced_target_queues_a_recovery_round() {
             target_branch: "main".to_string(),
             target_commit: fixture.develop_tip.clone(),
         },
-        5,
     )
     .unwrap();
 
     assert!(matches!(
         outcome,
         WorkflowAdvanceOutcome::Completed {
-            final_status: GoalStatus::Todo,
+            final_status: GoalStatus::Failed,
             ..
         }
     ));
     let detail = fixture.work_items.show_goal_detail("GOAL1").unwrap();
-    assert_eq!(detail["status"], "todo");
-    assert_eq!(detail["rounds"][0]["workflow_recovery"]["state"], "queued");
+    assert_eq!(detail["status"], "failed");
+    assert_eq!(detail["rounds"][0]["workflow_recovery"]["state"], "failed");
     assert_eq!(
         detail["rounds"][0]["workflow_recovery"]["kind"],
         "integration"
@@ -573,7 +572,6 @@ fn a_stale_candidate_whose_target_never_moved_fails_without_spending_the_budget(
             target_branch: "main".to_string(),
             target_commit: fixture.main_tip.clone(),
         },
-        5,
     )
     .unwrap_err();
 

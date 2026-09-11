@@ -1,11 +1,10 @@
 use serde_json::Value;
 
-use crate::application::work_items::FileWorkItemService;
 use crate::application::workflow::now_timestamp;
 use crate::error::{RefineError, RefineResult};
 use crate::model::goal::{
-    IMPLEMENTATION_PLAN_SCHEMA_VERSION, ImplementationPlan, ImplementationPlanPhase,
-    ImplementationPlanState, ImplementationPlanningFailure,
+    ImplementationPlan, ImplementationPlanPhase, ImplementationPlanState,
+    ImplementationPlanningFailure,
 };
 use crate::model::workflow::GoalStatus;
 
@@ -106,46 +105,6 @@ pub(in crate::application::workflow) fn persist_plan(
         ctx.round_idx,
         expected,
         plan,
-    )?;
-    Ok(())
-}
-
-pub(crate) fn recover_interrupted_plan(
-    work_items: &FileWorkItemService,
-    goal_id: &str,
-    round_idx: usize,
-) -> RefineResult<()> {
-    let detail = work_items.show_goal_detail(goal_id)?;
-    let Some(raw) = detail
-        .get("rounds")
-        .and_then(Value::as_array)
-        .and_then(|rounds| rounds.get(round_idx))
-        .and_then(|round| round.get("implementation_plan"))
-        .cloned()
-        .filter(|value| !value.is_null())
-    else {
-        return Ok(());
-    };
-    let mut plan = decode_plan(raw)?;
-    let previous = plan.clone();
-    let interrupted_failure = plan
-        .failure
-        .as_ref()
-        .is_some_and(|failure| failure.category == "interrupted");
-    if plan.schema_version == IMPLEMENTATION_PLAN_SCHEMA_VERSION && !interrupted_failure {
-        return Ok(());
-    }
-    plan.schema_version = IMPLEMENTATION_PLAN_SCHEMA_VERSION;
-    if interrupted_failure {
-        plan.state = ImplementationPlanState::InProgress;
-        plan.failure = None;
-    }
-    plan.updated_at = now_timestamp();
-    work_items.replace_goal_round_implementation_plan(
-        goal_id,
-        round_idx,
-        Some(&previous),
-        &plan,
     )?;
     Ok(())
 }

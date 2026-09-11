@@ -98,6 +98,17 @@ impl FileEventService {
         }
         if let Some(id) = &invocation.context.goal_id {
             let goal = FileWorkItemService::new(&self.refine_dir).show_goal_detail(id)?;
+            if let Some(outcome) = invocation.context.data.get("outcome") {
+                if goal["pending_workflow_outcome"]["id"] != outcome["id"]
+                    || goal["pending_workflow_outcome"]["state"] != "pending"
+                    || chrono::Utc::now().timestamp_millis()
+                        >= outcome["deadline_ms"].as_i64().unwrap_or(0)
+                {
+                    return Err(RefineError::Conflict(
+                        "Workflow outcome was settled, superseded or expired".into(),
+                    ));
+                }
+            }
             let pinned = invocation.context.data.get("goal").unwrap_or(&Value::Null);
             for key in ["status", "node_id", "candidate_commit", "event_generation"] {
                 if invocation.context.data.get("occurrence").is_some()

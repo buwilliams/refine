@@ -51,7 +51,7 @@ fn successful_blocking_results_allow_scheduler_and_manual_transitions_with_backg
                 }
             );
             assert_eq!(completed.results.len(), 2);
-            assert_eq!(completed.attempts.len(), 4);
+            assert_eq!(completed.attempts.len(), 2);
             assert_eq!(
                 fs::read_to_string(completed.context.cwd.join("launches.txt"))
                     .unwrap()
@@ -136,7 +136,7 @@ fn lifecycle_and_scheduler_reuse_occurrence_configuration_after_disabled_skill_e
             assert_eq!(entry.config_revision, revision);
             assert_eq!(entry.bindings.len(), 1);
             assert_eq!(entry.state, InvocationState::Succeeded);
-            assert_eq!(entry.attempts.len(), 2);
+            assert_eq!(entry.attempts.len(), 1);
             assert_eq!(
                 fs::read_to_string(entry.context.cwd.join("launches.txt"))
                     .unwrap()
@@ -198,6 +198,8 @@ fn manual_transition_preserves_entry_definition_when_skill_moves_to_exit() {
     );
     f.dispatch();
     let entry = f.invocation("workflow.todo.enter");
+    assert_eq!(f.execute(&entry).state, InvocationState::Succeeded);
+    f.dispatch();
     let exit = f.invocation("workflow.todo.exit");
     assert_eq!(entry.bindings[0].skill.prompt, "Original Entry definition");
     assert_eq!(exit.bindings[0].skill.prompt, "Updated Exit definition");

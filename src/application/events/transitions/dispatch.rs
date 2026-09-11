@@ -97,19 +97,29 @@ impl FileEventService {
                     }
                     let config: AutomationConfig = serde_json::from_value(queued["config"].clone())
                         .map_err(|e| RefineError::Serialization(e.to_string()))?;
+                    let mut complete = true;
+                    let mut fault = false;
                     for event in config.events.values().filter(|e| {
                         e.source == queued["source"].as_str().map(str::to_string)
                             && e.enabled
                             && e.scope.applies(&node)
                     }) {
+                        if config
+                            .bindings(event, &node)
+                            .iter()
+                            .all(|(binding, _)| binding.mode == BindingMode::Context)
+                        {
+                            continue;
+                        }
                         let source = queued["source"].as_str().unwrap_or_default();
                         let exit = source.ends_with(".exit");
-                        let generation = if exit {
+                        let departure = exit || source.ends_with(".success");
+                        let generation = if departure {
                             queued["previous_generation"].as_u64().unwrap_or(0)
                         } else {
                             queued["generation"].as_u64().unwrap_or(0)
                         };
-                        let round = if exit {
+                        let round = if departure {
                             queued["previous_round"].as_u64().unwrap_or(0)
                         } else {
                             queued["occurrence"]["round_idx"].as_u64().unwrap_or(0)
@@ -131,8 +141,15 @@ impl FileEventService {
                             BTreeMap::new(),
                             &key,
                         ) {
-                            Ok(_) => {}
+                            Ok(invocation) => {
+                                complete &= invocation.state.terminal();
+                                fault |= matches!(invocation.gate_assessment(), crate::application::workflow::gates::GateAssessment::Finding | crate::application::workflow::gates::GateAssessment::Fault);
+                            }
                             Err(error) => {
+                                fault |= config
+                                    .bindings(event, &node)
+                                    .iter()
+                                    .any(|(binding, _)| binding.mode == BindingMode::Blocking);
                                 write_json(
                                     &self
                                         .refine_dir
@@ -142,6 +159,17 @@ impl FileEventService {
                                 )?;
                             }
                         }
+                    }
+                    let source = queued["source"].as_str().unwrap_or_default();
+                    if source.ends_with(".enter") || source.ends_with(".success") {
+                        if !complete && !fault {
+                            continue;
+                        }
+                        crate::application::work_items::FileWorkItemService::for_node(
+                            &self.refine_dir,
+                            &node,
+                        )
+                        .settle_lifecycle_outcome(id, &queued, fault)?;
                     }
                     let _ = std::fs::remove_file(&path);
                 } else {
@@ -159,6 +187,7 @@ impl FileEventService {
                             .map_err(|e| RefineError::Serialization(e.to_string()))?;
                     let from = pending["from"].as_str().unwrap_or_default();
                     let source = format!("workflow.{from}.exit");
+                    let success_source = format!("workflow.{from}.success");
                     let entry_source = format!("workflow.{from}.enter");
                     let mut complete = true;
                     let mut failed = false;
@@ -171,20 +200,27 @@ impl FileEventService {
                             &goal, &config, &node, from,
                         )?
                     };
-                    let selected = config
+                    let selected = entry_config
                         .events
                         .values()
-                        .filter(|e| e.source.as_deref() == Some(&source))
-                        .map(|e| (&config, e))
+                        .filter(|event| {
+                            !["plan", "implement", "quality", "governance"].contains(&from)
+                                && event.source.as_deref() == Some(&entry_source)
+                        })
+                        .map(|event| (&entry_config, event))
                         .chain(
-                            entry_config
+                            config
                                 .events
                                 .values()
-                                .filter(|e| {
-                                    !["plan", "implement", "quality", "governance"].contains(&from)
-                                        && e.source.as_deref() == Some(&entry_source)
-                                })
-                                .map(|e| (&entry_config, e)),
+                                .filter(|event| event.source.as_deref() == Some(&success_source))
+                                .map(|event| (&config, event)),
+                        )
+                        .chain(
+                            config
+                                .events
+                                .values()
+                                .filter(|event| event.source.as_deref() == Some(&source))
+                                .map(|event| (&config, event)),
                         );
                     for (binding_config, event) in
                         selected.filter(|(_, e)| e.enabled && e.scope.applies(&node))
@@ -237,7 +273,7 @@ impl FileEventService {
                                     &json!({"event_id": event.id, "goal_id": id, "error": error.to_string()}),
                                 )?;
                                 failed = true;
-                                continue;
+                                break;
                             }
                         };
                         if let Some(required) =
@@ -253,6 +289,11 @@ impl FileEventService {
                             crate::application::workflow::gates::GateAssessment::Finding
                                 | crate::application::workflow::gates::GateAssessment::Fault
                         );
+                        // Later lifecycle edges may only begin after the preceding
+                        // required edge has succeeded.
+                        if !complete || failed {
+                            break;
+                        }
                     }
                     if complete || failed {
                         crate::infrastructure::process::supervisor::coordination::with_record_lock(

@@ -57,11 +57,19 @@ impl WorkflowEngine {
         );
         let policy = self.policy().map_err(unclaimed)?;
         let summary = work_items.show_goal_summary(goal_id).map_err(unclaimed)?;
-        if work_items
-            .show_goal_detail(goal_id)
-            .map_err(unclaimed)?
-            .get("pending_event_transition")
-            .is_some_and(|p| p["state"] == "pending")
+        if work_items.show_goal_detail(goal_id).map_err(unclaimed)?["workflow_integration_control"]
+            ["state"]
+            == "pending"
+            || work_items
+                .show_goal_detail(goal_id)
+                .map_err(unclaimed)?
+                .get("pending_workflow_outcome")
+                .is_some_and(|p| p["state"] == "pending")
+            || work_items
+                .show_goal_detail(goal_id)
+                .map_err(unclaimed)?
+                .get("pending_event_transition")
+                .is_some_and(|p| p["state"] == "pending")
         {
             return Err(unclaimed(RefineError::Conflict(format!(
                 "{} {goal_id}",

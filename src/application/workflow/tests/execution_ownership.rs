@@ -104,7 +104,7 @@ fn restart_recovery_preserves_goal_state_and_removes_retired_execution_files() {
     );
     assert_eq!(
         work_items.show_goal_summary("GOAL1").unwrap().goal.status,
-        GoalStatus::Plan
+        GoalStatus::Failed
     );
     for name in [
         "workflow-automation-state.json",

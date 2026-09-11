@@ -37,7 +37,7 @@ fn quality_operation_settles_parsing_failure_and_persists_the_same_goal_evidence
                 .and_then(|details| details.get("provider_attempt"))
         })
         .collect::<Vec<_>>();
-    assert_eq!(attempts.len(), 3);
+    assert_eq!(attempts.len(), 1);
     assert!(
         attempts
             .iter()
@@ -67,7 +67,7 @@ fn quality_operation_settles_parsing_failure_and_persists_the_same_goal_evidence
 }
 
 #[test]
-fn quality_repairs_one_invalid_response_and_retains_both_attempts() {
+fn quality_invalid_response_fails_once_and_retains_the_original_output() {
     let fixture = goal_quality_fixture(
         "quality-output-repair",
         "if test ! -e \"$0.attempted\"; then : > \"$0.attempted\"; printf 'not json\\n'; else printf '%s\\n' '{\"summary\":\"repaired\",\"results\":[{\"test\":\"Outcome works\",\"status\":\"passed\",\"evidence\":\"repaired plan\",\"command\":\"printf ok\"}]}'; fi",
@@ -78,35 +78,37 @@ fn quality_repairs_one_invalid_response_and_retains_both_attempts() {
     let previous = std::env::var_os("REFINE_SMOKE_AI_PATH");
     unsafe { std::env::set_var("REFINE_SMOKE_AI_PATH", &fixture.smoke_ai) };
 
-    let operation = fixture
-        .runner()
-        .run_goal_checks("GOAL1", "smoke-ai", Default::default())
-        .unwrap();
-    assert!(operation.result.ok, "{:#?}", operation.result);
-    assert_eq!(operation.result.provider_attempts.len(), 2);
-    assert!(!operation.result.provider_attempts[0].accepted);
-    assert_eq!(operation.result.provider_attempts[0].raw_output, "not json");
-    assert!(operation.result.provider_attempts[1].accepted);
-
+    assert!(
+        fixture
+            .runner()
+            .run_goal_checks("GOAL1", "smoke-ai", Default::default())
+            .is_err()
+    );
     let detail = FileWorkItemService::new(&fixture.refine_dir)
         .show_goal_detail("GOAL1")
         .unwrap();
-    let quality = &detail["rounds"][0]["quality_details"];
-    assert_eq!(quality["provider_attempts"].as_array().unwrap().len(), 2);
-    assert_eq!(quality["quality_proof"]["goal_id"], "GOAL1");
-    assert_eq!(quality["quality_proof"]["round_idx"], 0);
-    assert_eq!(quality["quality_proof"]["state"], "passed");
+    assert_eq!(
+        detail["rounds"][0]["quality_state"],
+        "output_contract_fault"
+    );
+    let registry = FileOperationRegistry::new(&fixture.runtime_root);
+    let operation = registry.recover().unwrap().pop().unwrap();
+    assert_eq!(operation.state, OperationState::Failed);
+    let (logs, _, _) = registry.page_logs(&operation.id, 50, 0).unwrap();
+    let attempts = logs
+        .iter()
+        .filter_map(|entry| entry.details.as_ref()?.get("provider_attempt"))
+        .collect::<Vec<_>>();
+    assert_eq!(attempts.len(), 1);
+    assert_eq!(attempts[0]["raw_output"], "not json");
 
     restore_smoke_ai(previous);
     fs::remove_dir_all(fixture.temp_root).unwrap();
 }
 
 #[test]
-fn quality_cancellation_during_repair_prevents_further_attempts() {
-    let fixture = goal_quality_fixture(
-        "quality-output-repair-cancel",
-        "if test ! -e \"$0.attempted\"; then : > \"$0.attempted\"; printf 'not json\\n'; else exec sleep 30; fi",
-    );
+fn quality_cancellation_during_provider_work_prevents_further_attempts() {
+    let fixture = goal_quality_fixture("quality-output-repair-cancel", "exec sleep 30");
     let _guard = smoke_ai_env_lock()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
@@ -118,19 +120,6 @@ fn quality_cancellation_during_repair_prevents_further_attempts() {
         .start_goal_checks("GOAL1", "smoke-ai", Default::default())
         .unwrap();
     let registry = FileOperationRegistry::new(&fixture.runtime_root);
-    for _ in 0..100 {
-        let (logs, _, _) = registry.page_logs(&operation.id, 50, 0).unwrap();
-        if logs.iter().any(|entry| {
-            entry
-                .details
-                .as_ref()
-                .and_then(|details| details.get("provider_attempt"))
-                .is_some()
-        }) {
-            break;
-        }
-        std::thread::sleep(std::time::Duration::from_millis(20));
-    }
     wait_for_operation_process(&fixture.runtime_root, &operation.id);
     registry
         .cancel_supervised(&operation.id, &|| Ok(()))
@@ -151,7 +140,7 @@ fn quality_cancellation_during_repair_prevents_further_attempts() {
                     .is_some()
             })
             .count(),
-        1
+        0
     );
     let detail = FileWorkItemService::new(&fixture.refine_dir)
         .show_goal_detail("GOAL1")

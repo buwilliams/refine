@@ -11,11 +11,15 @@
 
 ## Purpose
 
-Workflow moves software work forward without turning each Goal into an ad hoc chat session. It plans, implements, quality-checks, governs, integrates, reviews, retries, pauses, resumes, and recovers work through explicit Goal states.
+Workflow moves software work forward without turning each Goal into an ad hoc chat session. It plans, implements, quality-checks, governs, integrates, reviews, pauses, resumes, and supports explicit recovery of work through explicit Goal states.
 
 The point is durable semantic advancement. Refine should know what can happen next, why it can happen, and which node owns the Goal without persisting a second execution-ownership state machine.
 
 ## Expected Role
+
+Every workflow state supports Enter, Exit, Error, and Success events. A successful step follows Enter, work, Success, Exit, then destination Enter. A required Success handler failure enters Error handling; background failures remain visible without vetoing progress. Error-handler failure does not recursively emit another Error. Done and Cancelled remain terminal when their lifecycle handlers fail.
+
+Workflow outcomes are controlled through a shared Application capability exposed by API, CLI, MCP, and Web. Humans, agents, and Skills consume that capability. Requests carry expected revision, request identity, reason, and optional context. The first accepted redirect wins and stale callbacks cannot overwrite it. An explicit Plan decision appends an auditable Round retaining the candidate; a same-step retry retains previous attempt evidence. Force is an audited override of workflow gates, while ownership, concurrency, and required executable inputs remain enforced. Forced Done is status-only; forced integration is a separate explicit operation against a pinned candidate.
 
 The lifecycle is:
 
@@ -40,9 +44,9 @@ Linear Feature order plus priority is Refine's canonical dependency model. User-
 
 The existing admission cycle remains active while child Goal executions run. It materializes pending occurrences and alternates admission opportunities between eligible Goals and standalone Skills. Both use shared transient reservations and observed supervised processes for global, node, provider, and app capacity; one execution is counted once. Busy checkouts and malformed pending records do not prevent unrelated eligible work from being considered. Pending-record reads are bounded and rotate through the queue. An in-memory active set avoids duplicate launches in one runner, while synchronized Goal status, node assignment, and Round remain authoritative across nodes.
 
-Workers persist semantic artifacts and reread Goal authority at transitions and consequential boundaries. A restart may schedule the same nonterminal Goal again. Preserved planning, Git, quality, governance, integration, logs, branches, and worktrees make that repetition idempotent and explainable. A valid Quality or Governance finding may draft a fresh recovery Round and atomically return the Goal to todo; both stages share one bounded retry counter. Provider, parsing, Git, harness, and infrastructure failures do not consume that automatic recovery budget.
+Workers persist semantic artifacts and reread Goal authority at transitions and consequential boundaries. Failed workflow work is not automatically retried. Restart reconciliation first checks live ownership and completed receipts; interrupted work enters Error handling instead of being relaunched. Quality, Governance, integration, provider, and report-contract failures preserve their originating evidence. Another attempt or Round requires an explicit workflow decision.
 
-Preparation and non-retryable failures move an unchanged active Goal to failed. Retryable local failures use in-memory backoff and do not create durable delay records. Pause controls suppress new work and quiesce supported processes.
+Failures emit the source step's Error event before defaulting to Failed. Configured Error handlers have a bounded handling window, including queue time, and may use shared workflow controls to redirect the Goal. A successful handler result alone does not redirect it. Pause controls suppress new work and quiesce supported processes. Transport retry, state sync, daemon health recovery, and capacity waits remain separate from retrying workflow work.
 
 Bulk status correction protects automated states from generic replacement. Explicit cancellation is the lifecycle exception: it writes `cancelled` as Goal intent and then performs best-effort local cleanup per Goal.
 

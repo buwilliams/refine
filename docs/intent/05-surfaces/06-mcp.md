@@ -41,6 +41,8 @@ CLI, SSE, and browser callers.
 
 MCP exposes `list_events`, `list_skills`, `event_catalog`, and `trigger_event`. Dynamic definitions and typed runtime parameters use the same capability as CLI and browser. Generic capability requests provide revision-fenced editing, invocation inspection, and cancellation.
 
+`refine_workflow_control` exposes shared revision-fenced workflow decisions; a Skill invocation is optional provenance. `refine_hub_sites` discovers Knowledge Hub sites. `refine_request` provides full Hub management, query, import/export, assets, and publication through the shared API.
+
 ## Future Direction
 
 As agent-native interaction grows, MCP may become a primary way external assistants drive Refine. The tool catalog should grow toward the most valuable Application operations — planning, import, workflow advancement, review — while keeping each tool aligned to shared behavior rather than a one-off implementation.

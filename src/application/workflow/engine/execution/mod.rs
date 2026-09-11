@@ -1,5 +1,4 @@
 use std::collections::{BTreeMap, BTreeSet};
-use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
 use crate::application::projects::projection::ActiveGoalIndex;
@@ -32,7 +31,7 @@ use crate::application::workflow::{
 
 mod admission;
 mod attempt;
-mod retry;
+mod failure_fence;
 #[cfg(test)]
 pub(crate) mod test_hooks;
 use attempt::contain;
@@ -77,6 +76,7 @@ impl WorkflowEngine {
             let mut order = 0usize;
             let mut cycle_failures = 0;
             let mut rescan_required = false;
+            let mut failed = BTreeSet::new();
             loop {
                 // This is the admission controller itself, never a heartbeat helper thread.
                 crate::application::workflow::health::scheduler_tick(
@@ -109,11 +109,10 @@ impl WorkflowEngine {
                     });
                     match outcome {
                         Ok(result) => {
-                            self.clear_retry(&id);
                             results.push((order, result));
                         }
                         Err(error) => {
-                            self.record_retry(&id);
+                            failed.insert(id.clone());
                             errors.push(error);
                         }
                     }
@@ -193,14 +192,19 @@ impl WorkflowEngine {
                             }
                         }
                     }
-                    next_cycle = if rescan_required {
-                        Instant::now()
-                    } else {
-                        Instant::now() + ACTIVE_WORK_REPLENISH_INTERVAL
-                    };
+                    if rescan_required {
+                        next_cycle = Instant::now();
+                    }
                 }
                 if discovery.is_none() && Instant::now() >= next_cycle {
-                    let ids = active.keys().cloned().collect::<BTreeSet<_>>();
+                    // The poll budget includes discovery itself. Measuring from its
+                    // completion adds another full interval after capacity becomes free.
+                    next_cycle = Instant::now() + ACTIVE_WORK_REPLENISH_INTERVAL;
+                    let ids = active
+                        .keys()
+                        .cloned()
+                        .chain(failed.iter().cloned())
+                        .collect::<BTreeSet<_>>();
                     // An empty discovery captured before a completion cannot prove the queue
                     // is empty afterward: completion can free capacity or author a recovery Round.
                     rescan_required = false;

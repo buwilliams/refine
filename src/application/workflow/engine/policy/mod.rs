@@ -9,8 +9,8 @@ mod scheduling_eligibility;
 mod settings;
 pub(crate) use scheduling_eligibility::SchedulingEligibility;
 pub(crate) use settings::{
-    agent_idle_timeout, automatic_resource_budget_percent, setting_cap_with_default_values,
-    setting_string, setting_usize,
+    automatic_resource_budget_percent, setting_cap_with_default_values, setting_string,
+    setting_usize,
 };
 
 use crate::application::fleet::nodes::FileNodeRegistryService;
@@ -184,9 +184,8 @@ impl WorkflowEngine {
         Ok(())
     }
 
-    /// Reconciles node-local execution after a runner restart without changing synchronized
-    /// workflow authority. Old workers are stopped; durable stages remain where they were so the
-    /// next scheduler pass can repeat the incomplete idempotent work.
+    /// Stops interrupted execution and opens its error outcome without rerunning work.
+    /// Evidence and candidate state remain available for explicit workflow control.
     pub fn recover_interrupted_goals(&self, detail: &str) -> RefineResult<usize> {
         let Some(refine_dir) = self.refine_dir()? else {
             return Ok(0);
@@ -200,7 +199,8 @@ impl WorkflowEngine {
             .filter(|goal| {
                 matches!(
                     goal.status,
-                    GoalStatus::Plan
+                    GoalStatus::Todo
+                        | GoalStatus::Plan
                         | GoalStatus::Implement
                         | GoalStatus::Quality
                         | GoalStatus::Governance
@@ -226,11 +226,8 @@ impl WorkflowEngine {
                 );
                 continue;
             };
-            crate::application::workflow::phases::implementation_planning::recover_interrupted_plan(
-                &work_items,
-                &goal.id,
-                round_idx,
-            )?;
+            if goal.status == GoalStatus::Todo && work_items.show_goal_detail(&goal.id)?["rounds"][round_idx]["workflow_attempt_authority"].is_null() { continue; }
+            work_items.interrupt_workflow(&goal.id, detail)?;
             logs.append_round_log(
                 &goal.id,
                 round_idx,
@@ -239,13 +236,13 @@ impl WorkflowEngine {
                     severity: "warning".to_string(),
                     category: "workflow".to_string(),
                     message: format!(
-                        "Workflow execution was restarted from durable {} state: {detail}",
+                        "Workflow execution was interrupted in {} state: {detail}",
                         goal.status.as_str()
                     ),
                     details: Some(json_object(json!({
                         "reason": detail,
                         "checkpoint": goal.status.as_str(),
-                        "automatic_restart": true
+                        "automatic_restart": false
                     }))),
                     actions: Vec::new(),
                     actor: Some("refine".to_string()),

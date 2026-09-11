@@ -265,18 +265,23 @@ fn file_project_config_services_persist_governance_guidance_and_reporters() {
     let refine_dir = temp_root.join(".refine");
 
     let governance = FileGovernanceService::new(&refine_dir);
-    assert_eq!(governance.load().unwrap()["max_automatic_round_retries"], 5);
+    assert!(
+        governance
+            .load()
+            .unwrap()
+            .get("max_automatic_round_retries")
+            .is_none()
+    );
     let saved = governance
         .save(&json!({
             "product": "Refine",
             "constitution": "Be useful",
-            "rules": [{"text": "No regressions"}],
-            "max_automatic_round_retries": 3
+            "rules": [{"text": "No regressions"}]
         }))
         .unwrap();
     assert_eq!(saved["configured"], true);
     assert_eq!(saved["rules"].as_array().unwrap().len(), 1);
-    assert_eq!(saved["max_automatic_round_retries"], 3);
+    assert!(saved.get("max_automatic_round_retries").is_none());
     assert_eq!(
         governance
             .generate_rules(&json!({"product": "Refine", "constitution": "Be useful"}))
@@ -463,8 +468,13 @@ fn governance_rule_revisions_preserve_unrelated_fields_and_fence_stale_writers()
         .unwrap();
     assert_eq!(saved["rules_revision"], 1);
 
+    assert!(
+        service
+            .save(&json!({"max_automatic_round_retries": 2}))
+            .is_err()
+    );
     let scalar = service
-        .save(&json!({"max_automatic_round_retries": 2}))
+        .save(&json!({"constitution": "Local first, explicit recovery"}))
         .unwrap();
     assert_eq!(scalar["rules_revision"], 1);
     assert_eq!(scalar["rules"][0]["text"], "One");
@@ -479,7 +489,7 @@ fn governance_rule_revisions_preserve_unrelated_fields_and_fence_stale_writers()
         .unwrap();
     assert_eq!(replaced["rules_revision"], 2);
     assert_eq!(replaced["rules"][0]["text"], "Two");
-    assert_eq!(replaced["constitution"], "Local first");
+    assert_eq!(replaced["constitution"], "Local first, explicit recovery");
 
     fs::remove_dir_all(temp_root).unwrap();
 }

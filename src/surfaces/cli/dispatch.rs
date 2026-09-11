@@ -9,6 +9,7 @@ mod discovery;
 mod features;
 mod fleet;
 mod goals;
+mod hub;
 mod logs;
 mod nodes;
 mod projects;
@@ -187,6 +188,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
     };
 
     match cli.command {
+        Commands::Hub { action } => hub::dispatch(action),
         Commands::Skills { action } => skills::skills(action),
         command @ Commands::Config { .. } => config::dispatch_command(command),
         command @ Commands::Website { .. } => website::dispatch_command(command),
@@ -583,7 +585,7 @@ fn direct_work_item_service(target_root: &Path) -> RefineResult<FileWorkItemServ
 
 pub(super) fn explicit_target_root_path(command: &Commands) -> Option<&PathBuf> {
     match command {
-        Commands::Skills { .. } => None,
+        Commands::Skills { .. } | Commands::Hub { .. } => None,
         Commands::Config { action } => match action {
             ConfigAction::Show { target_root, .. } => target_root.as_ref(),
             ConfigAction::Settings { action } => match action {
@@ -653,7 +655,11 @@ pub(super) fn explicit_target_root_path(command: &Commands) -> Option<&PathBuf> 
             | TodoAction::Undo { target_root, .. } => target_root.as_ref(),
         },
         Commands::Workflow { action } => match action {
-            WorkflowAction::Pause { .. } | WorkflowAction::Resume { .. } => None,
+            WorkflowAction::Pause { .. }
+            | WorkflowAction::Resume { .. }
+            | WorkflowAction::Show { .. }
+            | WorkflowAction::Move { .. }
+            | WorkflowAction::Integrate { .. } => None,
         },
         Commands::Node { action } => match action {
             NodeAction::List { target_root }

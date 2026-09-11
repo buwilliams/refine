@@ -31,7 +31,7 @@ When a Goal is failed:
 - If the Goal blocks ordered Feature work, that blockage should be visible.
 - Failed state should be a decision point, not an evidence sink.
 
-Structured-output failures identify the exhausted phase and retain every raw invalid response and diagnostic rather than presenting a provider or harness fault as an implementation defect. Integration races and merge- or refresh-time conflicts with provable or conflicted candidate deltas normally produce a fenced recovery Round instead of Failed; when the shared automatic-retry budget is already spent, the source Round retains the original identities, handoff, gates, target and conflict observations, and an explicit `integration_retry_exhausted` outcome. Failed remains appropriate when exact proof regeneration is unavailable, output repair or the bounded recovery lineage is exhausted, authority is lost, or required evidence cannot be established safely.
+Structured-output failures retain the original invalid response and diagnostic. Integration races, merge conflicts, refresh failures, and failed checks retain their candidate, branch, worktree, handoff, gates, and target observations. They emit the source step's Error event without generating a recovery Round or rerunning work. Configured Error handlers receive a bounded handling window; an explicit revision-fenced workflow decision may redirect the Goal with context. Without that decision, the Goal settles in Failed. A successful handler response alone does not change this outcome.
 
 ## Future Direction
 

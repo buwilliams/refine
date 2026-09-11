@@ -206,6 +206,8 @@ pub fn system_catalog() -> Vec<String> {
             [
                 format!("workflow.{step}.enter"),
                 format!("workflow.{step}.exit"),
+                format!("workflow.{step}.error"),
+                format!("workflow.{step}.success"),
             ]
         })
         .chain(std::iter::once("node.startup.ready".into()))

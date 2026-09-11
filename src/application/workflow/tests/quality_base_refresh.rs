@@ -5,22 +5,15 @@
 //! Governance-time refresh — one late rebase after a full Quality run. These
 //! tests pin the boundary's contract: free when the target has not moved,
 //! repinned (with Quality's stale evidence cleared) when it has, and the exact
-//! same resolve-in-place / fenced-recovery policy stage 3 shipped when the
-//! rebase conflicts.
+//! original candidate retained with an Error outcome when the rebase conflicts.
 
 #![cfg(unix)]
 
 use super::*;
 
-use std::sync::Arc;
-use std::sync::atomic::{AtomicU32, Ordering};
-
-use crate::application::persistence_sync::resolution::{
-    ResolutionRequest, ResolverOutcome, ScriptedResolver, ScriptedStep,
-};
 use crate::application::work_items::WorkflowAttemptAuthority;
 use crate::application::workflow::engine::behaviors::contract::WorkflowAdvanceOutcome;
-use crate::application::workflow::engine::behaviors::refresh_candidate_at_quality_boundary_with_resolver;
+use crate::application::workflow::engine::behaviors::refresh_candidate_at_quality_boundary;
 use crate::application::workflow::engine::context::WorkflowContext;
 use crate::application::workflow::phases::quality::{FileQualityService, QualitySettingsPatch};
 use serde_json::Value;
@@ -252,24 +245,6 @@ impl Drop for BoundaryFixture {
     }
 }
 
-fn completing_edit(edit: impl FnMut(&ResolutionRequest<'_>) + Send + 'static) -> ScriptedStep {
-    let mut edit = edit;
-    Box::new(move |request| {
-        edit(request);
-        Ok(ResolverOutcome::Completed)
-    })
-}
-
-/// A one-answer resolver that counts how many times it was asked — so a test
-/// can assert it was reached exactly once, or never reached at all.
-fn counting_resolver(calls: &Arc<AtomicU32>, outcome: ResolverOutcome) -> ScriptedResolver {
-    let counted = Arc::clone(calls);
-    ScriptedResolver::new(vec![Box::new(move |_request: &ResolutionRequest<'_>| {
-        counted.fetch_add(1, Ordering::SeqCst);
-        Ok(outcome.clone())
-    }) as ScriptedStep])
-}
-
 /// Rung 0: the target is exactly the pinned base. The ladder answers before it
 /// can touch anything — no rebase, no worktree churn, no repin, no resolver.
 #[test]
@@ -278,14 +253,10 @@ fn an_unmoved_target_is_a_no_op_before_quality() {
     let authority = fixture.claim();
     let mut context = fixture.context(authority);
     let before = fixture.checkout_trace();
-    let calls = Arc::new(AtomicU32::new(0));
-    let resolver = counting_resolver(&calls, ResolverOutcome::Unavailable);
 
-    let outcome =
-        refresh_candidate_at_quality_boundary_with_resolver(&mut context, Some(&resolver)).unwrap();
+    let outcome = refresh_candidate_at_quality_boundary(&mut context).unwrap();
 
     assert!(outcome.is_none(), "Quality must simply continue");
-    assert_eq!(calls.load(Ordering::SeqCst), 0);
     assert_eq!(fixture.checkout_trace(), before);
     let detail = fixture.detail();
     assert_eq!(detail["status"], "quality");
@@ -309,14 +280,10 @@ fn a_moved_target_that_already_contains_the_candidate_is_a_no_op() {
     let authority = fixture.claim();
     let mut context = fixture.context(authority);
     let before = fixture.checkout_trace();
-    let calls = Arc::new(AtomicU32::new(0));
-    let resolver = counting_resolver(&calls, ResolverOutcome::Unavailable);
 
-    let outcome =
-        refresh_candidate_at_quality_boundary_with_resolver(&mut context, Some(&resolver)).unwrap();
+    let outcome = refresh_candidate_at_quality_boundary(&mut context).unwrap();
 
     assert!(outcome.is_none());
-    assert_eq!(calls.load(Ordering::SeqCst), 0);
     assert_eq!(fixture.checkout_trace(), before);
     let detail = fixture.detail();
     assert_eq!(detail["candidate_commit"], fixture.candidate);
@@ -335,7 +302,7 @@ fn a_clean_refresh_repins_the_base_and_clears_stale_quality_evidence() {
     let authority = fixture.claim();
     let mut context = fixture.context(authority);
 
-    let outcome = refresh_candidate_at_quality_boundary_with_resolver(&mut context, None).unwrap();
+    let outcome = refresh_candidate_at_quality_boundary(&mut context).unwrap();
 
     assert!(outcome.is_none(), "Quality must run on the refreshed base");
     let detail = fixture.detail();
@@ -383,170 +350,37 @@ fn a_clean_refresh_repins_the_base_and_clears_stale_quality_evidence() {
     );
 }
 
-/// A conflicted rebase is resolved in place, unlocked, exactly as stage 3
-/// shipped — and the replacement candidate simply proceeds into Quality
-/// instead of costing a re-implementation Round.
+/// Conflicts restore the recorded candidate and stop without another Round.
 #[test]
-fn a_conflicted_refresh_resolves_in_place_and_the_replacement_proceeds_to_quality() {
-    let fixture = BoundaryFixture::new("quality-refresh-conflict", true);
-    let target = fixture.advance_target("app.txt", "target\n");
-    let authority = fixture.claim();
-    let mut context = fixture.context(authority);
-    let resolver = ScriptedResolver::new(vec![completing_edit(|request| {
-        fs::write(
-            request.workspace_dir.join("app.txt"),
-            "candidate and target\n",
-        )
-        .unwrap();
-    })]);
-
-    let outcome =
-        refresh_candidate_at_quality_boundary_with_resolver(&mut context, Some(&resolver)).unwrap();
-
-    assert!(outcome.is_none(), "the resolved candidate continues");
-    let detail = fixture.detail();
-    // No recovery Round: the Goal is still the same Round in Quality.
-    assert_eq!(detail["status"], "quality");
-    assert_eq!(detail["rounds"].as_array().unwrap().len(), 1);
-    let replacement = detail["candidate_commit"].as_str().unwrap().to_string();
-    assert_ne!(replacement, fixture.candidate);
-    assert_eq!(detail["base_commit"], target);
-    let refresh = &detail["rounds"][0]["workflow_candidate_refresh"];
-    assert_eq!(refresh["authorizing_status"], "quality");
-    assert_eq!(refresh["conflict_resolution"]["outcome"], "resolved");
-    assert!(
-        refresh["conflict_resolution"]["files"]
-            .as_array()
-            .is_some_and(|files| files.iter().any(|file| file == "app.txt"))
-    );
-    assert_eq!(
-        git_output(
-            &fixture.worktree,
-            &["show", &format!("{replacement}:app.txt")]
-        ),
-        "candidate and target\n"
-    );
-    assert_eq!(context.commit.as_deref(), Some(replacement.as_str()));
-}
-
-/// No resolver available: the boundary takes exactly the pre-resolver
-/// fallback — abort, restore the exact recorded candidate, and queue the
-/// fenced integration recovery Round on the shared budget. The pass ends
-/// there; Quality never runs on a candidate that no longer applies.
-#[test]
-fn an_unavailable_resolver_falls_back_to_the_fenced_recovery_round() {
+fn a_conflicted_refresh_fails_with_the_original_candidate_and_no_new_round() {
     let fixture = BoundaryFixture::new("quality-refresh-unavailable", true);
     fixture.advance_target("app.txt", "target\n");
     let authority = fixture.claim();
     let mut context = fixture.context(authority);
-    let calls = Arc::new(AtomicU32::new(0));
-    let resolver = counting_resolver(&calls, ResolverOutcome::Unavailable);
 
-    let outcome =
-        refresh_candidate_at_quality_boundary_with_resolver(&mut context, Some(&resolver)).unwrap();
+    let outcome = refresh_candidate_at_quality_boundary(&mut context).unwrap();
 
     let Some(WorkflowAdvanceOutcome::Completed { final_status, .. }) = outcome else {
         panic!("expected the pass to end on the recovery Round, got {outcome:?}");
     };
-    assert_eq!(final_status, GoalStatus::Todo);
-    assert_eq!(calls.load(Ordering::SeqCst), 1);
+    assert_eq!(final_status, GoalStatus::Failed);
     assert_eq!(
         git_output(&fixture.worktree, &["rev-parse", "HEAD"]).trim(),
         fixture.candidate,
         "the exact recorded candidate is restored"
     );
     let detail = fixture.detail();
-    assert_eq!(detail["status"], "todo");
+    assert_eq!(detail["status"], "failed");
     assert_eq!(detail["base_commit"], fixture.base);
     assert_eq!(detail["candidate_commit"], fixture.candidate);
-    assert_eq!(detail["rounds"].as_array().unwrap().len(), 2);
+    assert_eq!(detail["rounds"].as_array().unwrap().len(), 1);
     assert_eq!(
         detail["rounds"][0]["workflow_recovery"]["reason"],
         "candidate refresh conflicted"
     );
-    assert_eq!(
-        detail["rounds"][1]["automatic_retry"]["kind"],
-        "integration"
-    );
-    assert_eq!(
-        detail["rounds"][0]["workflow_recovery"]["retained_evidence"]["conflict_resolution"]["outcome"],
-        "unavailable"
-    );
-}
-
-/// The target moves again while the resolver is running unlocked. The refresh
-/// aborts and surfaces `TargetAdvanced`; the boundary's bounded loop re-derives
-/// against the moved tip rather than publishing a replacement built on a stale
-/// one.
-#[test]
-fn a_target_tip_moved_mid_refresh_retries_boundedly_before_quality() {
-    let fixture = BoundaryFixture::new("quality-refresh-race", true);
-    let first_target = fixture.advance_target("app.txt", "target\n");
-    let authority = fixture.claim();
-    let mut context = fixture.context(authority);
-    let calls = Arc::new(AtomicU32::new(0));
-    let counted = Arc::clone(&calls);
-    let advance_root = fixture.target_root.clone();
-    let resolver = ScriptedResolver::new(vec![
-        completing_edit(move |request| {
-            counted.fetch_add(1, Ordering::SeqCst);
-            fs::write(advance_root.join("app.txt"), "target v2\n").unwrap();
-            git(&advance_root, &["add", "app.txt"]).unwrap();
-            git(
-                &advance_root,
-                &["commit", "-m", "advance during resolution"],
-            )
-            .unwrap();
-            fs::write(
-                request.workspace_dir.join("app.txt"),
-                "candidate and target\n",
-            )
-            .unwrap();
-        }),
-        {
-            let counted = Arc::clone(&calls);
-            completing_edit(move |request| {
-                counted.fetch_add(1, Ordering::SeqCst);
-                fs::write(
-                    request.workspace_dir.join("app.txt"),
-                    "candidate and target v2\n",
-                )
-                .unwrap();
-            })
-        },
-    ]);
-
-    let outcome =
-        refresh_candidate_at_quality_boundary_with_resolver(&mut context, Some(&resolver)).unwrap();
-
+    assert!(detail["rounds"][0]["automatic_retry"].is_null());
     assert!(
-        outcome.is_none(),
-        "the retried refresh continues to Quality"
-    );
-    assert_eq!(calls.load(Ordering::SeqCst), 2, "one retry, not a loop");
-    let moved_target = git_output(&fixture.target_root, &["rev-parse", "main"])
-        .trim()
-        .to_string();
-    assert_ne!(moved_target, first_target);
-    let detail = fixture.detail();
-    assert_eq!(detail["status"], "quality");
-    assert_eq!(detail["rounds"].as_array().unwrap().len(), 1);
-    assert_eq!(detail["base_commit"], moved_target);
-    let replacement = detail["candidate_commit"].as_str().unwrap().to_string();
-    assert_eq!(
-        git_output(
-            &fixture.worktree,
-            &["show", &format!("{replacement}:app.txt")]
-        ),
-        "candidate and target v2\n"
-    );
-    assert_eq!(
-        git_output(
-            &fixture.worktree,
-            &["merge-base", &moved_target, &replacement]
-        )
-        .trim(),
-        moved_target
+        detail["rounds"][0]["workflow_recovery"]["retained_evidence"]["rebase_abort"].is_object()
     );
 }
 
@@ -561,7 +395,7 @@ fn a_later_target_move_still_refreshes_at_governance_and_retains_the_earlier_rep
     let quality_authority = fixture.claim();
     let mut context = fixture.context(quality_authority);
     assert!(
-        refresh_candidate_at_quality_boundary_with_resolver(&mut context, None)
+        refresh_candidate_at_quality_boundary(&mut context)
             .unwrap()
             .is_none()
     );
@@ -582,7 +416,7 @@ fn a_later_target_move_still_refreshes_at_governance_and_retains_the_earlier_rep
     let mut context = fixture.context_at(governance_authority, &quality_replacement);
 
     let outcome =
-        refresh_candidate_for_target_advancement(&mut context, GoalStatus::Governance, 5).unwrap();
+        refresh_candidate_for_target_advancement(&mut context, GoalStatus::Governance).unwrap();
 
     let CandidateRefreshOutcome::Refreshed {
         original_candidate,
@@ -635,7 +469,7 @@ fn repeated_refreshes_keep_a_bounded_flat_history() {
             .to_string();
         let mut context = fixture.context_at(authority, &candidate);
         assert!(
-            refresh_candidate_at_quality_boundary_with_resolver(&mut context, None)
+            refresh_candidate_at_quality_boundary(&mut context)
                 .unwrap()
                 .is_none()
         );

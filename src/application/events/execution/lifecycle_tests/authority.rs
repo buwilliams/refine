@@ -121,7 +121,7 @@ fn cancelled_invocation_stays_terminal_and_retains_its_workspace() {
     f.dispatch();
     assert_eq!(
         f.work().show_goal_detail("FRESH").unwrap()["status"],
-        "backlog"
+        "failed"
     );
 }
 

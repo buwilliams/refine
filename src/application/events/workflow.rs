@@ -210,6 +210,16 @@ pub fn exit(ctx: &WorkflowContext<'_>, from: GoalStatus, to: GoalStatus) -> Refi
         )?;
         require_success(&checked.results)?;
     }
+    let success = run_checked(
+        ctx,
+        from.clone(),
+        "success",
+        cwd,
+        json!({"destination": to.as_str(), "candidate_commit": ctx.commit}),
+        "",
+    )?;
+    require_success(&success.results)?;
+    checked.required.extend(success.required);
     let results = run_checked(
         ctx,
         from.clone(),

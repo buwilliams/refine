@@ -11,6 +11,7 @@ mod config;
 mod features;
 mod fleet;
 mod goals;
+mod hub;
 mod logs;
 mod nodes;
 mod projects;
@@ -19,6 +20,7 @@ mod sync;
 mod system;
 mod todos;
 mod workflow;
+pub use hub::HubAction;
 
 pub use agents::{AgentAction, CliAgentProfile};
 pub use config::{ConfigAction, ConfigDomain, ConfigPayload, ConfigSettingsAction};
@@ -45,6 +47,11 @@ pub struct Cli {
 
 #[derive(Debug, Subcommand)]
 pub enum Commands {
+    /// Manage Knowledge Hub sites, JSON data, queries and publication.
+    Hub {
+        #[command(subcommand)]
+        action: HubAction,
+    },
     /// Configure reusable Skills and their triggers, or run a Skill manually.
     Skills {
         #[command(subcommand)]

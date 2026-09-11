@@ -212,7 +212,7 @@ fn completed_skill_reuse_revalidates_workspace_without_rewriting_retained_result
 
 #[cfg(unix)]
 #[test]
-fn dirty_primary_survives_planning_implementation_repairs_ordered_bindings_and_skill_quality() {
+fn dirty_primary_survives_planning_ordered_implementation_and_skill_quality() {
     use std::os::unix::fs::PermissionsExt;
     let f = Fixture::new();
     let before = f.snapshot();
@@ -234,7 +234,6 @@ result['evidence']=['observed isolated cwd']
 if result['role']=='implement':
  pathlib.Path('app.txt').write_text('implemented\n')
  result['artifacts']={{'implementation_evidence':{{'checklist':[{{'id':'P1','outcome':'completed','evidence':'changed candidate'}}],'verification':['observed cwd']}}}}
-if result['role']=='implement': result['extra_field']='repair envelope only'
 if result['role']=='quality':
  result['artifacts']={{'tests':[{{'test':'isolated file','command':"test \"$(cat app.txt)\" = implemented && test -z \"${{GIT_DIR+x}}${{GIT_WORK_TREE+x}}${{GIT_INDEX_FILE+x}}\"",'status':'pending','evidence':''}}]}}
 print(json.dumps(result))
@@ -282,7 +281,7 @@ print(json.dumps(result))
         .unwrap();
     let result = f.service.execute(&implementation.id, || Ok(())).unwrap();
     assert_eq!(result.state, InvocationState::Succeeded, "{result:?}");
-    assert_eq!(result.attempts.len(), 4);
+    assert_eq!(result.attempts.len(), 2);
     let launches = fs::read(&log).unwrap();
     assert_eq!(
         f.service.execute(&implementation.id, || Ok(())).unwrap(),

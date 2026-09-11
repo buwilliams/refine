@@ -35,6 +35,7 @@ enum ToolBinding {
     /// agent can reach any daemon route, including writes.
     Passthrough,
     SkillTrigger,
+    WorkflowControl,
 }
 
 /// A capability the MCP surface exposes to clients.
@@ -60,6 +61,30 @@ impl McpTool {
     /// arguments are missing or invalid.
     pub fn build_request(&self, arguments: &Value) -> Result<RequestParts, String> {
         match &self.binding {
+            ToolBinding::WorkflowControl => {
+                let id = arguments["goal_id"].as_str().ok_or("goal_id is required")?;
+                if id.is_empty()
+                    || !id
+                        .bytes()
+                        .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+                {
+                    return Err("invalid goal_id".into());
+                }
+                let action = arguments["action"].as_str().unwrap_or("move");
+                if !["move", "integrate"].contains(&action) {
+                    return Err("action must be move or integrate".into());
+                }
+                let body = arguments
+                    .get("decision")
+                    .filter(|v| v.is_object())
+                    .ok_or("decision object is required")?
+                    .clone();
+                Ok(RequestParts {
+                    method: "POST".into(),
+                    path: format!("/workflow/goals/{id}/{action}"),
+                    body: Some(body),
+                })
+            }
             ToolBinding::Api {
                 method,
                 path,
@@ -191,6 +216,22 @@ pub fn tool_catalog() -> Vec<McpTool> {
             description: "Run one Skill with a Custom trigger on the active node, independently of Goals. Discover required inputs at /skills/{skill_id}/inputs. Reuse request_id to retry transport without duplicating work.",
             input_schema: || json!({"type":"object","properties":{"skill_id":{"type":"string"},"node_id":{"type":"string"},"request_id":{"type":"string"},"parameters":{"type":"object"}},"required":["skill_id"],"additionalProperties":false}),
             binding: ToolBinding::SkillTrigger,
+        },
+        McpTool {
+            name: "refine_workflow_control",
+            description: "Move or explicitly integrate a Goal through shared outcome controls. Read the current workflow_revision first. No Skill is required; forced actions retain override evidence.",
+            input_schema: || json!({"type":"object","properties":{"goal_id":{"type":"string"},"action":{"enum":["move","integrate"]},"decision":{"type":"object","properties":{"to":{"type":"string"},"reason":{"type":"string"},"expected_revision":{"type":"integer"},"request_id":{"type":"string"},"force":{"type":"boolean"},"context":{"type":"string"},"actor":{"type":"string"},"invocation_id":{"type":"string"}},"required":["to","reason","expected_revision","request_id"]}},"required":["goal_id","decision"]}),
+            binding: ToolBinding::WorkflowControl,
+        },
+        McpTool {
+            name: "refine_hub_sites",
+            description: "List Knowledge Hub sites. Manage assets, collections, records, indexes, queries and publication through /api/hub routes with refine_request.",
+            input_schema: empty_schema,
+            binding: ToolBinding::Api {
+                method: "GET",
+                path: "/api/hub/sites",
+                path_params: &[],
+            },
         },
         McpTool {
             name: "refine_system_status",

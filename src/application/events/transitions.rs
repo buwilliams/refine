@@ -92,7 +92,21 @@ pub fn prepare_write(
         .unwrap_or("default")
         .to_string();
     let config = (*current_config).clone();
-    let force = ["cancelled", "failed"].contains(&to.as_str());
+    let explicit_override = next["workflow_controls"]
+        .as_array()
+        .is_some_and(|controls| {
+            controls.len()
+                > current
+                    .and_then(|value| value["workflow_controls"].as_array())
+                    .map_or(0, Vec::len)
+                && controls
+                    .last()
+                    .is_some_and(|receipt| receipt["forced"] == true)
+        });
+    let force = ["cancelled", "failed"].contains(&to.as_str()) || explicit_override;
+    let redirected = current
+        .is_some_and(|value| value["pending_workflow_outcome"]["state"] == "pending")
+        && next["pending_workflow_outcome"]["state"] == "redirected";
     let entry_config = if force {
         None
     } else if let (Some(goal), Some(from)) = (current, from) {
@@ -104,6 +118,7 @@ pub fn prepare_write(
     };
     if let (Some(from), Some(current)) = (from, current) {
         let blocking = [
+            (&config, format!("workflow.{from}.success")),
             (&config, format!("workflow.{from}.exit")),
             (
                 entry_config.as_ref().unwrap_or(&config),
@@ -128,7 +143,7 @@ pub fn prepare_write(
                         .any(|(b, _)| b.mode == BindingMode::Blocking)
                 })
         });
-        if blocking && !force && !approval_path(root, current, &to).exists() {
+        if blocking && !force && !redirected && !approval_path(root, current, &to).exists() {
             if let Some(pending) = current
                 .get("pending_event_transition")
                 .filter(|p| p.get("state").and_then(Value::as_str) == Some("pending"))
@@ -176,14 +191,26 @@ pub fn prepare_write(
     // Automated phase entry is consumed by the existing workflow worker. Other
     // lifecycle hooks use the same pending dispatch capability as custom Events.
     let mut sources = Vec::new();
-    if !["plan", "implement", "quality", "governance"].contains(&to.as_str()) {
-        let source = format!("workflow.{to}.enter");
-        super::gate_configuration::pin_lifecycle_entry(next, &current_config, &node, &source);
-        sources.push(source);
-    }
     if let Some(from) = from {
+        let success = format!("workflow.{from}.success");
+        if !force
+            && !current.is_some_and(|value| value["pending_workflow_outcome"]["state"] == "pending")
+            && !config
+                .events
+                .values()
+                .filter(|event| event.source.as_deref() == Some(&success))
+                .any(|event| {
+                    config
+                        .bindings(event, &node)
+                        .iter()
+                        .any(|(binding, _)| binding.mode == BindingMode::Blocking)
+                })
+        {
+            sources.push(success);
+        }
         let source = format!("workflow.{from}.exit");
         if force
+            || redirected
             || !config
                 .events
                 .values()
@@ -198,12 +225,25 @@ pub fn prepare_write(
             sources.push(source);
         }
     }
+    if !["plan", "implement", "quality", "governance"].contains(&to.as_str()) {
+        let source = format!("workflow.{to}.enter");
+        super::gate_configuration::pin_lifecycle_entry(next, &current_config, &node, &source);
+        sources.push(source);
+    }
     for source in sources {
-        if config
-            .events
-            .values()
-            .filter(|e| e.source.as_deref() == Some(&source))
-            .any(|e| !config.bindings(e, &node).is_empty())
+        let terminal_success = ["done", "failed", "cancelled"].contains(&to.as_str())
+            && source == format!("workflow.{to}.enter")
+            && config.events.values().any(|event| {
+                event.source.as_deref() == Some(&format!("workflow.{to}.success"))
+                    && event.enabled
+                    && !config.bindings(event, &node).is_empty()
+            });
+        if terminal_success
+            || config
+                .events
+                .values()
+                .filter(|e| e.source.as_deref() == Some(&source))
+                .any(|e| !config.bindings(e, &node).is_empty())
         {
             let key = super::execution::stable_id(&format!("{}:{generation}:{source}", next["id"]));
             write_json(

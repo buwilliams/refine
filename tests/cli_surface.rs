@@ -7,6 +7,7 @@ mod cli_surface {
     pub(super) mod features;
     pub(super) mod fleet;
     pub(super) mod goals;
+    pub(super) mod hub;
     pub(super) mod logs;
     pub(super) mod nodes;
     pub(super) mod projects;
@@ -30,11 +31,19 @@ use cli_surface::daemon_status::*;
 use cli_surface::features::*;
 use cli_surface::fleet::*;
 use cli_surface::goals::*;
+use cli_surface::hub::*;
 use cli_surface::logs::*;
 use cli_surface::nodes::*;
 use cli_surface::projects::*;
 use cli_surface::system_diagnostics::*;
 use cli_surface::todos::*;
+
+#[test]
+#[ignore = "daemon-backed Hub and workflow test; run with the isolated CLI fixture"]
+fn hub_and_workflow_surface_suite() {
+    let fixture = IntegrationFixture::start("hub-workflow");
+    hub_and_workflow_controls_share_the_daemon_surface(&fixture);
+}
 
 #[test]
 #[ignore = "daemon-backed surface test; run through `cargo run --manifest-path xtask/Cargo.toml -- test-cli`"]
@@ -48,6 +57,7 @@ fn cli_surface_suite() {
     project_doctor_runs(&fixture);
     project_registry_lifecycle_commands(&fixture);
     system_doctor_and_api_groups_run(&fixture);
+    hub_and_workflow_controls_share_the_daemon_surface(&fixture);
     goal_create_list_show_edit_note_round_delete(&fixture);
     goal_feature_assignment_and_round_edit_latest(&fixture);
     goal_workflow_actions_start_retry_and_undo(&fixture);

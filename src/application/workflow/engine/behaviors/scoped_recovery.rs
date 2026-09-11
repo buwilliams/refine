@@ -7,6 +7,14 @@ use super::*;
 /// Integration-race recoveries are excluded on purpose — their candidate
 /// itself is stale, so they replay the full pipeline from a fresh base.
 pub(super) fn round_scoped_recovery_retry(round: &Value) -> Option<(String, usize)> {
+    if round["retained_candidate"].is_string() {
+        if let Some(source) = round["workflow_control"]["source_round"]
+            .as_u64()
+            .filter(|value| *value > 0)
+        {
+            return Some(("workflow_control".into(), source as usize - 1));
+        }
+    }
     let retry = round.get("automatic_retry")?;
     let kind = retry.get("kind").and_then(Value::as_str)?;
     if !matches!(kind, "quality" | "governance") {
@@ -50,42 +58,59 @@ pub(super) fn begin_scoped_recovery_round(
         recorded("candidate_commit"),
         recorded("base_commit"),
     ) else {
-        return Ok(None);
+        return if kind == "workflow_control" {
+            Err(RefineError::Conflict("Explicit candidate recovery requires retained branch, candidate and base identities".into()))
+        } else {
+            Ok(None)
+        };
     };
-    crate::application::workflow::engine::context::validate_round_workspace_branch(
-        &detail,
-        &ctx.goal_id,
-        source_round,
-        &source_branch,
-        &setting_string(&ctx.settings, "branch_name_pattern", "refine/{goal_id}"),
-    )?;
-    let Some(worktree_path) = app_git.existing_worktree_for_branch(&source_branch)? else {
-        ctx.log(
-            "git",
-            "Scoped recovery fell back to a fresh worktree; the source Round worktree is gone",
-            Some(json_object(json!({"source_branch": source_branch}))),
-        )?;
-        return Ok(None);
-    };
-    let worktree_path = worktree_path.display().to_string();
-    let source_workspace = crate::infrastructure::git::worktrees::ManagedWorktree {
-        repository: ctx.target_root.to_path_buf(),
-        path: std::path::PathBuf::from(&worktree_path),
-        branch: source_branch.clone(),
-        commit: Some(candidate.clone()),
-        allow_rebase: false,
-        registration: None,
-    };
-    let source_workspace = source_workspace.pin()?;
-    let worktree_git = FileGitWorktreeService::with_runtime_root(&worktree_path, ctx.runtime_root)
-        .with_managed_worktree(source_workspace.clone())?;
     let retained_candidate_intact = |worktree_git: &FileGitWorktreeService| -> RefineResult<bool> {
         let head = worktree_git.head_ref()?;
         let status = worktree_git.inspect("")?;
         Ok(head.commit.as_deref() == Some(candidate.as_str()) && status.is_pristine())
     };
-    if !retained_candidate_intact(&worktree_git)? {
-        ctx.log(
+    let source = if kind == "workflow_control" {
+        if round["retained_candidate"].as_str() != Some(candidate.as_str())
+            || app_git.resolve_commit(&candidate)? != candidate
+        {
+            return Err(RefineError::Conflict(
+                "Explicit recovery candidate changed or is unavailable".into(),
+            ));
+        }
+        // A new Round copies the exact retained commit, independently of the old
+        // checkout. Dirty work and missing worktrees cannot change its starting point.
+        None
+    } else {
+        crate::application::workflow::engine::context::validate_round_workspace_branch(
+            &detail,
+            &ctx.goal_id,
+            source_round,
+            &source_branch,
+            &setting_string(&ctx.settings, "branch_name_pattern", "refine/{goal_id}"),
+        )?;
+        let Some(worktree_path) = app_git.existing_worktree_for_branch(&source_branch)? else {
+            ctx.log(
+                "git",
+                "Scoped recovery fell back to a fresh worktree; the source Round worktree is gone",
+                Some(json_object(json!({"source_branch": source_branch}))),
+            )?;
+            return Ok(None);
+        };
+        let worktree_path = worktree_path.display().to_string();
+        let source_workspace = crate::infrastructure::git::worktrees::ManagedWorktree {
+            repository: ctx.target_root.to_path_buf(),
+            path: std::path::PathBuf::from(&worktree_path),
+            branch: source_branch.clone(),
+            commit: Some(candidate.clone()),
+            allow_rebase: false,
+            registration: None,
+        };
+        let source_workspace = source_workspace.pin()?;
+        let worktree_git =
+            FileGitWorktreeService::with_runtime_root(&worktree_path, ctx.runtime_root)
+                .with_managed_worktree(source_workspace.clone())?;
+        if !retained_candidate_intact(&worktree_git)? {
+            ctx.log(
             "git",
             "Scoped recovery fell back to a fresh worktree; the retained candidate checkout changed",
             Some(json_object(json!({
@@ -93,8 +118,10 @@ pub(super) fn begin_scoped_recovery_round(
                 "candidate_commit": candidate
             }))),
         )?;
-        return Ok(None);
-    }
+            return Ok(None);
+        }
+        Some((source_workspace, worktree_git))
+    };
     let branch = implementation_branch_name(
         setting_string(&ctx.settings, "branch_name_pattern", "refine/{goal_id}").as_str(),
         &ctx.goal_id,
@@ -105,12 +132,14 @@ pub(super) fn begin_scoped_recovery_round(
     // lands before any Git mutation.
     ctx.request_transition(GoalStatus::Todo, GoalStatus::Plan)?;
     let (worktree_path, handoff) = match with_repository_git_lock(ctx.target_root, || {
-        source_workspace.validate()?;
-        if !retained_candidate_intact(&worktree_git)? {
-            return Err(RefineError::Conflict(format!(
-                "Goal {} retained candidate changed before scoped recovery could begin",
-                ctx.goal_id
-            )));
+        if let Some((source_workspace, worktree_git)) = &source {
+            source_workspace.validate()?;
+            if !retained_candidate_intact(worktree_git)? {
+                return Err(RefineError::Conflict(format!(
+                    "Goal {} retained candidate changed before scoped recovery could begin",
+                    ctx.goal_id
+                )));
+            }
         }
         // Preserve the source Round and any conflicting recovery attempt verbatim.
         let target = app_git.managed_worktree_path(&branch)?;

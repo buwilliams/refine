@@ -31,19 +31,6 @@ impl FileGovernanceService {
                 })?;
                 current["constitution"] = Value::String(constitution.trim().to_string());
             }
-            if let Some(max_retries) = body.get("max_automatic_round_retries") {
-                let max_retries = max_retries.as_u64().ok_or_else(|| {
-                    RefineError::InvalidInput(
-                        "max_automatic_round_retries must be a nonnegative integer".to_string(),
-                    )
-                })?;
-                let max_retries = u32::try_from(max_retries).map_err(|_| {
-                    RefineError::InvalidInput(
-                        "max_automatic_round_retries must fit in a 32-bit integer".to_string(),
-                    )
-                })?;
-                current["max_automatic_round_retries"] = json!(max_retries);
-            }
             if let Some(rules) = body.get("rules") {
                 if !rules.is_array() {
                     return Err(RefineError::InvalidInput("rules must be a list".to_string()));
@@ -84,11 +71,7 @@ impl FileGovernanceService {
         for key in updates.keys() {
             if !matches!(
                 key.as_str(),
-                "product"
-                    | "constitution"
-                    | "rules"
-                    | "rules_revision"
-                    | "max_automatic_round_retries"
+                "product" | "constitution" | "rules" | "rules_revision"
             ) {
                 return Err(RefineError::InvalidInput(format!(
                     "unknown Governance field: {key}"
@@ -116,18 +99,6 @@ impl FileGovernanceService {
                     "rules_revision requires a rules replacement".to_string(),
                 ));
             }
-        }
-        if let Some(max_retries) = body.get("max_automatic_round_retries") {
-            let max_retries = max_retries.as_u64().ok_or_else(|| {
-                RefineError::InvalidInput(
-                    "max_automatic_round_retries must be a nonnegative integer".to_string(),
-                )
-            })?;
-            u32::try_from(max_retries).map_err(|_| {
-                RefineError::InvalidInput(
-                    "max_automatic_round_retries must fit in a 32-bit integer".to_string(),
-                )
-            })?;
         }
         Ok(())
     }
@@ -168,7 +139,7 @@ impl FileGovernanceService {
             let existed = path.exists();
             let mut value = read_json_or_default(
                 path,
-                json!({"product": "", "constitution": "", "rules": [], "max_automatic_round_retries": 5}),
+                json!({"product": "", "constitution": "", "rules": []}),
             )?;
             let before = value.clone();
             normalize_governance(&mut value);

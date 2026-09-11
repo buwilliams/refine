@@ -1256,6 +1256,7 @@ name = "refine"
 version = "4.2.0"
 dependencies = [
  "axum",
+ "base64",
  "chrono",
  "clap",
  "fs2",

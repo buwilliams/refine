@@ -1,5 +1,6 @@
 use super::*;
 use std::sync::Arc;
+use std::sync::{Mutex, OnceLock};
 type Hook = Arc<
     dyn Fn(&WorkflowEngine, &str, &str, WorkflowAttemptAuthority) -> RefineResult<()> + Send + Sync,
 >;

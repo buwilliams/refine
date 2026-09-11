@@ -71,10 +71,6 @@ function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
     ["on",  "On — an agent merges both intents before any authority fallback"],
     ["off", "Off — contested merges fail closed immediately"],
   ];
-  const conflictResolutionOptions = [
-    ["on",  "On — an agent resolves the conflicted refresh in place"],
-    ["off", "Off — a conflicted refresh aborts and queues a recovery Round"],
-  ];
   const providerOptions = [
     ["claude", "Claude Code (default)"],
     ["codex", "OpenAI Codex"],
@@ -92,7 +88,6 @@ function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
   const staleThreshold = String(s.state_sync_stale_threshold_seconds ?? "900");
   const autoRecovery = String(s.state_sync_auto_recovery ?? "remote");
   const agentResolution = String(s.state_sync_agent_resolution ?? "on");
-  const conflictResolution = String(s.workflow_conflict_resolution ?? "on");
   const parallelRunCap = String(s.parallel_run_cap ?? "").trim();
   const automaticResourceBudgetPercent = String(
     s.automatic_agent_resource_budget_percent ?? "70",
@@ -131,8 +126,8 @@ function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
         control: `<input type="text" id="s-pattern" data-testid="runtime-branch-name-pattern" value="${htmlEscape(s.branch_name_pattern || "refine/{goal_id}")}">`,
       })}
       ${renderSettingsEditableField({
-        id: "s-round-retries", label: "Automatic recovery Round limit", valueLabel: s.max_automatic_round_retries ?? 5,
-        control: `<input type="number" id="s-round-retries" min="0" max="100" value="${htmlEscape(s.max_automatic_round_retries ?? 5)}">`,
+        id: "s-error-timeout", label: "Error handling timeout (seconds)", valueLabel: s.workflow_error_timeout_seconds ?? 600,
+        control: `<input type="number" id="s-error-timeout" min="1" max="86400" value="${htmlEscape(s.workflow_error_timeout_seconds ?? 600)}">`,
       })}
       ${renderSettingsEditableField({
         id: "s-idle",
@@ -272,16 +267,6 @@ function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
         valueLabel: optionLabel(agentResolutionOptions, agentResolution),
         control: `<select id="s-state-sync-agent-resolution" data-testid="runtime-state-sync-agent-resolution">
           ${agentResolutionOptions.map(([v, lbl]) => `<option value="${v}" ${agentResolution === v ? "selected" : ""}>${lbl}</option>`).join("")}
-        </select>`,
-      })}
-      ${renderSettingsEditableField({
-        id: "s-workflow-conflict-resolution",
-        label: "Candidate refresh agent resolution",
-        guideItemId: "runtime-project-update-pulse",
-        description: "when a Goal's candidate no longer rebases onto the target it will merge into, let the installed agent resolve the conflicted refresh in place; turning it off aborts the refresh and queues the fenced integration recovery Round instead.",
-        valueLabel: optionLabel(conflictResolutionOptions, conflictResolution),
-        control: `<select id="s-workflow-conflict-resolution" data-testid="runtime-workflow-conflict-resolution">
-          ${conflictResolutionOptions.map(([v, lbl]) => `<option value="${v}" ${conflictResolution === v ? "selected" : ""}>${lbl}</option>`).join("")}
         </select>`,
       })}
       ${renderSettingsEditableField({
@@ -436,7 +421,7 @@ async function autosaveSettingsRuntime(options = {}) {
     parallel_run_cap: $("#s-cap").value,
     automatic_agent_resource_budget_percent: $("#s-automatic-resource-budget-percent").value,
     branch_name_pattern: $("#s-pattern").value,
-    max_automatic_round_retries: $("#s-round-retries").value,
+    workflow_error_timeout_seconds: $("#s-error-timeout").value,
     agent_idle_timeout_seconds: $("#s-idle").value,
     agent_hard_cap_seconds: $("#s-hard").value,
     worker_memory_limit_mb: $("#s-worker-memory").value,
@@ -452,7 +437,6 @@ async function autosaveSettingsRuntime(options = {}) {
     state_sync_stale_threshold_seconds: $("#s-state-sync-stale-threshold").value,
     state_sync_auto_recovery: $("#s-state-sync-auto-recovery").value,
     state_sync_agent_resolution: $("#s-state-sync-agent-resolution").value,
-    workflow_conflict_resolution: $("#s-workflow-conflict-resolution").value,
     file_browser_ignore_patterns: $("#s-file-browser-ignore").value,
     agent_cli: chosen,
   });
@@ -466,7 +450,7 @@ function bindNodeRuntimeConfigControls() {
   const root = document.querySelector('[data-tab-pane="runtime"]');
   const autosaveRuntime = bindSettingsAutosave(
     root,
-    "#s-cap, #s-automatic-resource-budget-percent, #s-pattern, #s-round-retries, #s-idle, #s-hard, #s-worker-memory, #s-ui-memory, #s-worker-cpu-priority, #s-resource-isolation, #s-agent-limit-pause, #s-chat-idle, #s-backlog-promote, #s-worktree-cleanup-delay, #s-state-sync-debounce, #s-project-update-pulse, #s-state-sync-stale-threshold, #s-state-sync-auto-recovery, #s-state-sync-agent-resolution, #s-workflow-conflict-resolution, #s-file-browser-ignore",
+    "#s-cap, #s-automatic-resource-budget-percent, #s-pattern, #s-error-timeout, #s-idle, #s-hard, #s-worker-memory, #s-ui-memory, #s-worker-cpu-priority, #s-resource-isolation, #s-agent-limit-pause, #s-chat-idle, #s-backlog-promote, #s-worktree-cleanup-delay, #s-state-sync-debounce, #s-project-update-pulse, #s-state-sync-stale-threshold, #s-state-sync-auto-recovery, #s-state-sync-agent-resolution, #s-file-browser-ignore",
     autosaveSettingsRuntime,
     { event: "settings-editable-commit" },
   );

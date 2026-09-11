@@ -1339,7 +1339,8 @@ impl FileGitSyncService {
                 continue;
             }
             let destination = live_root.join(&relative);
-            let key = record_lock_key(&destination);
+            let key = crate::application::hub::synchronization_lock_key(&relative)
+                .unwrap_or_else(|| record_lock_key(&destination));
             with_record_lock(live_root, &key, || {
                 let current = live_path_fingerprint(&destination)?;
                 let before = original.get(&relative).copied();
@@ -1436,6 +1437,9 @@ fn reconcile_hydrated_index(
     destination: &std::path::Path,
     desired: Option<u64>,
 ) {
+    if relative.starts_with("hub") {
+        crate::application::hub::query::invalidate(live_root);
+    }
     if desired.is_some() {
         record_synchronized_goal(live_root, relative, destination);
     } else {

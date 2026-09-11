@@ -41,14 +41,9 @@ fn cancelled_todo_entry_rejects_scheduler_admission_without_materializing_implem
             "cancelled blocking Entry admitted implementation: {result:?}"
         );
         let error = result.unwrap_err().to_string();
-        assert!(
-            error.contains(&entry.id)
-                && error.contains("workflow-todo-enter-gate")
-                && error.contains("Cancelled"),
-            "{error}"
-        );
+        assert!(error.contains("no longer authorizes todo"), "{error}");
         let goal = f.work().show_goal_detail("FRESH").unwrap();
-        assert_eq!(goal["status"], "todo");
+        assert_eq!(goal["status"], "failed");
         assert!(
             !f.service
                 .refine_dir
@@ -96,7 +91,7 @@ fn authored_todo_start_runs_lifecycle_skills_before_materializing_the_implementa
             assert_eq!(goal["status"], "plan", "{source} queued={queued_entry}");
             let invocation = f.invocation(source);
             assert_eq!(invocation.state, InvocationState::Succeeded);
-            assert_eq!(invocation.attempts.len(), 2);
+            assert_eq!(invocation.attempts.len(), 1);
             let owner = invocation.context.lifecycle.as_ref().unwrap();
             let implementation = PathBuf::from(ctx.worktree_path.as_ref().unwrap());
             assert_ne!(owner.path, implementation);

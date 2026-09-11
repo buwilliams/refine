@@ -100,6 +100,16 @@ impl FileEventService {
             FileOperationRegistry, OperationRegistry, OperationState,
         };
         let operations = FileOperationRegistry::new(runtime);
+        if invocation
+            .context
+            .metadata
+            .contains_key("event_operation_id")
+        {
+            invocation
+                .context
+                .metadata
+                .insert("interrupted_resume".into(), json!(true));
+        }
         if let Some(previous) = invocation
             .context
             .metadata

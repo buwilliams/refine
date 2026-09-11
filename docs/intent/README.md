@@ -117,6 +117,8 @@ The remaining documents are organized by semantic responsibility:
 
 Each section should be discrete enough to read on its own and connected enough to make the whole system easier to understand.
 
+Knowledge Hub is described in [Knowledge Hub](03-application/09-knowledge-hub.md), with its Controls entry in [Nav](05-surfaces/03-browser/02-nav.md).
+
 ## Writing Rules
 
 - Lead with key ideas.

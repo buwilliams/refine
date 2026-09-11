@@ -2,7 +2,7 @@ use super::*;
 use crate::application::workflow::phases::quality::{FileQualityService, QualitySettingsPatch};
 
 #[test]
-fn file_automation_fails_after_the_shared_quality_recovery_budget_is_exhausted() {
+fn quality_finding_fails_once_and_preserves_the_original_candidate() {
     let temp_root = unique_temp_dir("automation-quality-recovery");
     let target_root = temp_root.clone();
     let refine_dir = test_refine_dir(&target_root);
@@ -89,14 +89,12 @@ fn file_automation_fails_after_the_shared_quality_recovery_budget_is_exhausted()
     let automation = WorkflowEngine::with_target_root(&runtime_root, &target_root);
     let error = automation.evaluate_workflow().unwrap_err();
     assert!(
-        error
-            .to_string()
-            .contains("Quality findings remain after 5 automatic recovery Rounds"),
+        error.to_string().contains("automatic recovery is disabled"),
         "{error}"
     );
     let goal = work_items.show_goal_detail("GOAL1").unwrap();
     assert_eq!(goal["status"], "failed");
-    assert_eq!(goal["rounds"].as_array().unwrap().len(), 6);
+    assert_eq!(goal["rounds"].as_array().unwrap().len(), 1);
     assert_eq!(
         primary_before,
         (
@@ -104,7 +102,7 @@ fn file_automation_fails_after_the_shared_quality_recovery_budget_is_exhausted()
             fs::read(target_root.join(".git/index")).unwrap()
         )
     );
-    for round in 1..=6 {
+    for round in 1..=1 {
         let branch = format!("refine/GOAL1/round-{round}");
         let path = target_root
             .join(".git/refine-worktrees")
@@ -120,41 +118,16 @@ fn file_automation_fails_after_the_shared_quality_recovery_budget_is_exhausted()
                 .unwrap()
         );
     }
-    let latest = &goal["rounds"][5];
+    let latest = &goal["rounds"][0];
     assert_eq!(latest["quality_state"], "failed");
-    assert_eq!(latest["automatic_retry"]["attempt"], 5);
-    assert_eq!(latest["automatic_retry"]["kind"], "quality");
+    assert!(latest["automatic_retry"].is_null());
+    assert!(automation.evaluate_workflow().unwrap().steps.is_empty());
     assert_eq!(
-        latest["quality_recovery_details"]["phase"],
-        "quality_recovery"
-    );
-    assert!(
-        goal["rounds"][0]["quality_recovery_analysis"]
-            .as_str()
-            .unwrap_or("")
-            .contains("health check")
-    );
-    // Recovery Rounds are scoped: the Plan Skill focuses on the finding,
-    // and the Round continues on the retained candidate branch lineage.
-    let recovery_plan = &goal["rounds"][1]["implementation_plan"];
-    assert_eq!(recovery_plan["state"], "completed");
-    assert!(
-        recovery_plan["final_plan"]["result"]["summary"]
-            .as_str()
-            .unwrap_or("")
-            .starts_with("workflow.plan.enter:default-plan:"),
-        "{recovery_plan}"
-    );
-    assert!(recovery_plan["criticism"].is_null());
-    assert_eq!(
-        recovery_plan["final_plan"]["result"]["checklist"][0]["id"],
-        "workflow.plan.enter:default-plan:P1"
-    );
-    assert!(
-        goal["branch_name"]
-            .as_str()
-            .unwrap_or("")
-            .ends_with("round-6")
+        work_items.show_goal_detail("GOAL1").unwrap()["rounds"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
     );
     unsafe {
         if let Some(previous) = previous_smoke_ai {

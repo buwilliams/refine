@@ -6,6 +6,7 @@ pub(crate) mod dispatch;
 pub(crate) mod execution;
 pub(crate) mod gate_configuration;
 pub(crate) mod migration;
+pub(crate) mod outcomes;
 mod parameters;
 mod records;
 pub(crate) mod transitions;

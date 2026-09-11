@@ -18,7 +18,7 @@ pub(super) fn default_settings() -> JsonObject {
         ("agent_idle_timeout_seconds", "900"),
         ("agent_hard_cap_seconds", "7200"),
         ("agent_limit_pause_seconds", "60"),
-        ("max_automatic_round_retries", "5"),
+        ("workflow_error_timeout_seconds", "600"),
         ("worker_memory_limit_mb", ""),
         ("ui_memory_limit_mb", ""),
         ("worker_cpu_priority", "normal"),
@@ -36,7 +36,6 @@ pub(super) fn default_settings() -> JsonObject {
         ("git_remote", "origin"),
         ("merge_target_branch", "main"),
         ("quality_enabled", "0"),
-        ("workflow_conflict_resolution", "on"),
         ("allowed_commands", ""),
         ("agent_cli", "claude"),
         ("target_app_start_instructions", ""),
@@ -79,7 +78,7 @@ pub(super) fn allowed_settings() -> BTreeSet<&'static str> {
         "agent_idle_timeout_seconds",
         "agent_hard_cap_seconds",
         "agent_limit_pause_seconds",
-        "max_automatic_round_retries",
+        "workflow_error_timeout_seconds",
         "worker_memory_limit_mb",
         "ui_memory_limit_mb",
         "worker_cpu_priority",
@@ -97,7 +96,6 @@ pub(super) fn allowed_settings() -> BTreeSet<&'static str> {
         "git_remote",
         "merge_target_branch",
         "quality_enabled",
-        "workflow_conflict_resolution",
         "allowed_commands",
         "agent_cli",
         "target_app_start_instructions",
@@ -203,18 +201,6 @@ pub(super) fn normalize_setting(key: &str, value: &Value) -> RefineResult<String
             }
         }
         "quality_enabled" => Ok(if value_is_truthy(value) { "1" } else { "0" }.to_string()),
-        // Resolve-in-place for conflicted candidate refreshes. Off falls back
-        // to queueing a fenced recovery Round on every rebase conflict.
-        "workflow_conflict_resolution" => {
-            let choice = as_string(value).trim().to_ascii_lowercase();
-            if matches!(choice.as_str(), "on" | "off") {
-                Ok(choice)
-            } else {
-                Err(RefineError::InvalidInput(
-                    "workflow_conflict_resolution must be on or off".to_string(),
-                ))
-            }
-        }
         "target_app_env_json" => {
             let raw = as_string(value);
             let parsed = serde_json::from_str::<Value>(raw.trim()).map_err(|_| {
@@ -241,7 +227,7 @@ pub(super) fn normalize_setting(key: &str, value: &Value) -> RefineResult<String
                 normalize_range(key, value, 1, 100)
             }
         }
-        "max_automatic_round_retries" => normalize_range(key, value, 0, 100),
+        "workflow_error_timeout_seconds" => normalize_range(key, value, 1, 86400),
         "automatic_agent_resource_budget_percent" => normalize_range(key, value, 1, 100),
         "target_app_tcp_check_port" => {
             let text = as_string(value);

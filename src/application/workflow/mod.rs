@@ -121,15 +121,7 @@ fn now_timestamp() -> String {
 mod tests;
 
 use agents::{round_agent_context, selected_agent_context};
-use engine::{agent_idle_timeout, agent_worktree_cwd, implementation_branch_name, setting_string};
+use engine::{agent_worktree_cwd, implementation_branch_name, setting_string};
 use governance::GovernanceEvaluation;
 use phases::{complete_implementation_planning, run_governed_implementation_planning};
-#[cfg(test)]
-use recovery::workflow_conflict_resolution_enabled;
-use recovery::{
-    CandidateRefreshOutcome, refresh_candidate_for_target_advancement,
-    refresh_candidate_with_resolver, workflow_conflict_resolver,
-};
-use recovery::{
-    QualityRecoveryInvestigation, parse_quality_recovery_provider_output, quality_recovery_prompt,
-};
+use recovery::{CandidateRefreshOutcome, refresh_candidate_for_target_advancement};

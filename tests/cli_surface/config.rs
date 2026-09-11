@@ -27,7 +27,7 @@ pub(crate) fn config_commands_route_through_the_active_daemon(fixture: &Integrat
             .as_array()
             .unwrap()
             .len(),
-        22
+        42
     );
     for retired in ["quality", "governance", "guidance"] {
         assert!(

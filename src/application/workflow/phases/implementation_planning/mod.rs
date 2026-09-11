@@ -16,7 +16,6 @@ use crate::application::workflow::engine::context::WorkflowContext;
 
 mod runtime;
 
-pub(crate) use runtime::recover_interrupted_plan;
 use runtime::*;
 
 pub(crate) fn run_governed_implementation_planning(

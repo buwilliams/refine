@@ -108,9 +108,7 @@ pub(crate) fn run(
     let attempts = Cell::new(previous.len());
     let receipt_index = Cell::new(0);
     let cell = RefCell::new(invocation);
-    let policy = RepairPolicy {
-        max_repairs: 3usize.saturating_sub(previous.len().max(1)),
-    };
+    let policy = RepairPolicy { max_repairs: 0 };
     let original_outcome = RefCell::new(previous.iter().find_map(|(_, receipt)| {
         SkillResult::decode(&receipt.raw_output)
             .ok()
@@ -143,6 +141,26 @@ pub(crate) fn run(
             } else {
                 prompt.to_string()
             };
+            // Persist launch intent before crossing the provider boundary. An interrupted
+            // launch may have performed work even when no completion receipt was saved.
+            {
+                let mut current = cell.borrow_mut();
+                if current.context.metadata.get("interrupted_resume") == Some(&json!(true)) {
+                    return Err(RefineError::Conflict("Skill execution was interrupted without a completion receipt; explicit workflow control is required".into()));
+                }
+                let started = current
+                    .context
+                    .metadata
+                    .entry("started_bindings".to_string())
+                    .or_insert_with(|| json!({}));
+                if started.get(&binding.binding.id).is_some() {
+                    return Err(RefineError::Conflict(
+                        "Skill execution was interrupted without a completion receipt; explicit workflow control is required".into(),
+                    ));
+                }
+                started[&binding.binding.id] = json!(chrono::Utc::now().to_rfc3339());
+                service.save_invocation(&current)?;
+            }
             let before = observe(&git, &context.cwd)?;
             let started_at = chrono::Utc::now().to_rfc3339();
             let mut process_metadata = metadata.clone();

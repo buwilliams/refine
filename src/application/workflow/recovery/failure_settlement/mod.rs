@@ -15,6 +15,7 @@ impl WorkflowEngine {
         failure_stage: &str,
         error: &RefineError,
     ) -> FailureSettlement {
+        self.fence_failed_attempt(goal_id, authority);
         let evidence = evidence::OriginatingFailure::new(goal_id, authority, failure_stage, error);
         let outcome = evidence::contain("settlement", || {
             self.persist_goal_failure(&evidence, authority)

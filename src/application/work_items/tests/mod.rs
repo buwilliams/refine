@@ -28,3 +28,5 @@ fn unique_temp_dir(prefix: &str) -> PathBuf {
         .as_nanos();
     std::env::temp_dir().join(format!("refine-{prefix}-{}-{nanos}", std::process::id()))
 }
+
+mod outcomes;

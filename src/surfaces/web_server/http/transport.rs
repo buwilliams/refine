@@ -40,6 +40,23 @@ impl LocalHttpDaemon {
 
     pub(super) fn axum_router(&self, complete_after_request: Option<Arc<Notify>>) -> Router {
         Router::new()
+            .route(
+                "/api/hub",
+                any(axum_entrypoint).layer(axum::extract::DefaultBodyLimit::max(24 * 1024 * 1024)),
+            )
+            .route(
+                "/api/hub/{*path}",
+                any(axum_entrypoint).layer(axum::extract::DefaultBodyLimit::max(24 * 1024 * 1024)),
+            )
+            // MCP can call the same Hub asset capability with a base64 payload.
+            .route(
+                "/api/mcp",
+                any(axum_entrypoint).layer(axum::extract::DefaultBodyLimit::max(24 * 1024 * 1024)),
+            )
+            .route(
+                "/mcp",
+                any(axum_entrypoint).layer(axum::extract::DefaultBodyLimit::max(24 * 1024 * 1024)),
+            )
             .fallback(any(axum_entrypoint))
             .with_state(AxumDaemonState {
                 daemon: self.clone(),
@@ -115,6 +132,16 @@ impl LocalHttpDaemon {
                     }),
                 ));
             }
+        }
+
+        if request
+            .path
+            .split('?')
+            .next()
+            .unwrap_or("")
+            .starts_with("/hub/")
+        {
+            return self.with_request_metric(&request, "hub", started, self.hub_wire(&request));
         }
 
         if request.method == "GET"

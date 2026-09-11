@@ -20,3 +20,5 @@ pub mod todos;
 pub mod work_items;
 pub mod workers;
 pub mod workflow;
+
+pub mod hub;

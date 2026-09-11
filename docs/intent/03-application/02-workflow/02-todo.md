@@ -46,15 +46,7 @@ the work. Resumption follows the same rule — a Round branch that has gone
 missing is recreated at the Goal's recorded base, while one still carrying an
 interrupted Round's commits is reused exactly as it stands.
 
-A Quality- or Governance-finding recovery Round starts from the source
-Round's retained candidate in its own managed worktree. After the same atomic
-Todo admission, Refine verifies that the source checkout is registered at its
-owned location and still clean at the exact recorded candidate, then creates
-the new Round branch and checkout at that commit. The source Round's branch,
-checkout, and evidence are preserved. Missing or changed candidate contents
-can fall back to ordinary fresh materialization; ambiguous checkout ownership
-fails visibly without moving or cleaning retained work. Integration-race
-recoveries take the fresh path because their candidate itself is stale.
+An explicit Plan decision with a retained candidate creates a new Round branch and checkout at that exact commit. The source Round, worktree, and evidence remain intact. The new checkout does not depend on a pristine or still-present source worktree. Missing candidate or base identities fail visibly; Refine does not silently choose a fresh base.
 
 Lifecycle dispatch and scheduler admission consume the same occurrence-pinned Entry configuration, even when Skill definitions change before either worker runs. A completed blocking requirement can permit advancement while a background failure remains visible; cancellation or missing/invalid blocking evidence cannot.
 

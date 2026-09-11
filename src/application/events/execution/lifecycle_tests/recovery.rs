@@ -82,7 +82,7 @@ fn pending_and_cached_lifecycle_invocations_reject_missing_replaced_or_wrong_reg
             f.dispatch();
             assert_eq!(
                 f.work().show_goal_detail("FRESH").unwrap()["status"],
-                "backlog"
+                "failed"
             );
             if completed {
                 assert_eq!(f.service.invocation(&invocation.id).unwrap(), retained);
@@ -289,7 +289,7 @@ fn queued_lifecycle_dispatch_restarts_without_duplicate_processes() {
         let result = restarted.invocation(&invocation.id).unwrap();
         if result.state.terminal() {
             assert_eq!(result.state, InvocationState::Succeeded, "{result:?}");
-            assert_eq!(result.attempts.len(), 2);
+            assert_eq!(result.attempts.len(), 1);
             break;
         }
         assert!(

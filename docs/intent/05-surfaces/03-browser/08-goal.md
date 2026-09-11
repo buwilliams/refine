@@ -54,6 +54,8 @@ Current implementation details that matter to intent:
 
 The Goal surface should keep agent work concrete. A Goal without an actionable prompt is too vague for reliable automation.
 
+Workflow controls expose explicit step changes with reason, context, expected revision, and request identity. The Goal shows pending error handling and retained decision history. Forced Done is clearly status-only; forced integration is a separate action against the retained candidate. Node switches and late responses preserve the selected-node boundary.
+
 ## Future Direction
 
 Future Goals should carry richer evidence: screenshots, test output, design rationale, dependency traces, risk assessments, and agent reasoning summaries.

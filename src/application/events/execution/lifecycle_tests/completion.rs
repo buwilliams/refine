@@ -149,7 +149,7 @@ fn cancelled_partial_blocking_results_cannot_admit_todo_after_restart() {
     let cancelled = f.service.invocation(&entry.id).unwrap();
     assert_eq!(cancelled.state, InvocationState::Cancelled);
     assert_eq!(cancelled.results.len(), 1);
-    assert_eq!(cancelled.attempts.len(), 2);
+    assert_eq!(cancelled.attempts.len(), 1);
     let launches = fs::read(entry.context.cwd.join("launches.txt")).unwrap();
     let runtime = f.temp.join("runtime");
     let restarted = FileEventService::with_runtime_root(&f.service.refine_dir, &runtime);
@@ -160,11 +160,9 @@ fn cancelled_partial_blocking_results_cannot_admit_todo_after_restart() {
             .unwrap(),
         cancelled
     );
-    let mut ctx = super::workflow::claimed_context(&f, &runtime);
-    let error = WorkflowTodo.advance(&mut ctx).unwrap_err().to_string();
-    assert!(
-        error.contains(&entry.id) && error.contains("second"),
-        "{error}"
+    assert_eq!(
+        f.work().show_goal_detail("FRESH").unwrap()["status"],
+        "failed"
     );
     assert_eq!(restarted.invocation(&entry.id).unwrap(), cancelled);
     assert_eq!(
@@ -173,7 +171,7 @@ fn cancelled_partial_blocking_results_cannot_admit_todo_after_restart() {
     );
     assert_eq!(
         f.work().show_goal_detail("FRESH").unwrap()["status"],
-        "todo"
+        "failed"
     );
     f.assert_no_candidate();
     assert_eq!(before, f.snapshot());
@@ -250,7 +248,7 @@ fn incomplete_or_invalid_retained_success_cannot_settle_scheduler_or_manual_gate
             }
             assert_eq!(
                 f.work().show_goal_detail("FRESH").unwrap()["status"],
-                if scheduler { "todo" } else { "backlog" }
+                if scheduler { "todo" } else { "failed" }
             );
             assert_eq!(
                 bytes,

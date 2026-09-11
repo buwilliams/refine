@@ -53,7 +53,7 @@ impl QualityService for FileQualityService {
         let repair_session_id = std::cell::RefCell::new(None::<String>);
         let provider_attempts = std::cell::RefCell::new(Vec::new());
         let (_, mut plan) = crate::application::agent_io::structured_output::run_with_repair(
-            &crate::application::agent_io::structured_output::RepairPolicy::default(),
+            &crate::application::agent_io::structured_output::RepairPolicy { max_repairs: 0 },
             |directive| {
                 let (launch_prompt, launch_phase, settle_phase, metadata) = match directive {
                     None => (

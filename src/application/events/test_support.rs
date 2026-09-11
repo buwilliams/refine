@@ -22,7 +22,7 @@ pub fn adapt_fixture(path: &Path) -> PathBuf {
     wrapper
 }
 
-/// Native deterministic Skill execution with real checkout writes and one response repair.
+/// Native deterministic Skill execution with real checkout writes and a valid completion.
 #[cfg(unix)]
 pub(crate) struct SmokeSkill {
     previous: Option<std::ffi::OsString>,
@@ -58,7 +58,6 @@ subprocess.run(['git','add','skill-output.txt'], check=True)
 result['outcome'] = 'success'
 result['summary'] = 'Executed in the admitted lifecycle checkout'
 result['evidence'] = [str(cwd)]
-result['extra_field'] = 'repair envelope only'
 print(json.dumps(result))
 "#).unwrap();
         std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();

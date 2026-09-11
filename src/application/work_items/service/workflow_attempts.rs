@@ -250,11 +250,15 @@ impl FileWorkItemService {
             Value::String(failure_at.to_string()),
         );
         round.insert("updated".to_string(), Value::String(failure_at.to_string()));
-        object.insert(
-            "status".to_string(),
-            Value::String(GoalStatus::Failed.as_str().to_string()),
-        );
         object.insert("updated".to_string(), Value::String(failure_at.to_string()));
+        if !crate::application::events::outcomes::prepare_error(
+            &self.refine_dir,
+            &mut value,
+            failure_category,
+            failure_message,
+        )? {
+            value["status"] = json!("failed");
+        }
         write_json_atomically(&goal_path, &value)?;
         Ok(FailureSettlement::AuthoritativeFailure)
     }

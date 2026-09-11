@@ -138,7 +138,7 @@ fn provider(fixture: &Fixture, script: &str) -> ProviderEnv {
 
 #[cfg(unix)]
 #[test]
-fn malformed_plan_shapes_repair_from_retained_output_without_repeating_work() {
+fn malformed_plan_shapes_fail_once_and_retain_the_diagnostic() {
     let _env = crate::infrastructure::agents::invocation::smoke_ai_env_lock()
         .lock()
         .unwrap_or_else(|p| p.into_inner());
@@ -170,18 +170,14 @@ print(json.dumps(contract))
         invocation.bindings[0].skill.prompt = "DO_WORK_ONCE_ONLY".into();
         service.save_invocation(&invocation).unwrap();
         let completed = service.execute(&invocation.id, || Ok(())).unwrap();
-        assert_eq!(completed.state, InvocationState::Succeeded, "{completed:?}");
-        assert_eq!(completed.attempts.len(), 2);
+        assert_eq!(completed.state, InvocationState::Error, "{completed:?}");
+        assert_eq!(completed.attempts.len(), 1);
         assert!(completed.attempts[0]["diagnostic"].is_string());
-        assert_eq!(completed.attempts[1]["purpose"], "completion_repair");
         assert_eq!(
             std::fs::read_to_string(fixture.0.join("work-count")).unwrap(),
             "work\n"
         );
-        assert_eq!(
-            std::fs::read_to_string(fixture.0.join("repair-count")).unwrap(),
-            "repair\n"
-        );
+        assert!(!fixture.0.join("repair-count").exists());
     }
 }
 
@@ -392,7 +388,7 @@ fn paused_and_capacity_waits_are_local_and_transition_bounded() {
 
 #[cfg(unix)]
 #[test]
-fn report_repair_cannot_modify_an_already_dirty_candidate() {
+fn malformed_report_retains_dirty_candidate_without_a_repair_launch() {
     let _env = crate::infrastructure::agents::invocation::smoke_ai_env_lock()
         .lock()
         .unwrap_or_else(|p| p.into_inner());
@@ -440,11 +436,49 @@ print(json.dumps(result))
     service.save_invocation(&invocation).unwrap();
     let completed = service.execute(&invocation.id, || Ok(())).unwrap();
     assert_eq!(completed.state, InvocationState::Error);
-    assert_eq!(completed.attempts.len(), 2);
-    assert_eq!(completed.attempts[1]["observational_violation"], true);
+    assert_eq!(completed.attempts.len(), 1);
     assert_eq!(
         std::fs::read_to_string(target.join("file")).unwrap(),
-        "unauthorized repair edit"
+        "legitimate quality correction"
     );
     assert_eq!(index_before, git(&["write-tree"]));
+}
+
+#[test]
+fn interrupted_launch_without_receipt_does_not_invoke_provider_again() {
+    let fixture = Fixture::new();
+    let service = fixture.service();
+    let mut invocation = prepared(&fixture, "workflow.plan.enter");
+    let binding = invocation.bindings[0].clone();
+    invocation.context.metadata.insert(
+        "started_bindings".into(),
+        json!({binding.binding.id.clone(): "2026-09-11T00:00:00Z"}),
+    );
+    service.save_invocation(&invocation).unwrap();
+    let contract = result_contract(&invocation.id, &binding.binding.id, &binding.skill.role);
+    let error = super::super::completion::run(
+        &service,
+        &mut invocation,
+        &binding,
+        "must not launch",
+        &contract,
+        &Default::default(),
+        Some(10),
+        true,
+        &|| Ok(()),
+    )
+    .unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("interrupted without a completion receipt"),
+        "{error}"
+    );
+    assert!(
+        service
+            .invocation(&invocation.id)
+            .unwrap()
+            .attempts
+            .is_empty()
+    );
 }

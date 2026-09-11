@@ -31,7 +31,11 @@ fn standard_capture_returns_while_pending_scope_blocks_followup_until_proven_rel
                 return Ok(());
             }
             if goal == "GOAL3" {
-                assert!(clock.lock().unwrap().unwrap().elapsed() < Duration::from_secs(1));
+                let elapsed = clock.lock().unwrap().unwrap().elapsed();
+                assert!(
+                    elapsed < Duration::from_secs(1),
+                    "Followup admission took {elapsed:?} after scope release"
+                );
                 next.fetch_add(1, Ordering::SeqCst);
                 return Err(RefineError::Conflict("followup admitted".into()));
             }

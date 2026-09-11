@@ -760,3 +760,71 @@ fn events_defaults_adopt_remote_configuration_and_disjoint_edits_sync_between_no
     );
     assert!(merged.revision > base.revision + 1);
 }
+
+#[test]
+fn hub_sites_records_publication_and_tombstones_sync_and_invalidate_warm_indexes() {
+    use crate::application::hub::Hub;
+    use serde_json::json;
+    let fixture = SyncFixture::new("hub-sync");
+    let a = Hub::new(
+        refine_dir_for_target_root(&fixture.a).unwrap(),
+        fixture.a.join("run"),
+    );
+    let b = Hub::new(
+        refine_dir_for_target_root(&fixture.b).unwrap(),
+        fixture.b.join("run"),
+    );
+    let site = a.save_site("reports", &json!({"name":"Reports"})).unwrap();
+    a.save_collection(
+        "reports",
+        "events",
+        &json!({"indexes":{"fields":{"value":"number"}}}),
+    )
+    .unwrap();
+    let first = a
+        .put("reports", "events", "one", &json!({"data":{"value":1}}))
+        .unwrap();
+    a.save_asset("reports", "index.html", b"<h1>Reports</h1>", None, false)
+        .unwrap();
+    a.publish(
+        "reports",
+        site["revision"].as_str().unwrap(),
+        &["events".into()],
+        true,
+    )
+    .unwrap();
+    fixture.service(&fixture.a).sync().unwrap();
+    fixture.service(&fixture.b).sync().unwrap();
+    assert_eq!(
+        b.asset("reports", "index.html", true).unwrap().0,
+        b"<h1>Reports</h1>"
+    );
+    let q =
+        serde_json::from_value(json!({"filters":[{"field":"value","op":"eq","value":1}]})).unwrap();
+    assert_eq!(b.public_query("reports", "events", &q).unwrap()["total"], 1);
+    a.put(
+        "reports",
+        "events",
+        "one",
+        &json!({"revision":first["revision"],"data":{"value":2}}),
+    )
+    .unwrap();
+    fixture.service(&fixture.a).sync().unwrap();
+    fixture.service(&fixture.b).sync().unwrap();
+    assert_eq!(b.query("reports", "events", &q).unwrap()["total"], 0);
+    let current = b.get("reports", "events", "one").unwrap();
+    b.delete(
+        "reports",
+        "events",
+        "one",
+        current["revision"].as_str().unwrap(),
+    )
+    .unwrap();
+    fixture.service(&fixture.b).sync().unwrap();
+    fixture.service(&fixture.a).sync().unwrap();
+    assert!(a.get("reports", "events", "one").is_err());
+    assert_eq!(
+        a.query("reports", "events", &Default::default()).unwrap()["total"],
+        0
+    );
+}

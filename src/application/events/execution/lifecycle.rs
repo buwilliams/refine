@@ -50,6 +50,14 @@ pub(super) fn applicable(event: &EventDefinition, context: &InvocationContext) -
     if event.kind != EventKind::System || context.goal_id.is_none() {
         return false;
     }
+    if event
+        .source
+        .as_deref()
+        .is_some_and(|s| s.ends_with(".error") || s.ends_with(".success"))
+        && context.data["goal"]["branch_name"].is_null()
+    {
+        return true;
+    }
     match event.source.as_deref() {
         Some(
             "workflow.backlog.enter"
@@ -58,7 +66,11 @@ pub(super) fn applicable(event: &EventDefinition, context: &InvocationContext) -
             | "workflow.todo.exit",
         ) => true,
         Some(
-            "workflow.failed.enter"
+            "workflow.done.enter"
+            | "workflow.done.exit"
+            | "workflow.review.enter"
+            | "workflow.review.exit"
+            | "workflow.failed.enter"
             | "workflow.failed.exit"
             | "workflow.cancelled.enter"
             | "workflow.cancelled.exit",
@@ -133,8 +145,12 @@ impl LifecycleWorkspace {
                     || goal["status"] != *from
                     || goal["event_generation"].as_u64().unwrap_or(0) != *generation
                     || context.workflow_revision != Some(*workflow_revision)
-                    || !["workflow.todo.enter", "workflow.todo.exit"]
-                        .contains(&self.source.as_str())
+                    || ![
+                        "workflow.todo.enter",
+                        "workflow.todo.success",
+                        "workflow.todo.exit",
+                    ]
+                    .contains(&self.source.as_str())
                 {
                     return Err(unavailable("claimed lifecycle transition changed"));
                 }
@@ -164,6 +180,10 @@ impl LifecycleWorkspace {
                             "workflow.{}.exit",
                             pending["from"].as_str().unwrap_or_default()
                         ),
+                        format!(
+                            "workflow.{}.success",
+                            pending["from"].as_str().unwrap_or_default()
+                        ),
                     ]
                     .contains(&self.source)
                 {
@@ -173,15 +193,17 @@ impl LifecycleWorkspace {
                 }
             }
             LifecycleAuthority::Occurrence { occurrence } => {
-                let side = if self.source.ends_with(".enter") {
-                    "to"
-                } else {
-                    "from"
-                };
+                let edge = self.source.rsplit('.').next().unwrap_or_default();
+                if !["enter", "exit", "success", "error"].contains(&edge)
+                    || (edge == "error" && occurrence["error"] != true)
+                {
+                    return Err(unavailable("invalid lifecycle outcome occurrence"));
+                }
+                let side = if edge == "enter" { "to" } else { "from" };
                 let expected = format!(
                     "workflow.{}.{}",
                     occurrence[side].as_str().unwrap_or_default(),
-                    if side == "to" { "enter" } else { "exit" }
+                    edge
                 );
                 if self.source != expected
                     || !goal["workflow_events"]

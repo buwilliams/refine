@@ -34,14 +34,16 @@ impl IntegrationFixture {
     fn start_with_automation(suite: &str, agent_automation_enabled: bool) -> Self {
         let repo_root = repo_root();
         let port = test_port();
-        let runtime_root = repo_root.join("run");
+        let runtime_root =
+            env_path("REFINE_TEST_RUNTIME_ROOT").unwrap_or_else(|| repo_root.join("run"));
         let app_root = env_path("REFINE_TEST_APP_ROOT")
             .unwrap_or_else(|| default_app_root(&repo_root, suite, port));
         let artifact_root = repo_root
             .join("target/refine-integration/artifacts")
             .join(format!("{suite}-{port}"));
         let app_registry_backup = fs::read(runtime_root.join("apps.json")).ok();
-        let binary = PathBuf::from(env!("CARGO_BIN_EXE_refine"));
+        let binary = env_path("REFINE_TEST_BINARY")
+            .unwrap_or_else(|| PathBuf::from(env!("CARGO_BIN_EXE_refine")));
         let static_root = repo_root.join("src/surfaces/web/static");
 
         let mut fixture = Self {

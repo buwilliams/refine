@@ -100,6 +100,10 @@ The API should remain local-first. It should be secure by context, constrained b
 
 A Skill save can include `event_bindings`, a complete list of `{event_id, binding}` assignments for that Skill. The Skill and its assignments update atomically under the observed configuration revision. Omitting the field preserves assignments; an empty list removes them. Other Skills’ assignments remain unchanged.
 
+API contract version 6 advertises explicit workflow outcomes, the four lifecycle event edges, and Knowledge Hub. Workflow controls expose revision-fenced decisions and retained receipts under `/api/workflow/goals/:id`, with `/move` and separate `/integrate` operations. Knowledge Hub management uses `/api/hub` for sites, collections, records, indexes, queries, assets, and publication. Hosted pages share the existing server at `/hub/sites/:site/`, with draft preview at `/hub/preview/:site/`. Publication selects read-only collections; hosted queries cannot mutate data. Local write acceptance and state-repository synchronization are reported separately.
+
+Hub collection definitions declare `indexes.fields` using `string`, `number`, `boolean`, or `timestamp`, plus an optional `indexes.search` list. Record writes contain `data`, an optional `request_id`, and the current `revision` for updates. Query version 1 accepts `filters` with `field`, `op` (`eq`, `ne`, `gt`, `gte`, `lt`, `lte`), and `value`; `search`; `sort` and `descending`; `select`; `cursor` and `limit`; `group_by`; named `aggregates`; and `time_bucket` with a timestamp field and bucket duration in seconds. Responses return `rows`, `total`, and `next_cursor`. Collection queries require POST and remain read-only. Asset uploads use `path`, `revision`, and either `text` or `bytes_base64`; asset downloads return `bytes_base64` and the content hash. Published collection queries use `/hub/sites/:site/api/:collection/query`.
+
 ## Future Direction
 
 Future agent-native surfaces may use the API directly or through a higher-level protocol. The API should be structured enough for automated discovery and stable enough that agents can rely on it.

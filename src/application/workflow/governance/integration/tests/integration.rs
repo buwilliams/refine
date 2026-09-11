@@ -167,3 +167,84 @@ fn governance_push_failure_retries_without_duplicate_merge() {
     .unwrap();
     fs::remove_dir_all(temp_root).unwrap();
 }
+
+#[test]
+fn forced_integration_records_real_git_evidence_and_duplicate_requests_do_not_repeat_it() {
+    let root = unique_temp_dir("forced-integration");
+    let repo = root.join("repo");
+    fs::create_dir_all(&repo).unwrap();
+    init_repo(&repo);
+    commit_file(&repo, "app.txt", "base\n", "base");
+    let base = git_stdout(&repo, &["rev-parse", "HEAD"]);
+    let remote = root.join("remote.git");
+    git(
+        &root,
+        &["init", "--bare", "-b", "main", remote.to_str().unwrap()],
+    )
+    .unwrap();
+    git(
+        &repo,
+        &["remote", "add", "origin", remote.to_str().unwrap()],
+    )
+    .unwrap();
+    git(&repo, &["push", "-u", "origin", "main"]).unwrap();
+    let branch = "refine/GOAL1/round-1";
+    let candidate_dir = root.join("candidate");
+    git(
+        &repo,
+        &[
+            "worktree",
+            "add",
+            "-b",
+            branch,
+            candidate_dir.to_str().unwrap(),
+        ],
+    )
+    .unwrap();
+    commit_file(&candidate_dir, "feature.txt", "candidate\n", "candidate");
+    let candidate = git_stdout(&candidate_dir, &["rev-parse", "HEAD"]);
+    git(&candidate_dir, &["push", "-u", "origin", branch]).unwrap();
+    let state = prepare_refine_dir(&repo).unwrap();
+    let work = FileWorkItemService::new(&state);
+    work.create_goal_summary("Integrate explicitly", Some("GOAL1"))
+        .unwrap();
+    work.append_goal_round_summary("GOAL1", "Operator", "Implement")
+        .unwrap();
+    work.update_goal_git_refs("GOAL1", branch, "main", &base, Some(&candidate))
+        .unwrap();
+    work.update_goal_round_evaluation_summary("GOAL1", 0, &json!({"workflow_git_remote":"origin"}))
+        .unwrap();
+    work.set_goal_status_unchecked("GOAL1", &GoalStatus::Failed)
+        .unwrap();
+    let before = work.show_goal_detail("GOAL1").unwrap();
+    let request = crate::application::work_items::WorkflowControl {
+        to: GoalStatus::Governance,
+        reason: "Operator verified this candidate".into(),
+        context: String::new(),
+        expected_revision: before["workflow_revision"].as_u64().unwrap(),
+        request_id: "force-integrate-1".into(),
+        force: true,
+        actor: "Operator".into(),
+        invocation_id: None,
+    };
+    let service =
+        FileGovernanceIntegrationService::with_target_root(root.join("runtime"), &state, &repo);
+    let first = service.force_integrate("GOAL1", &request).unwrap();
+    let main = git_stdout(&repo, &["rev-parse", "main"]);
+    assert!(git_succeeds(
+        &repo,
+        &["merge-base", "--is-ancestor", &candidate, "main"]
+    ));
+    assert_eq!(first["decision"]["integration_performed"], true);
+    let after = work.show_goal_detail("GOAL1").unwrap();
+    assert_eq!(after["status"], "review");
+    assert_eq!(
+        after["rounds"][0]["workflow_integration"]["candidate_commit"],
+        candidate
+    );
+    assert_ne!(after["rounds"][0]["quality_state"], "passed");
+    let repeated = service.force_integrate("GOAL1", &request).unwrap();
+    assert_eq!(repeated, first);
+    assert_eq!(git_stdout(&repo, &["rev-parse", "main"]), main);
+    fs::remove_dir_all(root).unwrap();
+}

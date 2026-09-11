@@ -1150,3 +1150,86 @@ fn setting_string(settings: &JsonObject, key: &str, fallback: &str) -> String {
 
 #[cfg(test)]
 mod tests;
+
+impl FileGovernanceIntegrationService {
+    /// Explicit surface operation. Recording a forced decision never manufactures
+    /// Quality or Governance evidence; integration records only the actual Git result.
+    pub fn force_integrate(
+        &self,
+        id: &str,
+        request: &crate::application::work_items::WorkflowControl,
+    ) -> RefineResult<Value> {
+        if !request.force || request.to != GoalStatus::Governance {
+            return Err(RefineError::InvalidInput(
+                "Forced integration requires force=true and to=governance".into(),
+            ));
+        }
+        let work = FileWorkItemService::with_projection_cache(
+            &self.refine_dir,
+            &self.runtime_root,
+            self.runtime_root.join("cache"),
+        );
+        // Serialize duplicate callers before recording launch intent. Validate every required
+        // input before changing Goal state; the durable reservation excludes the scheduler.
+        crate::infrastructure::process::supervisor::coordination::with_record_lock(
+            &self.refine_dir,
+            &format!("forced-integration-{id}"),
+            || {
+                let goal = work.show_goal_detail(id)?;
+                if let Some(existing) = goal["workflow_controls"].as_array().and_then(|receipts| {
+                    receipts
+                        .iter()
+                        .find(|r| r["request_id"] == request.request_id)
+                }) {
+                    if existing["request"] != serde_json::to_value(request).unwrap()
+                        || existing["integration_requested"] != true
+                    {
+                        return Err(RefineError::Conflict(
+                            "request_id identifies another decision".into(),
+                        ));
+                    }
+                    return Ok(
+                        json!({"decision":existing,"integration":existing["integration_result"]["integration"],"forced":true}),
+                    );
+                }
+                let round = goal["rounds"]
+                    .as_array()
+                    .and_then(|a| a.len().checked_sub(1))
+                    .ok_or_else(|| RefineError::Conflict("No candidate Round".into()))?;
+                let branch = required_string(&goal, "branch_name", id)?;
+                let candidate = required_string(&goal, "candidate_commit", id)?;
+                let remote = required_string(&goal["rounds"][round], "workflow_git_remote", id)?;
+                let target = self
+                    .target_root
+                    .clone()
+                    .map(Ok)
+                    .unwrap_or_else(|| target_root(&self.refine_dir))?;
+                let git = FileGitWorktreeService::with_runtime_root(&target, &self.runtime_root);
+                if git.resolve_commit(&candidate)? != candidate
+                    || git.resolve_commit(&branch)? != candidate
+                    || git.remote_branch_commit(&remote, &branch)?.as_deref()
+                        != Some(candidate.as_str())
+                {
+                    return Err(RefineError::Conflict("Forced integration requires the exact candidate on both the local branch and its configured remote".into()));
+                }
+                work.control_workflow_operation(id, request, true)?;
+                let result = self
+                    .integrate_workflow_candidate(
+                        id,
+                        round,
+                        goal["node_id"].as_str().unwrap_or("default"),
+                        &branch,
+                        &candidate,
+                        &remote,
+                    )
+                    .and_then(|value| {
+                        serde_json::to_value(value)
+                            .map_err(|e| RefineError::Serialization(e.to_string()))
+                    });
+                let receipt =
+                    work.finish_controlled_integration(id, &request.request_id, &result)?;
+                result.map(|integration| json!({"decision":receipt,"integration":integration,"forced":true}))
+            },
+        )
+    }
+}

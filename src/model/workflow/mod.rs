@@ -356,3 +356,24 @@ mod tests {
         );
     }
 }
+
+/// An explicit, revision-fenced workflow decision from any surface.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct WorkflowControl {
+    pub to: GoalStatus,
+    pub reason: String,
+    #[serde(default)]
+    pub context: String,
+    pub expected_revision: u64,
+    pub request_id: String,
+    #[serde(default)]
+    pub force: bool,
+    #[serde(default = "default_actor")]
+    pub actor: String,
+    #[serde(default)]
+    pub invocation_id: Option<String>,
+}
+fn default_actor() -> String {
+    "operator".into()
+}

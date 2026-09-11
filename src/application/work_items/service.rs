@@ -1,3 +1,5 @@
+mod outcomes;
+pub use crate::model::workflow::WorkflowControl;
 mod already_merged;
 mod already_merged_quality_failure;
 mod bulk_operations;

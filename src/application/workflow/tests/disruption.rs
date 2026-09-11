@@ -1,18 +1,8 @@
-//! The disruption doctrine as a regression test.
-//!
-//! The operator force-stops running production to deploy releases, abruptly
-//! disrupting in-flight Goals. Durable Goal state (goal.json rounds, logs, and
-//! proofs plus Git branches, refs, and markers) is the COMPLETE truth: on
-//! restart the workflow re-enters the current step and either redoes the work
-//! or recovers from durable evidence. No liveness or interruption bookkeeping
-//! exists, and none may be required.
-//!
-//! Each test drives a Goal into one step's mid-flight durable state, simulates
-//! the force-stop by abandoning the in-flight attempt exactly where the step's
-//! durable claim or partial evidence has been written, then constructs a FRESH
-//! `WorkflowEngine` — what a process restart looks like — and proves
-//! `recover_interrupted_goals` + `evaluate_workflow` carry the Goal to Review
-//! with a committed, integrated candidate and NO manual intervention.
+//! Interrupted workflow attempts preserve durable claims, branches, candidates,
+//! logs and partial evidence. Restart settles the attempt through Error handling
+//! without relaunching the worker. A later attempt requires an explicit decision.
+//! Each regression seeds a distinct interruption point and checks that repeated
+//! startup does not rerun work or manufacture completion evidence.
 
 #![cfg(unix)]
 
@@ -262,48 +252,49 @@ impl DisruptionFixture {
             .unwrap();
     }
 
-    /// The restart: a fresh engine over the same durable state, running the
-    /// production recovery entry point and then the ordinary scheduler pass.
-    fn restart_and_finish(&self, expected_recovered: usize) -> WorkflowPassResult {
+    fn assert_restart_preserves_evidence_without_relaunch(&self) {
+        let before = self.work_items.show_goal_detail(GOAL).unwrap();
+        let main = git_output(&self.target_root, &["rev-parse", "main"]);
         let engine = WorkflowEngine::with_target_root(&self.runtime_root, &self.target_root);
         assert_eq!(
             engine
                 .recover_interrupted_goals("operator force-stopped production")
                 .unwrap(),
-            expected_recovered
+            1
         );
-        engine.evaluate_workflow().unwrap()
+        let pass = engine.evaluate_workflow().unwrap();
+        assert!(
+            pass.steps.is_empty(),
+            "Interrupted work was relaunched: {pass:?}"
+        );
+        let after = self.work_items.show_goal_detail(GOAL).unwrap();
+        assert_eq!(after["status"], "failed");
+        assert_eq!(
+            after["rounds"].as_array().unwrap().len(),
+            before["rounds"].as_array().unwrap().len()
+        );
+        assert_eq!(after["candidate_commit"], before["candidate_commit"]);
+        assert_eq!(after["branch_name"], before["branch_name"]);
+        for field in [
+            "implementation_plan",
+            "implementation_report",
+            "quality_details",
+            "workflow_integration",
+        ] {
+            assert_eq!(
+                after["rounds"][0][field], before["rounds"][0][field],
+                "{field}"
+            );
+        }
+        assert_eq!(git_output(&self.target_root, &["rev-parse", "main"]), main);
+        assert_eq!(
+            engine.recover_interrupted_goals("second restart").unwrap(),
+            0
+        );
+        assert!(engine.evaluate_workflow().unwrap().steps.is_empty());
     }
-
     fn detail(&self) -> Value {
         self.work_items.show_goal_detail(GOAL).unwrap()
-    }
-
-    /// The doctrine's finish line: Review, with the recorded candidate commit
-    /// integrated into the target branch and no settled failure on the Round.
-    fn assert_reached_review_with_integrated_candidate(&self) -> Value {
-        let detail = self.detail();
-        assert_eq!(detail["status"], "review", "{detail:#}");
-        let candidate = detail["candidate_commit"]
-            .as_str()
-            .unwrap_or_default()
-            .to_string();
-        assert!(!candidate.is_empty(), "{detail:#}");
-        let failure = detail["rounds"][0]["failure_category"]
-            .as_str()
-            .unwrap_or("");
-        assert!(failure.is_empty(), "{detail:#}");
-        assert_eq!(
-            detail["rounds"][0]["workflow_integration"]["candidate_commit"],
-            json!(candidate),
-            "{detail:#}"
-        );
-        git(
-            &self.target_root,
-            &["merge-base", "--is-ancestor", &candidate, "main"],
-        )
-        .unwrap();
-        detail
     }
 }
 
@@ -318,7 +309,7 @@ impl Drop for DisruptionFixture {
 /// REDO: the restarted engine supersedes the stale claim and runs the whole
 /// pipeline.
 #[test]
-fn force_stop_after_claim_in_todo_redoes_the_whole_pipeline() {
+fn force_stop_after_claim_in_todo_preserves_the_unstarted_attempt() {
     let fixture = DisruptionFixture::new("disruption-todo-claim");
     let _env = smoke_ai_env_lock()
         .lock()
@@ -327,26 +318,14 @@ fn force_stop_after_claim_in_todo_redoes_the_whole_pipeline() {
 
     drop(fixture.claim(GoalStatus::Todo));
 
-    let pass = fixture.restart_and_finish(0);
-    assert_eq!(pass.steps.len(), 1, "{:#?}", pass.steps);
-    assert_eq!(pass.steps[0].final_status, "review");
-    let detail = fixture.assert_reached_review_with_integrated_candidate();
-    let candidate = detail["candidate_commit"].as_str().unwrap();
-    assert!(
-        git_output(
-            &fixture.target_root,
-            &["show", &format!("{candidate}:app.txt")]
-        )
-        .contains("disruption fixture implementation edit"),
-        "the redone implementation must be in the integrated candidate"
-    );
+    fixture.assert_restart_preserves_evidence_without_relaunch();
 }
 
 /// Disruption point: after the Todo → Plan transition and worktree
 /// materialization, before any planning artifact was persisted.
 /// REDO: planning is entirely done over.
 #[test]
-fn force_stop_after_entering_plan_redoes_planning() {
+fn force_stop_after_entering_plan_preserves_plan_entry() {
     let fixture = DisruptionFixture::new("disruption-plan-entry");
     let _env = smoke_ai_env_lock()
         .lock()
@@ -356,11 +335,7 @@ fn force_stop_after_entering_plan_redoes_planning() {
     fixture.enter_plan_with_worktree();
     drop(fixture.claim(GoalStatus::Plan));
 
-    fixture.restart_and_finish(1);
-    let detail = fixture.assert_reached_review_with_integrated_candidate();
-    let plan = &detail["rounds"][0]["implementation_plan"];
-    assert_eq!(plan["state"], "completed", "{plan:#}");
-    assert!(!plan["final_plan"].is_null(), "{plan:#}");
+    fixture.assert_restart_preserves_evidence_without_relaunch();
 }
 
 /// Disruption point: mid-planning — the proposal artifact is persisted, the
@@ -433,21 +408,7 @@ fn force_stop_mid_planning_reuses_the_persisted_proposal() {
         .unwrap();
     drop(fixture.claim(GoalStatus::Plan));
 
-    fixture.restart_and_finish(1);
-    let detail = fixture.assert_reached_review_with_integrated_candidate();
-    let plan = &detail["rounds"][0]["implementation_plan"];
-    // The interrupted attempt's proposal survived; only criticize and revise
-    // were (re)done.
-    assert_eq!(
-        plan["proposal"]["started_at"], seeded_started_at,
-        "{plan:#}"
-    );
-    assert_eq!(
-        plan["proposal"]["result"]["summary"], "Seeded proposal from the interrupted attempt.",
-        "{plan:#}"
-    );
-    assert!(!plan["final_plan"].is_null(), "{plan:#}");
-    assert_eq!(plan["state"], "completed", "{plan:#}");
+    fixture.assert_restart_preserves_evidence_without_relaunch();
 }
 
 /// Disruption point: planning finished and the Plan → Implement transition
@@ -468,13 +429,7 @@ fn force_stop_after_plan_before_implement_reuses_the_final_plan() {
     let planned = fixture.detail()["rounds"][0]["implementation_plan"]["final_plan"].clone();
     assert!(!planned.is_null());
 
-    fixture.restart_and_finish(1);
-    let detail = fixture.assert_reached_review_with_integrated_candidate();
-    let plan = &detail["rounds"][0]["implementation_plan"];
-    // The final plan is byte-identical evidence from before the disruption:
-    // planning was recovered, not redone.
-    assert_eq!(plan["final_plan"], planned, "{plan:#}");
-    assert!(!plan["implementation"].is_null(), "{plan:#}");
+    fixture.assert_restart_preserves_evidence_without_relaunch();
 }
 
 /// Disruption point: mid-implement — the durable phase is `implement`, the
@@ -482,7 +437,7 @@ fn force_stop_after_plan_before_implement_reuses_the_final_plan() {
 /// REDO: the implementation runs over; the worktree contents are absorbed
 /// into the redone candidate.
 #[test]
-fn force_stop_mid_implement_with_worktree_redoes_the_implementation() {
+fn force_stop_mid_implement_with_worktree_preserves_partial_implementation() {
     let fixture = DisruptionFixture::new("disruption-implement-mid");
     let _env = smoke_ai_env_lock()
         .lock()
@@ -501,23 +456,7 @@ fn force_stop_mid_implement_with_worktree_redoes_the_implementation() {
     content.push_str("# half-finished agent edit\n");
     fs::write(&app, content).unwrap();
 
-    fixture.restart_and_finish(1);
-    let detail = fixture.assert_reached_review_with_integrated_candidate();
-    let candidate = detail["rounds"][0]["workflow_integration"]["candidate_commit"]
-        .as_str()
-        .unwrap();
-    let integrated = git_output(
-        &fixture.target_root,
-        &["show", &format!("{candidate}:app.txt")],
-    );
-    assert!(
-        integrated.contains("# half-finished agent edit"),
-        "existing work was preserved:\n{integrated}"
-    );
-    assert!(
-        integrated.contains("disruption fixture implementation edit"),
-        "the redone implementation must be in the candidate:\n{integrated}"
-    );
+    fixture.assert_restart_preserves_evidence_without_relaunch();
 }
 
 /// Disruption point: the implementation committed its candidate and recorded
@@ -525,7 +464,7 @@ fn force_stop_mid_implement_with_worktree_redoes_the_implementation() {
 /// step re-enters Implement and does the work over on top of the preserved
 /// candidate commit.
 #[test]
-fn force_stop_after_implement_commit_before_quality_redoes_on_the_preserved_candidate() {
+fn force_stop_after_implement_commit_before_quality_preserves_the_candidate() {
     let fixture = DisruptionFixture::new("disruption-implement-committed");
     let _env = smoke_ai_env_lock()
         .lock()
@@ -558,33 +497,14 @@ fn force_stop_after_implement_commit_before_quality_redoes_on_the_preserved_cand
         .update_goal_candidate_commit(GOAL, &seeded_candidate)
         .unwrap();
 
-    fixture.restart_and_finish(1);
-    let detail = fixture.assert_reached_review_with_integrated_candidate();
-    let final_candidate = detail["candidate_commit"].as_str().unwrap();
-    // The redo built on top of the preserved commit instead of discarding it.
-    git(
-        &fixture.target_root,
-        &[
-            "merge-base",
-            "--is-ancestor",
-            &seeded_candidate,
-            final_candidate,
-        ],
-    )
-    .unwrap();
-    let integrated = git_output(
-        &fixture.target_root,
-        &["show", &format!("{final_candidate}:app.txt")],
-    );
-    assert!(integrated.contains("# pre-disruption candidate line"));
-    assert!(integrated.contains("disruption fixture implementation edit"));
+    fixture.assert_restart_preserves_evidence_without_relaunch();
 }
 
 /// Disruption point: the Quality correction agent finished and its report was
 /// persisted, but the gate never ran. RECOVER: the persisted agent evidence is
 /// reused verbatim and only the gate runs.
 #[test]
-fn force_stop_after_quality_agent_evidence_reuses_it_and_runs_only_the_gate() {
+fn force_stop_after_quality_agent_evidence_preserves_it_without_running_the_gate() {
     let fixture = DisruptionFixture::new("disruption-quality-agent");
     let _env = smoke_ai_env_lock()
         .lock()
@@ -612,21 +532,7 @@ fn force_stop_after_quality_agent_evidence_reuses_it_and_runs_only_the_gate() {
         .unwrap();
     drop(fixture.claim(GoalStatus::Quality));
 
-    fixture.restart_and_finish(1);
-    let detail = fixture.assert_reached_review_with_integrated_candidate();
-    let round = &detail["rounds"][0];
-    // A redone correction agent would have written the smoke fixture report;
-    // the seeded evidence surviving proves recovery, not redo.
-    assert_eq!(
-        round["quality_agent_report"], SEEDED_QUALITY_AGENT_REPORT,
-        "{round:#}"
-    );
-    assert_eq!(round["quality_state"], "passed", "{round:#}");
-    assert!(
-        round["quality_details"]["operation_id"].as_str().is_some(),
-        "the gate itself ran fresh after the restart: {round:#}"
-    );
-    assert_eq!(round["quality_candidate_commit"], json!(candidate));
+    fixture.assert_restart_preserves_evidence_without_relaunch();
 }
 
 /// Disruption point: a durable passed Quality proof exists and the
@@ -654,20 +560,7 @@ fn force_stop_after_quality_proof_before_governance_reuses_the_proof() {
     fixture.advance(GoalStatus::Governance);
     drop(fixture.claim(GoalStatus::Governance));
 
-    fixture.restart_and_finish(1);
-    let detail = fixture.assert_reached_review_with_integrated_candidate();
-    let round = &detail["rounds"][0];
-    // The seeded proof was reused as-is: the Quality gate never regenerated it.
-    assert_eq!(
-        round["quality_details"]["operation_id"], SEEDED_QUALITY_OPERATION,
-        "{round:#}"
-    );
-    assert_eq!(round["quality_candidate_commit"], json!(candidate));
-    assert_eq!(round["rule_state"], "passed", "{round:#}");
-    assert_eq!(
-        round["workflow_integration"]["candidate_commit"],
-        json!(candidate)
-    );
+    fixture.assert_restart_preserves_evidence_without_relaunch();
 }
 
 /// Disruption point: mid-Governance with the integrated-target transaction
@@ -676,7 +569,7 @@ fn force_stop_after_quality_proof_before_governance_reuses_the_proof() {
 /// transaction (marker removed, residue worktree recreated, recovery event
 /// journaled), reuses the durable Quality proof, and integrates.
 #[test]
-fn force_stop_mid_governance_with_transaction_marker_recovers_and_integrates() {
+fn force_stop_mid_governance_with_transaction_marker_preserves_the_transaction_without_relaunch() {
     let fixture = DisruptionFixture::new("disruption-governance-marker");
     let _env = smoke_ai_env_lock()
         .lock()
@@ -723,24 +616,5 @@ fn force_stop_mid_governance_with_transaction_marker_recovers_and_integrates() {
     )
     .unwrap();
 
-    fixture.restart_and_finish(1);
-    let detail = fixture.assert_reached_review_with_integrated_candidate();
-    let round = &detail["rounds"][0];
-    assert_eq!(
-        round["quality_details"]["operation_id"], SEEDED_QUALITY_OPERATION,
-        "{round:#}"
-    );
-    assert!(
-        !marker.exists(),
-        "the interrupted transaction marker must be recovered and closed"
-    );
-    let recoveries = fs::read_to_string(
-        fixture
-            .target_root
-            .join(".git/refine-integrated-target-recoveries.jsonl"),
-    )
-    .unwrap();
-    let event: Value = serde_json::from_str(recoveries.lines().next().unwrap()).unwrap();
-    assert_eq!(event["interrupted"]["goal_id"], GOAL, "{event:#}");
-    assert_eq!(event["workspace"], "integration_worktree", "{event:#}");
+    fixture.assert_restart_preserves_evidence_without_relaunch();
 }

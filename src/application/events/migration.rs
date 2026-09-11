@@ -13,10 +13,6 @@ pub(super) fn migrate(root: &Path) -> RefineResult<AutomationConfig> {
             originals.insert(name.into(), read_json::<Value>(&path)?);
         }
     }
-    let governance = originals
-        .get("governance.json")
-        .cloned()
-        .unwrap_or(Value::Null);
     let quality_settings =
         crate::application::workflow::phases::quality::FileQualityService::new(root)
             .load_settings()?;
@@ -32,13 +28,6 @@ pub(super) fn migrate(root: &Path) -> RefineResult<AutomationConfig> {
             &archive,
             &json!({"schema_version": 1, "sources": originals, "quality_prompt_hash": super::execution::stable_id(&config.skills["default-quality"].prompt), "quality_commands": quality_settings.legacy_commands}),
         )?;
-    }
-    if let Some(limit) = governance
-        .get("max_automatic_round_retries")
-        .and_then(Value::as_u64)
-    {
-        crate::infrastructure::process::supervisor::config::FileSettingsService::new(root)
-            .update(&json!({"max_automatic_round_retries": limit.to_string()}))?;
     }
     config.validate().map_err(RefineError::InvalidInput)?;
     Ok(config)

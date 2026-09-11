@@ -33,6 +33,7 @@ impl WorkflowEngine {
                 prepare_refine_dir(target)?,
                 &self.runtime_root,
             );
+            events.dispatch_outcomes(target)?;
             if let Err(error) = events.dispatch_goal_events(target) {
                 eprintln!("refine Goal event materialization: {error}");
             }
@@ -121,7 +122,6 @@ impl WorkflowEngine {
             })
             .filter(|goal| goal.round_count > 0)
             .filter(|goal| !active.contains(&goal.id) && !observed.contains(&goal.id))
-            .filter(|goal| !self.retry_delayed(&goal.id))
             .filter(|goal| eligibility.feature_eligible(&goal.id))
             .filter(|goal| eligibility.priority_eligible(goal))
             .cloned()
@@ -136,6 +136,16 @@ impl WorkflowEngine {
         let mut load = self.observed_execution_load()?;
         let mut result = Vec::new();
         for goal in goals {
+            let detail = items.show_goal_detail(&goal.id)?;
+            if self.failed_attempt_is_fenced(&goal.id, &detail) {
+                continue;
+            }
+            if detail["workflow_integration_control"]["state"] == "pending"
+                || detail["pending_workflow_outcome"]["state"] == "pending"
+                || detail["pending_event_transition"]["state"] == "pending"
+            {
+                continue;
+            }
             if goal.status == GoalStatus::Todo
                 && events
                     .missing_workflow_requirement(

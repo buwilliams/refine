@@ -161,8 +161,8 @@ function readParameters(root) {
 function skillTriggerLabel(source) {
   if (source === "custom") return "Custom";
   if (source === "node.startup.ready") return "Node starts";
-  const match = source?.match(/^workflow\.(.+)\.(enter|exit)$/);
-  return match ? `${match[1][0].toUpperCase() + match[1].slice(1)} ${match[2] === "enter" ? "starts" : "ends"}` : "Unconfigured";
+  const match = source?.match(/^workflow\.(.+)\.(enter|exit|error|success)$/);
+  return match ? `${match[1][0].toUpperCase() + match[1].slice(1)} ${({enter:"starts",exit:"exits",error:"error",success:"success"})[match[2]]}` : "Unconfigured";
 }
 
 let skillIdSequence = 0;

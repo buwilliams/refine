@@ -215,19 +215,16 @@ fn run_planning(
 
 #[cfg(unix)]
 #[test]
-fn plan_skill_repairs_invalid_artifact_and_retains_diagnostics() {
+fn plan_skill_rejects_invalid_artifact_without_repair_and_retains_diagnostics() {
     let (result, detail) = run_planning(
         "event-plan-repair",
         "if not prompt.startswith('Repair only'): result['artifacts']['plan']={'summary':'Missing checklist'}",
         false,
         false,
     );
-    assert_eq!(
-        result.unwrap().checklist[0].id,
-        "workflow.plan.enter:default-plan:P1"
-    );
+    assert!(result.unwrap_err().to_string().contains("checklist"));
     let attempts = detail["invocations"][0]["attempts"].as_array().unwrap();
-    assert_eq!(attempts.len(), 2);
+    assert_eq!(attempts.len(), 1);
     assert!(
         attempts[0]["diagnostic"]
             .as_str()
@@ -240,12 +237,11 @@ fn plan_skill_repairs_invalid_artifact_and_retains_diagnostics() {
             .unwrap()
             .contains("Missing checklist")
     );
-    assert!(attempts[1]["diagnostic"].is_null());
 }
 
 #[cfg(unix)]
 #[test]
-fn plan_skill_exhausts_bounded_repairs_without_accepting_an_invalid_plan() {
+fn plan_skill_fails_once_without_accepting_an_invalid_plan() {
     let (result, detail) = run_planning(
         "event-plan-exhausted",
         "result['artifacts']['plan']={'summary':'Missing checklist'}",
@@ -263,7 +259,7 @@ fn plan_skill_exhausts_bounded_repairs_without_accepting_an_invalid_plan() {
             .as_array()
             .unwrap()
             .len(),
-        3
+        1
     );
     assert_eq!(
         detail["rounds"][0]["implementation_plan"]["failure"]["category"],

@@ -27,7 +27,7 @@ fn web_server_manages_events_skills_and_reporters() {
         body: None,
     });
     assert_eq!(catalog.status, 200);
-    assert_eq!(catalog.body["sources"].as_array().unwrap().len(), 22);
+    assert_eq!(catalog.body["sources"].as_array().unwrap().len(), 42);
     let skills = server.handle(ApiRequest {
         method: "GET".into(),
         path: "/api/skills".into(),

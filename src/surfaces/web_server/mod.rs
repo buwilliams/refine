@@ -19,6 +19,14 @@ pub struct ApiRouteGroup {
 
 pub const API_GROUPS: &[ApiRouteGroup] = &[
     ApiRouteGroup {
+        prefix: "/api/hub",
+        capability: "Knowledge Hub sites, assets, JSON collections, indexes, queries and publishing",
+    },
+    ApiRouteGroup {
+        prefix: "/workflow/goals",
+        capability: "Inspect and control workflow outcomes, explicit retries, audited forced moves and integration",
+    },
+    ApiRouteGroup {
         prefix: "/system",
         capability: "install state, daemon status, semantic releases, release update, source promotion, doctor",
     },
@@ -235,3 +243,8 @@ mod tests;
 mod work_routes;
 
 pub use http::{HttpRequest, LocalHttpDaemon, WireResponse};
+
+mod hub_routes;
+mod outcome_routes;
+
+mod hub_host;

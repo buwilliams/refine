@@ -56,7 +56,7 @@ fn migration_preserves_content_is_idempotent_and_stale_writes_cannot_erase_edits
     std::fs::create_dir_all(&service.refine_dir).unwrap();
     std::fs::write(service.refine_dir.join("guidance.json"), r#"[{"id":"context","name":"Accessibility","rule":"For interfaces","instructions":"Support keyboard navigation","enabled":false}]"#).unwrap();
     let config = service.config().unwrap();
-    assert_eq!(config.events.len(), 21);
+    assert_eq!(config.events.len(), 41);
     assert!(!system_catalog().iter().any(|s| s.contains("sync")));
     assert!(
         config.skills["guidance-context"]
@@ -585,8 +585,8 @@ fn missing_automatic_input_settles_as_visible_error_instead_of_waiting_forever()
     );
     service.dispatch_goal_events(&fixture.0).unwrap();
     let goal = work.show_goal_detail("INPUT1").unwrap();
-    assert_eq!(goal["status"], "backlog");
-    assert_eq!(goal["pending_event_transition"]["state"], "failed");
+    assert_eq!(goal["status"], "failed");
+    assert_eq!(goal["event_transition_history"][0]["state"], "failed");
     let runs = service.invocations(0, 100).unwrap();
     assert_eq!(runs["items"][0]["state"], "error");
     assert!(
