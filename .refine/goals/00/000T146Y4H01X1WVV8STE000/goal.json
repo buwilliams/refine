@@ -3,7 +3,7 @@
   "branch_name": "refine/00000T146Y4H01X1WVV8STE000/round-1",
   "candidate_commit": null,
   "created": "2026-09-11T14:27:52Z",
-  "event_generation": 5,
+  "event_generation": 6,
   "feature_id": null,
   "feature_order": null,
   "id": "00000T146Y4H01X1WVV8STE000",
@@ -554,11 +554,65 @@
       },
       "workflow_reconciliation": null,
       "workflow_recovery": null
+    },
+    {
+      "agent_context": null,
+      "assignee": "Buddy Williams",
+      "constitution_state": "unclassified",
+      "created": "2026-09-11T15:08:16Z",
+      "failure_at": "",
+      "failure_category": "",
+      "failure_message": "",
+      "gate_configurations": {
+        "6:default:workflow.todo.enter": {
+          "events": {
+            "workflow.todo.enter": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.todo.enter",
+              "kind": "system",
+              "name": "Workflow Todo Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.todo.enter"
+            }
+          },
+          "revision": 40,
+          "schema_version": 2,
+          "skills": {}
+        }
+      },
+      "governance_candidate_commit": "",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "guidance_decision": null,
+      "implementation_plan": null,
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "For the web UI surface, create two new main nav right-aligned dropdown buttons, one for Skills and one for Sites. The right-aligned button order should be Skills, Sites, Settings, and New Goal. Yes, that is a rename of Controls to Settings. Move the menus from Settings (formerly Controls) to the appropriate new menu for Sites and Skills. Add a separator to the new menus for New Skill, New Site, Manage Skills, and Manage Sites. Ensure you use the standardized styles and layout we already have in the app.\n\nContinue from the retained Round 1 implementation at /home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T146Y4H01X1WVV8STE000-round-1. Preserve its uncommitted changes, branch, logs, and failed-attempt evidence; carry the relevant implementation into this Round without discarding history. The five focused JavaScript suites were verified again with 40 passed and zero skipped. The recorded corrected static-surface run passed 21 tests. Investigate and unblock the seven remaining Rust failures documented in /tmp/refine-nav-unit.log: compare against pinned base 9c1be94cf6421854a1c6693b7403b57d8f7576b2, trace the missing recovery/quality architecture assertion and shared-lock cascade, and fix established defects or use evidence-backed workarounds while preserving required checks. Follow the updated Implementation, Quality, and Governance Skills, document changes and verification, and advance through the normal workflow.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-09-11T15:08:16Z",
+      "workflow_attempt_authority": null,
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
     }
   ],
-  "status": "failed",
+  "status": "todo",
   "target_branch": "main",
-  "updated": "2026-09-11T14:45:04Z",
+  "updated": "2026-09-11T15:08:16Z",
   "workflow_events": [
     {
       "at": "2026-09-11T14:27:52.512340696+00:00",
@@ -604,7 +658,16 @@
       "node_id": "default",
       "round_idx": 0,
       "to": "failed"
+    },
+    {
+      "at": "2026-09-11T15:08:16.247177297+00:00",
+      "forced": false,
+      "from": "failed",
+      "generation": 6,
+      "node_id": "default",
+      "round_idx": 1,
+      "to": "todo"
     }
   ],
-  "workflow_revision": 19
+  "workflow_revision": 20
 }
