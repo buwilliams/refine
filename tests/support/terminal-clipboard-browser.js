@@ -26,7 +26,7 @@ function loadChromium() {
 const BROWSER = loadChromium();
 const SKIP = BROWSER ? false : "no Playwright chromium build is available";
 
-async function openTerminalApp({ platform = "Linux x86_64", onInput } = {}) {
+async function openTerminalApp({ platform = "Linux x86_64", onInput, insecure = false } = {}) {
   const server = http.createServer((request, response) => {
     const pathname = new URL(request.url, "http://localhost").pathname;
     const file = path.resolve(STATIC, pathname === "/" ? "index.html"
@@ -40,8 +40,11 @@ async function openTerminalApp({ platform = "Linux x86_64", onInput } = {}) {
     response.end(fs.readFileSync(file));
   });
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const browser = await BROWSER.chromium.launch({ executablePath: BROWSER.executablePath });
-  const context = await browser.newContext({ permissions: ["clipboard-read", "clipboard-write"] });
+  const browser = await BROWSER.chromium.launch({
+    executablePath: BROWSER.executablePath,
+    args: insecure ? ["--host-resolver-rules=MAP refine-clipboard.test 127.0.0.1", "--no-proxy-server"] : [],
+  });
+  const context = await browser.newContext({ permissions: insecure ? [] : ["clipboard-read", "clipboard-write"] });
   const page = await context.newPage();
   const errors = [];
   const inputs = [];
@@ -70,7 +73,7 @@ async function openTerminalApp({ platform = "Linux x86_64", onInput } = {}) {
     if (pathname === "/api/dashboard") body = { counts: {}, needs_attention: [] };
     await route.fulfill({ contentType: "application/json", body: JSON.stringify(body) });
   });
-  await page.goto(`http://127.0.0.1:${server.address().port}/#/dashboard`);
+  await page.goto(`http://${insecure ? "refine-clipboard.test" : "127.0.0.1"}:${server.address().port}/#/dashboard`);
   await page.waitForFunction(() => typeof ensureTerminalRenderer === "function");
   await page.evaluate(() => {
     window.clipboardEvents = [];

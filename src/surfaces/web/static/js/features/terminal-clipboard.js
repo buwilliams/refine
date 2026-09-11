@@ -1,8 +1,25 @@
 // Clipboard interactions belong to the originating renderer, including retained
 // output. Only paste depends on a live managed session.
 function terminalSelection(terminal) {
-  if (!terminal?.term?.hasSelection?.()) return "";
-  return terminal.term.getSelection?.() || "";
+  const snapshot = terminal?.selectionSnapshot;
+  if (snapshot && (snapshot.term !== terminal.term || snapshot.sessionId !== terminal.sessionId)) {
+    terminal.selectionSnapshot = null;
+  }
+  return terminal?.term?.getSelection?.() || terminal?.selectionSnapshot?.text || "";
+}
+
+// Snapshot identity is also its generation: a late copy may consume only the
+// exact selection it captured. Clipboard attempts own their recovery text.
+function invalidateTerminalSelection(terminal) {
+  if (!terminal?.selectionSnapshot) return;
+  terminal.selectionSnapshot = null;
+  updateTerminalClipboardControls(terminal);
+}
+
+function resetTerminalClipboard(terminal) {
+  if (!terminal) return;
+  terminal.selectionSnapshot = null;
+  terminal.clipboard = null;
 }
 
 function terminalPreservesCopy(terminal) {
@@ -22,13 +39,16 @@ function terminalClipboardHasFocus(terminal) {
 }
 
 function handleTerminalClipboardKeydown(e, terminal = terminalStateFor()) {
-  if (!terminalClipboardHasFocus(terminal) || e.altKey) return false;
+  if (!terminalClipboardHasFocus(terminal)) return false;
   if (e.type && e.type !== "keydown") return false;
   const key = String(e.key || "").toLowerCase();
-  const copy = ((e.ctrlKey || e.metaKey) && key === "c")
-    || (e.ctrlKey && !e.shiftKey && key === "insert");
-  const paste = ((e.ctrlKey || e.metaKey) && key === "v")
-    || (e.shiftKey && !e.ctrlKey && key === "insert");
+  const copy = !e.altKey && (((e.ctrlKey || e.metaKey) && key === "c")
+    || (e.ctrlKey && !e.shiftKey && key === "insert"));
+  const paste = !e.altKey && (((e.ctrlKey || e.metaKey) && key === "v")
+    || (e.shiftKey && !e.ctrlKey && key === "insert"));
+  if (!copy && !["shift", "control", "alt", "meta", "altgraph", "capslock", "numlock", "scrolllock"].includes(key)) {
+    invalidateTerminalSelection(terminal);
+  }
   if ((!copy && !paste) || (copy && !terminalSelection(terminal))) return false;
   if (paste && (!terminal.sessionId || terminal.exited)) {
     // Retained output remains copyable, but xterm must not interpret a paste
@@ -63,9 +83,20 @@ function bindTerminalClipboardEvents(terminal) {
   term.element?.addEventListener("paste", (e) => {
     if (terminal.term === term) handleTerminalPaste(e, terminal);
   }, true);
-  term.onSelectionChange?.(() => {
-    if (terminal.term === term) updateTerminalClipboardControls(terminal);
-  });
+  term.element?.addEventListener("pointerdown", (e) => {
+    if (terminal.term === term && e.button === 0) invalidateTerminalSelection(terminal);
+  }, true);
+  const captureSelection = () => {
+    if (terminal.term !== term) return;
+    const text = term.getSelection?.();
+    if (text) terminal.selectionSnapshot = { text, term, sessionId: terminal.sessionId };
+    updateTerminalClipboardControls(terminal);
+  };
+  term.onSelectionChange?.(captureSelection);
+  // xterm can omit a nonempty selection-change event when a later gesture
+  // selects the same coordinates. Capture before its mouse-up handler can
+  // report input and clear that selection.
+  term.element?.addEventListener("pointerup", captureSelection, true);
 }
 
 function renderTerminalCopyControl(terminal) {
@@ -136,6 +167,7 @@ function copyTerminalSelection(terminal, event = null) {
   if (!text || !terminalClipboardIsVisible(terminal)) return false;
   const copy = {
     text, tab: chatState.tabs[terminal.tabId], term: terminal.term, sessionId: terminal.sessionId,
+    selectionSnapshot: terminal.selectionSnapshot,
     focus: document.activeElement, message: "Copying selection…", recovery: false, pending: true,
   };
   terminal.clipboard = copy;
@@ -178,6 +210,7 @@ function terminalCopyIsCurrent(terminal, copy) {
 
 function finishTerminalCopy(terminal, copy) {
   if (!terminalCopyIsCurrent(terminal, copy)) return;
+  if (terminal.selectionSnapshot === copy.selectionSnapshot) terminal.selectionSnapshot = null;
   copy.message = "Selection copied.";
   copy.recovery = false;
   copy.pending = false;
@@ -271,6 +304,7 @@ function pasteTerminalText(
   // Let xterm normalize line endings and honor the PTY application's
   // bracketed-paste mode. Agent TUIs use that framing to preserve multiline
   // content as one editable prompt rather than submitting embedded lines.
+  invalidateTerminalSelection(terminal);
   terminal.term.paste(text);
   return true;
 }
