@@ -9,11 +9,11 @@
     "name": "Node Startup Ready",
     "source": "node.startup.ready"
   },
-  "execution_state": "pending",
+  "execution_state": "running",
   "gate": "satisfied",
   "goal_id": null,
   "id": "fc61387bf8ea5802e308bb78d57685265a306eb4c583b0bf4d4edde5acd87cd8",
   "node_id": "default",
   "result_count": 0,
-  "state": "pending"
+  "state": "running"
 }

@@ -3,7 +3,7 @@
   "branch_name": "refine/DR07C216F3E4EC22A57C60BE0B/round-6",
   "candidate_commit": "3fb8b4bf8377f07a4acc7d1e18b8f8e7ea8abbd9",
   "created": "2026-09-10T08:26:00Z",
-  "event_generation": 23,
+  "event_generation": 24,
   "feature_id": "00000T130Z0R6J0GJMARY62005",
   "feature_order": 2,
   "id": "DR07C216F3E4EC22A57C60BE0B",
@@ -8950,6 +8950,28 @@
       "failure_at": "",
       "failure_category": "",
       "failure_message": "",
+      "gate_configurations": {
+        "24:default:workflow.done.enter": {
+          "events": {
+            "workflow.done.enter": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.done.enter",
+              "kind": "system",
+              "name": "Workflow Done Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.done.enter"
+            }
+          },
+          "revision": 26,
+          "schema_version": 2,
+          "skills": {}
+        }
+      },
       "governance_candidate_commit": "3fb8b4bf8377f07a4acc7d1e18b8f8e7ea8abbd9",
       "governance_checked_at": "2026-09-10T21:57:17Z",
       "governance_details": {
@@ -9359,9 +9381,9 @@
       "workflow_recovery": null
     }
   ],
-  "status": "review",
+  "status": "done",
   "target_branch": "main",
-  "updated": "2026-09-10T21:57:22Z",
+  "updated": "2026-09-11T12:40:15Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:06:37.178169037+00:00",
@@ -9569,7 +9591,16 @@
       "node_id": "default",
       "round_idx": 5,
       "to": "review"
+    },
+    {
+      "at": "2026-09-11T12:40:15.012946244+00:00",
+      "forced": false,
+      "from": "review",
+      "generation": 24,
+      "node_id": "default",
+      "round_idx": 5,
+      "to": "done"
     }
   ],
-  "workflow_revision": 167
+  "workflow_revision": 168
 }
