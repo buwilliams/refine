@@ -3,7 +3,7 @@
   "branch_name": "refine/DR74050DA12C5442DF797B8AB6/round-3",
   "candidate_commit": null,
   "created": "2026-09-10T08:26:05Z",
-  "event_generation": 7,
+  "event_generation": 8,
   "feature_id": "00000T130Z0R6J0GJMARY62005",
   "feature_order": 3,
   "id": "DR74050DA12C5442DF797B8AB6",
@@ -2367,9 +2367,31 @@
           "state": "succeeded"
         }
       },
-      "failure_at": "",
-      "failure_category": "",
-      "failure_message": "",
+      "failure_at": "2026-09-11T12:39:12Z",
+      "failure_category": "interrupted",
+      "failure_message": "workflow runner restarted; nonterminal work remains schedulable from its synchronized state",
+      "gate_configurations": {
+        "8:default:workflow.failed.enter": {
+          "events": {
+            "workflow.failed.enter": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.failed.enter",
+              "kind": "system",
+              "name": "Workflow Failed Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.failed.enter"
+            }
+          },
+          "revision": 26,
+          "schema_version": 2,
+          "skills": {}
+        }
+      },
       "governance_candidate_commit": "",
       "governance_checked_at": "",
       "governance_details": "",
@@ -2549,9 +2571,9 @@
       "workflow_recovery": null
     }
   ],
-  "status": "implement",
+  "status": "failed",
   "target_branch": "main",
-  "updated": "2026-09-11T10:11:41Z",
+  "updated": "2026-09-11T12:39:12Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:06:36.894817765+00:00",
@@ -2615,7 +2637,16 @@
       "node_id": "default",
       "round_idx": 2,
       "to": "implement"
+    },
+    {
+      "at": "2026-09-11T12:39:12.997503452+00:00",
+      "forced": true,
+      "from": "implement",
+      "generation": 8,
+      "node_id": "default",
+      "round_idx": 2,
+      "to": "failed"
     }
   ],
-  "workflow_revision": 55
+  "workflow_revision": 56
 }
