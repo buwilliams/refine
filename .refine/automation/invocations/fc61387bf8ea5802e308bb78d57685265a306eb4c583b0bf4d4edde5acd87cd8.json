@@ -101,11 +101,49 @@
       }
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "succeeded",
+  "results": {
+    "trigger-2124c51c-8d1f-44b7-8a07-7a989a68227f": {
+      "invocation_id": "fc61387bf8ea5802e308bb78d57685265a306eb4c583b0bf4d4edde5acd87cd8",
+      "binding_id": "trigger-2124c51c-8d1f-44b7-8a07-7a989a68227f",
+      "role": "task",
+      "outcome": "success",
+      "summary": "Queued fetch-goals-from-email as invocation 81e43c6eab51121e0ade753648640334562812eb23a564db01622cb6d1fbf197. Completing startup Skill immediately without waiting for the child Skill.",
+      "evidence": [
+        "Trigger command exited 0 with REFINE_DAEMON_PORT=8082 and request ID startup-email-fc61387bf8ea5802e308bb78d57685265a306eb4c583b0bf4d4edde5acd87cd8.",
+        "Returned invocation ID 81e43c6eab51121e0ade753648640334562812eb23a564db01622cb6d1fbf197 with state pending and error null."
+      ],
+      "artifacts": {}
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "trigger-2124c51c-8d1f-44b7-8a07-7a989a68227f",
+      "checkout": {
+        "observation": {
+          "branch": "main",
+          "head_commit": "f46f8710af32b77d13cec54853bcc4cf3fb728a9",
+          "status_porcelain": []
+        },
+        "tree": "d0a865224eb594442472f9853182ab233f7dede5"
+      },
+      "checkout_recorded": true,
+      "diagnostic": null,
+      "observational_violation": false,
+      "operation_id": null,
+      "process_id": "proc-1789130414423-1100349-188",
+      "prompt_bytes": 1837,
+      "provider_session_id": null,
+      "purpose": "work",
+      "raw_output": "{\"artifacts\":{},\"binding_id\":\"trigger-2124c51c-8d1f-44b7-8a07-7a989a68227f\",\"evidence\":[\"Trigger command exited 0 with REFINE_DAEMON_PORT=8082 and request ID startup-email-fc61387bf8ea5802e308bb78d57685265a306eb4c583b0bf4d4edde5acd87cd8.\",\"Returned invocation ID 81e43c6eab51121e0ade753648640334562812eb23a564db01622cb6d1fbf197 with state pending and error null.\"],\"invocation_id\":\"fc61387bf8ea5802e308bb78d57685265a306eb4c583b0bf4d4edde5acd87cd8\",\"outcome\":\"success\",\"role\":\"task\",\"summary\":\"Queued fetch-goals-from-email as invocation 81e43c6eab51121e0ade753648640334562812eb23a564db01622cb6d1fbf197. Completing startup Skill immediately without waiting for the child Skill.\"}",
+      "received_at": "2026-09-11T12:40:30.794583909+00:00",
+      "started_at": "2026-09-11T12:40:14.419517753+00:00",
+      "workflow_revision": null
+    }
+  ],
   "created_at": "2026-09-11T12:39:12.765162561+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-11T12:40:30.839207556+00:00",
   "error": null,
   "action_applied": false
 }

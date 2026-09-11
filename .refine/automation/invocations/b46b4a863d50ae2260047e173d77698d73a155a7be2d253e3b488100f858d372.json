@@ -31,6 +31,8 @@
     "node_id": "default",
     "target_root": "/home/buddy/projects/refine-next",
     "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR74050DA12C5442DF797B8AB6-round-3",
+    "workspace": null,
+    "lifecycle": null,
     "provider": "codex",
     "goal_id": "DR74050DA12C5442DF797B8AB6",
     "round_idx": 2,
@@ -1361,11 +1363,11 @@
       "parameters": {}
     }
   ],
-  "state": "running",
+  "state": "cancelled",
   "results": {},
   "attempts": [],
   "created_at": "2026-09-10T21:59:53.109092683+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-11T12:40:29.535569570+00:00",
   "error": null,
   "action_applied": false
 }
