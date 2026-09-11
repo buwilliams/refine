@@ -3,7 +3,7 @@
   "branch_name": "refine/DRCBAA3A2FC4ABDDCEC2B87473/round-4",
   "candidate_commit": null,
   "created": "2026-09-10T08:26:07Z",
-  "event_generation": 13,
+  "event_generation": 14,
   "feature_id": "00000T130Z0R6J0GJMARY62005",
   "feature_order": 6,
   "id": "DRCBAA3A2FC4ABDDCEC2B87473",
@@ -5330,6 +5330,28 @@
       "failure_at": "",
       "failure_category": "",
       "failure_message": "",
+      "gate_configurations": {
+        "14:default:workflow.cancelled.enter": {
+          "events": {
+            "workflow.cancelled.enter": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.cancelled.enter",
+              "kind": "system",
+              "name": "Workflow Cancelled Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.cancelled.enter"
+            }
+          },
+          "revision": 26,
+          "schema_version": 2,
+          "skills": {}
+        }
+      },
       "governance_candidate_commit": "",
       "governance_checked_at": "",
       "governance_details": "",
@@ -5355,9 +5377,9 @@
       "workflow_recovery": null
     }
   ],
-  "status": "todo",
+  "status": "cancelled",
   "target_branch": "main",
-  "updated": "2026-09-10T16:22:21Z",
+  "updated": "2026-09-11T12:39:38Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:06:36.799534192+00:00",
@@ -5475,7 +5497,16 @@
       "node_id": "default",
       "round_idx": 4,
       "to": "todo"
+    },
+    {
+      "at": "2026-09-11T12:39:38.163147241+00:00",
+      "forced": true,
+      "from": "todo",
+      "generation": 14,
+      "node_id": "default",
+      "round_idx": 4,
+      "to": "cancelled"
     }
   ],
-  "workflow_revision": 90
+  "workflow_revision": 91
 }

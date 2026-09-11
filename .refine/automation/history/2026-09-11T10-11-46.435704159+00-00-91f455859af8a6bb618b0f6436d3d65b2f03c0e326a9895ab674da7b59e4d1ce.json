@@ -9,9 +9,11 @@
     "name": "Fetch Goals from Email",
     "source": null
   },
+  "execution_state": "running",
+  "gate": "missing",
   "goal_id": null,
   "id": "91f455859af8a6bb618b0f6436d3d65b2f03c0e326a9895ab674da7b59e4d1ce",
   "node_id": "default",
   "result_count": 0,
-  "state": "pending"
+  "state": "running"
 }

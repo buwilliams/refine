@@ -31,6 +31,8 @@
     "node_id": "default",
     "target_root": "/home/buddy/projects/refine-next",
     "cwd": "/home/buddy/projects/refine-next",
+    "workspace": null,
+    "lifecycle": null,
     "provider": "codex",
     "goal_id": null,
     "round_idx": null,
@@ -49,8 +51,12 @@
       }
     },
     "metadata": {
+      "event_operation_id": "1a0907af4c110ca3d1",
       "manual_skill_id": "fetch-goals-from-email",
-      "requested_parameters": {}
+      "requested_parameters": {},
+      "started_bindings": {
+        "trigger-2748a40c-20f1-4533-851a-d3d752e56013": "2026-09-11T12:39:32.309007906+00:00"
+      }
     }
   },
   "bindings": [
@@ -82,7 +88,7 @@
       "parameters": {}
     }
   ],
-  "state": "pending",
+  "state": "running",
   "results": {},
   "attempts": [],
   "created_at": "2026-09-11T10:11:46.435704159+00:00",
