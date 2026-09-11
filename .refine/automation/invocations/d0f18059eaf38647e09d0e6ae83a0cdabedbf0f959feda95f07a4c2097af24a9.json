@@ -90,11 +90,48 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "succeeded",
+  "results": {
+    "trigger-2748a40c-20f1-4533-851a-d3d752e56013": {
+      "invocation_id": "d0f18059eaf38647e09d0e6ae83a0cdabedbf0f959feda95f07a4c2097af24a9",
+      "binding_id": "trigger-2748a40c-20f1-4533-851a-d3d752e56013",
+      "role": "task",
+      "outcome": "success",
+      "summary": "No new email requests. No Goals imported or recovered, no errors, and no indication of more mail remaining.",
+      "evidence": [
+        "Command exited 0. JSON result: fetched_count=0, batch_limit=25, goal_ids=[], errors=[]. No further batch required."
+      ],
+      "artifacts": {}
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "trigger-2748a40c-20f1-4533-851a-d3d752e56013",
+      "checkout": {
+        "observation": {
+          "branch": "main",
+          "head_commit": "9c1be94cf6421854a1c6693b7403b57d8f7576b2",
+          "status_porcelain": []
+        },
+        "tree": "df949206c3e777f2c0e35b72f529559c8517d6dc"
+      },
+      "checkout_recorded": true,
+      "diagnostic": null,
+      "observational_violation": false,
+      "operation_id": null,
+      "process_id": "proc-1789134413383-1754417-85",
+      "prompt_bytes": 2129,
+      "provider_session_id": null,
+      "purpose": "work",
+      "raw_output": "{\"artifacts\":{},\"binding_id\":\"trigger-2748a40c-20f1-4533-851a-d3d752e56013\",\"evidence\":[\"Command exited 0. JSON result: fetched_count=0, batch_limit=25, goal_ids=[], errors=[]. No further batch required.\"],\"invocation_id\":\"d0f18059eaf38647e09d0e6ae83a0cdabedbf0f959feda95f07a4c2097af24a9\",\"outcome\":\"success\",\"role\":\"task\",\"summary\":\"No new email requests. No Goals imported or recovered, no errors, and no indication of more mail remaining.\"}\n",
+      "received_at": "2026-09-11T13:47:25.062903607+00:00",
+      "started_at": "2026-09-11T13:46:53.379397134+00:00",
+      "workflow_revision": null
+    }
+  ],
   "created_at": "2026-09-11T13:46:21.703341666+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-11T13:47:25.107297739+00:00",
   "error": null,
   "action_applied": false
 }
