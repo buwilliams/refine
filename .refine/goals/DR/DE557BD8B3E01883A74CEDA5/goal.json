@@ -3,7 +3,7 @@
   "branch_name": "refine/DRDE557BD8B3E01883A74CEDA5/round-1",
   "candidate_commit": "868a903cd3f5d364d01b50b57294a0cfd1c7843a",
   "created": "2026-09-11T12:39:44Z",
-  "event_generation": 5,
+  "event_generation": 6,
   "feature_id": null,
   "feature_order": null,
   "id": "DRDE557BD8B3E01883A74CEDA5",
@@ -46,11 +46,11 @@
       "created": "2026-09-11T12:39:44Z",
       "event_configuration": {
         "events": {
-          "workflow.quality.enter": {
+          "workflow.governance.enter": {
             "bindings": [
               {
                 "enabled": true,
-                "id": "default-quality",
+                "id": "default-governance",
                 "inputs": {},
                 "mode": "blocking",
                 "order": 0,
@@ -58,30 +58,30 @@
                 "scope": {
                   "node_id": null
                 },
-                "skill_id": "default-quality"
+                "skill_id": "default-governance"
               }
             ],
             "enabled": true,
-            "id": "workflow.quality.enter",
+            "id": "workflow.governance.enter",
             "kind": "system",
-            "name": "Workflow Quality Enter",
+            "name": "Workflow Governance Enter",
             "on_success": null,
             "parameters": [],
             "scope": {
               "node_id": null
             },
-            "source": "workflow.quality.enter"
+            "source": "workflow.governance.enter"
           }
         },
-        "revision": 27,
+        "revision": 28,
         "schema_version": 2,
         "skills": {
-          "default-quality": {
+          "default-governance": {
             "enabled": true,
-            "id": "default-quality",
-            "name": "Quality",
+            "id": "default-governance",
+            "name": "Governance",
             "parameters": [],
-            "prompt": "## Quality review\n\nIndependently review the finalized plans and candidate implementation. Select or add meaningful tests, correct defects when needed, and run the relevant checks. Report actual commands, results and findings. Refine verifies the exact candidate and supervises evaluation commands.\n\n## Required behavior\n\nPreserve the relevant Goal and docs/intent product behavior. Keep Model, Application, Infrastructure, and Surfaces coherent; shared capabilities authoritative; local state and evidence inspectable and recoverable; and affected surfaces semantically consistent.\n\n## Review and verification\n\nJudge the candidate against the Goal and only the relevant docs/intent pages. Use the smallest deterministic checks that cover the affected behavior, adding or adjusting behavior-focused tests only when evidence is missing. Scale integration and failure-path checks to actual risk. Test the governing invariant through the affected real entry paths and lifecycle boundaries. Look for cases that could disprove the implementation's assumptions, including relevant callers outside the changed files. Group findings with a common cause into one coherent recovery request. Report exact commands, results, and remaining uncertainty. Do not require unrelated tests, documentation, refactors, or cleanup; documentation is relevant only when product intent or an architectural contract changes.\n\n## Acceptance checks\n\n- The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks.\n\n## Intent and architecture\n\nApplicability: Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract.\n\nUse the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Model, Application, Infrastructure, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.\n\nFor this project on the current Default node, /home/buddy/projects/refine-next is the target development checkout and /home/buddy/projects/refine is the serving Refine installation. Use the invocation's pinned workspace (the managed Goal Round worktree when supplied) for code changes and verification, and read the relevant intent from that candidate. Verify paths from the current invocation and runtime before operating on another node. Source promotion and restarting the serving installation are separate operator actions; an ordinary implementation or Quality run should not deploy its candidate or restart the daemon that is supervising it.\n\n## Cohesive code files\n\nApplicability: Apply whenever an agent adds or changes code files in any language.\n\nKeep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.\n",
+            "prompt": "## Governance\n\nReview the Goal against the Governance intent below. Do not edit files, merge, push, or change Goal state. A finding must identify the violated intent or invariant, its concrete consequence, and an actionable recovery request. Group related symptoms by their underlying cause.\n\n## Product intent\n\nRefine is an orchestration layer above CLI agents to distribute software development work across a fleet.  Refine moves Goals through a workflow to ensure parallel implementation and governance via Skills.\n\n## Intent and architecture\n\n- Keep domain concepts, invariants, and pure policy in `src/model`; shared behavior and orchestration in `src/application`; Git, process, host, storage, provider, and telemetry mechanisms in `src/infrastructure`; and adapters for people and machines in `src/surfaces`. Keep `error.rs` as a neutral shared boundary. Model remains independent of the other areas, and code outside Surfaces does not depend on surface adapters.\n- Maintain a consistent architecture by extending the existing semantic responsibilities and dependency boundaries described in `docs/intent/01-design.md`. Prefer existing concepts and shared owners. A new or refined domain concept is appropriate when it explains the required behavior, reduces duplicated policies or special cases, and preserves those boundaries.\n- Preserve Rust-based flat-file persistence, file indexes, and in-memory caching. Keep CLI and API work under 50 ms, excluding time spent waiting on LLMs or outside tools.\n- Maintain affected documentation, especially `docs/intent/*`, and preserve its established format. Apply the scope limits in the intent guidance below.\n- Keep Refine agent-first by using installed coding-agent CLIs. Do not duplicate or reimplement coding-agent functionality.\n\n## Cohesive code files\n\nKeep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.\n",
             "provenance": "refine-default-v1",
             "role": "task",
             "scope": {
@@ -558,6 +558,78 @@
               }
             }
           }
+        },
+        "5:default:workflow.quality.exit": {
+          "events": {
+            "workflow.quality.exit": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.quality.exit",
+              "kind": "system",
+              "name": "Workflow Quality Exit",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.quality.exit"
+            }
+          },
+          "revision": 28,
+          "schema_version": 2,
+          "skills": {}
+        },
+        "5:default:workflow.quality.success": {
+          "events": {},
+          "revision": 28,
+          "schema_version": 2,
+          "skills": {}
+        },
+        "6:default:workflow.governance.enter": {
+          "events": {
+            "workflow.governance.enter": {
+              "bindings": [
+                {
+                  "enabled": true,
+                  "id": "default-governance",
+                  "inputs": {},
+                  "mode": "blocking",
+                  "order": 0,
+                  "overrides": null,
+                  "scope": {
+                    "node_id": null
+                  },
+                  "skill_id": "default-governance"
+                }
+              ],
+              "enabled": true,
+              "id": "workflow.governance.enter",
+              "kind": "system",
+              "name": "Workflow Governance Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.governance.enter"
+            }
+          },
+          "revision": 28,
+          "schema_version": 2,
+          "skills": {
+            "default-governance": {
+              "enabled": true,
+              "id": "default-governance",
+              "name": "Governance",
+              "parameters": [],
+              "prompt": "## Governance\n\nReview the Goal against the Governance intent below. Do not edit files, merge, push, or change Goal state. A finding must identify the violated intent or invariant, its concrete consequence, and an actionable recovery request. Group related symptoms by their underlying cause.\n\n## Product intent\n\nRefine is an orchestration layer above CLI agents to distribute software development work across a fleet.  Refine moves Goals through a workflow to ensure parallel implementation and governance via Skills.\n\n## Intent and architecture\n\n- Keep domain concepts, invariants, and pure policy in `src/model`; shared behavior and orchestration in `src/application`; Git, process, host, storage, provider, and telemetry mechanisms in `src/infrastructure`; and adapters for people and machines in `src/surfaces`. Keep `error.rs` as a neutral shared boundary. Model remains independent of the other areas, and code outside Surfaces does not depend on surface adapters.\n- Maintain a consistent architecture by extending the existing semantic responsibilities and dependency boundaries described in `docs/intent/01-design.md`. Prefer existing concepts and shared owners. A new or refined domain concept is appropriate when it explains the required behavior, reduces duplicated policies or special cases, and preserves those boundaries.\n- Preserve Rust-based flat-file persistence, file indexes, and in-memory caching. Keep CLI and API work under 50 ms, excluding time spent waiting on LLMs or outside tools.\n- Maintain affected documentation, especially `docs/intent/*`, and preserve its established format. Apply the scope limits in the intent guidance below.\n- Keep Refine agent-first by using installed coding-agent CLIs. Do not duplicate or reimplement coding-agent functionality.\n\n## Cohesive code files\n\nKeep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.\n",
+              "provenance": "refine-default-v1",
+              "role": "task",
+              "scope": {
+                "node_id": null
+              }
+            }
+          }
         }
       },
       "governance_candidate_commit": "",
@@ -742,9 +814,145 @@
       "prompt": "From: Buddy Williams <buddy.williams@insurity.com>\nSubject: Bug Report\n\nBody:\nI did a comparison between your copy and paste and what I did on different branch.  I couldn't get yours to work.  I ask Claude to compare and Claude found this.  But I will leave it up to you.\r\n\r\nUsers of the toolbar agent terminal (the in-app terminal shown for agent/plan/goal/standalone/skill tabs) could not copy terminal output or paste into it. The app is accessed over the network via plain http to a hostname on a shared server (bo2lnxipsapp01-style), not localhost.\r\n\r\nRoot causes (two, compounding)\r\n\r\n1. Non-secure context. Browsers only expose the async Clipboard API (navigator.clipboard) on HTTPS or localhost. Over plain http://<hostname>, navigator.clipboard is undefined, so any copy/paste path that depends on it silently fails.\r\n   - Confirmed via console: secureContext:false, hasClipboardAPI:false.\r\n2. Agent mouse-tracking wipes the selection. The terminal is xterm.js. Agent TUIs enable SGR mouse tracking; when active, xterm disables its selection service and, critically, clears the selection on mouse-up. The mechanism is xterm's built-in:\r\nonUserInput(() => { this.hasSelection && this.clearSelection() })\r\n   The mouse-report sequences xterm sends to the agent count as \"user input,\" so releasing the mouse fires onUserInput → clearSelection. By the time the user presses Ctrl+C, term.getSelection() is empty.\r\n   - Confirmed via console probe: onSelectionChange fired the real text during the drag, then fired \"\" on release; after release liveSelection:\"\" and the Copy button was disabled:true.\r\n\r\nWhat we discovered about the codebase\r\n\r\n- The vendored xterm.js already supports macOptionClickForcesSelection / rightClickSelectsWord; the escape hatch for selecting under mouse mode is Shift-drag (all platforms) or Option-drag (Mac, only if macOptionClickForcesSelection is on).\r\n- Static web assets are served from disk (src/surfaces/web/static, stat-cache invalidated on mtime), so JS changes go live on a hard refresh — no rebuild needed.\r\n- origin/main already had a fix — commit b4a63709 (maintainer, same day): a new terminal-clipboard.js module + Copy button + \"Shift/Option-drag to select\" hint + a recovery-textarea fallback + native copy/paste-event paths (which do work over http) + browser tests.\r\n- But main's fix had a gap: its terminalSelection() reads the live selection and never caches it, so under agent mouse-tracking the selection is gone before copy — the Copy button stays disabled and every path has empty text. Main's browser tests run a plain terminal, so they never exercise the mouse-tracking case.\r\n\r\nThe final fix\r\n\r\nWe switched to main (which carries the maintainer's module), then added the missing piece on branch fix/agent-terminal-selection-cache (commit e99fdaf8).\r\n\r\nFile: src/surfaces/web/static/js/features/terminal-clipboard.js (+28 / −4)\r\n\r\n┌──────────────────────────────────────┬─────────────────────────────────┬───────────────────────────────────────────────┐\r\n│           Function / line            │             Change              │                      Why                      │\r\n├──────────────────────────────────────┼─────────────────────────────────┼───────────────────────────────────────────────┤\r\n│                                      │ Fall back to                    │ So copy has text even after mouse-mode clears │\r\n│ terminalSelection() — line 3         │ terminal.lastSelection when the │  the live selection                           │\r\n│                                      │  live selection is empty        │                                               │\r\n├──────────────────────────────────────┼─────────────────────────────────┼───────────────────────────────────────────────┤\r\n│ bindTerminalClipboardEvents()        │ Cache each non-empty selection  │ Captures the text during the drag, before     │\r\n│ onSelectionChange — line 82          │ into terminal.lastSelection as  │ mouse-up wipes it                             │\r\n│                                      │ it's made                       │                                               │\r\n├──────────────────────────────────────┼─────────────────────────────────┼───────────────────────────────────────────────┤\r\n│                                      │ On a plain typed key (length    │ So a bare Ctrl/Cmd+C after typing still       │\r\n│ handleTerminalClipboardKeydown() —   │ === 1 or Enter), clear          │ reaches the PTY as SIGINT, not a stale        │\r\n│ line 38                              │ lastSelection                   │ re-copy. Mouse reports arrive as PTY data,    │\r\n│                                      │                                 │ not keydowns, so they never clear it          │\r\n├──────────────────────────────────────┼─────────────────────────────────┼───────────────────────────────────────────────┤\r\n│ finishTerminalCopy() — line 200      │ Clear lastSelection after a     │ Same SIGINT-preservation reason; the copy     │\r\n│                                      │ successful copy                 │ already consumed the text                     │\r\n└──────────────────────────────────────┴─────────────────────────────────┴───────────────────────────────────────────────┘\r\n\r\nWhy this is sufficient: main's module already used the native copy/paste events (clipboardData.setData / getData), which work over plain http, plus a recovery textarea. They just never had text. Feeding the cached selection into terminalSelection() makes the Copy button, Ctrl+C, the recovery UI, and Ctrl+V all work. Verified live in the app.\r\n\r\n\r\n[cid:insurity-small2_60d9d841-975e-4326-81a1-42eb773307d1.jpg]\r\n\r\nBuddy Williams\r\n\r\nVP & Forward Deployed Engineer\r\n\r\nT +1-860-616-2578\r\n\r\n\r\n\r\n[cid:excellence2026signature(17b0688e-5473-4b74-96eb-a73f633f2c2f)_48407359-d77b-4967-95cd-277a32b50ebc.png]<https://insurity.com/excellence?utm_source=Email-Signature&utm_medium=Email&utm_campaign=Event-Excellence-2026>\r\n\r\n_____________________________________________________________________________________________________\r\n\r\nThe information contained in this e-mail message is intended only for the personal and confidential use of the intended recipient(s). This message may be an attorney-client communication and/or work product and as such is privileged and confidential. If the reader of this message is not the intended recipient or an agent responsible for delivering it to the intended recipient, you are hereby notified that you have received this document in error and that any review, dissemination, distribution, or copying of this message is strictly prohibited. If you have received this communication in error, please notify us immediately by e-mail, and delete the original message.\r\n_____________________________________________________________________________________________________\r\n~~~Insurity~~~",
       "quality_agent_report": "workflow.quality.enter:default-quality: Quality passed for the unchanged pinned candidate: 139 tests passed with zero skips, plus syntax and diff checks.",
       "quality_candidate_commit": "868a903cd3f5d364d01b50b57294a0cfd1c7843a",
-      "quality_checked_at": "",
-      "quality_details": "",
-      "quality_message": "",
+      "quality_checked_at": "2026-09-11T12:54:39Z",
+      "quality_details": {
+        "candidate_commit": "868a903cd3f5d364d01b50b57294a0cfd1c7843a",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRDE557BD8B3E01883A74CEDA5-round-1",
+        "diagnostics": [
+          "Reused Skill review workflow.quality.enter:default-quality for final candidate content: automation/invocations/cbd9b0f4c76aaa4a0718166c036e7e8f2942533f997c49fec7bcada970148b77.json",
+          "Observed supervised process proc-1789131232543-1100349-3011 exited 0. stdout: to a replacement managed session (27.581589ms)\n✔ clipboard text buffered before replacement cannot cross managed sessions (26.678708ms)\n✔ clipboard shortcuts remain untouched when focus is outside a terminal (27.470711ms)\n✔ copy shortcuts and native Copy work after exit and macOS forces selection (77.15619ms)\n✔ an active terminal selection cannot capture shortcuts outside its renderer (28.429333ms)\n✔ late and superseded clipboard results cannot replace current copy feedback (52.423384ms)\n✔ Cmd clipboard shortcuts yield to native browser events (27.813727ms)\n✔ terminal-specific fallback performs one operation and ignores key repeat (26.809916ms)\n✔ pending read results and errors cannot affect an inactive terminal (214.901362ms)\n✔ mouse-cleared selection remains available to Copy selection and native Copy (52.310715ms)\n✔ terminal: snapshot invalidation restores exactly one interruption (242.509885ms)\n✔ agent: snapshot invalidation restores exactly one interruption (237.4693ms)\n✔ plan: snapshot invalidation restores exactly one interruption (237.797336ms)\n✔ goal: snapshot invalidation restores exactly one interruption (237.378068ms)\n✔ standalone: snapshot invalidation restores exactly one interruption (241.052375ms)\n✔ skill: snapshot invalidation restores exactly one interruption (240.797264ms)\n✔ delayed success consumes its generation only, and failed recovery is independent (52.745306ms)\n✔ the custom-key policy consumes Alt vertical keydowns and deliberate repeats exactly once (3.984982ms)\n✔ the navigation override ignores other event phases, composition and modifier combinations (1.154889ms)\n✔ the navigation override requires focus, visibility and current terminal state (3.450244ms)\n✔ a replaced renderer cannot invoke keyboard policy on the current session (0.635436ms)\n✔ retained output consumes Alt navigation without emitting after exit or session loss (1.139225ms)\nℹ tests 30\nℹ suites 0\nℹ pass 30\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 2609.842285",
+          "Observed supervised process proc-1789131235608-1100349-3026 exited 0.",
+          "Observed supervised process proc-1789131272872-1100349-3252 exited 0.",
+          "Observed supervised process proc-1789131277535-1100349-3270 exited 0. stdout: ✔ the initial Goal log request fetches the newest page and displays it chronologically (13.666642ms)\n✔ the first Goal SSE log reaches the toolbar and replayed entries stay deduplicated (3.025665ms)\n✔ main SSE transport reconnects in place and reconciles durable visible state (1.718547ms)\n✔ background operations use SSE after one durable registration read (5.735977ms)\n✔ Goal log search covers trail content and Head/Tail changes visible order (1.819184ms)\n✔ Goal log stream renders safe formatted messages and validated action links (8.076449ms)\n✔ Goal log search and stream order persist with the toolbar tab (2.374234ms)\nℹ tests 7\nℹ suites 0\nℹ pass 7\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 167.316899",
+          "Observed supervised process proc-1789131278207-1100349-3276 exited 0.",
+          "Observed supervised process proc-1789131278991-1100349-3288 exited 0."
+        ],
+        "evaluation_scope": "isolated_candidate",
+        "operation_id": "1a090880b7910ca3d9",
+        "provider_attempts": [],
+        "quality_proof": {
+          "checked_at": "2026-09-11T12:54:39Z",
+          "checked_candidate_commit": "868a903cd3f5d364d01b50b57294a0cfd1c7843a",
+          "evaluation_scope": "isolated_candidate",
+          "goal_id": "DRDE557BD8B3E01883A74CEDA5",
+          "operation_id": "1a090880b7910ca3d9",
+          "results": [
+            {
+              "command": "node --test tests/web_terminal_clipboard.test.js tests/web_terminal_keyboard.test.js",
+              "evidence": "Observed supervised process proc-1789131232543-1100349-3011 exited 0. stdout: to a replacement managed session (27.581589ms)\n✔ clipboard text buffered before replacement cannot cross managed sessions (26.678708ms)\n✔ clipboard shortcuts remain untouched when focus is outside a terminal (27.470711ms)\n✔ copy shortcuts and native Copy work after exit and macOS forces selection (77.15619ms)\n✔ an active terminal selection cannot capture shortcuts outside its renderer (28.429333ms)\n✔ late and superseded clipboard results cannot replace current copy feedback (52.423384ms)\n✔ Cmd clipboard shortcuts yield to native browser events (27.813727ms)\n✔ terminal-specific fallback performs one operation and ignores key repeat (26.809916ms)\n✔ pending read results and errors cannot affect an inactive terminal (214.901362ms)\n✔ mouse-cleared selection remains available to Copy selection and native Copy (52.310715ms)\n✔ terminal: snapshot invalidation restores exactly one interruption (242.509885ms)\n✔ agent: snapshot invalidation restores exactly one interruption (237.4693ms)\n✔ plan: snapshot invalidation restores exactly one interruption (237.797336ms)\n✔ goal: snapshot invalidation restores exactly one interruption (237.378068ms)\n✔ standalone: snapshot invalidation restores exactly one interruption (241.052375ms)\n✔ skill: snapshot invalidation restores exactly one interruption (240.797264ms)\n✔ delayed success consumes its generation only, and failed recovery is independent (52.745306ms)\n✔ the custom-key policy consumes Alt vertical keydowns and deliberate repeats exactly once (3.984982ms)\n✔ the navigation override ignores other event phases, composition and modifier combinations (1.154889ms)\n✔ the navigation override requires focus, visibility and current terminal state (3.450244ms)\n✔ a replaced renderer cannot invoke keyboard policy on the current session (0.635436ms)\n✔ retained output consumes Alt navigation without emitting after exit or session loss (1.139225ms)\nℹ tests 30\nℹ suites 0\nℹ pass 30\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 2609.842285",
+              "exit_code": 0,
+              "process_id": "proc-1789131232543-1100349-3011",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality: Shared selection invalidation, copy generation fencing, paste and interruption behavior."
+            },
+            {
+              "command": "NODE_PATH=/tmp/refine-hub-browser/node_modules node --test tests/web_terminal_clipboard_browser.test.js tests/web_terminal_copy_lifecycle_browser.test.js tests/web_terminal_copy_recovery_browser.test.js tests/web_terminal_paste_browser.test.js tests/web_terminal_keyboard_browser.test.js tests/web_terminal_selection_browser.test.js > /tmp/DRDE557-quality-browser.log 2>&1",
+              "evidence": "Observed supervised process proc-1789131235608-1100349-3026 exited 0.",
+              "exit_code": 0,
+              "process_id": "proc-1789131235608-1100349-3026",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality: Real browser clipboard and terminal lifecycle behavior."
+            },
+            {
+              "command": "node --test tests/web_supervisor_toolbar.test.js > /tmp/DRDE557-quality-toolbar.log 2>&1",
+              "evidence": "Observed supervised process proc-1789131272872-1100349-3252 exited 0.",
+              "exit_code": 0,
+              "process_id": "proc-1789131272872-1100349-3252",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality: Toolbar session, renderer and tab lifecycle."
+            },
+            {
+              "command": "node --test tests/web_goal_log_tail.test.js",
+              "evidence": "Observed supervised process proc-1789131277535-1100349-3270 exited 0. stdout: ✔ the initial Goal log request fetches the newest page and displays it chronologically (13.666642ms)\n✔ the first Goal SSE log reaches the toolbar and replayed entries stay deduplicated (3.025665ms)\n✔ main SSE transport reconnects in place and reconciles durable visible state (1.718547ms)\n✔ background operations use SSE after one durable registration read (5.735977ms)\n✔ Goal log search covers trail content and Head/Tail changes visible order (1.819184ms)\n✔ Goal log stream renders safe formatted messages and validated action links (8.076449ms)\n✔ Goal log search and stream order persist with the toolbar tab (2.374234ms)\nℹ tests 7\nℹ suites 0\nℹ pass 7\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 167.316899",
+              "exit_code": 0,
+              "process_id": "proc-1789131277535-1100349-3270",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality: Related Goal history and stream behavior."
+            },
+            {
+              "command": "git diff --name-only f46f8710af32b77d13cec54853bcc4cf3fb728a9 HEAD -- '*.js' | xargs -r -n 1 node --check",
+              "evidence": "Observed supervised process proc-1789131278207-1100349-3276 exited 0.",
+              "exit_code": 0,
+              "process_id": "proc-1789131278207-1100349-3276",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality: JavaScript syntax."
+            },
+            {
+              "command": "git diff --check f46f8710af32b77d13cec54853bcc4cf3fb728a9 HEAD",
+              "evidence": "Observed supervised process proc-1789131278991-1100349-3288 exited 0.",
+              "exit_code": 0,
+              "process_id": "proc-1789131278991-1100349-3288",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality: Candidate diff integrity."
+            }
+          ],
+          "round_idx": 0,
+          "schema_version": 1,
+          "skills": {
+            "invocations": {
+              "workflow.quality.enter:default-quality": "cbd9b0f4c76aaa4a0718166c036e7e8f2942533f997c49fec7bcada970148b77"
+            },
+            "required_bindings": [
+              "workflow.quality.enter:default-quality"
+            ],
+            "requirements_id": "0223f1104eee7711a0826fa73b03fc1c3aa9dbbca80f347b1ea8013635424209"
+          },
+          "source_candidate_commit": "868a903cd3f5d364d01b50b57294a0cfd1c7843a",
+          "state": "passed"
+        },
+        "results": [
+          {
+            "command": "node --test tests/web_terminal_clipboard.test.js tests/web_terminal_keyboard.test.js",
+            "evidence": "Observed supervised process proc-1789131232543-1100349-3011 exited 0. stdout: to a replacement managed session (27.581589ms)\n✔ clipboard text buffered before replacement cannot cross managed sessions (26.678708ms)\n✔ clipboard shortcuts remain untouched when focus is outside a terminal (27.470711ms)\n✔ copy shortcuts and native Copy work after exit and macOS forces selection (77.15619ms)\n✔ an active terminal selection cannot capture shortcuts outside its renderer (28.429333ms)\n✔ late and superseded clipboard results cannot replace current copy feedback (52.423384ms)\n✔ Cmd clipboard shortcuts yield to native browser events (27.813727ms)\n✔ terminal-specific fallback performs one operation and ignores key repeat (26.809916ms)\n✔ pending read results and errors cannot affect an inactive terminal (214.901362ms)\n✔ mouse-cleared selection remains available to Copy selection and native Copy (52.310715ms)\n✔ terminal: snapshot invalidation restores exactly one interruption (242.509885ms)\n✔ agent: snapshot invalidation restores exactly one interruption (237.4693ms)\n✔ plan: snapshot invalidation restores exactly one interruption (237.797336ms)\n✔ goal: snapshot invalidation restores exactly one interruption (237.378068ms)\n✔ standalone: snapshot invalidation restores exactly one interruption (241.052375ms)\n✔ skill: snapshot invalidation restores exactly one interruption (240.797264ms)\n✔ delayed success consumes its generation only, and failed recovery is independent (52.745306ms)\n✔ the custom-key policy consumes Alt vertical keydowns and deliberate repeats exactly once (3.984982ms)\n✔ the navigation override ignores other event phases, composition and modifier combinations (1.154889ms)\n✔ the navigation override requires focus, visibility and current terminal state (3.450244ms)\n✔ a replaced renderer cannot invoke keyboard policy on the current session (0.635436ms)\n✔ retained output consumes Alt navigation without emitting after exit or session loss (1.139225ms)\nℹ tests 30\nℹ suites 0\nℹ pass 30\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 2609.842285",
+            "exit_code": 0,
+            "process_id": "proc-1789131232543-1100349-3011",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality: Shared selection invalidation, copy generation fencing, paste and interruption behavior."
+          },
+          {
+            "command": "NODE_PATH=/tmp/refine-hub-browser/node_modules node --test tests/web_terminal_clipboard_browser.test.js tests/web_terminal_copy_lifecycle_browser.test.js tests/web_terminal_copy_recovery_browser.test.js tests/web_terminal_paste_browser.test.js tests/web_terminal_keyboard_browser.test.js tests/web_terminal_selection_browser.test.js > /tmp/DRDE557-quality-browser.log 2>&1",
+            "evidence": "Observed supervised process proc-1789131235608-1100349-3026 exited 0.",
+            "exit_code": 0,
+            "process_id": "proc-1789131235608-1100349-3026",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality: Real browser clipboard and terminal lifecycle behavior."
+          },
+          {
+            "command": "node --test tests/web_supervisor_toolbar.test.js > /tmp/DRDE557-quality-toolbar.log 2>&1",
+            "evidence": "Observed supervised process proc-1789131272872-1100349-3252 exited 0.",
+            "exit_code": 0,
+            "process_id": "proc-1789131272872-1100349-3252",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality: Toolbar session, renderer and tab lifecycle."
+          },
+          {
+            "command": "node --test tests/web_goal_log_tail.test.js",
+            "evidence": "Observed supervised process proc-1789131277535-1100349-3270 exited 0. stdout: ✔ the initial Goal log request fetches the newest page and displays it chronologically (13.666642ms)\n✔ the first Goal SSE log reaches the toolbar and replayed entries stay deduplicated (3.025665ms)\n✔ main SSE transport reconnects in place and reconciles durable visible state (1.718547ms)\n✔ background operations use SSE after one durable registration read (5.735977ms)\n✔ Goal log search covers trail content and Head/Tail changes visible order (1.819184ms)\n✔ Goal log stream renders safe formatted messages and validated action links (8.076449ms)\n✔ Goal log search and stream order persist with the toolbar tab (2.374234ms)\nℹ tests 7\nℹ suites 0\nℹ pass 7\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 167.316899",
+            "exit_code": 0,
+            "process_id": "proc-1789131277535-1100349-3270",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality: Related Goal history and stream behavior."
+          },
+          {
+            "command": "git diff --name-only f46f8710af32b77d13cec54853bcc4cf3fb728a9 HEAD -- '*.js' | xargs -r -n 1 node --check",
+            "evidence": "Observed supervised process proc-1789131278207-1100349-3276 exited 0.",
+            "exit_code": 0,
+            "process_id": "proc-1789131278207-1100349-3276",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality: JavaScript syntax."
+          },
+          {
+            "command": "git diff --check f46f8710af32b77d13cec54853bcc4cf3fb728a9 HEAD",
+            "evidence": "Observed supervised process proc-1789131278991-1100349-3288 exited 0.",
+            "exit_code": 0,
+            "process_id": "proc-1789131278991-1100349-3288",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality: Candidate diff integrity."
+          }
+        ],
+        "source_candidate_commit": "868a903cd3f5d364d01b50b57294a0cfd1c7843a"
+      },
+      "quality_message": "All Quality Skills passed with supervised evidence.",
       "quality_requirements": {
         "candidate_commit": "868a903cd3f5d364d01b50b57294a0cfd1c7843a",
         "id": "0223f1104eee7711a0826fa73b03fc1c3aa9dbbca80f347b1ea8013635424209",
@@ -842,10 +1050,10 @@
           "summary": "Quality passed for the unchanged pinned candidate: 139 tests passed with zero skips, plus syntax and diff checks."
         }
       ],
-      "quality_state": "unclassified",
+      "quality_state": "passed",
       "reporter": "buddy.williams@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-09-11T12:53:51Z",
+      "updated": "2026-09-11T12:54:41Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-11T12:39:46Z",
         "round_idx": 0,
@@ -855,9 +1063,9 @@
       "workflow_recovery": null
     }
   ],
-  "status": "quality",
+  "status": "governance",
   "target_branch": "main",
-  "updated": "2026-09-11T12:53:51Z",
+  "updated": "2026-09-11T12:54:41Z",
   "workflow_events": [
     {
       "at": "2026-09-11T12:39:44.857489461+00:00",
@@ -903,7 +1111,16 @@
       "node_id": "default",
       "round_idx": 0,
       "to": "quality"
+    },
+    {
+      "at": "2026-09-11T12:54:40.961528335+00:00",
+      "forced": false,
+      "from": "quality",
+      "generation": 6,
+      "node_id": "default",
+      "round_idx": 0,
+      "to": "governance"
     }
   ],
-  "workflow_revision": 31
+  "workflow_revision": 36
 }
