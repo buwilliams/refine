@@ -3,7 +3,7 @@
   "branch_name": "refine/DRDE557BD8B3E01883A74CEDA5/round-1",
   "candidate_commit": "868a903cd3f5d364d01b50b57294a0cfd1c7843a",
   "created": "2026-09-11T12:39:44Z",
-  "event_generation": 7,
+  "event_generation": 8,
   "feature_id": null,
   "feature_order": null,
   "id": "DRDE557BD8B3E01883A74CEDA5",
@@ -677,6 +677,26 @@
           "revision": 28,
           "schema_version": 2,
           "skills": {}
+        },
+        "8:default:workflow.done.enter": {
+          "events": {
+            "workflow.done.enter": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.done.enter",
+              "kind": "system",
+              "name": "Workflow Done Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.done.enter"
+            }
+          },
+          "revision": 37,
+          "schema_version": 2,
+          "skills": {}
         }
       },
       "governance_candidate_commit": "868a903cd3f5d364d01b50b57294a0cfd1c7843a",
@@ -1150,9 +1170,9 @@
       "workflow_recovery": null
     }
   ],
-  "status": "review",
+  "status": "done",
   "target_branch": "main",
-  "updated": "2026-09-11T12:56:57Z",
+  "updated": "2026-09-11T13:14:53Z",
   "workflow_events": [
     {
       "at": "2026-09-11T12:39:44.857489461+00:00",
@@ -1216,7 +1236,16 @@
       "node_id": "default",
       "round_idx": 0,
       "to": "review"
+    },
+    {
+      "at": "2026-09-11T13:14:53.494380601+00:00",
+      "forced": false,
+      "from": "review",
+      "generation": 8,
+      "node_id": "default",
+      "round_idx": 0,
+      "to": "done"
     }
   ],
-  "workflow_revision": 43
+  "workflow_revision": 44
 }
