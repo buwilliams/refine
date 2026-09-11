@@ -1,0 +1,5 @@
+{
+  "content": "{\n  \"migrated_at\": \"2026-07-22T12:24:12Z\",\n  \"sources\": [\n    {\n      \"enabled_commands\": [],\n      \"quality_timing\": \"pre_merge\",\n      \"quality_was_enabled\": false,\n      \"source\": \"node:default\",\n      \"timeout_seconds\": 600\n    }\n  ],\n  \"version\": 1\n}",
+  "schema_version": 1,
+  "source": "quality/legacy-command-transition.json"
+}
