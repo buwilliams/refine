@@ -267,6 +267,11 @@ function clipboardRuntime() {
         terminalStateFor(tabId).term.selection = text;
         terminalStateFor(tabId).term.selectionHandler?.();
       },
+      copyControl(tabId) { return copyTerminalSelection(terminalStateFor(tabId)); },
+      pointer(tabId) {
+        terminalStateFor(tabId).term.element.listeners.get("pointerdown")({ button: 0 });
+      },
+      selected(tabId) { return terminalSelection(terminalStateFor(tabId)); },
       copied(tabId) { return terminalStateFor(tabId).clipboard; },
       exited(tabId) { terminalStateFor(tabId).exited = true; },
       options(tabId) { return terminalStateFor(tabId).term.options; },

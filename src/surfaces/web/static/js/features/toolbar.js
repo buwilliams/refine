@@ -303,6 +303,7 @@ function resetTerminalState() {
     }
     terminal.eventSource?.close();
     terminal.outputResizeObserver?.disconnect();
+    resetTerminalClipboard(terminal);
     terminal.term?.dispose();
     if (terminal.inputFlushTimer) clearTimeout(terminal.inputFlushTimer);
     if (terminal.resizeTimer) clearTimeout(terminal.resizeTimer);
@@ -1254,7 +1255,7 @@ async function startTerminalSession(tab = currentToolbarTab()) {
   const terminal = terminalStateFor(tabId);
   if (!terminal || terminal.loading || terminal.stopping || terminal.connected) return;
   terminal.loading = true;
-  terminal.clipboard = null;
+  resetTerminalClipboard(terminal);
   terminal.error = "";
   drawToolbar();
   try {
@@ -1276,9 +1277,9 @@ async function startTerminalSession(tab = currentToolbarTab()) {
       ? await waitForBackgroundOperation(queued.operation, { timeoutMs: 3000 })
       : queued;
     terminal.eventSource?.close();
+    resetTerminalClipboard(terminal);
     terminal.term?.dispose();
     terminal.term = null;
-    terminal.clipboard = null;
     terminal.display = "";
     terminal.historyReplayPending = false;
     terminal.sessionId = result.id || "";
@@ -1732,7 +1733,7 @@ function ensureTerminalRenderer(output, tab = currentToolbarTab()) {
   if (terminal.term) {
     terminal.term.dispose();
     terminal.term = null;
-    terminal.clipboard = null;
+    resetTerminalClipboard(terminal);
   }
   const size = terminalSize(output, terminal);
   // Opening xterm against a hidden host bakes transient minimum dimensions
@@ -1762,6 +1763,7 @@ function ensureTerminalRenderer(output, tab = currentToolbarTab()) {
   term.attachCustomKeyEventHandler?.(
     (event) => handleTerminalCustomKeyEvent(event, terminal, tab, term),
   );
+  resetTerminalClipboard(terminal);
   terminal.term = term;
   bindTerminalClipboardEvents(terminal);
   resizeTerminalRenderer(output, terminal);
@@ -2866,6 +2868,7 @@ async function closeChatTab(tabId) {
 function removeToolbarTab(tabId) {
   const currentTerminal = terminalStates.get(tabId);
   currentTerminal?.eventSource?.close();
+  resetTerminalClipboard(currentTerminal);
   currentTerminal?.term?.dispose();
   terminalStates.delete(tabId);
   delete chatState.tabs[tabId];

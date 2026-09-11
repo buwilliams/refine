@@ -344,3 +344,72 @@ test("pending read results and errors cannot affect an inactive terminal", async
     }
   }
 });
+
+test("mouse-cleared selection remains available to Copy selection and native Copy", async () => {
+  const browser = clipboardRuntime();
+  browser.runtime.add("agent", "agent", "Agent");
+  browser.runtime.select("agent", "captured before mouse-up");
+  browser.runtime.select("agent", "");
+  assert.equal(browser.runtime.copyControl("agent"), true);
+  await settleInput();
+  assert.deepEqual(browser.writes, ["captured before mouse-up"]);
+  browser.runtime.select("agent", "native captured text");
+  browser.runtime.select("agent", "");
+  assert.equal(browser.runtime.copyEvent("agent").copied["text/plain"], "native captured text");
+  await settleInput();
+  assert.deepEqual(inputRequests(browser), []);
+});
+
+
+for (const mode of ["terminal", "agent", "plan", "goal", "standalone", "skill"]) {
+  test(`${mode}: snapshot invalidation restores exactly one interruption`, async () => {
+    for (const gesture of ["x", "Enter", "Backspace", "Escape", "ArrowLeft", "Alt+ArrowUp", "pointer", "paste", "copy"]) {
+      const browser = clipboardRuntime();
+      browser.runtime.add(mode, mode, mode);
+      browser.runtime.select(mode, "snapshot");
+      browser.runtime.select(mode, "");
+      for (const key of ["Shift", "Control", "Alt", "Meta"]) {
+        browser.runtime.key(mode, { key });
+        browser.runtime.key(mode, { key, type: "keyup" });
+        assert.equal(browser.runtime.selected(mode), "snapshot");
+      }
+      assert.equal(browser.runtime.key(mode, { key: "c", ctrlKey: true }).acceptedByTerminal, false);
+      if (gesture === "pointer") browser.runtime.pointer(mode);
+      else if (gesture === "paste") browser.runtime.pasteEvent(mode, "accepted");
+      else if (gesture === "copy") browser.runtime.copyEvent(mode);
+      else browser.runtime.key(mode, { key: gesture.replace("Alt+", ""), altKey: gesture.startsWith("Alt+") });
+      assert.equal(browser.runtime.selected(mode), "", gesture);
+      assert.equal(browser.runtime.key(mode, { key: "c", ctrlKey: true }).acceptedByTerminal, true);
+      await settleInput();
+      const input = inputRequests(browser).map(({ body }) => body.data).join("");
+      assert.equal(input.split("\x03").length - 1, 1, gesture);
+    }
+  });
+}
+
+test("delayed success consumes its generation only, and failed recovery is independent", async () => {
+  const browser = clipboardRuntime();
+  browser.runtime.add("agent", "agent", "Agent");
+  let resolve;
+  browser.setWrite(() => new Promise((done) => { resolve = done; }));
+  browser.runtime.select("agent", "old");
+  browser.runtime.select("agent", "");
+  browser.runtime.copyControl("agent");
+  browser.runtime.select("agent", "new");
+  browser.runtime.select("agent", "");
+  resolve();
+  await settleInput();
+  assert.equal(browser.runtime.selected("agent"), "new");
+  browser.setWrite(async () => { throw new Error("denied"); });
+  browser.runtime.copyControl("agent");
+  await settleInput();
+  assert.equal(browser.runtime.selected("agent"), "new");
+  assert.equal(browser.runtime.copied("agent").recovery, true);
+  browser.runtime.pointer("agent");
+  assert.equal(browser.runtime.selected("agent"), "");
+  assert.equal(browser.runtime.copied("agent").text, "new");
+  browser.runtime.select("agent", "session-bound");
+  browser.runtime.select("agent", "");
+  browser.runtime.rotateSession("agent", "replacement");
+  assert.equal(browser.runtime.selected("agent"), "");
+});

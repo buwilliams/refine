@@ -67,6 +67,7 @@ for (const profile of ['agent', 'skill']) {
       await page.evaluate(() => {
         terminalStateFor().term.scrollToTop();
         terminalStateFor().term.select(0, 0, 14);
+        terminalStateFor().term.clearSelection();
       });
       releaseStatus();
       await page.evaluate(() => activation);
@@ -80,6 +81,16 @@ for (const profile of ['agent', 'skill']) {
         selected: terminalSelection(terminalStateFor()), viewport: terminalStateFor().term.buffer.active.viewportY,
       })), { same: true, selected: 'OUTPUT-agent-a', viewport: 0 });
       assert.equal(app.launches.length, 2);
+      await page.evaluate(() => terminalStateFor().term.focus());
+      await page.keyboard.press('Escape');
+      await page.evaluate(async () => {
+        await activateToolbarTab(clipboardTabs.b);
+        await activateToolbarTab(clipboardTabs.a);
+      });
+      await page.locator('[data-testid="terminal-stop"]').waitFor();
+      assert.equal(app.launches.length, 3, 'invalidation releases automatic-start suppression');
+      assert.equal(await page.evaluate(() => terminalStateFor().term !== originalTerm
+        && !terminalStateFor().selectionSnapshot), true);
       assert.deepEqual(app.pageErrors, []);
     } finally { await app.close(); }
   });
@@ -109,10 +120,19 @@ for (const profile of ['agent', 'skill']) {
       await page.waitForFunction(() => terminalStateFor().clipboard.recovery);
       assert.equal(await page.getByRole('textbox', { name: 'Selected terminal text', exact: true }).inputValue(), 'OUTPUT-agent-a');
       await page.getByRole('button', { name: 'Dismiss', exact: true }).click();
+      assert.equal(await page.evaluate(() => terminalStateFor().historyReplayPending), true);
+      await page.evaluate(() => terminalStateFor().term.focus());
+      await page.keyboard.press('Escape');
       await page.waitForFunction(() => terminalStateFor().term.buffer.active.getLine(0).translateToString(true) === 'earlier context');
+      await page.evaluate(() => {
+        terminalStateFor().term.select(0, 0, 7);
+        terminalStateFor().term.clearSelection();
+      });
+      assert.equal(await page.evaluate(() => terminalSelection(terminalStateFor())), 'earlier');
       await page.getByRole('button', { name: 'Restart', exact: true }).click();
       await page.locator('[data-testid="terminal-stop"]').waitFor();
       assert.equal(app.launches.length, 3);
+      assert.equal(await page.evaluate(() => terminalStateFor().selectionSnapshot), null);
       assert.equal(await page.evaluate(() => terminalStateFor().term !== originalTerm && !terminalStateFor().clipboard), true);
       assert.deepEqual(app.pageErrors, []);
     } finally { await app.close(); }

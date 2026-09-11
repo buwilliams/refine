@@ -29,7 +29,9 @@ Current implementation details that matter to intent:
 - all Agent, Custom Skill, and shell terminal tabs expose a selection hint: Shift-drag on
   Windows/Linux and Option-drag on macOS select text even when the application
   captures mouse input; ordinary mouse gestures still reach the application;
-- a keyboard-accessible Copy selection control follows the current selection;
+- a keyboard-accessible Copy selection control follows the live selection or
+  the latest nonempty selection text retained by that renderer. Mouse reports
+  can clear xterm's visible selection without losing the text available to copy;
   it and native Copy work with retained output after exit or disconnection,
   preserving the originating tab, selection, and renderer;
 - returning to a tab with selected output or an unfinished copy preserves that
@@ -63,6 +65,15 @@ Current implementation details that matter to intent:
 - output is retained up to a bounded size in the UI;
 - terminal sessions run through the local daemon rather than raw browser execution;
 - worktree-aware terminal behavior supports merge and standalone workflows.
+
+Retained selection text survives output, tab switching, renderer remounting,
+exit, and disconnection. A new primary pointer gesture, a nonmodifier terminal
+key other than copy, accepted paste, or renderer/session replacement invalidates
+it; tab disposal releases it. Successful copy consumes only the selection snapshot
+captured by that attempt, preserving a newer selection and any still-visible
+xterm selection. Once selection and pending/recovery copy state are released,
+deferred history replay and normal automatic-start behavior can resume.
+Clipboard recovery text remains available independently of selection invalidation.
 
 Clipboard attempts and recovery text are transient browser state owned by their
 originating tab. They do not change process or workflow authority.
