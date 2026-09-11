@@ -13,7 +13,7 @@ Knowledge Hub gives people and agents a durable place for reports, significant e
 
 ## Expected Role
 
-Controls > Knowledge Hub lists sites, opens them in new tabs, and provides full management. Published sites use `/hub/sites/<site>/`; draft previews use `/hub/preview/<site>/`. These routes share the Refine installation's existing hosting and access boundary. Publication does not create an independent authentication boundary within that server.
+Controls > Knowledge Hub lists sites, opens them in new tabs, and offers Add site. Full management lives in Settings > Knowledge Hub, immediately after Skills. Site rows open their editors; Add site uses the shared modal field layout and Save/Cancel footer. Published sites use `/hub/sites/<site>/`; draft previews use `/hub/preview/<site>/`. These routes share the Refine installation's existing hosting and access boundary. Publication does not create an independent authentication boundary within that server.
 
 Site and collection identifiers remain stable when display names change. Updates use revision checks, and record imports preserve explicit identifiers. Publishing selects one complete static asset manifest atomically, so editing a draft does not partially change a published site. Public collection queries are read-only.
 

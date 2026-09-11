@@ -48,33 +48,58 @@ async function refreshKnowledgeHub() {
   try {
     const data = await api("GET", "/api/hub/sites");
     if (generation !== hubGeneration || !isNodeContextGenerationCurrent(node)) return;
-    renderInto(root, `<div class="nav-menu-label nav-context-section-label">Knowledge Hub</div>${data.sites.map(({item}) => `<button class="nav-menu-item nav-control-item" data-hub-open="${htmlEscape(item.id)}" data-public="${!!item.publication}">${htmlEscape(item.name)}</button>`).join("")}<button class="nav-menu-item" data-hub-add>Add site...</button><button class="nav-menu-item" data-hub-manage>Manage Knowledge Hub...</button>`);
+    renderInto(root, `<div class="nav-menu-label nav-context-section-label">Knowledge Hub</div>${data.sites.map(({item}) => `<button class="nav-menu-item nav-control-item nav-management-item" type="button" data-hub-open="${htmlEscape(item.id)}" data-public="${!!item.publication}"><svg class="nav-menu-icon" aria-hidden="true" viewBox="0 0 24 24" focusable="false"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M3 9h18M8 13h8M8 16h5"></path></svg><span>${htmlEscape(item.name)}</span></button>`).join("")}<button class="nav-menu-item nav-control-item nav-management-item" type="button" data-hub-add><svg class="nav-menu-icon" aria-hidden="true" viewBox="0 0 24 24" focusable="false"><path d="M12 5v14M5 12h14"></path></svg><span>Add site...</span></button>`);
     root.querySelectorAll("[data-hub-open]").forEach(b => b.onclick = () => {
       const tab = window.open("about:blank", "_blank"); if (tab) tab.opener = null;
       hubSiteUrl(b.dataset.hubOpen, b.dataset.public === "true").then(url => { if (tab) tab.location.replace(url); }).catch(e => {tab?.close(); showActionError(e);});
     });
     root.querySelector("[data-hub-add]").onclick = () => editHubSite();
-    root.querySelector("[data-hub-manage]").onclick = () => openKnowledgeHub();
     if (typeof registerCommand === "function") registerCommand({id:"hub.manage",title:"Manage Knowledge Hub",group:"Knowledge Hub",run:openKnowledgeHub});
   } catch (error) { if (generation === hubGeneration) root.textContent = "Knowledge Hub unavailable"; }
 }
-async function openKnowledgeHub() {
-  const root = hubModal("Knowledge Hub", `<p>Sites and saved data belong to this app and synchronize through its state repository.</p><button data-add>Add site</button><div data-sites></div>`);
-  await hubAction(root, async () => {
-    const data = await api("GET", "/api/hub/sites"); if (!root.isConnected || !isNodeContextGenerationCurrent(root._nodeGeneration)) return;
-    root.querySelector("[data-sites]").innerHTML = `<table class="table"><thead><tr><th>Name</th><th>Publication</th><th></th></tr></thead><tbody>${data.sites.map(({item}) => `<tr><td>${htmlEscape(item.name)}</td><td>${item.publication ? "Published" : "Private"}</td><td><button data-edit="${htmlEscape(item.id)}">Manage</button></td></tr>`).join("")}</tbody></table>`;
-    root.querySelectorAll("[data-edit]").forEach(b => b.onclick = () => {root._close(); openHubSite(b.dataset.edit);});
-  });
-  root.querySelector("[data-add]").onclick = () => {root._close(); editHubSite();};
+function openKnowledgeHub() {
+  location.hash = "#/settings/knowledge-hub";
+}
+function renderKnowledgeHubSettings(data = {}) {
+  const sites = data?.sites || [];
+  return `<section class="settings-section" data-testid="settings-knowledge-hub">
+    <div class="actions"><h3>Knowledge Hub</h3><span class="spacer"></span><button type="button" data-hub-new-site>Add site</button></div>
+    <p class="muted">Sites and saved data belong to this app and synchronize through its state repository.</p>
+    <table class="table"><thead><tr><th>Name</th><th>Publication</th></tr></thead><tbody>${sites.map(({item}) => `<tr data-hub-site="${htmlEscape(item.id)}" tabindex="0" aria-label="Manage ${htmlEscape(item.name)}"><td>${htmlEscape(item.name)}</td><td>${item.publication ? "Published" : "Private"}</td></tr>`).join("")}</tbody></table>
+    ${sites.length ? "" : '<p class="muted">No sites yet.</p>'}</section>`;
+}
+function bindKnowledgeHubSettings() {
+  const root = document.querySelector('[data-testid="settings-knowledge-hub"]');
+  if (!root) return;
+  root.querySelector('[data-hub-new-site]').onclick = () => editHubSite();
+  bindAutomationRows(root, '[data-hub-site]', row => openHubSite(row.dataset.hubSite));
 }
 function editHubSite(existing) {
-  const root = hubModal(existing ? "Edit site" : "Add site", `<label>Name<input data-name required value="${htmlEscape(existing?.item.name || "")}"></label><label>Description<textarea data-description>${htmlEscape(existing?.item.description || "")}</textarea></label><button data-submit>Save site</button>`);
-  root.querySelector("[data-submit]").onclick = () => hubAction(root, async () => {
-    const name = root.querySelector("[data-name]").value.trim(); if (!name) throw new Error("Enter a name.");
-    const id = existing?.item.id || hubId();
-    await hubApi(root,"PUT", hubPath(id), {name,description:root.querySelector("[data-description]").value,revision:existing?.revision});
-    root._close(); await refreshKnowledgeHub(); await openHubSite(id);
-  });
+  const root = hubModal(existing ? "Edit site" : "Add site", `<form data-hub-site-form>
+    <div class="form-row"><label for="hub-site-name">Name</label><input type="text" id="hub-site-name" data-name required value="${htmlEscape(existing?.item.name || "")}"></div>
+    <div class="form-row"><label for="hub-site-description">Description</label><textarea id="hub-site-description" data-description rows="4">${htmlEscape(existing?.item.description || "")}</textarea></div>
+  </form>`);
+  const save = root.querySelector('[data-save]');
+  save.hidden = false;
+  save.dataset.submit = "";
+  root.querySelector('[data-close]').textContent = "Cancel";
+  const submit = () => {
+    if (!root.querySelector('form').reportValidity()) return;
+    return hubAction(root, async () => {
+      const name = root.querySelector("[data-name]").value.trim(); if (!name) throw new Error("Enter a name.");
+      save.disabled = true;
+      try {
+        const id = existing?.item.id || hubId();
+        await hubApi(root,"PUT", hubPath(id), {name,description:root.querySelector("[data-description]").value,revision:existing?.revision});
+        root._close(); await refreshKnowledgeHub();
+        if (isSettingsRoute()) await refreshSettings({force: true});
+        await openHubSite(id);
+      } finally { save.disabled = false; }
+    });
+  };
+  save.onclick = submit;
+  root.querySelector('form').onsubmit = event => { event.preventDefault(); submit(); };
+  root.querySelector('[data-name]').focus();
 }
 async function openHubSite(site) {
   const root = hubModal("Manage site", `<div data-detail></div>`);
@@ -83,19 +108,19 @@ async function openHubSite(site) {
     if (!root.isConnected || !isNodeContextGenerationCurrent(root._nodeGeneration)) return;
     root.querySelector("[data-detail]").innerHTML = `<h3>${htmlEscape(data.item.name)}</h3><p>${htmlEscape(data.item.description || "")}</p><p>${data.item.publication ? "Published" : "Private"}. Saved locally. State sync: ${htmlEscape(status.sync?.status || "unknown")}. Remote availability follows app state synchronization.</p><div class="actions"><button data-edit>Edit site</button><button data-preview>Open preview</button><button class="danger" data-delete-site>Delete site</button></div>
     <h3>Publication</h3><p>Publishing makes the selected collections readable through the site URL.</p>${collections.collections.map(({item})=>`<label><input type="checkbox" data-publish-collection value="${htmlEscape(item.id)}" ${data.item.publication?.collections?.includes(item.id)?"checked":""}>${htmlEscape(item.id)}</label>`).join("")}<div class="actions"><button data-publish>Publish</button><button data-unpublish ${data.item.publication?"":"disabled"}>Unpublish</button></div>
-    <h3>Website files</h3><label>Upload files<input type="file" data-files multiple></label><label>Upload directory<input type="file" data-directory multiple webkitdirectory></label><button data-new-file>New text file</button><table class="table"><thead><tr><th>Path</th><th>Bytes</th><th></th></tr></thead><tbody>${Object.entries(assets.item).map(([path,v])=>`<tr><td>${htmlEscape(path)}</td><td>${v.bytes}</td><td><button data-asset="${htmlEscape(path)}">Edit/download</button></td></tr>`).join("")}</tbody></table>
-    <h3>Collections</h3><button data-new-collection>Add collection</button><table class="table"><tbody>${collections.collections.map(c=>`<tr><td>${htmlEscape(c.item.id)}</td><td><button data-collection="${htmlEscape(c.item.id)}">Manage data</button></td></tr>`).join("")}</tbody></table>`;
+    <h3>Website files</h3><label>Upload files<input type="file" data-files multiple></label><label>Upload directory<input type="file" data-directory multiple webkitdirectory></label><button data-new-file>New text file</button><table class="table"><thead><tr><th>Path</th><th>Bytes</th></tr></thead><tbody>${Object.entries(assets.item).map(([path,v])=>`<tr data-asset="${htmlEscape(path)}" tabindex="0" aria-label="Open ${htmlEscape(path)}"><td>${htmlEscape(path)}</td><td>${v.bytes}</td></tr>`).join("")}</tbody></table>
+    <h3>Collections</h3><button data-new-collection>Add collection</button><table class="table"><tbody>${collections.collections.map(c=>`<tr data-collection="${htmlEscape(c.item.id)}" tabindex="0" aria-label="Manage ${htmlEscape(c.item.id)}"><td>${htmlEscape(c.item.id)}</td></tr>`).join("")}</tbody></table>`;
     const reload = async () => {root._close();await refreshKnowledgeHub();await openHubSite(site);};
     root.querySelector("[data-edit]").onclick=()=>{root._close();editHubSite(data);};
     root.querySelector("[data-preview]").onclick=()=>{const tab=window.open("about:blank","_blank");if(tab)tab.opener=null;hubAction(root,async()=>{try{const url=await hubSiteUrl(site,false);if(tab)tab.location.replace(url);}catch(e){tab?.close();throw e;}});};
     root.querySelector("[data-publish]").onclick=()=>hubAction(root,async()=>{await hubApi(root,"POST",`${hubPath(site)}/publish`,{revision:data.revision,collections:[...root.querySelectorAll("[data-publish-collection]:checked")].map(c=>c.value)});await reload();});
     root.querySelector("[data-unpublish]").onclick=()=>hubAction(root,async()=>{await hubApi(root,"POST",`${hubPath(site)}/unpublish`,{revision:data.revision});await reload();});
-    root.querySelector("[data-delete-site]").onclick=()=>hubAction(root,async()=>{await hubApi(root,"DELETE",hubPath(site),{revision:data.revision});root._close();await refreshKnowledgeHub();await openKnowledgeHub();});
+    root.querySelector("[data-delete-site]").onclick=()=>hubAction(root,async()=>{await hubApi(root,"DELETE",hubPath(site),{revision:data.revision});root._close();await refreshKnowledgeHub();openKnowledgeHub();if(isSettingsRoute())await refreshSettings({force:true});});
     for(const input of root.querySelectorAll("[data-files],[data-directory]")) input.onchange=()=>hubAction(root,async()=>{let manifest=assets;for(const file of input.files){if(file.size>16*1024*1024)throw new Error("Assets must be at most 16 MiB");const path=file.webkitRelativePath?file.webkitRelativePath.split("/").slice(1).join("/"):file.name;manifest=await hubApi(root,"PUT",`${hubPath(site)}/assets`,{path,revision:manifest.revision,bytes_base64:await hubFileBase64(file)});}await reload();});
-    root.querySelectorAll("[data-asset]").forEach(b=>b.onclick=()=>{root._close();editHubAsset(site,b.dataset.asset,assets.revision);});
+    bindAutomationRows(root, "[data-asset]", row=>{root._close();editHubAsset(site,row.dataset.asset,assets.revision);});
     root.querySelector("[data-new-file]").onclick=()=>{root._close();editHubAsset(site,"",assets.revision);};
     root.querySelector("[data-new-collection]").onclick=()=>{root._close();editHubCollection(site);};
-    root.querySelectorAll("[data-collection]").forEach(b=>b.onclick=()=>{root._close();openHubCollection(site,collections.collections.find(c=>c.item.id===b.dataset.collection));});
+    bindAutomationRows(root, "[data-collection]", row=>{root._close();openHubCollection(site,collections.collections.find(c=>c.item.id===row.dataset.collection));});
   });
 }
 async function editHubAsset(site,path,revision) {
@@ -114,8 +139,8 @@ async function openHubCollection(site,collection) {
   const root=hubModal(c,`<div class="actions"><button data-schema>Indexes</button><button data-rebuild>Rebuild indexes</button><button data-new>Add record</button><button class="danger" data-delete>Delete collection</button></div><label>Import JSON/JSONL<input type="file" data-import accept=".json,.jsonl"></label><button data-export>Export JSONL</button><label>Query (JSON)<textarea data-query rows="7" spellcheck="false">{"version":1,"limit":100}</textarea></label><button data-run>Run query</button><p data-summary role="status"></p><div data-rows></div><div class="actions"><button data-prev disabled>Previous</button><button data-next disabled>Next</button></div>`);
   let cursor=null,previous=[],next=null,query={version:1,limit:100};
   const run=()=>hubAction(root,async()=>{const result=await hubApi(root,"POST",`${path}/query`,{...query,cursor});if(!root.isConnected || !isNodeContextGenerationCurrent(root._nodeGeneration))return;next=result.next_cursor;root.querySelector("[data-summary]").textContent=`${result.total} results`;
-    root.querySelector("[data-rows]").innerHTML=`<table class="table"><thead><tr><th>Record</th><th>Data</th><th></th></tr></thead><tbody>${result.rows.map((row,i)=>`<tr><td>${htmlEscape(row.item?.id||row.id||String(i+1))}</td><td><pre>${htmlEscape(JSON.stringify(row.item?.data||row.data||row,null,2))}</pre></td><td>${row.item?`<button data-record="${i}">Edit</button>`:""}</td></tr>`).join("")}</tbody></table>`;
-    root.querySelectorAll("[data-record]").forEach(b=>b.onclick=()=>{root._close();editHubRecord(site,collection,result.rows[Number(b.dataset.record)]);});
+    root.querySelector("[data-rows]").innerHTML=`<table class="table"><thead><tr><th>Record</th><th>Data</th></tr></thead><tbody>${result.rows.map((row,i)=>`<tr${row.item ? ` data-record="${i}" tabindex="0" aria-label="Edit ${htmlEscape(row.item.id)}"` : ""}><td>${htmlEscape(row.item?.id||row.id||String(i+1))}</td><td><pre>${htmlEscape(JSON.stringify(row.item?.data||row.data||row,null,2))}</pre></td></tr>`).join("")}</tbody></table>`;
+    bindAutomationRows(root, "[data-record]", row=>{root._close();editHubRecord(site,collection,result.rows[Number(row.dataset.record)]);});
     root.querySelector("[data-prev]").disabled=!previous.length;root.querySelector("[data-next]").disabled=!next;
   });
   root.querySelector("[data-run]").onclick=()=>{try{query=JSON.parse(root.querySelector("[data-query]").value);cursor=null;previous=[];run();}catch(e){root.querySelector("[data-automation-error]").textContent=e.message;}};

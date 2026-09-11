@@ -19,7 +19,7 @@ function hubFixture() {
       if (method === "PUT") sites.set(site, { revision: `site-${++revision}`, item: { id: site, ...body, publication: null } });
       return sites.get(site);
     }
-    if (rest[0] === "assets") return { revision: "assets-1", item: {} };
+    if (rest[0] === "assets") return method === "POST" ? {bytes_base64: Buffer.from("Report").toString("base64")} : { revision: "assets-1", item: {"index.html": {bytes: 6}} };
     if (rest[0] === "collections" && rest.length === 1) return { collections: [...collections.values()] };
     const collection = rest[1];
     if (rest.length === 2) {
@@ -39,7 +39,7 @@ function hubFixture() {
     }
     return {};
   };
-  return { fixture, sites, records, writes };
+  return { fixture, sites, collections, records, writes };
 }
 
 test("Knowledge Hub uses the existing origin and manages sites and paginated records", { skip: SKIP }, async () => {
@@ -58,7 +58,10 @@ test("Knowledge Hub uses the existing origin and manages sites and paginated rec
     await popup.close();
     await page.getByTestId("context-menu-toggle").click();
     await page.locator('[data-hub-add]').click();
-    await page.locator('[data-name]').fill("Usage report");
+    assert.equal(await page.locator('[data-name]').getAttribute('id'), 'hub-site-name');
+    assert.equal(await page.locator('.modal-body button[data-submit]').count(), 0);
+    assert.equal(await page.locator('.modal-actions [data-submit]').count(), 1);
+    await page.getByLabel('Name', {exact: true}).fill("Usage report");
     await page.locator('[data-description]').fill("Durable statistics");
     await page.locator('[data-submit]').click();
     const binary = Buffer.from([0, 137, 255, 10, 42]);
@@ -114,6 +117,86 @@ test("Workflow controls send the Goal revision and explicit override through the
     assert.equal(submitted.expected_revision, 7);
     assert.equal(submitted.actor, "Reporter");
     assert.ok(submitted.request_id);
+    assert.deepEqual(app.pageErrors, []);
+  } finally { await app.close(); }
+});
+
+
+test("Hub modal rows open from cells and keyboards; Controls uses the shared menu layout", { skip: SKIP }, async () => {
+  const data = hubFixture();
+  data.collections.set("events", {revision: "collection-1", item: {id: "events", indexes: {}}});
+  data.records.set("one", {revision: "record-1", item: {id: "one", data: {value: 42}}});
+  const app = await openApp({fixture: data.fixture});
+  const page = app.page;
+  try {
+    await page.goto(`${app.origin}/#/goals`);
+    await page.getByTestId("context-menu-toggle").click();
+    await page.locator('[data-hub-add]').waitFor();
+    const menu = await page.locator('#nav-knowledge-hub button').evaluateAll(buttons => buttons.map(button => ({
+      classes: button.className, icons: button.querySelectorAll('svg.nav-menu-icon').length,
+      width: button.getBoundingClientRect().width, border: getComputedStyle(button).borderTopWidth,
+      textOffset: button.querySelector('span').getBoundingClientRect().left - button.getBoundingClientRect().left
+    })));
+    assert.equal(menu.length, 2);
+    assert.equal(await page.locator("[data-hub-manage]").count(), 0);
+    for (const item of menu) {
+      assert.match(item.classes, /nav-control-item nav-management-item/);
+      assert.equal(item.icons, 1);
+      assert.equal(item.border, "0px");
+      assert.equal(item.width, menu[0].width);
+      assert.equal(item.textOffset, menu[0].textOffset);
+    }
+    await page.getByTestId("context-menu-toggle").click();
+    await page.goto(`${app.origin}/#/settings/knowledge-hub`);
+    await page.locator('[data-hub-new-site]').waitFor();
+    const tabs = await page.locator('.settings-tab').allTextContents();
+    assert.equal(tabs[tabs.indexOf('Skills') + 1], 'Knowledge Hub');
+    await page.locator('[data-hub-new-site]').click();
+    assert.equal(await page.locator('.form-row label[for="hub-site-name"]').count(), 1);
+    assert.equal(await page.locator('.form-row label[for="hub-site-description"]').count(), 1);
+    await page.locator('[data-close]').click();
+    assert.equal(await page.locator('[data-testid="hub-modal"]').count(), 0);
+    let row = page.locator('tr[data-hub-site="reports"]');
+    assert.equal(await row.locator('button').count(), 0);
+    await row.locator('td').last().click();
+    row = page.locator('tr[data-asset="index.html"]');
+    assert.equal(await row.locator('button').count(), 0);
+    await row.focus();
+    await page.keyboard.press('Enter');
+    await page.waitForFunction(() => document.querySelector('[data-content]')?.value === 'Report');
+    assert.equal(await page.locator('[data-content]').inputValue(), "Report");
+    await page.locator('[data-close]').click();
+    await page.evaluate(() => openHubSite('reports'));
+    row = page.locator('tr[data-collection="events"]');
+    assert.equal(await row.locator('button').count(), 0);
+    await row.focus(); await page.keyboard.press('Space');
+    row = page.locator('tr[data-record="0"]');
+    assert.equal(await row.locator('button').count(), 0);
+    await row.locator('td').last().click();
+    assert.deepEqual(JSON.parse(await page.locator('[data-data]').inputValue()), {value: 42});
+    assert.deepEqual(app.pageErrors, []);
+  } finally { await app.close(); }
+});
+
+test("Skill history opens runs from row cells and keyboard activation", {skip: SKIP}, async () => {
+  const run = {id: "run-one", event: {name: "Inspect report"}, state: "succeeded", created_at: "2026-09-11", results: {}};
+  const app = await openApp({fixture: pathname => {
+    if (pathname === '/api/event-invocations') return {items: [run], total: 1};
+    if (pathname === '/api/event-invocations/run-one') return run;
+    if (pathname === '/api/hub/sites') return {sites: []};
+    return apiFixture(pathname);
+  }});
+  try {
+    await app.page.goto(`${app.origin}/#/goals`);
+    for (const key of [null, 'Enter', 'Space']) {
+      await app.page.evaluate(() => openEventHistory());
+      const row = app.page.locator('tr[data-open-run="run-one"]');
+      assert.equal(await row.locator('button').count(), 0);
+      if (key) { await row.focus(); await app.page.keyboard.press(key); }
+      else await row.locator('td').last().click();
+      await app.page.locator('.modal-title').filter({hasText: 'Inspect report'}).waitFor();
+      await app.page.locator('[data-close]').click();
+    }
     assert.deepEqual(app.pageErrors, []);
   } finally { await app.close(); }
 });

@@ -1529,13 +1529,21 @@ test("Skills use one trigger, shared modal controls and clickable rows with clon
     await page.goto(`${app.origin}/#/settings/events`);
     await page.locator('[data-testid="settings-skills"]').waitFor();
     assert.equal(new URL(page.url()).hash,"#/settings/skills");
-    assert.deepEqual(await page.locator('.settings-tab').allTextContents().then(labels=>labels.map(s=>s.trim())),["Processes","Application","Reporters","Skills","Target App","Runtime"]);
+    assert.deepEqual(await page.locator('.settings-tab').allTextContents().then(labels=>labels.map(s=>s.trim())),["Processes","Application","Reporters","Skills","Knowledge Hub","Target App","Runtime"]);
     assert.equal(await page.locator('[data-testid="automation-table"] td:first-child button').count(),0);
     await page.locator('[data-automation-row]').focus(); await page.keyboard.press('Enter');
     const modal = page.locator('[data-testid="automation-modal"]');
     await modal.waitFor();
     assert.equal(await modal.locator('.modal-title').textContent(), 'Inspect release — Edit Skill');
     assert.equal(await modal.locator('#automation-name').isVisible(), false);
+    assert.deepEqual(await modal.getByRole('tab').allTextContents(), ['Instructions', 'Settings']);
+    assert.equal(await modal.locator('details[data-skill-settings]').count(), 0);
+    await modal.getByRole('tab', {name: 'Instructions', exact: true}).focus();
+    await page.keyboard.press('ArrowRight');
+    assert.equal(await modal.getByRole('tab', {name: 'Settings', exact: true}).getAttribute('aria-selected'), 'true');
+    await page.keyboard.press('Home');
+    assert.equal(await modal.getByRole('tab', {name: 'Instructions', exact: true}).getAttribute('aria-selected'), 'true');
+
     assert.equal(await modal.locator('[data-prompt]').isVisible(), false);
     assert.equal(await modal.locator('[data-settings-markdown-preview]').textContent().then(s => s.trim()), 'Inspect the release.');
     await modal.locator('[data-settings-markdown-edit]').click();
@@ -1543,8 +1551,12 @@ test("Skills use one trigger, shared modal controls and clickable rows with clon
     await modal.locator('[data-settings-markdown-edit]').click();
     assert.equal(await modal.locator('[data-settings-markdown-preview] h2').textContent(), 'Release instructions');
     assert.equal(await modal.locator('[data-settings-markdown-preview] strong').textContent(), 'all changes');
-    await modal.locator('[data-skill-settings] > summary').click();
+    await modal.getByRole('tab', {name: 'Settings', exact: true}).click();
     await modal.locator('#automation-name').waitFor();
+    assert.equal(await modal.locator('[data-settings-markdown-preview]').isVisible(), false);
+    await modal.getByRole('tab', {name:'Instructions', exact:true}).click();
+    assert.equal(await modal.locator('[data-settings-markdown-preview] h2').textContent(), 'Release instructions');
+    await modal.getByRole('tab', {name:'Settings', exact:true}).click();
     assert.equal(await modal.locator('[data-trigger-source]').count(),1);
     assert.equal(await modal.locator('[data-role], [data-add-binding], [data-overrides]').count(),0);
     assert.doesNotMatch(await modal.textContent(),/Result role|Override project assignment/);
@@ -1574,7 +1586,7 @@ test("Skills use one trigger, shared modal controls and clickable rows with clon
     assert.equal(data.records[0].item.parameters[0].default,'beta');
     await page.locator('[data-automation-row]').click();
     await modal.locator('[data-clone-skill]').click();
-    await modal.locator('[data-skill-settings] > summary').click();
+    await modal.getByRole('tab', {name: 'Settings', exact: true}).click();
     await modal.locator('#automation-name').waitFor();
     assert.equal(await modal.locator('#automation-name').inputValue(),'Inspect release copy');
     assert.equal(await modal.locator('[data-delete]').isVisible(),false);
@@ -1734,3 +1746,45 @@ for (const cryptoMode of ["without-randomUUID", "without-crypto"]) {
     } finally { await app.close(); }
   });
 }
+
+
+test("Governance editor tabs preserve drafts and reveal invalid fields before saving", {skip:SKIP}, async () => {
+  const data = skillFixture();
+  data.records[0].item.name = 'Governance';
+  data.records[0].trigger.source = 'workflow.governance.enter';
+  const app = await openApp({fixture: data.fixture});
+  try {
+    const page = app.page;
+    await page.goto(`${app.origin}/#/settings/skills`);
+    await page.locator('[data-automation-row]').click();
+    const modal = page.getByTestId('automation-modal');
+    const instructions = modal.getByRole('tab', {name:'Instructions', exact:true});
+    const settings = modal.getByRole('tab', {name:'Settings', exact:true});
+    assert.equal(await instructions.getAttribute('aria-selected'), 'true');
+    await settings.click();
+    await page.evaluate(() => setSettingsTab('skills'));
+    assert.match(await settings.getAttribute('class'), /active/);
+    await modal.locator('#automation-name').fill('');
+    await instructions.click();
+    await modal.locator('[data-save]').click();
+    assert.equal(await settings.getAttribute('aria-selected'), 'true');
+    assert.equal(await modal.locator('#automation-name').evaluate(el => el === document.activeElement), true);
+    assert.equal(data.writes.length, 0);
+    await modal.locator('#automation-name').fill('Governance checks');
+    await instructions.click();
+    await modal.locator('[data-settings-markdown-edit]').click();
+    await modal.locator('[data-prompt]').fill('');
+    await settings.click();
+    await modal.locator('[data-save]').click();
+    assert.equal(await instructions.getAttribute('aria-selected'), 'true');
+    assert.equal(await modal.locator('[data-prompt]').evaluate(el => el === document.activeElement), true);
+    await modal.locator('[data-prompt]').fill('Review the implementation against the intent.');
+    await settings.click();
+    assert.equal(await modal.locator('#automation-name').inputValue(), 'Governance checks');
+    await modal.locator('[data-save]').click();
+    await modal.waitFor({state:'detached'});
+    assert.equal(data.writes.length, 1);
+    assert.equal(data.writes[0].item.prompt, 'Review the implementation against the intent.');
+    assert.deepEqual(app.pageErrors, []);
+  } finally { await app.close(); }
+});

@@ -608,6 +608,10 @@ select {
 .table td { color: var(--color-text); font-size: 14px; }
 .table tbody tr:hover td { background: #fafcff; }
 .table tr:hover { cursor: pointer; }
+.table tbody tr[tabindex="0"]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
 @media (max-width: 760px) {
   .mobile-card-table,
   .mobile-card-table thead,

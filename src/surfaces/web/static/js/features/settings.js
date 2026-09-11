@@ -136,6 +136,7 @@ async function loadSettingsSurfaceData() {
   return {
     noProject: false,
     automation: needs.skills ? await loadAutomationSettings(activeSlug) : null,
+    hub: activeSlug === "knowledge-hub" ? await api("GET", "/api/hub/sites") : null,
     s: settings,
     diag: diag || {},
     reps: state.reporters,
@@ -686,6 +687,7 @@ const SETTINGS_SURFACES = {
       { slug: "application", label: "Application" },
       { slug: "reporters", label: "Reporters" },
       { slug: "skills", label: "Skills" },
+      { slug: "knowledge-hub", label: "Knowledge Hub" },
       { slug: "target-app", label: "Target App" },
       { slug: "runtime", label: "Runtime" },
     ],
@@ -756,7 +758,7 @@ function setSettingsTab(slug) {
   $$("[data-tab-pane]").forEach((pane) => {
     pane.classList.toggle("active", pane.dataset.tabPane === normalized);
   });
-  $$(".settings-tab").forEach((btn) => {
+  $$("#settings-tabs .settings-tab").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.tabTarget === normalized);
   });
 }
@@ -913,6 +915,7 @@ function renderSettingsTabBody(surface, slug, data) {
     }
   }
   if (slug === "skills") return renderAutomationSettings(slug, data.automation);
+  if (slug === "knowledge-hub") return renderKnowledgeHubSettings(data.hub);
   return `<p class="muted">Unknown settings tab.</p>`;
 }
 
@@ -978,6 +981,7 @@ function bindSettingsTabBody(surface, slug, data) {
 
   }
   if (slug === "skills") bindAutomationSettings(slug, data.automation);
+  if (slug === "knowledge-hub") bindKnowledgeHubSettings();
 }
 
 function drawSettingsSurface(surface, data, activeSlugOverride = null) {

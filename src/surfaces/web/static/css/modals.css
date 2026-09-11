@@ -587,6 +587,5 @@
 .automation-instructions :is(.settings-markdown-preview, textarea) {
   min-height: min(46dvh, 420px);
 }
-.automation-skill-settings > summary { cursor: pointer; margin-bottom: 16px; }
 
 .automation-pagination { display: flex; gap: 8px; margin-top: 16px; }
