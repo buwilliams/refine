@@ -220,25 +220,20 @@ impl FileEventService {
                         .get("verification_only")
                         .and_then(Value::as_bool)
                         == Some(true);
-                let role_instructions = if pinned.skill.role == "governance" {
-                    "For failure, artifacts.violations must contain objects with stable rule_id and message fields; also fill recovery_analysis and recovery_round_prompt."
-                } else {
-                    ""
-                };
                 let authority = if invocation.context.goal_id.is_some() {
                     "Do not change Goal state, merge or push."
                 } else {
                     "Perform only the actions authorized by the Skill instructions and inputs. Use supported Refine commands for Goal changes."
                 };
                 let prompt = format!(
-                    "{}\n{role_instructions}\n\nAttached Skills:\n{}\n\nParameters:\n{}\n\nPinned context:\n{}\n\nRefine completion contract (supplied by the system):\n{}\nReturn one JSON object matching this contract. {authority} Identity fields must be copied exactly. Use outcome failure for findings and error for execution faults. Supply actual evidence; do not fabricate a pass. {}",
+                    "{}\n\nAttached Skills:\n{}\n\nParameters:\n{}\n\nPinned context:\n{}\n\nRefine completion contract (supplied by the system):\n{}\nReturn one JSON object matching this contract. {authority} Identity fields must be copied exactly. Use outcome failure for findings and error for execution faults. Use your judgment to decide when to stop and which outcome to report. The summary, evidence, and artifacts fields are optional context; no checklist, test commands, supporting evidence, or recovery proposal is required by Refine. {}",
                     pinned.skill.prompt,
                     contexts,
                     json!(pinned.parameters),
                     invocation.context.data,
                     contract,
                     if observational {
-                        "This invocation is observational: do not change files or Git state. Report findings and proposed check commands against the pinned candidate."
+                        "This invocation is observational: do not change files or Git state. Report your decision about the current work."
                     } else {
                         ""
                     }

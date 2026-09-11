@@ -1,7 +1,6 @@
 //! A provider turn produces work; completion repair only accepts its retained report.
 use super::execution::PinnedBinding;
 use super::{EventInvocation, FileEventService};
-use crate::application::agent_io::contracts::skill_result::validate_artifacts;
 use crate::application::agent_io::structured_output::{Contract, RepairPolicy, run_with_repair};
 use crate::error::{RefineError, RefineResult};
 use crate::infrastructure::agents::invocation::{HostAgentProviderService, ProviderInvocation};
@@ -249,7 +248,6 @@ pub(crate) fn run(
             result
                 .validate(&id, &binding.binding.id, &binding.skill.role)
                 .map_err(RefineError::Serialization)?;
-            validate_artifacts(&result)?;
             Ok(result)
         },
         |_, outcome| {

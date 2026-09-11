@@ -258,9 +258,9 @@ fn web_server_manages_quality_skill_and_checks() {
     assert_eq!(operation.result["owner_id"], "GOAL1");
     assert_eq!(
         operation.result["results"][0]["test"],
-        "workflow.quality.enter:default-quality: Dashboard loads for a signed-in user."
+        "workflow.quality.enter:default-quality"
     );
-    assert!(operation.result["results"][0]["process_id"].is_string());
+    assert!(operation.result["results"][0]["process_id"].is_null());
     let detail = work_items.show_goal_detail("GOAL1").unwrap();
     assert_eq!(detail["rounds"][0]["quality_state"], "passed");
     assert_eq!(

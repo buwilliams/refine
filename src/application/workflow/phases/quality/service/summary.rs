@@ -3,14 +3,22 @@ use super::*;
 const MAX_SUMMARY_CHARS: usize = 400;
 const MAX_TEST_CHARS: usize = 140;
 const MAX_CAUSE_CHARS: usize = 190;
-const GENERIC_FAILURE_SUMMARY: &str = "Quality failed: no valid structured failure evidence was recorded; inspect Details and supervised logs.";
+const GENERIC_FAILURE_SUMMARY: &str = "Quality agent reported failure.";
 
 pub(crate) fn quality_failure_summary(result: &QualityCheckResult) -> String {
+    if !result.summary.trim().is_empty() {
+        return bounded_text(
+            &format!("Quality failed: {}", result.summary.trim()),
+            MAX_SUMMARY_CHARS,
+        );
+    }
     let failed = result
         .results
         .iter()
         .enumerate()
-        .filter(|(_, result)| result.status.trim() != "passed" || result.exit_code != Some(0))
+        .filter(|(_, result)| {
+            result.status.trim() == "failed" || result.exit_code.is_some_and(|code| code != 0)
+        })
         .collect::<Vec<_>>();
     let additional = failed.len().saturating_sub(1);
 
@@ -75,7 +83,7 @@ fn result_cause(result: &QualityTestResult) -> Option<String> {
         }
         None if result.command.trim().is_empty() => normalized_optional(&result.evidence)
             .or_else(|| Some("no supervised command execution was observed".to_string())),
-        None => Some("no supervised command execution was observed".to_string()),
+        None => normalized_optional(&result.evidence),
         Some(0) if result.status.trim() != "passed" => {
             Some("Quality recorded a failed evaluation despite a zero command exit".to_string())
         }

@@ -172,112 +172,43 @@ impl FileQualityService {
                 accepted.insert(result.binding_id.clone(), result);
             }
         }
-        let mut skills = accepted.into_values().collect::<Vec<SkillResult>>();
+        let skills = accepted.into_values().collect::<Vec<SkillResult>>();
         let coverage = super::skill_evidence::coverage(&snapshot, &skills);
         if !coverage.covers(&snapshot) {
             return Err(RefineError::Conflict(
                 "Quality requirement coverage is incomplete".into(),
             ));
         }
-        // Imported enforced commands remain supervised until the migrated Skill is
-        // deliberately edited or replaced. Merely omitting them from a response cannot
-        // silently weaken the pre-upgrade gate.
-        let archive = self.refine_dir.join("automation/migration-v1.json");
-        if archive.exists() {
-            let migration: Value = crate::infrastructure::storage::automation::read_json(&archive)?;
-            if let Some(skill) = config.skills.get("default-quality").filter(|s| s.enabled)
-                && migration["quality_prompt_hash"].as_str()
-                    == Some(&crate::application::events::execution::stable_id(
-                        &skill.prompt,
-                    ))
-                && config
-                    .events
-                    .values()
-                    .filter(|e| e.source.as_deref() == Some("workflow.quality.enter"))
-                    .any(|e| {
-                        config
-                            .bindings(e, &request.node_id)
-                            .iter()
-                            .any(|(b, _)| b.skill_id == skill.id && b.mode == BindingMode::Blocking)
-                    })
-            {
-                let commands = migration["quality_commands"]
-                    .as_array()
-                    .cloned()
-                    .unwrap_or_default();
-                if !commands.is_empty() {
-                    skills.push(SkillResult { invocation_id: "migration-v1".into(), binding_id: "imported-quality-commands".into(), role: "quality".into(), outcome: "success".into(), summary: "Preserved enforced checks".into(), evidence: vec![], artifacts: json!({"tests": commands.iter().filter_map(Value::as_str).map(|command| json!({"test": command, "command": command, "status":"pending", "evidence":""})).collect::<Vec<_>>()}) });
-                }
-            }
-        }
-        let mut results = Vec::new();
-        let mut diagnostics = invocation_evidence;
-        for skill in skills {
-            if skill.outcome == "error" {
-                return Err(RefineError::Degraded(skill.summary));
-            }
-            if skill.outcome != "success" {
-                results.push(QualityTestResult {
-                    test: skill.binding_id,
-                    status: "failed".into(),
-                    evidence: skill.summary,
-                    command: String::new(),
-                    process_id: None,
-                    exit_code: None,
-                });
-                continue;
-            }
-            let tests = skill
-                .artifacts
-                .get("tests")
-                .and_then(Value::as_array)
-                .ok_or_else(|| {
-                    RefineError::InvalidInput(
-                        "Quality Skill must return supervised test commands".into(),
-                    )
-                })?;
-            if tests.is_empty() {
-                return Err(RefineError::InvalidInput(
-                    "Quality success requires at least one observed check".into(),
-                ));
-            }
-            for test in tests {
-                let mut result: QualityTestResult = serde_json::from_value(test.clone())
-                    .map_err(|e| RefineError::InvalidInput(format!("Quality Skill test: {e}")))?;
-                if result.command.trim().is_empty() || result.test.trim().is_empty() {
-                    return Err(RefineError::InvalidInput(
-                        "Quality tests require a name and noninteractive command".into(),
-                    ));
-                }
-                result.test = format!("{}: {}", skill.binding_id, result.test);
-                self.ensure_operation_active(&request, "next Skill check")?;
-                let mut metadata = request.process_metadata.clone();
-                metadata.insert("quality_test".into(), json!(result.test));
-                metadata.insert("quality_command".into(), json!(result.command));
-                let observed = self.run_observed_command(&result.command, &root, metadata)?;
-                if observed.shell_parser_aborted() {
-                    return Err(quality_command_harness_fault(&result.command, &observed));
-                }
-                result.status = if observed.exit_code == Some(0) {
+        // The selected agents decide. Optional artifacts are retained by the
+        // invocation recorder, never executed or graded by this coordinator.
+        let results = skills
+            .iter()
+            .map(|skill| QualityTestResult {
+                test: skill.binding_id.clone(),
+                status: if skill.outcome == "success" {
                     "passed"
                 } else {
                     "failed"
                 }
-                .into();
-                result.evidence = observed.evidence();
-                result.process_id = Some(observed.process_id);
-                result.exit_code = observed.exit_code;
-                diagnostics.push(result.evidence.clone());
-                results.push(result);
-            }
-        }
+                .into(),
+                evidence: skill.summary.clone(),
+                command: String::new(),
+                process_id: None,
+                exit_code: None,
+            })
+            .collect::<Vec<_>>();
+        let diagnostics = invocation_evidence;
         verify_candidate(&root, &request.candidate_commit, "after Skill checks")?;
         self.ensure_operation_active(&request, "Skill Quality settlement")?;
-        let ok = !results.is_empty() && results.iter().all(|r| r.status == "passed");
+        let ok = skills.iter().all(|skill| skill.outcome == "success");
         let mut result = QualityCheckResult {
             owner_id: request.owner_id,
             ok,
-            summary: "All Quality Skills passed with supervised evidence.".into(),
+            summary: if ok {
+                "Quality Skills reported success.".into()
+            } else {
+                String::new()
+            },
             results,
             diagnostics,
             candidate_commit: request.candidate_commit,

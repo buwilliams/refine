@@ -272,7 +272,7 @@ count=0
 if test -f "$0.count"; then count=$(sed -n '1p' "$0.count"); fi
 count=$((count + 1))
 printf '%s\n' "$count" > "$0.count"
-printf '%s\n' '{"summary":"The candidate passes.","results":[{"test":"Candidate works","status":"passed","evidence":"Verified.","command":"true"}]}'
+printf '%s\n' '{"ok":true,"summary":"The candidate passes.","results":[{"test":"Candidate works","status":"passed","evidence":"Verified.","command":"true"}]}'
 "#,
         )
         .unwrap();

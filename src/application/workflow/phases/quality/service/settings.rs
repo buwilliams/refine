@@ -156,49 +156,6 @@ impl FileQualityService {
         self.refine_dir.join(SETTINGS_FILE)
     }
 
-    pub(crate) fn run_observed_command(
-        &self,
-        command: &str,
-        cwd: &Path,
-        metadata: Map<String, Value>,
-    ) -> RefineResult<ObservedExecution> {
-        let runtime_root = self.runtime_root.clone().ok_or_else(|| {
-            RefineError::Degraded("runtime root is required for Quality".to_string())
-        })?;
-        let security = FileSecurityService::from_project_settings(&runtime_root, &self.refine_dir)?;
-        security.authorize_host_command("quality", command)?;
-        let (shell, args) = shell_program_args(command);
-        let observed_shell = shell.clone();
-        crate::infrastructure::git::worktrees::validate_workspace_launch(&metadata, Some(cwd))?;
-        let output = FileProcessSupervisor::with_allowed_commands(
-            runtime_root,
-            security.allowed_commands.iter().cloned(),
-        )
-        .run_to_completion(ManagedProcessSpec {
-            owner: ProcessOwner::Quality,
-            command: shell,
-            args,
-            cwd: Some(cwd.display().to_string()),
-            env: Vec::new(),
-            stdin: None,
-            limits: Some(ProcessResourceLimits {
-                kill_on_parent_exit: true,
-                ..Default::default()
-            }),
-            authorization_command: Some(command.to_string()),
-            sensitive: false,
-            metadata,
-        })?;
-        output.require_complete_capture()?;
-        Ok(ObservedExecution {
-            process_id: output.process.id,
-            shell: observed_shell,
-            exit_code: output.process.exit_code,
-            stdout: output.stdout,
-            stderr: output.stderr,
-        })
-    }
-
     pub(crate) fn ensure_operation_active(
         &self,
         request: &QualityCheckRequest,

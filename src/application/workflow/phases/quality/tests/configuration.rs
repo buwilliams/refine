@@ -25,7 +25,7 @@ fn quality_settings_persist_and_report_configured_state() {
 }
 
 #[test]
-fn quality_evaluation_fails_when_agent_omits_a_configured_test() {
+fn quality_evaluation_does_not_require_per_test_proof() {
     let result = parse_quality_provider_output(
         "GOAL1",
         &["First outcome".to_string(), "Second outcome".to_string()],
@@ -33,11 +33,9 @@ fn quality_evaluation_fails_when_agent_omits_a_configured_test() {
     )
     .unwrap();
 
-    assert!(!result.ok);
-    assert_eq!(result.results.len(), 2);
-    assert_eq!(result.results[1].test, "Second outcome");
-    assert_eq!(result.results[1].status, "failed");
-    assert!(result.results[1].evidence.contains("omitted"));
+    assert!(result.ok);
+    assert_eq!(result.results.len(), 1);
+    assert_eq!(result.results[0].test, "First outcome");
 }
 
 #[test]
@@ -116,4 +114,19 @@ fn quality_migrates_enabled_legacy_commands_without_a_silent_noop() {
     assert_eq!(transitioned.tests, vec!["Replacement behavior passes"]);
     assert!(transitioned.legacy_commands.is_empty());
     fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn legacy_quality_requires_a_decision_but_not_a_report() {
+    for ok in [true, false] {
+        let result = parse_quality_provider_output(
+            "GOAL1",
+            &["Project instructions".into()],
+            &json!({"ok":ok}).to_string(),
+        )
+        .unwrap();
+        assert_eq!(result.ok, ok);
+        assert!(result.results.is_empty());
+    }
+    assert!(parse_quality_provider_output("GOAL1", &[], r#"{"summary":"No decision"}"#).is_err());
 }

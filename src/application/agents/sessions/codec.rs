@@ -193,7 +193,6 @@ struct IncompleteSignal {
 pub(super) struct SignalReader {
     incomplete: Option<IncompleteSignal>,
     write_grace_period: Duration,
-    requires_planning_result: bool,
     last_seen_fingerprint: Option<u64>,
     observed_change: bool,
 }
@@ -217,7 +216,6 @@ impl SignalReader {
         Self {
             incomplete: None,
             write_grace_period,
-            requires_planning_result: false,
             last_seen_fingerprint: None,
             observed_change: false,
         }
@@ -228,14 +226,6 @@ impl SignalReader {
     /// invalid alike — as agent activity for the idle watchdog.
     pub(super) fn take_observed_change(&mut self) -> bool {
         std::mem::take(&mut self.observed_change)
-    }
-
-    /// Reject completed signals that omit `planning_result` instead of letting
-    /// them settle as prose: planning phases require the structured object, and
-    /// an in-session rewrite is far cheaper than a downstream decode failure.
-    pub(super) fn requiring_planning_result(mut self, required: bool) -> Self {
-        self.requires_planning_result = required;
-        self
     }
 
     pub(super) fn take(&mut self, path: &Path) -> RefineResult<SignalRead> {
@@ -314,14 +304,6 @@ impl SignalReader {
                 )));
             }
         };
-        if self.requires_planning_result
-            && matches!(signal.state, AgentSessionState::Completed)
-            && signal.planning_result.is_none()
-        {
-            return Ok(SignalRead::InvalidContract(
-                "completion signal omitted the required planning_result object".to_string(),
-            ));
-        }
         fs::remove_file(path).map_err(|error| {
             RefineError::Io(format!(
                 "failed to consume Goal Agent signal {}: {error}",
@@ -365,42 +347,15 @@ pub(super) fn goal_agent_protocol_prompt(
     )
 }
 
-fn completion_contract(signal_path: &Path, implementation_phase: Option<&str>) -> String {
+fn completion_contract(signal_path: &Path, _implementation_phase: Option<&str>) -> String {
     let destination = signal_path.display();
-    let guidance_contract = "`guidance_applied` must contain only the displayed zero-based integer Completion Index for each applicable Guidance candidate, such as `[0]`; use `[]` when none apply, and never use candidate names or stable configuration IDs.";
+    let guidance_contract = "If supplied, `guidance_applied` records only the displayed zero-based integer Completion Index for each applicable Guidance candidate, such as `[0]`; use `[]` when none apply, and never use candidate names or stable configuration IDs.";
     let write_protocol = format!(
         "Write the complete JSON to `{destination}.tmp`, parse-check that temporary file with `jq .` or another JSON parser, and only after it parses atomically replace `{destination}` with `mv` or an equivalent rename. Never write the completion payload directly to `{destination}`."
     );
-    match implementation_phase {
-        Some("plan") => {
-            let planning_result =
-                crate::application::agent_io::prompts::implementation_planning::plan_result_contract_json();
-            format!(
-                "Choose applicable Guidance. On completion, produce one JSON object with `state`, a brief `message`, `guidance_applied`, and the required `planning_result`. {guidance_contract} `planning_result` must be a JSON object, never omitted or quoted as a string. Use this complete signal shape: `{{\"state\":\"completed\",\"message\":\"brief planning summary\",\"guidance_applied\":[0],\"planning_result\":{planning_result}}}`. {write_protocol}"
-            )
-        }
-        Some("criticize") => {
-            let planning_result =
-                crate::application::agent_io::prompts::implementation_planning::criticism_result_contract_json();
-            format!(
-                "Choose applicable Guidance. On completion, produce one JSON object with `state`, a brief `message`, `guidance_applied`, and the required `planning_result`. {guidance_contract} `planning_result` must be a JSON object, never omitted or quoted as a string. Use this complete signal shape, with `findings` empty when nothing material was found: `{{\"state\":\"completed\",\"message\":\"brief criticism summary\",\"guidance_applied\":[0],\"planning_result\":{planning_result}}}`. {write_protocol}"
-            )
-        }
-        Some("revise") => {
-            let planning_result =
-                crate::application::agent_io::prompts::implementation_planning::revision_result_contract_json();
-            format!(
-                "Choose applicable Guidance. On completion, produce one JSON object with `state`, a brief `message`, `guidance_applied`, and the required `planning_result`. {guidance_contract} `planning_result` must be a JSON object, never omitted or quoted as a string. Use this complete signal shape with one populated canonical `criticism_id` and `resolution` entry per material finding: `{{\"state\":\"completed\",\"message\":\"brief revision summary\",\"guidance_applied\":[0],\"planning_result\":{planning_result}}}`. {write_protocol}"
-            )
-        }
-        _ => {
-            let implementation_evidence =
-                crate::application::agent_io::prompts::implementation_planning::implementation_evidence_contract_json();
-            format!(
-                "Report changes and exact verification. Choose applicable Guidance. On completion, produce `{{\"state\":\"completed\",\"message\":\"changes and exact verification\",\"guidance_applied\":[0],\"implementation_evidence\":{implementation_evidence}}}`. {guidance_contract} Guidance makes the field required, though it may be empty. Replace each checklist `outcome` with one of `completed|no_change_needed|deviated|rejected|blocked`. A governed implementation checklist requires evidence for every stable ID without altering the accepted plan. {write_protocol}"
-            )
-        }
-    }
+    format!(
+        "Use your judgment to decide when to stop. Choose applicable Guidance. On completion, produce `{{\"state\":\"completed\",\"message\":\"your decision and useful context\",\"guidance_applied\":[0]}}`. {guidance_contract} Planning details and implementation reports are optional context. {write_protocol}"
+    )
 }
 
 pub(super) fn pty_size(cols: u16, rows: u16) -> PtySize {

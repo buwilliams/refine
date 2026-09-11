@@ -1,7 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
-pub mod implementation_planning;
 pub mod structured_output;
 
 macro_rules! prompt_templates {
@@ -204,19 +203,19 @@ mod tests {
     }
 
     #[test]
-    fn quality_commands_must_encode_pass_semantics_in_their_exit_status() {
+    fn quality_prompt_delegates_judgment_without_supervised_proof() {
         let loaded = PromptEngine::load(PromptTemplate::PostImplementationQuality);
 
-        assert!(loaded.contains("exit 0 iff the test passes"));
-        assert!(loaded.contains("never return grep's no-match exit 1 for a pass"));
+        assert!(loaded.contains("use your judgment"));
+        assert!(loaded.contains("does not require a test list or execute commands"));
     }
 
     #[test]
     fn quality_defaults_are_template_owned() {
         let loaded = PromptEngine::load(PromptTemplate::QualityDefaultInstructions);
 
-        assert!(loaded.contains("Evaluate every Quality test"));
-        assert!(loaded.contains("Do not change product code"));
+        assert!(loaded.contains("project instructions and your judgment"));
+        assert!(loaded.contains("run checks when useful"));
     }
 
     #[test]

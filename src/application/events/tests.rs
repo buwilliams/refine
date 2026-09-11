@@ -279,17 +279,23 @@ print(json.dumps(contract))
 #[cfg(unix)]
 #[test]
 fn default_skills_complete_a_real_workflow_with_observed_quality_and_candidate_evidence() {
-    exercise_workflow(false);
+    exercise_workflow(false, false);
 }
 
 #[cfg(unix)]
 #[test]
 fn queued_custom_skill_is_admitted_before_an_active_goal_finishes() {
-    exercise_workflow(true);
+    exercise_workflow(true, false);
 }
 
 #[cfg(unix)]
-fn exercise_workflow(concurrent_skill: bool) {
+#[test]
+fn governance_failure_needs_no_violation_list_or_recovery_proposal() {
+    exercise_workflow(false, true);
+}
+
+#[cfg(unix)]
+fn exercise_workflow(concurrent_skill: bool, governance_failure: bool) {
     use crate::application::work_items::FileWorkItemService;
     use crate::application::workflow::WorkflowEngine;
     use crate::infrastructure::process::supervisor::config::FileSettingsService;
@@ -317,7 +323,9 @@ fn exercise_workflow(concurrent_skill: bool) {
     git(&["add", "app.txt"]);
     git(&["commit", "-qm", "initial"]);
     let provider = fixture.0.join("provider");
-    std::fs::write(&provider, r##"#!/usr/bin/env python3
+    std::fs::write(
+        &provider,
+        r##"#!/usr/bin/env python3
 import sys,json,pathlib,time
 fixture=pathlib.Path(@FIXTURE@)
 prompt=' '.join(sys.argv[1:])
@@ -325,7 +333,8 @@ decode=json.JSONDecoder().raw_decode
 result=decode(prompt.split('Refine completion contract (supplied by the system):\n',1)[1])[0]
 context=decode(prompt.split('Pinned context:\n',1)[1])[0]
 role=result['role']
-result['evidence']=['Inspected the candidate and observed the requested behavior.']
+result.pop('summary', None)
+if role=='governance' and (fixture/'decline').exists(): result['outcome']='failure'
 if role=='task':
  (fixture/'skill-finished').write_text('done')
 if role=='implement':
@@ -335,12 +344,14 @@ if role=='implement':
   while not (fixture/'skill-finished').exists() and time.monotonic()<deadline: time.sleep(.02)
   assert (fixture/'skill-finished').exists(), 'Queued Skill was starved behind the active Goal'
  pathlib.Path('app.txt').write_text('after\n')
- checklist=context['goal']['rounds'][-1]['implementation_plan']['final_plan']['result']['checklist']
- result['artifacts']={'implementation_evidence':{'checklist':[{'id':i['id'],'outcome':'completed','evidence':'Changed app.txt and verified contents'} for i in checklist], 'verification':['app.txt contains after']}}
 if role=='quality':
- result['artifacts']={'tests':[{'test':'Requested output','command':"test \"$(cat app.txt)\" = after",'status':'passed','evidence':'The supervised command checks the actual file'}]}
+ assert pathlib.Path('app.txt').read_text() == 'after\n'
+ result['artifacts']={'tests':[{'command':'touch must-not-execute; exit 1'}]}
 print(json.dumps(result))
-"##.replace("@FIXTURE@", &json!(fixture.0).to_string())).unwrap();
+"##
+        .replace("@FIXTURE@", &json!(fixture.0).to_string()),
+    )
+    .unwrap();
     std::fs::set_permissions(&provider, std::fs::Permissions::from_mode(0o755)).unwrap();
     let _environment = crate::infrastructure::agents::invocation::smoke_ai_env_lock()
         .lock()
@@ -380,6 +391,9 @@ print(json.dumps(result))
             json!({"revision":quality["revision"],"item":quality_item,"trigger":quality_trigger}),
         )
         .unwrap();
+    if governance_failure {
+        std::fs::write(fixture.0.join("decline"), "yes").unwrap();
+    }
     if concurrent_skill {
         std::fs::write(fixture.0.join("concurrent"), "yes").unwrap();
         let revision = service.config().unwrap().revision;
@@ -433,12 +447,36 @@ print(json.dumps(result))
     } else {
         engine.evaluate_workflow()
     };
+    let goal = work.show_goal_detail("EVENTGOAL").unwrap();
+    if governance_failure {
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Governance agent reported failure")
+        );
+        assert_eq!(goal["status"], "failed", "{goal}");
+        assert_eq!(goal["rounds"][0]["failure_category"], "governance");
+        assert_eq!(
+            std::fs::read_to_string(target.join("app.txt")).unwrap(),
+            "before\n"
+        );
+        let runs = service.invocations(0, 100).unwrap();
+        assert!(
+            runs["items"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|i| i["event"]["source"] == "workflow.governance.enter"
+                    && i["state"] == "failed")
+        );
+        return;
+    }
     assert!(
         result.is_ok(),
         "{result:?}\n{}",
         work.show_goal_detail("EVENTGOAL").unwrap()
     );
-    let goal = work.show_goal_detail("EVENTGOAL").unwrap();
     assert_eq!(goal["status"], "review", "{goal}");
     assert_eq!(
         std::fs::read_to_string(target.join("app.txt")).unwrap(),
@@ -471,6 +509,12 @@ print(json.dumps(result))
         1,
         "An unchanged candidate needs one Quality review: {runs}"
     );
+    assert!(
+        !target
+            .join(".git/refine-worktrees/refine-EVENTGOAL-round-1/must-not-execute")
+            .exists()
+    );
+    assert!(!target.join("must-not-execute").exists());
     let proof = &goal["rounds"][0]["quality_details"]["quality_proof"];
     assert_eq!(
         proof["skills"]["required_bindings"]

@@ -343,10 +343,10 @@ fn quality_cancellation_before_provider_launch_records_cancelled_evidence() {
 }
 
 #[test]
-fn quality_cancellation_between_commands_prevents_later_work() {
+fn quality_cancellation_stops_the_agent_before_its_next_action() {
     let fixture = goal_quality_fixture(
-        "quality-cancel-between-commands",
-        "printf '%s\\n' '{\"ok\":true,\"results\":[{\"test\":\"First outcome\",\"status\":\"passed\",\"evidence\":\"planned\",\"command\":\"printf started > first-started; while [ ! -f release-first ]; do sleep 1; done\"},{\"test\":\"Second outcome\",\"status\":\"passed\",\"evidence\":\"planned\",\"command\":\"printf second > second-ran\"}]}'",
+        "quality-cancel-between-agent-actions",
+        "printf started > first-started; while [ ! -f release-first ]; do sleep 1; done; printf second > second-ran",
     );
     FileQualityService::new(&fixture.refine_dir)
         .save_settings(QualitySettingsPatch {

@@ -417,6 +417,7 @@ pub struct SkillResult {
     pub role: String,
     /// success, failure (a finding), or error (execution infrastructure/contract).
     pub outcome: String,
+    #[serde(default)]
     pub summary: String,
     #[serde(default)]
     pub evidence: Vec<String>,
@@ -435,67 +436,8 @@ impl SkillResult {
         {
             return Err("Skill result identity does not match this invocation".into());
         }
-        if !["success", "failure", "error"].contains(&self.outcome.as_str())
-            || self.summary.trim().is_empty()
-        {
-            return Err("Skill result requires an outcome and summary".into());
-        }
-        if self.outcome == "success"
-            && role == "plan"
-            && !self.artifacts.get("plan").is_some_and(Value::is_object)
-        {
-            return Err("Plan Skills must return a plan artifact".into());
-        }
-        if self.outcome == "success"
-            && ["quality", "governance"].contains(&role)
-            && self.evidence.is_empty()
-        {
-            return Err("gate success requires supporting evidence".into());
-        }
-        if role == "governance" && self.outcome != "error" {
-            let violations = self
-                .artifacts
-                .get("violations")
-                .and_then(Value::as_array)
-                .ok_or("Governance requires a violations array")?;
-            if violations.iter().any(|v| {
-                v.get("rule_id")
-                    .and_then(Value::as_str)
-                    .is_none_or(|s| s.trim().is_empty())
-                    || v.get("message")
-                        .and_then(Value::as_str)
-                        .is_none_or(|s| s.trim().is_empty())
-            }) {
-                return Err(
-                    "Governance violations require stable rule_id and message fields".into(),
-                );
-            }
-            if self.outcome == "success" && !violations.is_empty() {
-                return Err("a Governance success cannot contain violations".into());
-            }
-            if self.outcome == "failure"
-                && (violations.is_empty()
-                    || self
-                        .artifacts
-                        .get("recovery_round_prompt")
-                        .and_then(Value::as_str)
-                        .is_none_or(|s| s.trim().is_empty()))
-            {
-                return Err(
-                    "Governance findings require violations and an actionable recovery request"
-                        .into(),
-                );
-            }
-        }
-        if role == "quality"
-            && self.outcome == "success"
-            && self
-                .artifacts
-                .get("tests")
-                .and_then(Value::as_array)
-                .is_none_or(Vec::is_empty)
-        {
-            return Err("Quality requires supervised test commands".into());
+        if !["success", "failure", "error"].contains(&self.outcome.as_str()) {
+            return Err("Skill result requires success, failure, or error".into());
         }
         Ok(())
     }

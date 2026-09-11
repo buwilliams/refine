@@ -518,11 +518,10 @@ fn web_server_reports_between_planning_phases_without_launching_a_diagnostic_age
         )
         .unwrap();
     work_items
-        .replace_goal_round_implementation_plan(
+        .seed_legacy_implementation_plan(
             "GOAL-BETWEEN-PHASES",
             0,
-            None,
-            &ImplementationPlan {
+            &json!({"implementation_plan": ImplementationPlan {
                 schema_version: IMPLEMENTATION_PLAN_SCHEMA_VERSION,
                 state: ImplementationPlanState::InProgress,
                 phase: ImplementationPlanPhase::Criticize,
@@ -550,7 +549,7 @@ fn web_server_reports_between_planning_phases_without_launching_a_diagnostic_age
                 invalid_output_attempts: Vec::new(),
                 provider_session_id: None,
                 governance_precheck: None,
-            },
+            }}),
         )
         .unwrap();
 

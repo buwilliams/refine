@@ -9,10 +9,7 @@
 use super::*;
 
 use crate::application::workflow::engine::context::WorkflowContext;
-use crate::application::workflow::phases::implementation_planning::{
-    begin_implementation_phase, complete_implementation_planning,
-    run_governed_implementation_planning,
-};
+use crate::application::workflow::phases::implementation_planning::run_planning_skills;
 use crate::application::workflow::phases::quality::{FileQualityService, QualitySettingsPatch};
 use crate::infrastructure::git::worktrees::FileGitWorktreeService;
 use crate::model::goal::{
@@ -206,8 +203,7 @@ impl DisruptionFixture {
         ctx.worktree_path = Some(self.worktree.display().to_string());
         let goal = self.work_items.show_goal_detail(GOAL).unwrap();
         let agent_context = goal["rounds"][0]["agent_context"].clone();
-        run_governed_implementation_planning(&ctx, &goal, &agent_context, &self.worktree, BRANCH)
-            .unwrap();
+        run_planning_skills(&ctx, &agent_context, &self.worktree).unwrap();
         ctx
     }
 
@@ -277,6 +273,7 @@ impl DisruptionFixture {
         assert_eq!(after["branch_name"], before["branch_name"]);
         for field in [
             "implementation_plan",
+            "event_results",
             "implementation_report",
             "quality_details",
             "workflow_integration",
@@ -413,7 +410,7 @@ fn force_stop_mid_planning_reuses_the_persisted_proposal() {
     };
     fixture
         .work_items
-        .replace_goal_round_implementation_plan(GOAL, 0, None, &plan)
+        .seed_legacy_implementation_plan(GOAL, 0, &json!({"implementation_plan":plan}))
         .unwrap();
     drop(fixture.claim(GoalStatus::Plan));
 
@@ -435,7 +432,7 @@ fn force_stop_after_plan_before_implement_reuses_the_final_plan() {
     fixture.seed_agent_context();
     drop(fixture.run_real_planning());
     fixture.advance(GoalStatus::Implement);
-    let planned = fixture.detail()["rounds"][0]["implementation_plan"]["final_plan"].clone();
+    let planned = fixture.detail()["rounds"][0]["event_results"].clone();
     assert!(!planned.is_null());
 
     fixture.assert_restart_preserves_evidence_without_relaunch();
@@ -457,7 +454,6 @@ fn force_stop_mid_implement_with_worktree_preserves_partial_implementation() {
     let mut ctx = fixture.run_real_planning();
     ctx.request_transition(GoalStatus::Plan, GoalStatus::Implement)
         .unwrap();
-    begin_implementation_phase(&ctx).unwrap();
     drop(ctx);
     // The dead agent's half-finished tracked edit, never committed.
     let app = fixture.worktree.join("app.txt");
@@ -484,14 +480,6 @@ fn force_stop_after_implement_commit_before_quality_preserves_the_candidate() {
     let mut ctx = fixture.run_real_planning();
     ctx.request_transition(GoalStatus::Plan, GoalStatus::Implement)
         .unwrap();
-    begin_implementation_phase(&ctx).unwrap();
-    complete_implementation_planning(
-        &ctx,
-        "2026-08-15T00:00:00Z".to_string(),
-        "implementation report before disruption".to_string(),
-        None,
-    )
-    .unwrap();
     drop(ctx);
     fixture
         .work_items

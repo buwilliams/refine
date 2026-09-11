@@ -470,8 +470,7 @@ impl FileWorkItemService {
         })?;
         if fields.contains_key("implementation_plan") {
             return Err(RefineError::InvalidInput(
-                "implementation_plan is Workflow-owned evidence and can only be changed through its fenced planning authority"
-                    .to_string(),
+                "Historical implementation plans are read-only".into(),
             ));
         }
 
@@ -607,5 +606,20 @@ impl FileWorkItemService {
             let _ = fs::remove_dir(parent);
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+impl FileWorkItemService {
+    pub(crate) fn seed_legacy_implementation_plan(
+        &self,
+        goal_id: &str,
+        round_idx: usize,
+        fields: &Value,
+    ) -> RefineResult<()> {
+        let summary = self.show_goal_summary(goal_id)?;
+        let (_lock, path, mut value) = self.read_goal_value_unchecked(&summary)?;
+        value["rounds"][round_idx]["implementation_plan"] = fields["implementation_plan"].clone();
+        write_json_atomically(&path, &value)
     }
 }

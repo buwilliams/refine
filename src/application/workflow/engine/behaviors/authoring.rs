@@ -7,7 +7,6 @@ impl WorkflowBehavior for WorkflowPlan {
     }
 
     fn advance(&self, ctx: &mut WorkflowContext<'_>) -> RefineResult<WorkflowAdvanceOutcome> {
-        let branch = ctx.require_branch()?.to_string();
         let worktree_path = ctx.require_worktree_path()?.to_string();
         let goal = match ctx.work_items.show_goal_detail(&ctx.goal_id) {
             Ok(goal) => goal,
@@ -24,9 +23,7 @@ impl WorkflowBehavior for WorkflowPlan {
             Ok(cwd) => cwd,
             Err(error) => return fail(ctx, "plan", error),
         };
-        if let Err(error) =
-            run_governed_implementation_planning(ctx, &goal, &agent_context, &agent_cwd, &branch)
-        {
+        if let Err(error) = run_planning_skills(ctx, &agent_context, &agent_cwd) {
             return fail(ctx, "plan", error);
         }
         ctx.agent_cwd = Some(agent_cwd);
@@ -34,7 +31,7 @@ impl WorkflowBehavior for WorkflowPlan {
         Ok(WorkflowAdvanceOutcome::Transition {
             from: GoalStatus::Plan,
             to: GoalStatus::Implement,
-            reason: "Plan Skills produced validated implementation plans".to_string(),
+            reason: "Plan Skills reported success".to_string(),
         })
     }
 }
@@ -62,11 +59,10 @@ impl WorkflowBehavior for WorkflowImplementation {
             Ok(cwd) => cwd,
             Err(error) => return fail(ctx, "agent", error),
         };
-        let final_plan = match begin_implementation_phase(ctx) {
+        let final_plan = match planning_context(ctx) {
             Ok(plan) => plan,
             Err(error) => return fail(ctx, "implement", error),
         };
-        let implementation_started_at = now_timestamp();
         let results = crate::application::events::workflow::run(
             ctx,
             GoalStatus::Implement,
@@ -81,45 +77,6 @@ impl WorkflowBehavior for WorkflowImplementation {
             .map(|r| format!("{}: {}", r.binding_id, r.summary))
             .collect::<Vec<_>>()
             .join("\n");
-        let mut evidence = crate::model::goal::ImplementationExecutionEvidence {
-            checklist: Vec::new(),
-            verification: Vec::new(),
-        };
-        for result in results.iter().filter(|r| r.role == "implement") {
-            let value = result
-                .artifacts
-                .get("implementation_evidence")
-                .cloned()
-                .ok_or_else(|| {
-                    RefineError::InvalidInput("Implement Skill omitted checklist evidence".into())
-                })?;
-            let next: crate::model::goal::ImplementationExecutionEvidence =
-                serde_json::from_value(value)
-                    .map_err(|e| RefineError::InvalidInput(e.to_string()))?;
-            for item in next.checklist {
-                if let Some(existing) = evidence.checklist.iter_mut().find(|e| e.id == item.id) {
-                    existing
-                        .evidence
-                        .push_str(&format!("\n{}: {}", result.binding_id, item.evidence));
-                    if !matches!(
-                        item.outcome,
-                        crate::model::goal::ImplementationChecklistOutcome::Completed
-                            | crate::model::goal::ImplementationChecklistOutcome::NoChangeNeeded
-                    ) {
-                        existing.outcome = item.outcome;
-                    }
-                } else {
-                    evidence.checklist.push(item);
-                }
-            }
-            evidence.verification.extend(next.verification);
-        }
-        complete_implementation_planning(
-            ctx,
-            implementation_started_at,
-            provider_output.clone(),
-            Some(evidence),
-        )?;
         if let Err(error) = ctx
             .work_items
             .update_latest_goal_round_implementation_report(&ctx.goal_id, &provider_output)
@@ -182,21 +139,6 @@ impl WorkflowBehavior for WorkflowImplementation {
             return fail(ctx, "candidate_handoff", error);
         }
         ctx.candidate_handoff_operation_id = Some(handoff_id.clone());
-        let changed_paths = match worktree_git.changed_paths_since(&target_branch, &commit.commit) {
-            Ok(paths) => paths,
-            Err(error) => return fail(ctx, "guidance", error),
-        };
-        let code_changed = changed_paths.iter().any(|path| is_code_path(path));
-        let guidance_decision = match guidance_decision(&agent_context, None, code_changed) {
-            Ok(decision) => decision,
-            Err(error) => return fail(ctx, "guidance", error),
-        };
-        if let Err(error) = ctx.work_items.update_latest_goal_round_evaluation_summary(
-            &ctx.goal_id,
-            &json!({"guidance_decision": guidance_decision}),
-        ) {
-            return fail(ctx, "guidance", error);
-        }
         if commit.has_changes_since_base {
             ctx.log(
                 "git",

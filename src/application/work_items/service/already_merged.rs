@@ -471,14 +471,10 @@ fn normalize_quality_proof(
         || details.get("evaluation_scope").and_then(Value::as_str) != Some("isolated_candidate")
         || operation_id.is_none()
         || checked_at.is_none()
-        || results.is_none()
     {
         return unavailable();
     }
     let results = results.cloned().unwrap_or_default();
-    if !quality_results_are_passed(&results) {
-        return unavailable();
-    }
     let proof = QualityProof {
         schema_version: QUALITY_PROOF_SCHEMA_VERSION,
         goal_id: goal_id.to_string(),
@@ -529,16 +525,8 @@ fn valid_quality_proof(
             == Some(proof.source_candidate_commit.as_str())
         && details.get("evaluation_scope").and_then(Value::as_str)
             == Some(proof.evaluation_scope.as_str())
-        && details.get("results").and_then(Value::as_array) == Some(&proof.results)
         && round.get("quality_checked_at").and_then(Value::as_str)
             == Some(proof.checked_at.as_str())
-        && quality_results_are_passed(&proof.results)
-}
-
-fn quality_results_are_passed(results: &[Value]) -> bool {
-    results
-        .iter()
-        .all(|result| result.get("status").and_then(Value::as_str) == Some("passed"))
 }
 
 fn nonempty_round_string(round: &Value, key: &str) -> bool {
@@ -561,4 +549,43 @@ fn terminal_reconciliation_object<'a>(
     round
         .get("workflow_reconciliation")
         .filter(|evidence| evidence.get("state").and_then(Value::as_str) == Some(state))
+}
+
+#[cfg(test)]
+mod decision_tests {
+    use super::*;
+
+    #[test]
+    fn retained_quality_decision_uses_candidate_identity_without_grading_optional_details() {
+        let mut round = json!({
+            "quality_state":"passed", "quality_candidate_commit":"candidate",
+            "quality_checked_at":"2026-09-11T00:00:00Z",
+            "quality_details":{
+                "operation_id":"review", "candidate_commit":"candidate",
+                "source_candidate_commit":"candidate", "evaluation_scope":"isolated_candidate"
+            }
+        });
+        let (proof, _, _) = normalize_quality_proof("GOAL", 0, "candidate", &round);
+        let proof = proof.unwrap();
+        assert!(proof.results.is_empty());
+        round["quality_details"]["quality_proof"] = json!(proof);
+        round["quality_details"]["results"] =
+            json!([{"status":"failed","evidence":"Historical detail; final decision is passed"}]);
+        assert!(
+            normalize_quality_proof("GOAL", 0, "candidate", &round)
+                .0
+                .is_some()
+        );
+        assert!(
+            normalize_quality_proof("GOAL", 0, "different", &round)
+                .0
+                .is_none()
+        );
+        round["quality_state"] = json!("failed");
+        assert!(
+            normalize_quality_proof("GOAL", 0, "candidate", &round)
+                .0
+                .is_none()
+        );
+    }
 }

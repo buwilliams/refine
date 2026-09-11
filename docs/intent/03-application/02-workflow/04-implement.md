@@ -12,6 +12,6 @@ Implement converts the finalized plan into a committed, reviewable candidate wit
 
 ## Expected Role
 
-The implementation agent changes the isolated worktree, applies relevant guidance, and reports every stable checklist ID with verification evidence. Checklist outcomes use one aligned vocabulary: `completed` and `no_change_needed` are successful evidenced results, while `deviated`, `rejected`, and `blocked` record why execution did not follow the accepted item. Refine records changed files, the implementation report, exact candidate commit, branch, target branch, and base commit. It then advances the Goal to Quality.
+The implementation AI changes the isolated worktree, follows the Goal and applicable Skill instructions, and judges when to stop. Refine follows its reported decision without requiring checklist IDs, per-item evidence, or verification commands. Optional planning and implementation reports remain available as context and history. Refine records the exact candidate commit, branch, target branch, and base commit before advancing to Quality.
 
 The implementation agent may run useful checks, but it does not approve, merge, push, or advance Goal state. Failures preserve the candidate and evidence and move the Goal to Failed.

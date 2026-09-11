@@ -5,7 +5,8 @@ use crate::model::Timestamp;
 
 pub const QUALITY_PROOF_SCHEMA_VERSION: u32 = 1;
 
-/// Durable, provider-independent proof for one exact Quality evaluation.
+/// Recorded Quality decision and candidate identity. The historical wire name
+/// is retained; optional report contents do not prove or determine acceptance.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct QualityProof {
     pub schema_version: u32,
@@ -24,7 +25,7 @@ pub struct QualityProof {
     pub skills: Option<Box<QualitySkillEvidence>>,
 }
 
-/// Coverage of the requirements selected for this exact candidate evaluation.
+/// Which selected agents completed this exact candidate review.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct QualitySkillEvidence {
     pub requirements_id: String,

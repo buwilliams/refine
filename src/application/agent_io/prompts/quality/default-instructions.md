@@ -1,1 +1,1 @@
-Evaluate every Quality test against the Goal candidate. Determine the least expensive reliable way to run each test, then report pass or fail with evidence. Do not change product code while evaluating the candidate.
+Review the Goal candidate using the project instructions and your judgment. Investigate and run checks when useful, then decide whether the work is ready. Share useful context for the next agent.

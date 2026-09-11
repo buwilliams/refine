@@ -83,7 +83,7 @@ fn quality_failure_summary_has_clear_fallback_without_structured_evidence() {
 
     assert_eq!(
         quality_failure_summary(&result),
-        "Quality failed: no valid structured failure evidence was recorded; inspect Details and supervised logs."
+        "Quality agent reported failure."
     );
 }
 
@@ -139,7 +139,7 @@ fn quality_error_summary_preserves_bounded_harness_fault_cause() {
 }
 
 #[test]
-fn quality_service_uses_agent_to_evaluate_every_plain_text_test() {
+fn quality_service_preserves_the_agent_decision_and_optional_report() {
     let temp_root = unique_temp_dir("quality-trait");
     let candidate_root = temp_root.join("candidate");
     let refine_dir = temp_root.join("state");
@@ -214,15 +214,12 @@ fn quality_service_uses_agent_to_evaluate_every_plain_text_test() {
         })
         .unwrap();
     assert!(result.ok, "{result:#?}");
-    assert_eq!(
-        result.summary,
-        "All Quality tests passed with observed supervised evidence."
-    );
+    assert_eq!(result.summary, "Both checks passed.");
     assert_eq!(result.results.len(), 2);
     assert_eq!(result.results[0].test, "Dashboard loads");
     assert_eq!(result.results[0].command, "printf dashboard-ok");
-    assert!(result.results[0].process_id.is_some());
-    assert_eq!(result.results[0].exit_code, Some(0));
+    assert!(result.results[0].process_id.is_none());
+    assert_eq!(result.results[0].exit_code, None);
 
     let gate = service.gate("GOAL1").unwrap();
     assert!(gate.ok);
@@ -260,7 +257,7 @@ fn quality_service_uses_agent_to_evaluate_every_plain_text_test() {
 }
 
 #[test]
-fn quality_evaluation_rejects_an_extra_unobserved_pass_claim() {
+fn quality_evaluation_keeps_agent_selected_details() {
     let result = parse_quality_provider_output(
         "GOAL1",
         &["Configured outcome".to_string()],
@@ -268,9 +265,9 @@ fn quality_evaluation_rejects_an_extra_unobserved_pass_claim() {
     )
     .unwrap();
 
-    assert_eq!(result.results.len(), 1);
-    assert_eq!(result.results[0].status, "failed");
-    assert!(result.results[0].evidence.contains("2 result(s)"));
+    assert!(result.ok);
+    assert_eq!(result.results.len(), 2);
+    assert_eq!(result.results[0].status, "passed");
 }
 
 #[test]
@@ -316,7 +313,7 @@ fn quality_project_migration_retries_after_staged_failure() {
 }
 
 #[test]
-fn quality_rejects_agent_pass_without_successful_observed_execution() {
+fn quality_does_not_override_the_decision_by_executing_a_reported_command() {
     let temp_root = unique_temp_dir("quality-false-positive");
     let candidate_root = temp_root.join("candidate");
     let refine_dir = temp_root.join("state");
@@ -379,17 +376,17 @@ fn quality_rejects_agent_pass_without_successful_observed_execution() {
             ),
         })
         .unwrap();
-    assert!(!result.ok);
-    assert_eq!(result.results[0].status, "failed");
-    assert_eq!(result.results[0].exit_code, Some(1));
-    assert!(result.results[0].process_id.is_some());
+    assert!(result.ok);
+    assert_eq!(result.results[0].status, "passed");
+    assert_eq!(result.results[0].exit_code, None);
+    assert!(result.results[0].process_id.is_none());
     restore_smoke_ai(previous);
     fs::remove_dir_all(temp_root).unwrap();
 }
 
 #[cfg(unix)]
 #[test]
-fn quality_runs_supervised_commands_with_bash_process_substitution() {
+fn quality_keeps_shell_commands_as_report_text() {
     let temp_root = unique_temp_dir("quality-bash-process-substitution");
     let candidate_root = temp_root.join("candidate");
     let refine_dir = temp_root.join("state");
@@ -455,14 +452,14 @@ fn quality_runs_supervised_commands_with_bash_process_substitution() {
         .unwrap();
 
     assert!(result.ok, "{result:#?}");
-    assert_eq!(result.results[0].exit_code, Some(0));
+    assert_eq!(result.results[0].exit_code, None);
     restore_smoke_ai(previous);
     fs::remove_dir_all(temp_root).unwrap();
 }
 
 #[cfg(unix)]
 #[test]
-fn quality_records_shell_parser_aborts_as_harness_faults() {
+fn quality_does_not_parse_or_execute_shell_text_in_reports() {
     let fixture = goal_quality_fixture(
         "quality-shell-parser-harness-fault",
         "printf '%s\\n' '{\"ok\":true,\"results\":[{\"test\":\"Outcome works\",\"status\":\"passed\",\"evidence\":\"planned\",\"command\":\"printf ok < <(\"}]}'",
@@ -477,24 +474,19 @@ fn quality_records_shell_parser_aborts_as_harness_faults() {
         .register_goal_checks("GOAL1", "smoke-ai", Default::default())
         .unwrap();
 
-    let error = runner.run_registered(&operation.id, request).unwrap_err();
-
-    assert!(error.to_string().contains("Quality command harness fault"));
+    let result = runner.run_registered(&operation.id, request).unwrap();
+    assert!(result.result.ok);
+    assert!(result.result.results[0].process_id.is_none());
     let detail = FileWorkItemService::new(&fixture.refine_dir)
         .show_goal_detail("GOAL1")
         .unwrap();
-    assert_eq!(detail["rounds"][0]["quality_state"], "harness_fault");
+    assert_eq!(detail["rounds"][0]["quality_state"], "passed");
     assert_eq!(
-        detail["rounds"][0]["quality_details"]["error_kind"],
-        "harness_fault"
-    );
-    let settled = FileOperationRegistry::new(&fixture.runtime_root)
-        .status(&operation.id)
-        .unwrap();
-    assert_eq!(settled.state, OperationState::Failed);
-    assert_eq!(
-        settled.error.as_ref().unwrap()["code"],
-        "quality_command_harness_fault"
+        FileOperationRegistry::new(&fixture.runtime_root)
+            .status(&operation.id)
+            .unwrap()
+            .state,
+        OperationState::Succeeded
     );
 
     restore_smoke_ai(previous);
@@ -502,7 +494,7 @@ fn quality_records_shell_parser_aborts_as_harness_faults() {
 }
 
 #[test]
-fn quality_accepts_no_match_evidence_when_command_encodes_pass_semantics() {
+fn quality_preserves_the_agent_explanation() {
     let temp_root = unique_temp_dir("quality-no-match-pass");
     let candidate_root = temp_root.join("candidate");
     let refine_dir = temp_root.join("state");
@@ -569,7 +561,7 @@ fn quality_accepts_no_match_evidence_when_command_encodes_pass_semantics() {
 
     assert!(result.ok, "{result:#?}");
     assert_eq!(result.results[0].status, "passed");
-    assert_eq!(result.results[0].exit_code, Some(0));
+    assert_eq!(result.results[0].exit_code, None);
     assert!(
         result.results[0]
             .evidence
@@ -589,7 +581,7 @@ fn quality_detects_candidate_mutation_and_preserves_it() {
     fs::create_dir_all(&temp_root).unwrap();
     fs::write(
         &smoke_ai,
-        "#!/bin/sh\nprintf '%s\\n' '{\"ok\":true,\"results\":[{\"test\":\"Candidate remains stable\",\"status\":\"passed\",\"evidence\":\"claimed\",\"command\":\"printf mutation >> candidate.txt\"}]}'\n",
+        "#!/bin/sh\nprintf mutation >> candidate.txt\nprintf '%s\\n' '{\"ok\":true,\"results\":[{\"test\":\"Candidate remains stable\",\"status\":\"passed\",\"evidence\":\"claimed\",\"command\":\"printf mutation >> candidate.txt\"}]}'\n",
     )
     .unwrap();
     make_executable(&smoke_ai);
@@ -644,10 +636,10 @@ fn quality_detects_candidate_mutation_and_preserves_it() {
         })
         .unwrap_err();
     assert!(
-        error
-            .to_string()
-            .contains("dirty candidate index or worktree")
+        matches!(error, RefineError::QualityCandidateInfrastructure(_)),
+        "{error}"
     );
+    assert!(error.to_string().contains("dirty"), "{error}");
     assert!(
         fs::read_to_string(candidate_root.join("candidate.txt"))
             .unwrap()

@@ -55,7 +55,6 @@ where
         artifact_handoff,
         completion_timeout,
         idle_timeout,
-        requires_planning_result,
     } = super::pty_lifecycle::launch_session(launch)?;
 
     let reader_path = stdout_path.clone();
@@ -93,8 +92,7 @@ where
     let mut implementation_evidence = None;
     let mut planning_result = None;
     let completion_started_at = std::time::Instant::now();
-    let mut signal_reader =
-        SignalReader::default().requiring_planning_result(requires_planning_result);
+    let mut signal_reader = SignalReader::default();
     let mut invalid_signal_recovery = InvalidSignalRecovery::default();
     let mut toolbar_timeout_protected = false;
     let mut status_result = (|| -> RefineResult<_> {

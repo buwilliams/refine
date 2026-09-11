@@ -85,7 +85,7 @@ fn execution_outcomes_and_gate_permission_are_independent() {
 struct ProviderEnv(Option<std::ffi::OsString>);
 
 #[test]
-fn blocking_gate_rejects_spoofed_identity_and_malformed_artifacts() {
+fn blocking_gate_checks_identity_but_does_not_grade_artifacts() {
     let fixture = Fixture::new();
     let mut invocation = prepared(&fixture, "workflow.plan.enter");
     let binding = invocation.bindings[0].clone();
@@ -110,7 +110,7 @@ fn blocking_gate_rejects_spoofed_identity_and_malformed_artifacts() {
     invocation
         .results
         .insert(binding.binding.id.clone(), accepted);
-    assert_eq!(invocation.gate_assessment(), GateAssessment::Fault);
+    assert_eq!(invocation.gate_assessment(), GateAssessment::Satisfied);
 }
 #[cfg(unix)]
 impl Drop for ProviderEnv {
@@ -138,7 +138,7 @@ fn provider(fixture: &Fixture, script: &str) -> ProviderEnv {
 
 #[cfg(unix)]
 #[test]
-fn malformed_plan_shapes_fail_once_and_retain_the_diagnostic() {
+fn arbitrary_plan_shapes_are_retained_without_grading() {
     let _env = crate::infrastructure::agents::invocation::smoke_ai_env_lock()
         .lock()
         .unwrap_or_else(|p| p.into_inner());
@@ -159,8 +159,8 @@ if prompt.startswith('Repair only'):
 else:
  assert 'DO_WORK_ONCE_ONLY' in prompt
  with pathlib.Path('work-count').open('a') as f: f.write('work\n')
- if '{shape}' == 'extra_checklist_fields': contract['artifacts']['plan']['checklist'][0]['affected_behavior']=['unexpected']
- else: contract['artifacts']['plan']['criticism_resolutions']={{'C1':'resolved'}}
+ if '{shape}' == 'extra_checklist_fields': contract['artifacts']={{'plan':{{'checklist':[{{'affected_behavior':['context']}}]}}}}
+ else: contract['artifacts']={{'plan':{{'criticism_resolutions':{{'C1':'resolved'}}}}}}
 print(json.dumps(contract))
 "#
             ),
@@ -170,9 +170,9 @@ print(json.dumps(contract))
         invocation.bindings[0].skill.prompt = "DO_WORK_ONCE_ONLY".into();
         service.save_invocation(&invocation).unwrap();
         let completed = service.execute(&invocation.id, || Ok(())).unwrap();
-        assert_eq!(completed.state, InvocationState::Error, "{completed:?}");
+        assert_eq!(completed.state, InvocationState::Succeeded, "{completed:?}");
         assert_eq!(completed.attempts.len(), 1);
-        assert!(completed.attempts[0]["diagnostic"].is_string());
+        assert!(completed.attempts[0]["diagnostic"].is_null());
         assert_eq!(
             std::fs::read_to_string(fixture.0.join("work-count")).unwrap(),
             "work\n"
@@ -425,7 +425,7 @@ if prompt.startswith('Repair only'):
  pathlib.Path('file').write_text('unauthorized repair edit')
 else:
  pathlib.Path('file').write_text('legitimate quality correction')
- result['artifacts']={}
+ result.pop('outcome')
 print(json.dumps(result))
 "#,
     );
@@ -481,4 +481,31 @@ fn interrupted_launch_without_receipt_does_not_invoke_provider_again() {
             .attempts
             .is_empty()
     );
+}
+
+#[test]
+fn every_workflow_role_uses_the_agent_decision_without_required_supporting_fields() {
+    for role in ["plan", "implement", "quality", "governance"] {
+        for outcome in ["success", "failure", "error"] {
+            let fixture = Fixture::new();
+            let mut invocation = prepared(&fixture, &format!("workflow.{role}.enter"));
+            let binding = invocation.bindings[0].clone();
+            let result: SkillResult = serde_json::from_value(json!({
+                "invocation_id":invocation.id, "binding_id":binding.binding.id,
+                "role":role, "outcome":outcome
+            }))
+            .unwrap();
+            invocation.results.insert(binding.binding.id, result);
+            invocation.state = execution::aggregate_state(&invocation);
+            assert_eq!(
+                invocation.gate_assessment(),
+                match outcome {
+                    "success" => GateAssessment::Satisfied,
+                    "failure" => GateAssessment::Finding,
+                    _ => GateAssessment::Fault,
+                },
+                "{role}: {outcome}"
+            );
+        }
+    }
 }

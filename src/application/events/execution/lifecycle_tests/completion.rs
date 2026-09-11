@@ -180,7 +180,7 @@ fn cancelled_partial_blocking_results_cannot_admit_todo_after_restart() {
 #[test]
 fn incomplete_or_invalid_retained_success_cannot_settle_scheduler_or_manual_gates() {
     for scheduler in [false, true] {
-        for defect in ["missing", "identity", "role", "summary"] {
+        for defect in ["missing", "identity", "role", "outcome"] {
             let f = Fixture::new();
             let _smoke = SmokeSkill::install(&f.service, &f.temp);
             let source = if scheduler {
@@ -209,11 +209,11 @@ fn incomplete_or_invalid_retained_success_cannot_settle_scheduler_or_manual_gate
                     incomplete.results.get_mut("second").unwrap().invocation_id = "other".into()
                 }
                 "role" => incomplete.results.get_mut("second").unwrap().role = "plan".into(),
-                "summary" => incomplete
+                "outcome" => incomplete
                     .results
                     .get_mut("second")
                     .unwrap()
-                    .summary
+                    .outcome
                     .clear(),
                 "failure" => {
                     incomplete.results.get_mut("second").unwrap().outcome = "failure".into()

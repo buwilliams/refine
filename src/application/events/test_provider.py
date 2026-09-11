@@ -29,9 +29,7 @@ def object_from(raw):
 
 if role == 'implement':
     report = legacy('Implement the Goal')
-    checklist = context['goal']['rounds'][-1]['implementation_plan']['final_plan']['result']['checklist']
     result['summary'] = report or 'Implemented the fixture change.'
-    result['artifacts'] = {'implementation_evidence': {'checklist': [{'id': i['id'], 'outcome': 'completed', 'evidence': result['summary']} for i in checklist], 'verification': ['Actual supervised fixture execution']}}
 elif role == 'quality':
     quality = decode(prompt.split('Project Quality instructions and tests:\n', 1)[1])[0] if 'Project Quality instructions and tests:\n' in prompt else {'configured':True}
     if quality.get('configured', True):
@@ -41,7 +39,7 @@ elif role == 'quality':
         if value and isinstance(value.get('results'), list):
             result['artifacts'] = {'tests': value['results']}
             result['summary'] = value.get('summary') or 'Fixture Quality evaluation'
-            # A command is only a proposal. Refine observes it before deciding pass/fail.
+            result['outcome'] = 'success' if value.get('ok') is True else 'failure'
         else:
             print(raw); sys.exit(0)
     else:

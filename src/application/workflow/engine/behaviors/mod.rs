@@ -15,7 +15,9 @@ use crate::application::workflow::governance::integration::{
     AlreadyMergedResolutionDisposition, FileGovernanceIntegrationService, TargetRefresh,
     refresh_target_from_remote,
 };
-use crate::application::workflow::phases::implementation_planning::begin_implementation_phase;
+use crate::application::workflow::phases::implementation_planning::{
+    planning_context, run_planning_skills,
+};
 use crate::application::workflow::phases::quality::{
     QualityCheckResult, QualityOperationRunner, is_quality_harness_fault,
     is_quality_output_contract_fault, quality_error_summary,
@@ -25,10 +27,9 @@ use crate::application::workflow::recovery::candidate_handoff::{
     register_candidate_handoff, retain_candidate_handoff_after_failure, settle_candidate_handoff,
 };
 use crate::application::workflow::{
-    CandidateRefreshOutcome, GovernanceEvaluation, agent_worktree_cwd,
-    complete_implementation_planning, implementation_branch_name, json_object, now_timestamp,
-    refresh_candidate_for_target_advancement, round_agent_context,
-    run_governed_implementation_planning, selected_agent_context, setting_string,
+    CandidateRefreshOutcome, GovernanceEvaluation, agent_worktree_cwd, implementation_branch_name,
+    json_object, now_timestamp, refresh_candidate_for_target_advancement, round_agent_context,
+    selected_agent_context, setting_string,
 };
 use crate::error::{MergeConflictStage, RefineError, RefineResult};
 use crate::infrastructure::git::with_repository_git_lock;
@@ -1310,18 +1311,7 @@ fn run_quality_correction_agent(ctx: &mut WorkflowContext<'_>) -> RefineResult<(
                 ctx.round_idx + 1
             ))
         })?;
-    let plan = round
-        .get("implementation_plan")
-        .and_then(|plan| plan.get("final_plan"))
-        .and_then(|artifact| artifact.get("result"))
-        .cloned()
-        .unwrap_or_else(|| json!({
-            "summary": "Validate an imported implementation candidate.",
-            "checklist": [{
-                "id": "IMPORTED",
-                "description": round.get("prompt").and_then(Value::as_str).unwrap_or("Review the imported candidate")
-            }]
-        }));
+    let plan = planning_context(ctx)?;
     let implementation_report = round
         .get("implementation_report")
         .and_then(Value::as_str)
@@ -1490,110 +1480,6 @@ fn goal_agent_context(
     }))
 }
 
-const CODE_FILE_GUIDANCE_RULE: &str =
-    "Apply whenever an agent adds or changes code files in any language.";
-
-fn guidance_decision(
-    agent_context: &Value,
-    applied: Option<&[usize]>,
-    code_changed: bool,
-) -> RefineResult<Value> {
-    let candidates = agent_context
-        .get("guidance_candidates")
-        .and_then(Value::as_array)
-        .map(Vec::as_slice)
-        .unwrap_or(&[]);
-    if candidates.is_empty() {
-        if applied.is_some_and(|indexes| !indexes.is_empty()) {
-            return Err(RefineError::InvalidInput(
-                "Goal Agent selected guidance when no candidates were provided".to_string(),
-            ));
-        }
-        return Ok(json!({
-            "context_version": 1,
-            "applied": [],
-            "skipped": [],
-            "recorded_at": now_timestamp(),
-        }));
-    }
-    let applied = applied.ok_or_else(|| {
-        RefineError::InvalidInput(
-            "Goal Agent completion must include guidance_applied when guidance candidates exist"
-                .to_string(),
-        )
-    })?;
-    let unique = applied
-        .iter()
-        .copied()
-        .collect::<std::collections::BTreeSet<_>>();
-    if unique.len() != applied.len() || unique.iter().any(|index| *index >= candidates.len()) {
-        return Err(RefineError::InvalidInput(
-            "Goal Agent guidance_applied must contain unique in-range candidate indexes"
-                .to_string(),
-        ));
-    }
-    let required_code_guidance = candidates
-        .iter()
-        .enumerate()
-        .find_map(|(index, candidate)| {
-            (candidate.get("rule").and_then(Value::as_str) == Some(CODE_FILE_GUIDANCE_RULE))
-                .then_some(index)
-        });
-    if code_changed && required_code_guidance.is_some_and(|index| !unique.contains(&index)) {
-        return Err(RefineError::InvalidInput(
-            "Goal Agent must apply enabled Guidance whose Rule requires it for changed code files"
-                .to_string(),
-        ));
-    }
-    let applied_candidates = candidates
-        .iter()
-        .enumerate()
-        .filter(|(index, _)| unique.contains(index))
-        .map(|(_, candidate)| candidate.clone())
-        .collect::<Vec<_>>();
-    let skipped_candidates = candidates
-        .iter()
-        .enumerate()
-        .filter(|(index, _)| !unique.contains(index))
-        .map(|(_, candidate)| candidate.clone())
-        .collect::<Vec<_>>();
-    Ok(json!({
-        "context_version": 1,
-        "applied": applied_candidates,
-        "skipped": skipped_candidates,
-        "code_files_changed": code_changed,
-        "recorded_at": now_timestamp(),
-    }))
-}
-
-fn is_code_path(path: &str) -> bool {
-    let path = std::path::Path::new(path);
-    let extension = path
-        .extension()
-        .and_then(|extension| extension.to_str())
-        .map(|extension| extension.to_ascii_lowercase());
-    !matches!(
-        extension.as_deref(),
-        Some(
-            "adoc"
-                | "avif"
-                | "bmp"
-                | "gif"
-                | "ico"
-                | "jpeg"
-                | "jpg"
-                | "md"
-                | "mdx"
-                | "pdf"
-                | "png"
-                | "rst"
-                | "svg"
-                | "txt"
-                | "webp"
-        )
-    )
-}
-
 fn evaluate_workflow_governance(
     ctx: &WorkflowContext<'_>,
     worktree_path: &str,
@@ -1629,22 +1515,23 @@ fn evaluate_workflow_governance(
         })
         .collect::<Vec<_>>()
         .join("\n\n");
-    if !failures.is_empty() && recovery.trim().is_empty() {
-        return Err(RefineError::InvalidInput(
-            "Governance findings require an actionable recovery request".into(),
-        ));
-    }
     Ok(GovernanceEvaluation {
         failed: !failures.is_empty(),
         message: (!failures.is_empty()).then(|| {
-            failures
+            let messages = failures
                 .iter()
-                .map(|r| r.summary.as_str())
+                .map(|r| r.summary.trim())
+                .filter(|s| !s.is_empty())
                 .collect::<Vec<_>>()
-                .join("; ")
+                .join("; ");
+            if messages.is_empty() {
+                "Governance agent reported failure.".into()
+            } else {
+                messages
+            }
         }),
-        recovery_analysis: (!failures.is_empty()).then_some(analysis),
-        recovery_round_prompt: (!failures.is_empty()).then_some(recovery),
+        recovery_analysis: (!analysis.trim().is_empty()).then_some(analysis),
+        recovery_round_prompt: (!recovery.trim().is_empty()).then_some(recovery),
         details: json_object(
             json!({"phase": "post_implementation", "configured": !results.is_empty(), "skill_results": results, "failed_actions": actions, "worktree": worktree_path, "candidate_commit": ctx.commit}),
         ),

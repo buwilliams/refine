@@ -9,8 +9,13 @@ impl QualityService for FileQualityService {
         let candidate_root = PathBuf::from(&request.cwd);
         verify_candidate(&candidate_root, &request.candidate_commit, "before")?;
         let settings = self.load_settings()?;
-        let definitions = quality_test_definitions(&settings);
-        if definitions.is_empty() {
+        let test_names = settings
+            .tests
+            .iter()
+            .chain(&settings.legacy_commands)
+            .cloned()
+            .collect::<Vec<_>>();
+        if test_names.is_empty() {
             verify_candidate(&candidate_root, &request.candidate_commit, "after")?;
             return Ok(QualityCheckResult {
                 owner_id: request.owner_id,
@@ -27,10 +32,6 @@ impl QualityService for FileQualityService {
                 skill_evidence: None,
             });
         }
-        let test_names = definitions
-            .iter()
-            .map(|definition| definition.test.clone())
-            .collect::<Vec<_>>();
         let tests_json = serde_json::to_string_pretty(&test_names).map_err(|error| {
             RefineError::Serialization(format!("failed to encode Quality tests: {error}"))
         })?;
@@ -111,73 +112,14 @@ impl QualityService for FileQualityService {
             },
         )?;
         plan.provider_attempts = provider_attempts.into_inner();
-        let mut results = Vec::with_capacity(definitions.len());
-        let mut diagnostics = plan.diagnostics;
-        let provider_attempts = plan.provider_attempts;
-        for (definition, planned) in definitions.iter().zip(plan.results) {
-            let mut result = planned;
-            if let Some(required) = definition.required_command.as_deref()
-                && result.command != required
-            {
-                result.status = "failed".to_string();
-                result.evidence = format!(
-                    "Migrated Quality command must remain {required:?}; the agent proposed {:?}.",
-                    result.command
-                );
-                diagnostics.push(result.evidence.clone());
-                results.push(result);
-                continue;
-            }
-            if result.command.trim().is_empty() {
-                result.status = "failed".to_string();
-                result.evidence =
-                    "Pass claim rejected because no supervised command execution was requested."
-                        .to_string();
-                diagnostics.push(result.evidence.clone());
-                results.push(result);
-                continue;
-            }
-            let mut metadata = request.process_metadata.clone();
-            metadata.insert("quality_test".to_string(), json!(&result.test));
-            metadata.insert("quality_command".to_string(), json!(&result.command));
-            self.ensure_operation_active(&request, "the next test command")?;
-            let observed = self.run_observed_command(&result.command, &candidate_root, metadata)?;
-            if observed.shell_parser_aborted() {
-                verify_candidate(&candidate_root, &request.candidate_commit, "after")?;
-                return Err(quality_command_harness_fault(&result.command, &observed));
-            }
-            let observed_ok = observed.exit_code == Some(0);
-            result.process_id = Some(observed.process_id.clone());
-            result.exit_code = observed.exit_code;
-            let observed_evidence = observed.evidence();
-            if result.status != "passed" || !observed_ok || result.evidence.trim().is_empty() {
-                result.status = "failed".to_string();
-            }
-            result.evidence = format!("{} Agent report: {}", observed_evidence, result.evidence);
-            diagnostics.push(observed_evidence);
-            results.push(result);
-        }
-        verify_candidate(&candidate_root, &request.candidate_commit, "after")?;
-        let ok = results.iter().all(|result| result.status == "passed");
-        let mut result = QualityCheckResult {
-            owner_id: request.owner_id,
-            ok,
-            summary: if ok {
-                "All Quality tests passed with observed supervised evidence.".to_string()
-            } else {
-                String::new()
-            },
-            results,
-            diagnostics,
-            candidate_commit: request.candidate_commit,
-            checked_at: None,
-            provider_attempts,
-            skill_evidence: None,
-        };
-        if !result.ok {
-            result.summary = quality_failure_summary(&result);
-        }
-        Ok(result)
+        verify_candidate(
+            &candidate_root,
+            &request.candidate_commit,
+            "after agent decision",
+        )?;
+        self.ensure_operation_active(&request, "Quality decision settlement")?;
+        plan.candidate_commit = request.candidate_commit;
+        Ok(plan)
     }
 
     fn screenshots(&self, _owner_id: &str) -> RefineResult<Vec<String>> {

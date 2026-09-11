@@ -4,13 +4,13 @@
 
 - **Independent Correction**: a fresh agent reviews both the finalized plan and implementation.
 - **Test Evidence**: Quality writes targeted tests when needed, may use sufficient existing tests, and runs the relevant checks to passing.
-- **Reuse Accepted Reviews**: a gate requests missing evidence and supervises proposed checks instead of unconditionally launching another review.
+- **Reuse Accepted Reviews**: Refine reuses the selected agents’ accepted decisions when they describe the current candidate.
 - **Exact Candidate**: corrections and results are bound to the committed Goal Round and isolated candidate.
 - **Explicit Recovery**: failed Quality preserves its evidence; a new attempt or Round requires a workflow decision.
 
 ## Purpose
 
-Quality turns implementation confidence into evidence and corrects defects before Governance can authorize integration.
+Quality lets AI review and correct the work using the Goal, context, and user-defined Quality Skills. The AI decides what to investigate and when the work is ready.
 
 ## Expected Role
 
@@ -18,9 +18,9 @@ A Quality pass first refreshes the candidate onto the current target, so the evi
 
 The Quality agent inspects the plan, diff, implementation report, repository, and configured project tests. It adds or updates tests when that improves coverage, or uses sufficient existing tests without requiring a special rationale. It runs relevant tests, diagnoses failures, corrects implementation or tests, and repeats until the selected checks pass or a real failure is reported.
 
-Refine records the observed checkout content after each accepted Skill report, commits Quality corrections, and updates the exact candidate identity. A review whose pinned requirements and observed content match the final candidate supplies the proposed checks directly after its result contract and original workspace registration are revalidated. A later Skill correction invalidates an earlier review of different content; only missing reviews are requested observationally. Valid failed findings for that candidate remain failures. Agent-reported test success never replaces supervised execution.
+Refine records checkout content after accepted Skill reports, commits Quality corrections, and updates the exact candidate identity. A review is reusable only for the selected Skill instructions, current workflow step, and final candidate content. A later correction can require an earlier reviewer to examine the changed candidate. Refine waits for configured required reviewers and follows their decisions; it does not require an evidence list, test commands, or per-test coverage, and never executes shell text from a report.
 
-Refine records supervised commands, exit codes, output, test results, provider-response attempts, and a versioned proof naming the Goal, zero-based Round, scope, operation, checked and source commits, state, timestamp, and complete coverage of the selected Skill requirements. Requirements are pinned for the workflow occurrence, and proof records the accepted invocation for each required binding. Empty Quality gates record explicit empty coverage and pass without agent checks. An unreadable evaluation records an output-contract error after its first provider attempt. A passing candidate advances to Governance. A failed verdict emits Quality Error and preserves the originating candidate, checkout, command evidence, and report. A handler or operator may explicitly request another attempt or a new Plan Round through the shared workflow controls. Such a Round retains the candidate and the earlier attempt's audit trail.
+Refine records agent decisions, optional reports, provider attempts, and the identities needed to relate a decision to the Goal, Round, workflow step, and exact candidate. Historical storage names such as `QualityProof` and `skill_evidence` remain compatible; they identify which configured agents reviewed which work, not the quality or completeness of their supporting material. Empty Quality gates pass without agent checks. A passing decision advances to Governance. A failed decision emits Quality Error and retains the candidate, checkout, and reports. A handler or operator can explicitly request another attempt or a Plan Round; Refine does not retry failed work automatically.
 
 Already-integrated work remains candidate-bound: complete legacy evidence may be normalized, but incomplete proof causes Refine to materialize a clean managed checkout of the exact source candidate and regenerate isolated Quality. The merged target or one of its descendants is never evaluated as a substitute for that candidate.
 

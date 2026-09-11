@@ -18,7 +18,7 @@ fn workflow_goal_agent_prompt_excludes_interactive_checkout_guidance() {
     assert!(!prompt.contains("Active Refine executable"));
     assert!(!prompt.contains("checkout-local `./r`"));
     assert!(prompt.contains("/runtime/processes/goal-agent.signal.json"));
-    assert!(prompt.contains("completed|no_change_needed|deviated|rejected|blocked"));
+    assert!(prompt.contains("Use your judgment to decide when to stop"));
     assert!(!prompt.contains("{{"));
     assert_eq!(prompt.matches("# Goal Agent Specification").count(), 1);
     assert_eq!(prompt.matches("LATEST_SENTINEL").count(), 1);
@@ -44,18 +44,11 @@ fn every_goal_agent_phase_uses_the_integer_guidance_completion_contract() {
         assert!(prompt.contains(signal.to_str().unwrap()));
         assert!(!prompt.contains("{{"));
     }
-    for prompt in [&plan, &criticize, &revise] {
-        assert!(prompt.contains("required `planning_result`"));
-        assert!(prompt.contains("never omitted or quoted as a string"));
-        assert!(!prompt.contains("implementation_evidence"));
+    for prompt in [&plan, &criticize, &revise, &implement] {
+        assert!(prompt.contains("Use your judgment to decide when to stop"));
+        assert!(!prompt.contains("checklist"));
+        assert!(!prompt.contains("required `planning_result`"));
     }
-    assert!(plan.contains("\"checklist\""));
-    assert!(criticize.contains("\"findings\""));
-    assert!(revise.contains("\"criticism_resolutions\""));
-    assert!(revise.contains("\"criticism_id\":\"C1\""));
-    assert!(revise.contains("\"resolution\":\"how the revised plan resolves"));
-    assert!(implement.contains("implementation_evidence"));
-    assert!(!implement.contains("planning_result"));
 }
 
 #[test]
@@ -122,7 +115,7 @@ fn completion_signal_allows_partial_json_only_for_the_write_grace_period() {
 }
 
 #[test]
-fn planning_completion_signals_must_carry_the_planning_result_object() {
+fn completion_decision_does_not_require_a_planning_result() {
     let root = unique_temp_dir("goal-agent-omitted-planning-result");
     fs::create_dir_all(&root).unwrap();
     let signal_path = root.join("goal-agent.signal.json");
@@ -132,17 +125,9 @@ fn planning_completion_signals_must_carry_the_planning_result_object() {
     )
     .unwrap();
 
-    let mut reader = SignalReader::new(Duration::ZERO).requiring_planning_result(true);
-    let SignalRead::InvalidContract(diagnostic) = reader.take(&signal_path).unwrap() else {
-        panic!("a planning completion without planning_result must be rejected");
-    };
-    assert!(diagnostic.contains("omitted the required planning_result object"));
-    // The rejected payload stays on disk for recovery to archive.
-    assert!(signal_path.is_file());
-
-    let mut lenient = SignalReader::new(Duration::ZERO);
+    let mut reader = SignalReader::new(Duration::ZERO);
     assert!(matches!(
-        lenient.take(&signal_path).unwrap(),
+        reader.take(&signal_path).unwrap(),
         SignalRead::Valid(_)
     ));
     fs::remove_dir_all(root).unwrap();
@@ -163,10 +148,9 @@ fn implementation_completion_signal_accepts_no_change_needed_evidence() {
         panic!("no_change_needed must be accepted by the Goal Agent completion schema");
     };
     let implementation_evidence = signal.implementation_evidence.unwrap();
-    let outcome = &implementation_evidence.checklist.first().unwrap().outcome;
     assert_eq!(
-        outcome,
-        &crate::model::goal::ImplementationChecklistOutcome::NoChangeNeeded
+        implementation_evidence["checklist"][0]["outcome"],
+        "no_change_needed"
     );
     assert!(!signal_path.exists());
     fs::remove_dir_all(root).unwrap();

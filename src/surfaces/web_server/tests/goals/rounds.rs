@@ -171,7 +171,7 @@ fn web_server_appends_and_reads_goal_round_logs() {
     assert!(
         planning_write.body["error"]["message"]
             .as_str()
-            .is_some_and(|message| message.contains("Workflow-owned evidence")),
+            .is_some_and(|message| message.contains("read-only")),
         "{}",
         planning_write.body
     );

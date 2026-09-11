@@ -94,7 +94,7 @@ pub struct GoalRound {
     /// Versioned context pinned before this round's implementation agent starts.
     #[serde(default)]
     pub agent_context: Option<serde_json::Value>,
-    /// Workflow-owned, versioned evidence for this round's implementation planning pipeline.
+    /// Historical structured planning reports, retained for compatibility and context.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub implementation_plan: Option<ImplementationPlan>,
     /// Structured guidance selection for current rounds; legacy strings remain readable.

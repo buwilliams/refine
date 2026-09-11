@@ -16,10 +16,7 @@ use crate::infrastructure::agents::invocation::{HostAgentProviderService, Provid
 use crate::infrastructure::git::with_repository_git_lock;
 use crate::infrastructure::git::worktrees::{FileGitWorktreeService, GitWorktreeService};
 use crate::infrastructure::observability::logs::FileLogService;
-use crate::infrastructure::process::subprocess::{
-    FileProcessSupervisor, ManagedProcessSpec, ProcessOwner, ProcessResourceLimits,
-    write_json_atomically,
-};
+use crate::infrastructure::process::subprocess::write_json_atomically;
 use crate::infrastructure::process::supervisor::config::{ConfigService, FileSettingsService};
 use crate::infrastructure::process::supervisor::operations::{
     FileOperationRegistry, OperationHandle, OperationRegistry, OperationState,
