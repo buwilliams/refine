@@ -88,11 +88,54 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "succeeded",
+  "results": {
+    "trigger-2748a40c-20f1-4533-851a-d3d752e56013": {
+      "invocation_id": "91f455859af8a6bb618b0f6436d3d65b2f03c0e326a9895ab674da7b59e4d1ce",
+      "binding_id": "trigger-2748a40c-20f1-4533-851a-d3d752e56013",
+      "role": "task",
+      "outcome": "success",
+      "summary": "Fetched one email request into Backlog as Goal DRDE557BD8B3E01883A74CEDA5. No errors or indication of more queued mail.",
+      "evidence": [
+        "Authorized fetch command exited with code 0.",
+        "JSON result: fetched_count=1, batch_limit=25, goal_ids=[\"DRDE557BD8B3E01883A74CEDA5\"], errors=[].",
+        "Batch limit was not reached; no further batch was required."
+      ],
+      "artifacts": {
+        "goal_ids": [
+          "DRDE557BD8B3E01883A74CEDA5"
+        ]
+      }
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "trigger-2748a40c-20f1-4533-851a-d3d752e56013",
+      "checkout": {
+        "observation": {
+          "branch": "main",
+          "head_commit": "f46f8710af32b77d13cec54853bcc4cf3fb728a9",
+          "status_porcelain": []
+        },
+        "tree": "d0a865224eb594442472f9853182ab233f7dede5"
+      },
+      "checkout_recorded": true,
+      "diagnostic": null,
+      "observational_violation": false,
+      "operation_id": null,
+      "process_id": "proc-1789130372327-1100349-46",
+      "prompt_bytes": 2120,
+      "provider_session_id": null,
+      "purpose": "work",
+      "raw_output": "{\n  \"artifacts\": {\n    \"goal_ids\": [\"DRDE557BD8B3E01883A74CEDA5\"]\n  },\n  \"binding_id\": \"trigger-2748a40c-20f1-4533-851a-d3d752e56013\",\n  \"evidence\": [\n    \"Authorized fetch command exited with code 0.\",\n    \"JSON result: fetched_count=1, batch_limit=25, goal_ids=[\\\"DRDE557BD8B3E01883A74CEDA5\\\"], errors=[].\",\n    \"Batch limit was not reached; no further batch was required.\"\n  ],\n  \"invocation_id\": \"91f455859af8a6bb618b0f6436d3d65b2f03c0e326a9895ab674da7b59e4d1ce\",\n  \"outcome\": \"success\",\n  \"role\": \"task\",\n  \"summary\": \"Fetched one email request into Backlog as Goal DRDE557BD8B3E01883A74CEDA5. No errors or indication of more queued mail.\"\n}\n",
+      "received_at": "2026-09-11T12:39:56.679032303+00:00",
+      "started_at": "2026-09-11T12:39:32.324550616+00:00",
+      "workflow_revision": null
+    }
+  ],
   "created_at": "2026-09-11T10:11:46.435704159+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-11T12:39:56.717821260+00:00",
   "error": null,
   "action_applied": false
 }
