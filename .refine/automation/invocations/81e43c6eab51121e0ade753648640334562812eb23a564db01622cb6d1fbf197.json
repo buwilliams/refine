@@ -90,11 +90,50 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "succeeded",
+  "results": {
+    "trigger-2748a40c-20f1-4533-851a-d3d752e56013": {
+      "invocation_id": "81e43c6eab51121e0ade753648640334562812eb23a564db01622cb6d1fbf197",
+      "binding_id": "trigger-2748a40c-20f1-4533-851a-d3d752e56013",
+      "role": "task",
+      "outcome": "success",
+      "summary": "No new email requests were found. No Goals were imported or recovered, and no errors were reported. The batch limit did not indicate remaining mail.",
+      "evidence": [
+        "Followed docs/runbooks/development-request-email.md.",
+        "The authorized fetch command exited with code 0.",
+        "Result: fetched_count=0, batch_limit=25, goal_ids=[], errors=[]. No further batch was required."
+      ],
+      "artifacts": {}
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "trigger-2748a40c-20f1-4533-851a-d3d752e56013",
+      "checkout": {
+        "observation": {
+          "branch": "main",
+          "head_commit": "f46f8710af32b77d13cec54853bcc4cf3fb728a9",
+          "status_porcelain": []
+        },
+        "tree": "d0a865224eb594442472f9853182ab233f7dede5"
+      },
+      "checkout_recorded": true,
+      "diagnostic": null,
+      "observational_violation": false,
+      "operation_id": null,
+      "process_id": "proc-1789130431501-1100349-245",
+      "prompt_bytes": 2129,
+      "provider_session_id": null,
+      "purpose": "work",
+      "raw_output": "{\n  \"artifacts\": {},\n  \"binding_id\": \"trigger-2748a40c-20f1-4533-851a-d3d752e56013\",\n  \"evidence\": [\n    \"Followed docs/runbooks/development-request-email.md.\",\n    \"The authorized fetch command exited with code 0.\",\n    \"Result: fetched_count=0, batch_limit=25, goal_ids=[], errors=[]. No further batch was required.\"\n  ],\n  \"invocation_id\": \"81e43c6eab51121e0ade753648640334562812eb23a564db01622cb6d1fbf197\",\n  \"outcome\": \"success\",\n  \"role\": \"task\",\n  \"summary\": \"No new email requests were found. No Goals were imported or recovered, and no errors were reported. The batch limit did not indicate remaining mail.\"\n}\n",
+      "received_at": "2026-09-11T12:40:53.092377733+00:00",
+      "started_at": "2026-09-11T12:40:31.497065479+00:00",
+      "workflow_revision": null
+    }
+  ],
   "created_at": "2026-09-11T12:40:21.491371718+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-11T12:40:53.135364139+00:00",
   "error": null,
   "action_applied": false
 }
