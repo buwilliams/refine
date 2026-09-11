@@ -85,6 +85,7 @@ pub(super) fn dashboard_attention_items(
     runner_reachable: bool,
     workflow_paused: bool,
     state_sync_health: Option<&crate::application::persistence_sync::health::StateSyncHealth>,
+    workflow_health: Option<&Value>,
 ) -> Vec<Value> {
     let mut items = indicators
         .iter()
@@ -123,10 +124,26 @@ pub(super) fn dashboard_attention_items(
             "message": "Workflow is paused."
         }));
     } else if !runner_reachable {
+        let reason = workflow_health
+            .and_then(|health| health.get("reason"))
+            .and_then(Value::as_str)
+            .filter(|reason| !reason.trim().is_empty());
+        let message = match reason {
+            Some(reason) => {
+                let state = workflow_health
+                    .and_then(|health| health["state"].as_str())
+                    .unwrap_or("unavailable");
+                format!("Workflow worker unavailable ({state}): {reason}")
+            }
+            None => {
+                "Refine cannot reach the runtime worker. Check runtime status for details.".into()
+            }
+        };
         items.push(json!({
             "kind": "banner",
             "severity": "error",
-            "message": "Refine cannot reach the runtime worker. Re-check auth after restoring provider access."
+            "message": message,
+            "workflow_health": workflow_health
         }));
     }
     items

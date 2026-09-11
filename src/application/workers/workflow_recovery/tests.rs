@@ -509,3 +509,46 @@ fn missing_group_evidence_cannot_authorize_replacement_after_leader_exit() {
     drop(fixture);
     std::fs::remove_dir_all(root.parent().unwrap().parent().unwrap()).unwrap();
 }
+
+#[test]
+fn complete_exit_receipt_recovers_lost_group_before_launching_a_replacement_worker() {
+    use crate::infrastructure::process::subprocess::owned_groups::test_fixture::UnobservedChild;
+    let root = root("lost-group-complete-proof");
+    let owner = FileProcessSupervisor::new(root.join("agents"));
+    let fixture = UnobservedChild::launch(
+        &owner,
+        true,
+        json!({"workflow_incarnation": "old-worker", "goal_id": "GOAL1"}),
+    );
+    let mut process = fixture.group.process.clone();
+    // Drop kills and reaps the escaped child and waits for the launching reaper.
+    drop(fixture);
+    process.state = "exited".into();
+    std::fs::write(
+        owner.processes_dir().join(format!("{}.json", process.id)),
+        serde_json::to_vec(&process).unwrap(),
+    )
+    .unwrap();
+    std::fs::remove_file(
+        root.join("agents/owned-groups")
+            .join(format!("{}.json", process.id)),
+    )
+    .unwrap();
+    let service = FileRunnerWorkerService::new(&root);
+    let BackgroundWorkerEnsure::Running(replacement) =
+        service.ensure_background_worker(WORKFLOW_RUNNER).unwrap()
+    else {
+        panic!("replacement was not launched")
+    };
+    assert!(!owner.group_pending(&process).unwrap());
+    wait_tick(&root, &replacement);
+    service.ensure_background_worker(WORKFLOW_RUNNER).unwrap();
+    assert!(assess_workflow_health(&root).healthy);
+    assert!(
+        root.join("agents/owned-groups")
+            .join(format!("{}.json", process.id))
+            .exists()
+    );
+    stop_all(&root);
+    std::fs::remove_dir_all(root.parent().unwrap().parent().unwrap()).unwrap();
+}

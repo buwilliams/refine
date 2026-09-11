@@ -39,6 +39,8 @@ PTY session settlement treats the workload result and the execution scope separa
 
 Standard subprocess capture also separates workload results from scope exit. A bounded final drain releases the caller while surviving or unverified descendants still consume deduplicated capacity and protect evidence. Incomplete capture is explicit and cannot be accepted as a complete machine-readable result. This does not grant new Goal mutation authority or permit worker replacement before proven scope exit.
 
+Worker replacement uses the shared process ownership assessment to recover a missing group record from a verified, complete original launch-scope receipt. It retains uncertain ownership and artifacts when that evidence is missing or invalid. A recovered exited scope releases capacity without signalling any current process; replacement health still requires the new worker's own scheduler tick.
+
 ## Future Direction
 
 Refine should keep execution ownership proportional to the cost of duplicate work. If future non-idempotent operations require stronger coordination, that protection should be scoped to the side-effect boundary itself rather than recreating a general durable worker-lock system for every workflow step.

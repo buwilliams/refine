@@ -50,7 +50,7 @@ fn dashboard_distinguishes_workflow_pause_from_runtime_reachability() {
             false,
             Some((
                 "error",
-                "Refine cannot reach the runtime worker. Re-check auth after restoring provider access.",
+                "Refine cannot reach the runtime worker. Check runtime status for details.",
             )),
         ),
         (false, true, Some(("info", "Workflow is paused."))),
@@ -59,7 +59,8 @@ fn dashboard_distinguishes_workflow_pause_from_runtime_reachability() {
     ];
 
     for (runner_reachable, workflow_paused, expected_banner) in scenarios {
-        let attention = dashboard_attention_items(&[], runner_reachable, workflow_paused, None);
+        let attention =
+            dashboard_attention_items(&[], runner_reachable, workflow_paused, None, None);
         let banners = attention
             .iter()
             .filter(|item| item["kind"] == "banner")
@@ -707,4 +708,54 @@ fn web_server_worktree_cleanup_routes_to_the_attached_target_app() {
     );
 
     remove_temp_dir(&temp_root);
+}
+
+#[test]
+fn dashboard_reports_workflow_ownership_reason_without_authentication_advice() {
+    let root = unique_temp_dir("dashboard-ownership-health");
+    let supervisor = FileProcessSupervisor::new(&root);
+    supervisor.register(serde_json::from_value(json!({
+        "id": "proc-lock", "owner": "maintenance", "pid": 2_000_000_000u32,
+        "state": "exited", "started_at": "1",
+        "details": json!({"isolated_process_group": true, "workflow_incarnation": "old-worker"}).to_string()
+    })).unwrap()).unwrap();
+    let mut server = server_with_projection();
+    server.runtime_root = Some(root.clone());
+    let response = server.handle(ApiRequest {
+        method: "GET".into(),
+        path: "/api/dashboard".into(),
+        body: None,
+    });
+    assert_eq!(response.status, 200);
+    let health = &response.body["workflow_health"];
+    assert_eq!(health["state"], "ownership_unverified");
+    assert!(
+        health["reason"]
+            .as_str()
+            .unwrap()
+            .contains("process proc-lock")
+    );
+    assert!(
+        health["reason"]
+            .as_str()
+            .unwrap()
+            .contains("evidence is missing")
+    );
+    let banner = response.body["needs_attention"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|item| item["kind"] == "banner")
+        .unwrap();
+    let message = banner["message"].as_str().unwrap();
+    assert!(message.contains("ownership_unverified"));
+    assert!(message.contains(health["reason"].as_str().unwrap()));
+    assert!(!message.contains("auth"));
+    assert!(
+        banner["workflow_health"]["remedy"]
+            .as_str()
+            .unwrap()
+            .contains("system doctor")
+    );
+    fs::remove_dir_all(root).unwrap();
 }

@@ -12,6 +12,7 @@ mod scope_guardian;
 #[cfg(target_os = "linux")]
 pub use scope_guardian::run_if_requested as run_scope_guardian_if_requested;
 mod assessment;
+mod recovery;
 mod stop;
 pub use assessment::OwnershipAssessment;
 #[cfg(all(test, target_os = "linux"))]
@@ -178,12 +179,19 @@ impl FileProcessSupervisor {
         &self,
         process: &ManagedProcess,
     ) -> RefineResult<OwnedGroup> {
-        let bytes = fs::read(self.group_path(&process.id)).map_err(|e| {
-            RefineError::Io(format!(
-                "owned execution evidence unavailable for {}: {e}; exit unverified",
-                process.id
-            ))
-        })?;
+        let bytes = match fs::read(self.group_path(&process.id)) {
+            Ok(bytes) => bytes,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                if let Some(group) = self.restore_exited_owned_group(process)? {
+                    return Ok(group);
+                }
+                return Err(RefineError::Io(format!(
+                    "owned execution evidence unavailable for {}: {error}; exit unverified",
+                    process.id
+                )));
+            }
+            Err(error) => return Err(RefineError::Io(error.to_string())),
+        };
         let group: OwnedGroup = serde_json::from_slice(&bytes)
             .map_err(|e| RefineError::Serialization(e.to_string()))?;
         Self::ensure_same_registration(process, &group.process)?;
@@ -199,7 +207,10 @@ impl FileProcessSupervisor {
             }
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
                 if Self::requires_group_ownership(process) {
-                    Ok(true)
+                    match self.restore_exited_owned_group(process)? {
+                        Some(group) => Ok(self.assess_owned_group(&group)?.pending()),
+                        None => Ok(true),
+                    }
                 } else {
                     Self::process_is_alive(process)
                 }
@@ -506,3 +517,6 @@ mod unsupported_tests {
         fs::remove_dir_all(root).unwrap();
     }
 }
+
+#[cfg(all(test, target_os = "linux"))]
+mod recovery_tests;

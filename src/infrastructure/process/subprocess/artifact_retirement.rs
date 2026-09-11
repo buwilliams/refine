@@ -69,10 +69,6 @@ impl FileProcessSupervisor {
             return Ok(());
         }
         let removed = self.remove_process_artifacts_locked(process);
-        if removed.is_ok() && process.owner == ProcessOwner::Maintenance {
-            let _ =
-                remove_file_if_present(&self.group_path(&process.id), "completed transient group");
-        }
         FileExt::unlock(&lock).ok();
         removed
     }
@@ -167,6 +163,11 @@ impl FileProcessSupervisor {
                     identity_path.display()
                 )));
             }
+        }
+        // A deferred handoff returned before any removal. Retire ownership only
+        // after the process and its artifacts have actually been retired.
+        if process.owner == ProcessOwner::Maintenance {
+            remove_file_if_present(&self.group_path(&process.id), "completed transient group")?;
         }
         Ok(())
     }

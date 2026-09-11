@@ -85,6 +85,7 @@ impl InProcessWebServer {
                 "preflight": preflight,
                 "activity": activity,
                 "runner_reachable": runner_reachable,
+                "workflow_health": process.get("workflow_health"),
                 "assignee_stats": assignee_stats_rows(&dashboard.assignee_stats),
                 "reporter_stats": assignee_stats_rows(&dashboard.reporter_stats),
                 "contributor_rankings": contributor_ranking_rows(&dashboard.reporter_stats),
@@ -97,7 +98,8 @@ impl InProcessWebServer {
                     &dashboard.attention_indicators,
                     runner_reachable,
                     workflow_paused,
-                    state_sync_health.as_ref()
+                    state_sync_health.as_ref(),
+                    process.get("workflow_health")
                 ),
                 "attached": attached
             }),

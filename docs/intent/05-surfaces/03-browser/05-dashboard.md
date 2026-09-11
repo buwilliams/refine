@@ -37,6 +37,8 @@ Current implementation details that matter to intent:
 
 The Dashboard should stay compact and practical. Its job is orientation and routing, not detailed editing.
 
+When the workflow worker is unavailable, the Dashboard presents the shared workflow-health state and reason and exposes its remedy. Missing runtime reachability alone never implies a provider authentication failure. When health evidence is unavailable, the banner directs the operator to runtime status without guessing a cause.
+
 ## Future Direction
 
 Future Dashboard views should summarize agent fleets, composition plans, blocked dependencies, pending approvals, and risk. As automation grows, it should become the user's high-level mission control for software work.
