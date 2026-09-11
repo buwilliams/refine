@@ -1,0 +1,111 @@
+{
+  "id": "6efe973039b434e97adbe164d394f411ae5e13a0f07edc7abff754042287c50f",
+  "event": {
+    "id": "node.startup.ready",
+    "name": "Node Startup Ready",
+    "kind": "system",
+    "source": "node.startup.ready",
+    "enabled": true,
+    "scope": {
+      "node_id": null
+    },
+    "parameters": [],
+    "bindings": [
+      {
+        "id": "trigger-2124c51c-8d1f-44b7-8a07-7a989a68227f",
+        "skill_id": "fetch-goals-from-email-on-startup",
+        "enabled": true,
+        "mode": "background",
+        "order": 0,
+        "scope": {
+          "node_id": "default"
+        },
+        "overrides": null,
+        "inputs": {}
+      }
+    ],
+    "on_success": null
+  },
+  "config_revision": 40,
+  "context": {
+    "node_id": "default",
+    "target_root": "/home/buddy/projects/refine-next",
+    "cwd": "/home/buddy/projects/refine-next",
+    "workspace": null,
+    "lifecycle": null,
+    "provider": "codex",
+    "goal_id": null,
+    "round_idx": null,
+    "workflow_revision": null,
+    "candidate_commit": null,
+    "data": {
+      "event": {
+        "daemon_port": 8082
+      },
+      "goal": {
+        "rounds": []
+      },
+      "system": {
+        "node_id": "default",
+        "project_root": "/home/buddy/projects/refine-next",
+        "refine_checkout": "/home/buddy/projects/refine",
+        "refine_executable": "/home/buddy/projects/refine/bin/refine",
+        "runtime_root": "/home/buddy/projects/refine/run/8082",
+        "workspace": "/home/buddy/projects/refine-next"
+      }
+    },
+    "metadata": {
+      "event_operation_id": "1a091f19049334aa10",
+      "started_bindings": {
+        "trigger-2124c51c-8d1f-44b7-8a07-7a989a68227f": "2026-09-11T19:28:42.588077190+00:00"
+      }
+    }
+  },
+  "bindings": [
+    {
+      "binding": {
+        "id": "trigger-2124c51c-8d1f-44b7-8a07-7a989a68227f",
+        "skill_id": "fetch-goals-from-email-on-startup",
+        "enabled": true,
+        "mode": "background",
+        "order": 0,
+        "scope": {
+          "node_id": "default"
+        },
+        "overrides": null,
+        "inputs": {}
+      },
+      "skill": {
+        "id": "fetch-goals-from-email-on-startup",
+        "name": "Fetch Goals from Email on startup",
+        "prompt": "Queue the Custom Skill `fetch-goals-from-email` once for this startup occurrence. Run system.refine_executable with arguments `skills trigger fetch-goals-from-email --request-id startup-email-<invocation_id>`, copying invocation_id exactly from this invocation's completion contract. Set REFINE_DAEMON_PORT to the daemon_port parameter for that command. Use safely quoted arguments. Report the queued invocation ID, then complete this startup Skill immediately. Do not wait for the child Skill: releasing this agent slot lets it run even when concurrency is limited to one. Reuse the same request ID if the command needs a retry; do not create a polling loop or fetch email directly. If the target Skill is missing or disabled, report that error without changing its configuration.",
+        "role": "task",
+        "enabled": true,
+        "scope": {
+          "node_id": "default"
+        },
+        "parameters": [
+          {
+            "name": "daemon_port",
+            "description": "",
+            "kind": "number",
+            "required": true,
+            "default": 8082,
+            "choices": []
+          }
+        ],
+        "provenance": null
+      },
+      "parameters": {
+        "daemon_port": 8082
+      }
+    }
+  ],
+  "state": "running",
+  "results": {},
+  "attempts": [],
+  "created_at": "2026-09-11T19:28:38.314315012+00:00",
+  "completed_at": null,
+  "error": null,
+  "action_applied": false
+}
