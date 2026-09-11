@@ -160,7 +160,7 @@ pub fn prepare_write(
                 next["event_actions"] = receipts.clone();
                 next["event_action_depth"] = requested["event_action_depth"].clone();
             }
-            next["pending_event_transition"] = json!({"id": id, "state": "pending", "from": from, "to": to, "node_id": node, "requested": requested, "config": config, "entry_config": entry_config, "revision": current.get("workflow_revision").and_then(Value::as_u64).unwrap_or(0) + 1});
+            next["pending_event_transition"] = json!({"id": id, "state": "pending", "from": from, "to": to, "node_id": node, "requested": requested, "config": config, "entry_config": entry_config, "generation": current.get("event_generation").and_then(Value::as_u64).unwrap_or(0), "candidate_commit": current.get("candidate_commit"), "revision": current.get("workflow_revision").and_then(Value::as_u64).unwrap_or(0) + 1});
             write_json(
                 &root
                     .join("automation/transitions")
@@ -176,7 +176,12 @@ pub fn prepare_write(
         .and_then(Value::as_u64)
         .unwrap_or(0)
         + 1;
-    let occurrence = json!({"generation": generation, "from": from, "to": to, "node_id": node, "round_idx": next.get("rounds").and_then(Value::as_array).and_then(|r| r.len().checked_sub(1)), "at": chrono::Utc::now().to_rfc3339(), "forced": force});
+    let revision = current
+        .and_then(|v| v.get("workflow_revision"))
+        .and_then(Value::as_u64)
+        .unwrap_or(0)
+        .saturating_add(1);
+    let occurrence = json!({"generation": generation, "workflow_revision": revision, "from": from, "to": to, "node_id": node, "round_idx": next.get("rounds").and_then(Value::as_array).and_then(|r| r.len().checked_sub(1)), "at": chrono::Utc::now().to_rfc3339(), "forced": force});
     next["event_generation"] = json!(generation);
     next.as_object_mut()
         .unwrap()

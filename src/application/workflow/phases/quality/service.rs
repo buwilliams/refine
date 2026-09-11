@@ -9,7 +9,7 @@ use serde_json::{Map, Value, json};
 use crate::application::agent_io::prompts::{PromptEngine, PromptTemplate, render};
 use crate::application::agent_io::structured_output::Contract;
 use crate::application::fleet::nodes::FileNodeRegistryService;
-use crate::application::work_items::{FileWorkItemService, WorkflowAttemptAuthority};
+use crate::application::work_items::{FileWorkItemService, WorkflowStepAuthority};
 use crate::application::workflow::WorkflowEngine;
 use crate::error::{RefineError, RefineResult};
 use crate::infrastructure::agents::invocation::{HostAgentProviderService, ProviderInvocation};

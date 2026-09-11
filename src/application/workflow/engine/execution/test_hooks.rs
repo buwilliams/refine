@@ -2,7 +2,7 @@ use super::*;
 use std::sync::Arc;
 use std::sync::{Mutex, OnceLock};
 type Hook = Arc<
-    dyn Fn(&WorkflowEngine, &str, &str, WorkflowAttemptAuthority) -> RefineResult<()> + Send + Sync,
+    dyn Fn(&WorkflowEngine, &str, &str, WorkflowStepAuthority) -> RefineResult<()> + Send + Sync,
 >;
 static HOOKS: OnceLock<Mutex<BTreeMap<std::path::PathBuf, Hook>>> = OnceLock::new();
 static FAILURE_REPORTS: OnceLock<Mutex<BTreeMap<std::path::PathBuf, Vec<serde_json::Value>>>> =
@@ -43,7 +43,7 @@ pub(crate) fn run(
     engine: &WorkflowEngine,
     goal: &str,
     stage: &str,
-    authority: WorkflowAttemptAuthority,
+    authority: WorkflowStepAuthority,
 ) -> RefineResult<()> {
     let hook = HOOKS
         .get_or_init(Default::default)
@@ -61,9 +61,10 @@ pub(super) fn scheduler(engine: &WorkflowEngine) -> RefineResult<()> {
         engine,
         "",
         "scheduler",
-        WorkflowAttemptAuthority {
+        WorkflowStepAuthority {
             round_idx: 0,
             workflow_revision: 0,
+            generation: 0,
         },
     )
 }

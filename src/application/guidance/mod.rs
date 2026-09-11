@@ -157,6 +157,19 @@ impl FileNextActionsService {
                 "refine system status",
             );
         }
+        if let Some(admission) = workflow_health
+            .as_ref()
+            .and_then(|health| health.admission.as_ref())
+        {
+            for (id, reason) in &admission.blocked_goals {
+                suggest(
+                    &mut suggestions,
+                    &format!("workflow-blocked-{id}"),
+                    &format!("Goal {id}: {reason}"),
+                    &format!("refine goal show {id}"),
+                );
+            }
+        }
         if goals.is_empty() {
             suggest(
                 &mut suggestions,

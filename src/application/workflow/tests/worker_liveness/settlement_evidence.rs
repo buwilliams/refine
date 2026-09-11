@@ -4,7 +4,7 @@ use super::*;
 pub(super) fn originating_evidence(
     workflow: &WorkflowEngine,
     goal: &str,
-    authority: crate::application::work_items::WorkflowAttemptAuthority,
+    authority: crate::application::work_items::WorkflowStepAuthority,
 ) -> Value {
     let found = fs::read_dir(workflow.runtime_root.join("workflow-failures"))
         .unwrap()
@@ -27,7 +27,7 @@ pub(super) fn originating_evidence(
 pub(super) fn assert_origin(
     value: &Value,
     goal: &str,
-    authority: crate::application::work_items::WorkflowAttemptAuthority,
+    authority: crate::application::work_items::WorkflowStepAuthority,
     stage: &str,
     error: &str,
 ) {
@@ -63,6 +63,14 @@ fn settlement_panics_preserve_supersession_and_structured_fallback_without_delay
         test_hooks::install(
             &workflow.runtime_root,
             Arc::new(move |engine, goal, stage, authority| {
+                if goal == "GOAL1" && stage == "before_claim" && claimed.lock().unwrap().is_some() {
+                    // Keep the explicitly authorized replacement unstarted while this
+                    // fixture inspects old settlement. Repeated injected decisions would
+                    // otherwise create unbounded new occurrences in the same scheduler pass.
+                    return Err(RefineError::Degraded(
+                        "Replacement held for settlement inspection".into(),
+                    ));
+                }
                 if goal == "GOAL1" && stage == "claimed" {
                     *claimed.lock().unwrap() = Some(authority);
                 }

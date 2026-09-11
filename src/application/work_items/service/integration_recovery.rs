@@ -1,7 +1,7 @@
 use super::*;
 use serde_json::json;
 
-use super::workflow_attempts::{goal_status, require_current_attempt};
+use super::workflow_attempts::{goal_status, require_current_step};
 
 impl FileWorkItemService {
     /// Repin a Goal's base and candidate onto a refreshed replacement.
@@ -15,7 +15,7 @@ impl FileWorkItemService {
     pub(crate) fn record_candidate_refresh(
         &self,
         goal_id: &str,
-        authority: WorkflowAttemptAuthority,
+        authority: WorkflowStepAuthority,
         authorizing_status: &GoalStatus,
         node_id: &str,
         branch: &str,
@@ -45,7 +45,7 @@ impl FileWorkItemService {
                 authorizing_status.as_str()
             )));
         }
-        require_current_attempt(goal_id, object, authority)?;
+        require_current_step(goal_id, object, authority)?;
         for (field, expected) in [
             ("branch_name", branch),
             ("base_commit", original_base),
@@ -138,7 +138,7 @@ impl FileWorkItemService {
     pub(crate) fn settle_integration_failure_summary(
         &self,
         goal_id: &str,
-        authority: WorkflowAttemptAuthority,
+        authority: WorkflowStepAuthority,
         authorizing_status: &GoalStatus,
         node_id: &str,
         reason: &str,
@@ -163,7 +163,7 @@ impl FileWorkItemService {
                 authorizing_status.as_str()
             )));
         }
-        require_current_attempt(goal_id, object, authority)?;
+        require_current_step(goal_id, object, authority)?;
         let rounds = object
             .get_mut("rounds")
             .and_then(Value::as_array_mut)

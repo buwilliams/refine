@@ -5,7 +5,7 @@ mod types;
 
 pub(crate) use service::{
     AlreadyMergedInspection, AlreadyMergedResolutionSnapshot, AlreadyMergedSettlement,
-    AlreadyMergedSettlementDecision, GoalCancellationExpectation, WorkflowAttemptAuthority,
+    AlreadyMergedSettlementDecision, GoalCancellationExpectation, WorkflowStepAuthority,
 };
 pub use service::{FileWorkItemService, WorkItemService, validate_manual_goal_transition};
 pub use types::*;

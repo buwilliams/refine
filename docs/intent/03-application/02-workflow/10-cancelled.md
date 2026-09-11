@@ -17,7 +17,7 @@ Single and bulk cancellation use the same Goal capability. Each Goal is changed 
 
 A stale worker cannot transition a cancelled Goal. Governance cancellation before integration prevents its first Git side effect; cancellation after integration begins remains terminal while integration may finish and preserve exact evidence. Cancellation itself never deletes history, branches, or worktrees. Separate retention-delayed maintenance may later hibernate a safe checkout or retire an exact local or upstream round-ref name only when its tip is proven reachable from the unchanged configured remote merge target. The Goal, Round, process records, and target-reachable commit remain inspectable.
 
-Undo and shared bulk movement may explicitly reopen a cancelled Goal to todo. Reopening clears the prior attempt's settlement authority; the next worker claims the existing latest Round or a newly submitted Round with a newer authority. Logs, process records, Round evidence, and any retained candidate refs or worktrees from the cancelled attempt remain evidence, but its late failure cannot fail the reopened Goal or write failure metadata onto the replacement Round.
+Undo and shared bulk movement may explicitly reopen a cancelled Goal to todo. Reopening creates a new workflow step occurrence; the next worker records responsibility for that authorized occurrence of the existing latest Round or a newly submitted Round. Earlier claims remain historical and need no cleanup. Logs, process records, Round evidence, and any retained candidate refs or worktrees from the cancelled attempt remain evidence, but its late failure cannot fail the reopened Goal or write failure metadata onto the replacement Round.
 
 ## Future Direction
 

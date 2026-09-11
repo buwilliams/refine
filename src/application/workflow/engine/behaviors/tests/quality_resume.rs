@@ -2,7 +2,7 @@ use super::already_merged_quality_failure::{
     SmokeAiOverride, behavior_test_git, behavior_test_temp_dir,
 };
 use super::*;
-use crate::application::work_items::{FileWorkItemService, WorkflowAttemptAuthority};
+use crate::application::work_items::{FileWorkItemService, WorkflowStepAuthority};
 use crate::application::workflow::phases::quality::{FileQualityService, QualitySettingsPatch};
 use crate::infrastructure::agents::invocation::smoke_ai_env_lock;
 use std::fs;
@@ -229,7 +229,7 @@ struct QualityResumeFixture {
     base: String,
     candidate: String,
     round_idx: usize,
-    authority: WorkflowAttemptAuthority,
+    authority: WorkflowStepAuthority,
 }
 
 impl QualityResumeFixture {

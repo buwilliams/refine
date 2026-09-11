@@ -188,6 +188,10 @@ fn workflow_quality_authority_loss_prevents_provider_launch() {
         Some(round_idx),
     );
     metadata.insert("workflow_revision".to_string(), json!(workflow_revision));
+    metadata.insert(
+        "workflow_step_generation".to_string(),
+        work_items.show_goal_detail("GOAL1").unwrap()["event_generation"].clone(),
+    );
     let runner = fixture.runner();
     let (operation, request) = runner
         .register_goal_checks("GOAL1", "smoke-ai", metadata)

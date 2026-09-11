@@ -19,12 +19,14 @@ pub struct AdmissionHealth {
     pub checked_at_ms: i64,
     pub eligible_since_ms: BTreeMap<String, i64>,
     pub cause: String,
+    #[serde(default)]
+    pub blocked_goals: BTreeMap<String, String>,
     pub free_capacity: bool,
     pub active_work: bool,
 }
 impl AdmissionHealth {
     pub fn waiting_count(&self, now: i64) -> usize {
-        if !self.free_capacity || self.active_work {
+        if !self.free_capacity {
             return 0;
         }
         self.eligible_since_ms
@@ -74,7 +76,6 @@ fn sample_admission(
         crate::infrastructure::storage::project_layout::refine_dir_for_target_root(target)?;
     let supervisor = FileProcessSupervisor::new(runtime);
     let paused = supervisor.pause_state()?;
-    let events = crate::application::events::FileEventService::new(&refine);
     let items = crate::application::work_items::FileWorkItemService::new(&refine);
     let index = ActiveGoalIndex::load_or_rebuild(&refine)?;
     let eligibility = SchedulingEligibility::new(index.goals());
@@ -138,30 +139,38 @@ fn sample_admission(
         String::new()
     };
     let mut ids = Vec::new();
+    let mut blocked_goals = BTreeMap::new();
     if cause.is_empty() {
         for goal in index.goals().filter(|g| {
-            g.status == GoalStatus::Todo
-                && g.round_count > 0
-                && crate::application::fleet::nodes::node_ids_match(
-                    g.node_id.as_deref().unwrap_or("default"),
-                    &policy.active_node_id,
-                )
-        }) {
-            if let Some(missing) = events.missing_workflow_requirement(
-                &items.show_goal_detail(&goal.id)?,
+            matches!(
+                g.status,
+                GoalStatus::Todo
+                    | GoalStatus::Plan
+                    | GoalStatus::Implement
+                    | GoalStatus::Quality
+                    | GoalStatus::Governance
+            ) && crate::application::fleet::nodes::node_ids_match(
+                g.node_id.as_deref().unwrap_or("default"),
                 &policy.active_node_id,
-            )? {
-                cause = missing;
-                continue;
-            }
-            if delayed.contains(&goal.id) {
-                cause = "retry delay".into();
-                continue;
-            }
-            if eligibility.feature_eligible(&goal.id) && eligibility.priority_eligible(goal) {
-                ids.push(goal.id.clone());
+            )
+        }) {
+            let detail = items.show_goal_detail(&goal.id)?;
+            let reason = if active.contains(&goal.id) {
+                Some("Live execution already occupies this Goal".into())
             } else {
-                cause = "scope or ordering blocks".into();
+                workflow.workflow_blocking_reason(
+                    goal,
+                    &detail,
+                    &eligibility,
+                    &policy.active_node_id,
+                )?
+            }
+            .or_else(|| delayed.contains(&goal.id).then(|| "retry delay".into()));
+            if let Some(reason) = reason {
+                cause = reason.clone();
+                blocked_goals.insert(goal.id.clone(), reason);
+            } else if goal.status == GoalStatus::Todo {
+                ids.push(goal.id.clone());
             }
         }
     }
@@ -181,12 +190,10 @@ fn sample_admission(
             (id, since)
         })
         .collect::<BTreeMap<_, _>>();
-    if !free_capacity || !active.is_empty() {
+    if !free_capacity {
         eligible_since_ms.clear();
     }
-    if !active.is_empty() {
-        cause = "live attempts or interactive Goal sessions".into();
-    } else if !free_capacity {
+    if !free_capacity {
         cause = "capacity is occupied".into();
     } else if !eligible_since_ms.is_empty() {
         cause = "eligible Todo work awaiting admission".into();
@@ -206,6 +213,7 @@ fn sample_admission(
         checked_at_ms: now,
         eligible_since_ms,
         cause,
+        blocked_goals,
         free_capacity,
         active_work: !active.is_empty(),
     })

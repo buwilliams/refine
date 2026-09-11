@@ -115,12 +115,252 @@ fn feature_order_and_gaps_do_not_look_like_stalled_admission() {
     let now = chrono::Utc::now().timestamp_millis();
     let snapshot = sample_admission(&root, &target, None, now).unwrap();
     assert!(snapshot.eligible_since_ms.is_empty());
-    assert_eq!(snapshot.cause, "scope or ordering blocks");
+    assert_eq!(snapshot.cause, "Feature ordering blocks this Goal");
     items.cancel_goal_summary("GOAL1").unwrap();
     let first = sample_admission(&root, &target, None, now).unwrap();
     assert!(first.eligible_since_ms.contains_key("GOAL2"));
     let after_gap = sample_admission(&root, &target, Some(&first), now + 31_000).unwrap();
     assert_eq!(after_gap.waiting_count(now + 31_000), 0);
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn retained_failure_claim_and_legacy_fence_cannot_veto_new_round_in_health_or_admission() {
+    let (root, target, items) = fixture();
+    let engine = WorkflowEngine::with_target_root(&root, &target);
+    let (round, revision, prompt) = items.authored_goal_commitment("GOAL1").unwrap();
+    let authority = items
+        .claim_workflow_attempt("GOAL1", GoalStatus::Todo, round, revision, &prompt)
+        .unwrap();
+    items
+        .settle_workflow_attempt_failure(
+            "GOAL1",
+            authority,
+            "implementation",
+            "Retained failure",
+            "2026-09-11T00:00:00Z",
+        )
+        .unwrap();
+    let failed_round = items.show_goal_detail("GOAL1").unwrap()["rounds"][0].clone();
+    use sha2::{Digest, Sha256};
+    let key = format!("{}:GOAL1", target.display());
+    let directory = root.join("workflow-failure-fences");
+    std::fs::create_dir_all(&directory).unwrap();
+    let path = directory.join(format!("{:x}.json", Sha256::digest(key.as_bytes())));
+    let legacy = serde_json::json!({"round_idx":0,"workflow_revision":revision});
+    std::fs::write(&path, serde_json::to_vec(&legacy).unwrap()).unwrap();
+    items
+        .append_goal_round_summary("GOAL1", "Reporter", "Recover using the retained work")
+        .unwrap();
+    for restart in [false, true] {
+        let replacement = WorkflowEngine::with_target_root(&root, &target);
+        if restart {
+            assert_eq!(replacement.recover_interrupted_goals("restart").unwrap(), 0);
+        }
+        let snapshot =
+            sample_admission(&root, &target, None, chrono::Utc::now().timestamp_millis()).unwrap();
+        assert!(snapshot.eligible_since_ms.contains_key("GOAL1"));
+        assert!(snapshot.blocked_goals.is_empty());
+        assert_eq!(
+            replacement.launchable_goals(&BTreeSet::new()).unwrap(),
+            vec!["GOAL1"]
+        );
+    }
+    assert_eq!(
+        items.show_goal_detail("GOAL1").unwrap()["rounds"][0],
+        failed_round
+    );
+    assert_eq!(
+        serde_json::from_slice::<Value>(&std::fs::read(path).unwrap()).unwrap(),
+        legacy
+    );
+    assert!(
+        engine
+            .unresolved_workflow_outcome("GOAL1", &items.show_goal_detail("GOAL1").unwrap())
+            .unwrap()
+            .is_none()
+    );
+    // A damaged historical marker is diagnostic evidence, not authority to stop
+    // the newly authorized Round or prevent health from describing it.
+    let damaged = directory.join(format!("{:x}.json", Sha256::digest(key.as_bytes())));
+    std::fs::write(&damaged, b"{damaged historical marker").unwrap();
+    let replacement = WorkflowEngine::with_target_root(&root, &target);
+    assert_eq!(replacement.recover_interrupted_goals("restart").unwrap(), 0);
+    assert_eq!(
+        replacement.launchable_goals(&BTreeSet::new()).unwrap(),
+        vec!["GOAL1"]
+    );
+    assert!(
+        sample_admission(&root, &target, None, chrono::Utc::now().timestamp_millis())
+            .unwrap()
+            .eligible_since_ms
+            .contains_key("GOAL1")
+    );
+    assert_eq!(
+        std::fs::read(&damaged).unwrap(),
+        b"{damaged historical marker"
+    );
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn health_and_admission_expose_the_same_unpersisted_outcome_until_superseded() {
+    let (root, target, items) = fixture();
+    let engine = WorkflowEngine::with_target_root(&root, &target);
+    let goal = items.show_goal_detail("GOAL1").unwrap();
+    let directory = root.join("workflow-failures");
+    std::fs::create_dir_all(&directory).unwrap();
+    let path = directory.join("unpersisted.json");
+    let evidence = serde_json::json!({"goal_id":"GOAL1", "target_root":target, "round_idx":0,
+        "generation":goal["event_generation"], "original_error":"Provider completion failed",
+        "settlement":{"unpersisted_evidence":"Goal filesystem unavailable"}});
+    std::fs::write(&path, serde_json::to_vec(&evidence).unwrap()).unwrap();
+    let snapshot =
+        sample_admission(&root, &target, None, chrono::Utc::now().timestamp_millis()).unwrap();
+    assert!(snapshot.eligible_since_ms.is_empty());
+    assert_eq!(
+        snapshot.blocked_goals["GOAL1"],
+        engine
+            .unresolved_workflow_outcome("GOAL1", &goal)
+            .unwrap()
+            .unwrap()
+    );
+    assert!(
+        engine
+            .launchable_goals(&BTreeSet::new())
+            .unwrap()
+            .is_empty()
+    );
+    items.cancel_goal_summary("GOAL1").unwrap();
+    items.undo_goal_summary("GOAL1").unwrap();
+    let snapshot =
+        sample_admission(&root, &target, None, chrono::Utc::now().timestamp_millis()).unwrap();
+    assert!(snapshot.eligible_since_ms.contains_key("GOAL1"));
+    assert_eq!(
+        engine.launchable_goals(&BTreeSet::new()).unwrap(),
+        vec!["GOAL1"]
+    );
+    assert_eq!(
+        serde_json::from_slice::<Value>(&std::fs::read(path).unwrap()).unwrap(),
+        evidence
+    );
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn restoring_a_legacy_marker_after_same_round_retry_cannot_resurrect_its_restriction() {
+    let (root, target, items) = fixture();
+    let engine = WorkflowEngine::with_target_root(&root, &target);
+    let (round, revision, prompt) = items.authored_goal_commitment("GOAL1").unwrap();
+    items
+        .claim_workflow_attempt("GOAL1", GoalStatus::Todo, round, revision, &prompt)
+        .unwrap();
+    use sha2::{Digest, Sha256};
+    let path = root.join("workflow-failure-fences").join(format!(
+        "{:x}.json",
+        Sha256::digest(format!("{}:GOAL1", target.display()).as_bytes())
+    ));
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    let bytes =
+        serde_json::to_vec(&serde_json::json!({"round_idx":round,"workflow_revision":revision}))
+            .unwrap();
+    std::fs::write(&path, &bytes).unwrap();
+    let before = items.show_goal_detail("GOAL1").unwrap();
+    assert!(
+        engine
+            .unresolved_workflow_outcome("GOAL1", &before)
+            .unwrap()
+            .is_some()
+    );
+    items
+        .control_workflow(
+            "GOAL1",
+            &crate::application::work_items::WorkflowControl {
+                to: GoalStatus::Todo,
+                reason: "Explicit retry".into(),
+                context: String::new(),
+                expected_revision: before["workflow_revision"].as_u64().unwrap(),
+                request_id: "retry-once".into(),
+                actor: "Operator".into(),
+                force: false,
+                invocation_id: None,
+            },
+        )
+        .unwrap();
+    // Simulate copying an old runtime backup after the new workflow decision.
+    std::fs::write(&path, &bytes).unwrap();
+    let replacement = WorkflowEngine::with_target_root(&root, &target);
+    assert_eq!(
+        replacement
+            .recover_interrupted_goals("restart after restore")
+            .unwrap(),
+        0
+    );
+    assert!(
+        replacement
+            .unresolved_workflow_outcome("GOAL1", &items.show_goal_detail("GOAL1").unwrap())
+            .unwrap()
+            .is_none()
+    );
+    assert_eq!(
+        replacement.launchable_goals(&BTreeSet::new()).unwrap(),
+        vec!["GOAL1"]
+    );
+    assert_eq!(
+        items.show_goal_detail("GOAL1").unwrap()["rounds"][0]["workflow_attempt_authority"],
+        before["rounds"][0]["workflow_attempt_authority"]
+    );
+    assert_eq!(std::fs::read(path).unwrap(), bytes);
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn late_legacy_failure_cannot_veto_a_superseding_node_decision_after_restart() {
+    let (root, target, items) = fixture();
+    let (round, revision, prompt) = items.authored_goal_commitment("GOAL1").unwrap();
+    items
+        .claim_workflow_attempt("GOAL1", GoalStatus::Todo, round, revision, &prompt)
+        .unwrap();
+    let directory = root.join("workflow-failures");
+    std::fs::create_dir_all(&directory).unwrap();
+    let path = directory.join("legacy-late.json");
+    let bytes = serde_json::to_vec(&serde_json::json!({
+        "goal_id":"GOAL1", "round_idx":round, "workflow_revision":revision,
+        "failure_at":"2099-01-01T00:00:00Z", "original_error":"Late legacy worker failure",
+        "settlement":{"unpersisted_evidence":"Goal write failed"}
+    }))
+    .unwrap();
+    std::fs::write(&path, &bytes).unwrap();
+    let engine = WorkflowEngine::with_target_root(&root, &target);
+    assert!(
+        engine
+            .launchable_goals(&BTreeSet::new())
+            .unwrap()
+            .is_empty()
+    );
+    crate::application::fleet::nodes::FileNodeRegistryService::new(&items.refine_dir)
+        .create("worker")
+        .unwrap();
+    items.transfer_goal_to_node("worker", "GOAL1").unwrap();
+    FileWorkItemService::for_node(&items.refine_dir, "worker")
+        .transfer_goal_to_node("default", "GOAL1")
+        .unwrap();
+    // Restoring or receiving legacy evidence after the decision cannot make its
+    // late timestamp outrank the workflow's recorded revision and occurrence.
+    std::fs::write(&path, &bytes).unwrap();
+    let replacement = WorkflowEngine::with_target_root(&root, &target);
+    assert_eq!(replacement.recover_interrupted_goals("restart").unwrap(), 0);
+    assert_eq!(
+        replacement.launchable_goals(&BTreeSet::new()).unwrap(),
+        vec!["GOAL1"]
+    );
+    assert!(
+        sample_admission(&root, &target, None, chrono::Utc::now().timestamp_millis())
+            .unwrap()
+            .eligible_since_ms
+            .contains_key("GOAL1")
+    );
+    assert_eq!(std::fs::read(path).unwrap(), bytes);
     std::fs::remove_dir_all(root).unwrap();
 }
 

@@ -1,6 +1,13 @@
 use super::*;
 
 impl WorkflowEngine {
+    pub(super) fn scheduling_generation(&self, goal_id: &str) -> RefineResult<u64> {
+        let root = self
+            .refine_dir()?
+            .ok_or_else(|| RefineError::InvalidInput("Missing workflow target".into()))?;
+        let goal = FileWorkItemService::new(root).show_goal_detail(goal_id)?;
+        Ok(goal["event_generation"].as_u64().unwrap_or(0))
+    }
     pub(super) fn target_still_attached(
         &self,
         registry: Option<&std::path::Path>,
@@ -71,7 +78,7 @@ impl WorkflowEngine {
         )
     }
 
-    pub(super) fn launchable_goals(&self, active: &BTreeSet<String>) -> RefineResult<Vec<String>> {
+    pub(crate) fn launchable_goals(&self, active: &BTreeSet<String>) -> RefineResult<Vec<String>> {
         let target_root = self.target_root.as_ref().ok_or_else(|| {
             RefineError::InvalidInput(
                 "target root is required to execute workflow work".to_string(),
@@ -81,7 +88,6 @@ impl WorkflowEngine {
         ActiveGoalIndex::ensure_built(&refine_dir)?;
         let index = ActiveGoalIndex::load_or_rebuild(&refine_dir)?;
         let policy = self.policy()?;
-        let events = crate::application::events::FileEventService::new(&refine_dir);
         let items = FileWorkItemService::new(&refine_dir);
         let mut observed = BTreeSet::new();
         for root in [self.runtime_root.clone(), self.runtime_root.join("agents")] {
@@ -137,22 +143,9 @@ impl WorkflowEngine {
         let mut result = Vec::new();
         for goal in goals {
             let detail = items.show_goal_detail(&goal.id)?;
-            if self.failed_attempt_is_fenced(&goal.id, &detail) {
-                continue;
-            }
-            if detail["workflow_integration_control"]["state"] == "pending"
-                || detail["pending_workflow_outcome"]["state"] == "pending"
-                || detail["pending_event_transition"]["state"] == "pending"
-            {
-                continue;
-            }
-            if goal.status == GoalStatus::Todo
-                && events
-                    .missing_workflow_requirement(
-                        &items.show_goal_detail(&goal.id)?,
-                        &policy.active_node_id,
-                    )?
-                    .is_some()
+            if self
+                .workflow_blocking_reason(&goal, &detail, &eligibility, &policy.active_node_id)?
+                .is_some()
             {
                 continue;
             }

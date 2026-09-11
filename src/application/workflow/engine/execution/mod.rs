@@ -3,7 +3,7 @@ use std::time::{Duration, Instant};
 
 use crate::application::projects::projection::ActiveGoalIndex;
 use crate::application::work_items::FileWorkItemService;
-use crate::application::work_items::WorkflowAttemptAuthority;
+use crate::application::work_items::WorkflowStepAuthority;
 use crate::application::workflow::engine::behaviors::contract::{
     WorkflowAdvanceOutcome, WorkflowBehavior,
 };
@@ -31,7 +31,6 @@ use crate::application::workflow::{
 
 mod admission;
 mod attempt;
-mod failure_fence;
 #[cfg(test)]
 pub(crate) mod test_hooks;
 use attempt::contain;
@@ -76,7 +75,10 @@ impl WorkflowEngine {
             let mut order = 0usize;
             let mut cycle_failures = 0;
             let mut rescan_required = false;
-            let mut failed = BTreeSet::new();
+            // Suppress repeated preparation faults only for the observed occurrence
+            // within this pass. A later workflow decision is immediately reconsidered.
+            let mut failed = BTreeMap::new();
+            let mut launched_generations = BTreeMap::new();
             loop {
                 // This is the admission controller itself, never a heartbeat helper thread.
                 crate::application::workflow::health::scheduler_tick(
@@ -112,7 +114,9 @@ impl WorkflowEngine {
                             results.push((order, result));
                         }
                         Err(error) => {
-                            failed.insert(id.clone());
+                            if let Some(generation) = launched_generations.remove(&id) {
+                                failed.insert(id.clone(), generation);
+                            }
                             errors.push(error);
                         }
                     }
@@ -125,7 +129,7 @@ impl WorkflowEngine {
                 {
                     let handle: std::thread::ScopedJoinHandle<
                         '_,
-                        RefineResult<(usize, Vec<(String, super::admission::AdmissionLease)>)>,
+                        RefineResult<(usize, Vec<(String, super::admission::AdmissionLease, u64)>)>,
                     > = discovery.take().unwrap();
                     let outcome = handle.join().unwrap_or_else(|_| {
                         Err(RefineError::Conflict("workflow discovery panicked".into()))
@@ -143,10 +147,11 @@ impl WorkflowEngine {
                             promoted += count;
                             cycle_failures = 0;
                             let empty = ids.is_empty();
-                            for (id, lease) in ids {
+                            for (id, lease, generation) in ids {
                                 if active.contains_key(&id) {
                                     continue;
                                 }
+                                launched_generations.insert(id.clone(), generation);
                                 let goal_id = id.clone();
                                 active.insert(
                                     id,
@@ -169,9 +174,10 @@ impl WorkflowEngine {
                                                 self,
                                                 &goal_id,
                                                 "delivery",
-                                                WorkflowAttemptAuthority {
+                                                WorkflowStepAuthority {
                                                     round_idx: 0,
                                                     workflow_revision: 0,
+                                                    generation: 0,
                                                 },
                                             )?;
                                             outcome
@@ -200,14 +206,11 @@ impl WorkflowEngine {
                     // The poll budget includes discovery itself. Measuring from its
                     // completion adds another full interval after capacity becomes free.
                     next_cycle = Instant::now() + ACTIVE_WORK_REPLENISH_INTERVAL;
-                    let ids = active
-                        .keys()
-                        .cloned()
-                        .chain(failed.iter().cloned())
-                        .collect::<BTreeSet<_>>();
+                    let ids = active.keys().cloned().collect::<BTreeSet<_>>();
                     // An empty discovery captured before a completion cannot prove the queue
                     // is empty afterward: completion can free capacity or author a recovery Round.
                     rescan_required = false;
+                    let failed = failed.clone();
                     discovery = Some(scope.spawn(move || contain("admission", || {
                         crate::infrastructure::process::supervisor::coordination::with_lock_timeout(Duration::from_millis(200), || {
                             if self.workflow_paused()? || !self.target_still_attached(worker_registry)? { return Ok((0, Vec::new())); }
@@ -217,9 +220,14 @@ impl WorkflowEngine {
                             self.service_pending_skills(usize::from(skills_first));
                             let promoted = self.promote_backlog_to_todo()?;
                             let mut candidates = Vec::new();
-                            for id in self.launchable_goals(&ids)? {
+                            let mut excluded = ids;
+                            for (id, generation) in &failed {
+                                if self.scheduling_generation(id)? == *generation { excluded.insert(id.clone()); }
+                            }
+                            for id in self.launchable_goals(&excluded)? {
+                                let generation = self.scheduling_generation(&id)?;
                                 if let Some(lease) = self.reserve_goal(&id)? {
-                                    candidates.push((id, lease));
+                                    candidates.push((id, lease, generation));
                                 }
                             }
                             self.service_pending_skills(32);

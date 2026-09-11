@@ -117,7 +117,11 @@ fn authored_todo_start_atomically_pins_nonempty_round() {
     let started = service
         .advance_claimed_goal_status("GOAL1", authority, GoalStatus::Todo, GoalStatus::Plan)
         .unwrap();
-    assert_eq!(started.goal.status, GoalStatus::Plan);
+    assert_eq!(started.generation, authority.generation + 1);
+    assert_eq!(
+        service.show_goal_summary("GOAL1").unwrap().goal.status,
+        GoalStatus::Plan
+    );
     assert_eq!(round_idx, 0);
     assert_eq!(request, "Authoritative source");
     fs::remove_dir_all(temp_root).unwrap();

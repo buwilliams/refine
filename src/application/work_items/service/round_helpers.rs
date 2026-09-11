@@ -42,23 +42,25 @@ pub(super) fn clear_latest_round_failure(object: &mut Map<String, Value>) {
     else {
         return;
     };
+    if round
+        .get("failure_message")
+        .and_then(Value::as_str)
+        .is_some_and(|s| !s.is_empty())
+    {
+        let evidence = serde_json::json!({"failure_category": round.get("failure_category"), "failure_message": round.get("failure_message"), "failure_at": round.get("failure_at"), "occurrence": round.get("workflow_failure_occurrence")});
+        if let Some(history) = round
+            .entry("failure_history")
+            .or_insert(serde_json::json!([]))
+            .as_array_mut()
+        {
+            history.push(evidence);
+        }
+    }
     for key in ["failure_category", "failure_message", "failure_at"] {
         if round.contains_key(key) {
             round.insert(key.to_string(), Value::String(String::new()));
         }
     }
-}
-
-pub(super) fn clear_latest_round_workflow_attempt(object: &mut Map<String, Value>) {
-    let Some(round) = object
-        .get_mut("rounds")
-        .and_then(Value::as_array_mut)
-        .and_then(|rounds| rounds.last_mut())
-        .and_then(Value::as_object_mut)
-    else {
-        return;
-    };
-    round.insert("workflow_attempt_authority".to_string(), Value::Null);
 }
 
 pub(super) fn new_round_value(reporter: &str, assignee: &str, prompt: &str) -> Value {
@@ -128,4 +130,56 @@ pub(super) fn new_round_value(reporter: &str, assignee: &str, prompt: &str) -> V
     round.insert("failure_message".to_string(), Value::String(String::new()));
     round.insert("failure_at".to_string(), Value::String(String::new()));
     Value::Object(round)
+}
+
+/// Retry selects fresh gate evidence while retaining the complete previous evaluation.
+/// Claims remain provenance and are never cleared as a lifecycle side effect.
+pub(super) fn archive_round_for_retry(round: &mut Value, target: &GoalStatus) -> RefineResult<()> {
+    let mut prior = round.clone();
+    let prior_object = prior
+        .as_object_mut()
+        .ok_or_else(|| RefineError::Serialization("Invalid Round".into()))?;
+    prior_object.remove("prior_attempts");
+    let object = round
+        .as_object_mut()
+        .ok_or_else(|| RefineError::Serialization("Invalid Round".into()))?;
+    object
+        .entry("prior_attempts")
+        .or_insert(serde_json::json!([]))
+        .as_array_mut()
+        .ok_or_else(|| RefineError::Serialization("Invalid prior attempts".into()))?
+        .push(prior);
+    if *target != GoalStatus::Governance {
+        for key in [
+            "quality_state",
+            "quality_message",
+            "quality_details",
+            "quality_checked_at",
+            "quality_candidate_commit",
+        ] {
+            object.remove(key);
+        }
+    }
+    for key in [
+        "rule_state",
+        "meta_rule_state",
+        "product_state",
+        "constitution_state",
+        "governance_message",
+        "governance_details",
+        "governance_checked_at",
+        "governance_candidate_commit",
+        "failure_category",
+        "failure_message",
+        "failure_at",
+        "event_results",
+        "gate_configurations",
+        "event_configuration",
+    ] {
+        object.remove(key);
+    }
+    for key in ["failure_category", "failure_message", "failure_at"] {
+        object.insert(key.into(), Value::String(String::new()));
+    }
+    Ok(())
 }

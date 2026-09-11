@@ -156,11 +156,12 @@ impl LifecycleWorkspace {
                 }
                 FileWorkItemService::new(root).verify_workflow_attempt(
                     &self.goal_id,
-                    crate::application::work_items::WorkflowAttemptAuthority {
+                    crate::application::work_items::WorkflowStepAuthority {
                         round_idx: self
                             .round_idx
                             .ok_or_else(|| unavailable("missing claimed Round"))?,
                         workflow_revision: *workflow_revision,
+                        generation: *generation,
                     },
                     crate::model::workflow::GoalStatus::Todo,
                     &self.node_id,
@@ -170,6 +171,13 @@ impl LifecycleWorkspace {
                 if goal["pending_event_transition"] != *pending
                     || pending["state"] != "pending"
                     || pending["revision"] != goal["workflow_revision"]
+                    || pending["generation"].as_u64().map_or(
+                        pending["revision"] != goal["workflow_revision"],
+                        |generation| {
+                            generation != goal["event_generation"].as_u64().unwrap_or(0)
+                                || pending["candidate_commit"] != goal["candidate_commit"]
+                        },
+                    )
                     || pending["from"] != goal["status"]
                     || ![
                         format!(
@@ -206,6 +214,8 @@ impl LifecycleWorkspace {
                     edge
                 );
                 if self.source != expected
+                    || occurrence["generation"].as_u64().unwrap_or(0)
+                        != goal["event_generation"].as_u64().unwrap_or(0)
                     || !goal["workflow_events"]
                         .as_array()
                         .is_some_and(|items| items.contains(occurrence))

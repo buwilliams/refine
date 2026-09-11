@@ -144,7 +144,7 @@ fn run_checked(
                 .and_then(Value::as_object)
                 .cloned()
                 .unwrap_or_default();
-            evidence.insert(invocation.id.clone(), json!({"source": source, "state": invocation.state, "results": invocation.results, "candidate_commit": ctx.commit}));
+            evidence.insert(invocation.id.clone(), json!({"source": source, "generation": ctx.attempt_authority.generation, "round_idx": ctx.round_idx, "state": invocation.state, "results": invocation.results, "candidate_commit": ctx.commit}));
             ctx.work_items.update_goal_round_evaluation_summary(
                 &ctx.goal_id,
                 ctx.round_idx,

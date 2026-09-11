@@ -11,7 +11,7 @@
 
 use super::*;
 
-use crate::application::work_items::WorkflowAttemptAuthority;
+use crate::application::work_items::WorkflowStepAuthority;
 use crate::application::workflow::engine::behaviors::contract::{
     WorkflowAdvanceOutcome, WorkflowBehavior,
 };
@@ -97,7 +97,7 @@ impl CheckoutElsewhereFixture {
         settings
     }
 
-    fn authority(&self, status: GoalStatus) -> WorkflowAttemptAuthority {
+    fn authority(&self, status: GoalStatus) -> WorkflowStepAuthority {
         let (round_idx, revision, request) =
             self.work_items.authored_goal_commitment("GOAL1").unwrap();
         self.work_items
@@ -105,7 +105,7 @@ impl CheckoutElsewhereFixture {
             .unwrap()
     }
 
-    fn context(&self, authority: WorkflowAttemptAuthority) -> WorkflowContext<'_> {
+    fn context(&self, authority: WorkflowStepAuthority) -> WorkflowContext<'_> {
         WorkflowContext::new(
             &self.runtime_root,
             &self.target_root,

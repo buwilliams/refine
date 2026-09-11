@@ -1,3 +1,4 @@
+mod restart;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -226,8 +227,37 @@ impl WorkflowEngine {
                 );
                 continue;
             };
-            if goal.status == GoalStatus::Todo && work_items.show_goal_detail(&goal.id)?["rounds"][round_idx]["workflow_attempt_authority"].is_null() { continue; }
-            work_items.interrupt_workflow(&goal.id, detail)?;
+            let current = work_items.show_goal_detail(&goal.id)?;
+            let authority =
+                crate::application::work_items::WorkflowStepAuthority::from_goal(&current)?;
+            let unresolved = self.unresolved_workflow_outcome(&goal.id, &current)?;
+            let receipts = restart::step_receipts(
+                &crate::application::events::FileEventService::new(&refine_dir),
+                &current,
+                authority,
+            )?;
+            if receipts.completed && unresolved.is_none() {
+                // The replacement consumes this step's accepted receipts through the
+                // ordinary exact-candidate path. It does not invoke failed work again.
+                continue;
+            }
+            if goal.status == GoalStatus::Todo {
+                if !receipts.started
+                    && self
+                        .unresolved_workflow_outcome(&goal.id, &current)?
+                        .is_none()
+                {
+                    continue;
+                }
+            }
+            match work_items.interrupt_workflow_if_current(
+                &goal.id,
+                authority,
+                unresolved.as_deref().unwrap_or(detail),
+            ) {
+                Err(RefineError::Conflict(_)) => continue,
+                result => result?,
+            }
             logs.append_round_log(
                 &goal.id,
                 round_idx,

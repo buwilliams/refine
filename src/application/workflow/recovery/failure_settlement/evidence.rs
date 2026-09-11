@@ -8,6 +8,7 @@ pub(super) struct OriginatingFailure {
     pub goal_id: String,
     pub round_idx: usize,
     pub workflow_revision: u64,
+    pub generation: u64,
     pub failure_stage: String,
     pub failure_at: String,
     pub original_error: String,
@@ -28,7 +29,7 @@ struct FailureEvidence<'a> {
 impl OriginatingFailure {
     pub(super) fn new(
         goal: &str,
-        authority: WorkflowAttemptAuthority,
+        authority: WorkflowStepAuthority,
         stage: &str,
         error: &RefineError,
     ) -> Self {
@@ -36,6 +37,7 @@ impl OriginatingFailure {
             goal_id: goal.into(),
             round_idx: authority.round_idx,
             workflow_revision: authority.workflow_revision,
+            generation: authority.generation,
             failure_stage: stage.into(),
             failure_at: now_timestamp(),
             original_error: error.to_string(),
@@ -54,10 +56,16 @@ impl OriginatingFailure {
             write_fault: None,
             final_outcome: None,
         };
+        if let Ok(mut value) = serde_json::to_value(&evidence) {
+            value["target_root"] = serde_json::json!(engine.target_root);
+            super::unresolved::remember(engine, &value);
+        }
         let write = contain("runtime evidence finalization", || -> Result<(), String> {
             #[cfg(test)]
             self.hook(engine, "evidence_write")?;
-            let bytes = serde_json::to_vec(&evidence).map_err(|e| e.to_string())?;
+            let mut value = serde_json::to_value(&evidence).map_err(|e| e.to_string())?;
+            value["target_root"] = serde_json::json!(engine.target_root);
+            let bytes = serde_json::to_vec(&value).map_err(|e| e.to_string())?;
             let dir = engine.runtime_root.join("workflow-failures");
             std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
             let path = dir.join(format!("{}.json", uuid::Uuid::new_v4()));
@@ -100,9 +108,10 @@ impl OriginatingFailure {
             engine,
             &self.goal_id,
             stage,
-            WorkflowAttemptAuthority {
+            WorkflowStepAuthority {
                 round_idx: self.round_idx,
                 workflow_revision: self.workflow_revision,
+                generation: self.generation,
             },
         )
         .map_err(|e| e.to_string())

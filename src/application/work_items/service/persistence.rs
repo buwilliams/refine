@@ -129,6 +129,7 @@ impl FileWorkItemService {
         let current = self.show_goal_summary(goal_id)?;
         self.ensure_goal_owned(&current)?;
         let (goal_path, value) = self.read_goal_value_unchecked_locked(&current)?;
+        self.verify_bound_occurrence(&current, &value)?;
         Ok((goal_lock, goal_path, value))
     }
 
@@ -138,7 +139,30 @@ impl FileWorkItemService {
     ) -> RefineResult<(GoalMutationLock, PathBuf, Value)> {
         let goal_lock = self.acquire_goal_mutation_lock(&current.goal.id)?;
         let (goal_path, value) = self.read_goal_value_unchecked_locked(current)?;
+        self.verify_bound_occurrence(current, &value)?;
         Ok((goal_lock, goal_path, value))
+    }
+
+    fn verify_bound_occurrence(
+        &self,
+        current: &GoalSummaryProjection,
+        value: &Value,
+    ) -> RefineResult<()> {
+        if let Some((id, authority)) = &self.execution_occurrence {
+            if id != &current.goal.id {
+                return Err(RefineError::Conflict(
+                    "Execution cannot mutate another Goal".into(),
+                ));
+            }
+            workflow_attempts::require_current_step(
+                id,
+                value
+                    .as_object()
+                    .ok_or_else(|| RefineError::Serialization("Goal is not an object".into()))?,
+                *authority,
+            )?;
+        }
+        Ok(())
     }
 
     pub(super) fn read_goal_value_unchecked_locked(
@@ -240,9 +264,6 @@ impl FileWorkItemService {
         );
         if !matches!(status, GoalStatus::Failed) {
             clear_latest_round_failure(object);
-        }
-        if !is_automated_status(status) {
-            clear_latest_round_workflow_attempt(object);
         }
         object.insert("updated".to_string(), Value::String(now_timestamp()));
         write_json_atomically(goal_path, value)

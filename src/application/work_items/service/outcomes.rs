@@ -125,54 +125,8 @@ impl FileWorkItemService {
                 ));
             }
             if let Some(round) = goal["rounds"].as_array_mut().and_then(|a| a.last_mut()) {
-                let mut prior = round.clone();
-                prior.as_object_mut().unwrap().remove("prior_attempts");
                 if is_automated_status(&request.to) || request.to == GoalStatus::Todo {
-                    let history = round
-                        .as_object_mut()
-                        .unwrap()
-                        .entry("prior_attempts")
-                        .or_insert(json!([]));
-                    history.as_array_mut().unwrap().push(prior);
-                    if request.to != GoalStatus::Governance {
-                        for key in [
-                            "quality_state",
-                            "quality_message",
-                            "quality_details",
-                            "quality_checked_at",
-                            "quality_candidate_commit",
-                        ] {
-                            round.as_object_mut().unwrap().remove(key);
-                        }
-                    }
-                    for key in [
-                        "rule_state",
-                        "meta_rule_state",
-                        "product_state",
-                        "constitution_state",
-                        "governance_message",
-                        "governance_details",
-                        "governance_checked_at",
-                        "governance_candidate_commit",
-                        "failure_category",
-                        "failure_message",
-                        "failure_at",
-                    ] {
-                        round.as_object_mut().unwrap().remove(key);
-                    }
-                    for key in [
-                        "workflow_attempt_authority",
-                        "event_results",
-                        "gate_configurations",
-                        "event_configuration",
-                    ] {
-                        round.as_object_mut().unwrap().remove(key);
-                    }
-                } else {
-                    round
-                        .as_object_mut()
-                        .unwrap()
-                        .remove("workflow_attempt_authority");
+                    archive_round_for_retry(round, &request.to)?;
                 }
             }
             goal["status"] = json!(request.to);
@@ -239,11 +193,28 @@ impl FileWorkItemService {
 }
 
 impl FileWorkItemService {
+    #[cfg(test)]
     pub(crate) fn interrupt_workflow(&self, id: &str, message: &str) -> RefineResult<()> {
+        let authority = WorkflowStepAuthority::from_goal(&self.show_goal_detail(id)?)?;
+        self.interrupt_workflow_if_current(id, authority, message)
+    }
+
+    pub(crate) fn interrupt_workflow_if_current(
+        &self,
+        id: &str,
+        authority: WorkflowStepAuthority,
+        message: &str,
+    ) -> RefineResult<()> {
         let _lock = self.acquire_goal_mutation_lock(id)?;
         let current = self.show_goal_summary(id)?;
         self.ensure_goal_owned(&current)?;
         let (path, mut goal) = self.read_goal_value_unchecked_locked(&current)?;
+        workflow_attempts::require_current_step(
+            id,
+            goal.as_object()
+                .ok_or_else(|| RefineError::Serialization("Goal is not an object".into()))?,
+            authority,
+        )?;
         if goal["workflow_integration_control"]["state"] == "pending" {
             let request_id = goal["workflow_integration_control"]["request_id"].clone();
             let result = json!({"state":"interrupted", "diagnostic":message,

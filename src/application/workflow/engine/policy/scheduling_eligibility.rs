@@ -302,3 +302,77 @@ mod tests {
         }
     }
 }
+
+impl crate::application::workflow::WorkflowEngine {
+    /// Shared by actual admission, independent health, and preparation readback.
+    pub(crate) fn workflow_blocking_reason(
+        &self,
+        goal: &GoalIndexProjection,
+        detail: &serde_json::Value,
+        ordering: &SchedulingEligibility,
+        node: &str,
+    ) -> crate::error::RefineResult<Option<String>> {
+        if !matches!(
+            goal.status,
+            GoalStatus::Todo
+                | GoalStatus::Plan
+                | GoalStatus::Implement
+                | GoalStatus::Quality
+                | GoalStatus::Governance
+        ) {
+            return Ok(Some(format!(
+                "Workflow step {} does not authorize execution",
+                goal.status.as_str()
+            )));
+        }
+        if !crate::application::fleet::nodes::node_ids_match(
+            goal.node_id.as_deref().unwrap_or("default"),
+            node,
+        ) {
+            return Ok(Some("Goal is assigned to another node".into()));
+        }
+        if goal.round_count == 0
+            || detail["rounds"]
+                .as_array()
+                .and_then(|r| r.last())
+                .and_then(|r| r["prompt"].as_str())
+                .is_none_or(|s| s.trim().is_empty())
+        {
+            return Ok(Some("No actionable current Round".into()));
+        }
+        for (key, reason) in [
+            (
+                "workflow_integration_control",
+                "Explicit integration is pending",
+            ),
+            (
+                "pending_workflow_outcome",
+                "Current step Error handling is pending",
+            ),
+            (
+                "pending_event_transition",
+                "Current workflow transition gates are pending",
+            ),
+        ] {
+            if detail[key]["state"] == "pending" {
+                return Ok(Some(reason.into()));
+            }
+        }
+        if let Some(reason) = self.unresolved_workflow_outcome(&goal.id, detail)? {
+            return Ok(Some(reason));
+        }
+        if !ordering.feature_eligible(&goal.id) {
+            return Ok(Some("Feature ordering blocks this Goal".into()));
+        }
+        if !ordering.priority_eligible(goal) {
+            return Ok(Some("Higher-priority work blocks this Goal".into()));
+        }
+        if goal.status == GoalStatus::Todo {
+            if let Some(root) = self.refine_dir()? {
+                return crate::application::events::FileEventService::new(root)
+                    .missing_workflow_requirement(detail, node);
+            }
+        }
+        Ok(None)
+    }
+}

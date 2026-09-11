@@ -2,11 +2,11 @@ use super::*;
 use crate::model::goal::{QUALITY_PROOF_SCHEMA_VERSION, QualityProof, RoundIntegration};
 use serde_json::json;
 
-use super::workflow_attempts::{goal_status, require_current_attempt};
+use super::workflow_attempts::{goal_status, require_current_step};
 
 #[derive(Clone, Debug)]
 pub(crate) struct AlreadyMergedResolutionSnapshot {
-    pub(crate) authority: WorkflowAttemptAuthority,
+    pub(crate) authority: WorkflowStepAuthority,
     pub(crate) candidate_commit: String,
     pub(crate) integration: Option<RoundIntegration>,
     pub(crate) gate_evidence: Value,
@@ -113,7 +113,11 @@ impl FileWorkItemService {
             )));
         }
 
-        let authority = workflow_attempt_authority(goal_id, round, round_idx)?;
+        let authority = WorkflowStepAuthority {
+            round_idx,
+            workflow_revision: workflow_revision(&detail),
+            generation: detail["event_generation"].as_u64().unwrap_or(0),
+        };
         let candidate_commit = detail
             .get("candidate_commit")
             .and_then(Value::as_str)
@@ -169,7 +173,7 @@ impl FileWorkItemService {
                 "Goal {goal_id} left quality before exact-candidate proof regeneration"
             )));
         }
-        require_current_attempt(goal_id, object, snapshot.authority)?;
+        require_current_step(goal_id, object, snapshot.authority)?;
         let current_round = object
             .get("rounds")
             .and_then(Value::as_array)
@@ -252,7 +256,7 @@ impl FileWorkItemService {
                 observed_status.as_str()
             )));
         }
-        require_current_attempt(goal_id, object, snapshot.authority)?;
+        require_current_step(goal_id, object, snapshot.authority)?;
         let current_round = object
             .get("rounds")
             .and_then(Value::as_array)
@@ -299,7 +303,6 @@ impl FileWorkItemService {
             }
         };
         round.insert("workflow_reconciliation".to_string(), evidence.clone());
-        round.insert("workflow_attempt_authority".to_string(), Value::Null);
         round.insert("updated".to_string(), json!(now));
         object.insert("status".to_string(), json!(status.as_str()));
         object.insert("updated".to_string(), json!(now));
@@ -311,36 +314,6 @@ impl FileWorkItemService {
             _ => unreachable!("already-merged settlement is terminal"),
         })
     }
-}
-
-fn workflow_attempt_authority(
-    goal_id: &str,
-    round: &Value,
-    round_idx: usize,
-) -> RefineResult<WorkflowAttemptAuthority> {
-    let attempt = round
-        .get("workflow_attempt_authority")
-        .and_then(Value::as_object)
-        .ok_or_else(|| {
-            RefineError::Conflict(format!(
-                "Goal {goal_id} has no current workflow attempt authority for already-merged resolution"
-            ))
-        })?;
-    let recorded_round = attempt
-        .get("round_idx")
-        .and_then(Value::as_u64)
-        .and_then(|value| usize::try_from(value).ok());
-    let workflow_revision = attempt.get("workflow_revision").and_then(Value::as_u64);
-    if recorded_round != Some(round_idx) || workflow_revision.is_none() {
-        return Err(RefineError::Conflict(format!(
-            "Goal {goal_id} has mismatched workflow attempt authority for Round {}",
-            round_idx + 1
-        )));
-    }
-    Ok(WorkflowAttemptAuthority {
-        round_idx,
-        workflow_revision: workflow_revision.unwrap_or_default(),
-    })
 }
 
 fn resolution_gate_evidence(detail: &Value, round: &Value) -> Value {

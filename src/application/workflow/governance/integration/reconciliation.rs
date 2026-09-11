@@ -4,7 +4,7 @@ use super::*;
 use crate::application::agents::provider_selection::resolve_agent_provider;
 use crate::application::work_items::{
     AlreadyMergedInspection, AlreadyMergedResolutionSnapshot, AlreadyMergedSettlement,
-    AlreadyMergedSettlementDecision, WorkflowAttemptAuthority,
+    AlreadyMergedSettlementDecision, WorkflowStepAuthority,
 };
 use crate::application::workflow::phases::quality::{FileQualityService, QualityOperationRunner};
 
@@ -52,7 +52,7 @@ impl FileGovernanceIntegrationService {
     pub(crate) fn resolve_already_merged_goal_with_authority(
         &self,
         goal_id: &str,
-        authority: WorkflowAttemptAuthority,
+        authority: WorkflowStepAuthority,
     ) -> RefineResult<AlreadyMergedResolution> {
         self.resolve_already_merged_goal_inner(goal_id, Some(authority))
     }
@@ -60,7 +60,7 @@ impl FileGovernanceIntegrationService {
     fn resolve_already_merged_goal_inner(
         &self,
         goal_id: &str,
-        expected_authority: Option<WorkflowAttemptAuthority>,
+        expected_authority: Option<WorkflowStepAuthority>,
     ) -> RefineResult<AlreadyMergedResolution> {
         let target_root = match &self.target_root {
             Some(target_root) => target_root.clone(),
@@ -88,7 +88,10 @@ impl FileGovernanceIntegrationService {
             }
             AlreadyMergedInspection::Eligible(snapshot) => snapshot,
         };
-        if expected_authority.is_some_and(|authority| authority != snapshot.authority) {
+        if expected_authority.is_some_and(|authority| {
+            authority.round_idx != snapshot.authority.round_idx
+                || authority.generation != snapshot.authority.generation
+        }) {
             return Err(RefineError::Conflict(format!(
                 "Goal {goal_id} already-merged resolver was superseded before repository inspection"
             )));
@@ -112,6 +115,10 @@ impl FileGovernanceIntegrationService {
                 Some(snapshot.authority.round_idx),
             );
             metadata.insert(
+                "workflow_step_generation".into(),
+                json!(snapshot.authority.generation),
+            );
+            metadata.insert(
                 "workflow_revision".to_string(),
                 json!(snapshot.authority.workflow_revision),
             );
@@ -133,7 +140,10 @@ impl FileGovernanceIntegrationService {
                     });
                 }
             };
-            if expected_authority.is_some_and(|authority| authority != snapshot.authority) {
+            if expected_authority.is_some_and(|authority| {
+                authority.round_idx != snapshot.authority.round_idx
+                    || authority.generation != snapshot.authority.generation
+            }) {
                 return Err(RefineError::Conflict(format!(
                     "Goal {goal_id} already-merged resolver was superseded during Quality regeneration"
                 )));

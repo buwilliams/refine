@@ -1,5 +1,5 @@
 use super::*;
-use crate::application::work_items::{FileWorkItemService, WorkflowAttemptAuthority};
+use crate::application::work_items::{FileWorkItemService, WorkflowStepAuthority};
 use crate::application::workflow::phases::quality::{FileQualityService, QualitySettingsPatch};
 use crate::infrastructure::agents::invocation::smoke_ai_env_lock;
 use crate::infrastructure::process::subprocess::workflow_subprocess_metadata;
@@ -116,7 +116,7 @@ struct AlreadyMergedQualityFixture {
     candidate: String,
     integration: Value,
     round_idx: usize,
-    authority: WorkflowAttemptAuthority,
+    authority: WorkflowStepAuthority,
 }
 
 impl AlreadyMergedQualityFixture {
@@ -290,6 +290,10 @@ fi
             "quality",
             "AlreadyMergedQualityRegeneration",
             Some(self.round_idx),
+        );
+        metadata.insert(
+            "workflow_step_generation".into(),
+            json!(self.authority.generation),
         );
         metadata.insert(
             "workflow_revision".to_string(),

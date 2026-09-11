@@ -4,7 +4,7 @@ use crate::infrastructure::process::supervisor::operations::{OperationHandle, Op
 use crate::model::goal::{QUALITY_PROOF_SCHEMA_VERSION, QualityProof};
 use serde_json::json;
 
-use super::workflow_attempts::{goal_status, require_current_attempt};
+use super::workflow_attempts::{goal_status, require_current_step};
 
 pub(crate) const ALREADY_MERGED_QUALITY_FAILED: &str = "already_merged_quality_failed";
 
@@ -22,7 +22,7 @@ impl FileWorkItemService {
     pub(crate) fn settle_already_merged_quality_failure(
         &self,
         goal_id: &str,
-        authority: WorkflowAttemptAuthority,
+        authority: WorkflowStepAuthority,
         candidate: &str,
         terminal_operation: Option<&OperationHandle>,
     ) -> RefineResult<Option<AlreadyMergedSettlement>> {
@@ -63,7 +63,7 @@ impl FileWorkItemService {
                 observed_status.as_str()
             )));
         }
-        require_current_attempt(goal_id, object, authority)?;
+        require_current_step(goal_id, object, authority)?;
         if object.get("candidate_commit").and_then(Value::as_str) != Some(candidate) {
             return Err(RefineError::Conflict(format!(
                 "Goal {goal_id} changed exact candidate before failed already-merged Quality settlement"
@@ -125,6 +125,7 @@ impl FileWorkItemService {
             "workflow_revision".to_string(),
             json!(authority.workflow_revision),
         );
+        reconciliation.insert("generation".into(), json!(authority.generation));
         reconciliation.insert("candidate_commit".to_string(), json!(candidate));
         reconciliation.insert("quality_proof_mode".to_string(), json!("regenerated"));
         reconciliation.insert(
@@ -148,7 +149,6 @@ impl FileWorkItemService {
         );
         round.insert("failure_message".to_string(), json!(failure.message));
         round.insert("failure_at".to_string(), json!(now.clone()));
-        round.insert("workflow_attempt_authority".to_string(), Value::Null);
         round.insert("updated".to_string(), json!(now.clone()));
         object.insert("status".to_string(), json!(GoalStatus::Failed.as_str()));
         object.insert("updated".to_string(), json!(now));
@@ -193,7 +193,7 @@ fn failed_quality_from_round(
 
 fn failed_quality_from_operation(
     goal_id: &str,
-    authority: WorkflowAttemptAuthority,
+    authority: WorkflowStepAuthority,
     candidate: &str,
     operation: &OperationHandle,
 ) -> Option<FailedQualityEvidence> {
@@ -204,9 +204,9 @@ fn failed_quality_from_operation(
             != u64::try_from(authority.round_idx).ok()
         || operation
             .request
-            .get("workflow_revision")
+            .get("workflow_step_generation")
             .and_then(Value::as_u64)
-            != Some(authority.workflow_revision)
+            != Some(authority.generation)
         || operation
             .request
             .get("candidate_commit")

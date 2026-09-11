@@ -30,3 +30,5 @@ fn unique_temp_dir(prefix: &str) -> PathBuf {
 }
 
 mod outcomes;
+
+mod workflow_occurrences;

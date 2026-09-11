@@ -56,7 +56,7 @@ use goal_filters::*;
 use record_persistence::*;
 use round_helpers::*;
 use validation::*;
-pub(crate) use workflow_attempts::WorkflowAttemptAuthority;
+pub(crate) use workflow_attempts::WorkflowStepAuthority;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct GoalCancellationExpectation {
@@ -144,6 +144,7 @@ pub struct FileWorkItemService {
     pub projection_cache_dir: Option<PathBuf>,
     pub active_node_root: Option<PathBuf>,
     pub active_node_id_override: Option<String>,
+    execution_occurrence: Option<(String, WorkflowStepAuthority)>,
     #[cfg(test)]
     after_bulk_goal_selection_hook: Option<std::sync::Arc<dyn Fn() + Send + Sync>>,
     #[cfg(test)]
@@ -166,6 +167,7 @@ impl FileWorkItemService {
     pub fn new(refine_dir: impl Into<PathBuf>) -> Self {
         Self {
             refine_dir: refine_dir.into(),
+            execution_occurrence: None,
             projection_cache_dir: None,
             active_node_root: None,
             active_node_id_override: None,
@@ -182,6 +184,7 @@ impl FileWorkItemService {
     pub fn for_node(refine_dir: impl Into<PathBuf>, node_id: impl Into<String>) -> Self {
         Self {
             refine_dir: refine_dir.into(),
+            execution_occurrence: None,
             projection_cache_dir: None,
             active_node_root: None,
             active_node_id_override: Some(node_id.into()),
@@ -212,6 +215,7 @@ impl FileWorkItemService {
     ) -> Self {
         Self {
             refine_dir: refine_dir.into(),
+            execution_occurrence: None,
             projection_cache_dir: Some(cache_dir.into()),
             active_node_root: None,
             active_node_id_override: None,
@@ -229,6 +233,7 @@ impl FileWorkItemService {
     ) -> Self {
         Self {
             refine_dir: refine_dir.into(),
+            execution_occurrence: None,
             projection_cache_dir: Some(cache_dir.into()),
             active_node_root: Some(runtime_root.into()),
             active_node_id_override: None,

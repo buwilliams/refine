@@ -54,6 +54,9 @@ pub(super) fn write_json_atomically(path: &std::path::Path, value: &Value) -> Re
         } else {
             false
         };
+        if is_goal_record(path) {
+            workflow_attempts::prepare_occurrence(current.as_ref(), &mut next);
+        }
         let object = next.as_object_mut().ok_or_else(|| {
             RefineError::Serialization(format!(
                 "workflow record {} is not a JSON object",

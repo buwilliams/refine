@@ -117,6 +117,9 @@ fn interrupted_integration_releases_reservation_without_repeating_git_work() {
     let projected = service
         .create_goal_summary("Controlled", Some("GOAL1"))
         .unwrap();
+    service
+        .append_goal_round_summary("GOAL1", "Reporter", "Integrate the retained candidate")
+        .unwrap();
     let path = refine_dir.join(&projected.goal.json_path);
     let mut durable: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
     durable["status"] = json!("governance");
@@ -152,7 +155,7 @@ fn interrupted_integration_releases_reservation_without_repeating_git_work() {
             .as_array()
             .unwrap()
             .len(),
-        1
+        2
     );
     fs::remove_dir_all(root).unwrap();
 }
@@ -174,7 +177,7 @@ fn forced_integration_rejects_missing_inputs_before_recording_a_decision() {
 }
 
 #[test]
-fn failed_attempt_admission_fence_is_cleared_by_an_explicit_new_attempt() {
+fn unresolved_step_outcome_is_superseded_by_explicit_retry_with_evidence_retained() {
     let root = unique_temp_dir("failed-attempt-fence");
     let service = FileWorkItemService::new(root.join(".refine"));
     service
@@ -189,15 +192,39 @@ fn failed_attempt_admission_fence_is_cleared_by_an_explicit_new_attempt() {
         .unwrap();
     let engine =
         crate::application::workflow::WorkflowEngine::with_target_root(root.join("runtime"), &root);
-    engine.fence_failed_attempt("GOAL1", authority);
-    assert!(engine.failed_attempt_is_fenced("GOAL1", &service.show_goal_detail("GOAL1").unwrap()));
+    let directory = root.join("runtime/workflow-failures");
+    fs::create_dir_all(&directory).unwrap();
+    let evidence = json!({"goal_id":"GOAL1", "target_root": root, "round_idx":authority.round_idx,
+        "generation":authority.generation, "workflow_revision":authority.workflow_revision,
+        "original_error":"provider failed", "settlement":{"unpersisted_evidence":"Goal write unavailable"}});
+    let path = directory.join("retained.json");
+    fs::write(&path, serde_json::to_vec(&evidence).unwrap()).unwrap();
+    assert!(
+        engine
+            .unresolved_workflow_outcome("GOAL1", &service.show_goal_detail("GOAL1").unwrap())
+            .unwrap()
+            .is_some()
+    );
     service
         .control_workflow(
             "GOAL1",
             &decision(&service, GoalStatus::Todo, "explicit-retry"),
         )
         .unwrap();
-    assert!(!engine.failed_attempt_is_fenced("GOAL1", &service.show_goal_detail("GOAL1").unwrap()));
+    assert!(
+        engine
+            .unresolved_workflow_outcome("GOAL1", &service.show_goal_detail("GOAL1").unwrap())
+            .unwrap()
+            .is_none()
+    );
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&fs::read(&path).unwrap()).unwrap(),
+        evidence
+    );
+    assert_eq!(
+        service.show_goal_detail("GOAL1").unwrap()["rounds"][0]["workflow_attempt_authority"]["generation"],
+        authority.generation
+    );
     assert_eq!(
         service.show_goal_detail("GOAL1").unwrap()["rounds"][0]["prior_attempts"]
             .as_array()

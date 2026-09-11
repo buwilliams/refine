@@ -11,7 +11,7 @@
 
 use super::*;
 
-use crate::application::work_items::WorkflowAttemptAuthority;
+use crate::application::work_items::WorkflowStepAuthority;
 use crate::application::workflow::engine::behaviors::contract::WorkflowAdvanceOutcome;
 use crate::application::workflow::engine::behaviors::refresh_candidate_at_quality_boundary;
 use crate::application::workflow::engine::context::WorkflowContext;
@@ -183,11 +183,11 @@ impl BoundaryFixture {
             .unwrap();
     }
 
-    fn claim(&self) -> WorkflowAttemptAuthority {
+    fn claim(&self) -> WorkflowStepAuthority {
         self.claim_at(GoalStatus::Quality)
     }
 
-    fn claim_at(&self, status: GoalStatus) -> WorkflowAttemptAuthority {
+    fn claim_at(&self, status: GoalStatus) -> WorkflowStepAuthority {
         let (round_idx, revision, request) =
             self.work_items.authored_goal_commitment(GOAL).unwrap();
         self.work_items
@@ -195,15 +195,11 @@ impl BoundaryFixture {
             .unwrap()
     }
 
-    fn context(&self, authority: WorkflowAttemptAuthority) -> WorkflowContext<'_> {
+    fn context(&self, authority: WorkflowStepAuthority) -> WorkflowContext<'_> {
         self.context_at(authority, &self.candidate)
     }
 
-    fn context_at(
-        &self,
-        authority: WorkflowAttemptAuthority,
-        candidate: &str,
-    ) -> WorkflowContext<'_> {
+    fn context_at(&self, authority: WorkflowStepAuthority, candidate: &str) -> WorkflowContext<'_> {
         let mut context = WorkflowContext::new(
             &self.runtime_root,
             &self.target_root,

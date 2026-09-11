@@ -318,7 +318,16 @@ fn force_stop_after_claim_in_todo_preserves_the_unstarted_attempt() {
 
     drop(fixture.claim(GoalStatus::Todo));
 
-    fixture.assert_restart_preserves_evidence_without_relaunch();
+    let before = fixture.detail();
+    let engine = WorkflowEngine::with_target_root(&fixture.runtime_root, &fixture.target_root);
+    assert_eq!(
+        engine
+            .recover_interrupted_goals("worker replaced before work")
+            .unwrap(),
+        0
+    );
+    assert_eq!(fixture.detail(), before);
+    assert!(!fixture.worktree.exists());
 }
 
 /// Disruption point: after the Todo → Plan transition and worktree
@@ -434,8 +443,7 @@ fn force_stop_after_plan_before_implement_reuses_the_final_plan() {
 
 /// Disruption point: mid-implement — the durable phase is `implement`, the
 /// worktree is present with the dead agent's uncommitted half-done edit.
-/// REDO: the implementation runs over; the worktree contents are absorbed
-/// into the redone candidate.
+/// Recovery retains the worktree and enters Failed; another attempt requires a decision.
 #[test]
 fn force_stop_mid_implement_with_worktree_preserves_partial_implementation() {
     let fixture = DisruptionFixture::new("disruption-implement-mid");
@@ -446,8 +454,9 @@ fn force_stop_mid_implement_with_worktree_preserves_partial_implementation() {
 
     fixture.enter_plan_with_worktree();
     fixture.seed_agent_context();
-    let ctx = fixture.run_real_planning();
-    fixture.advance(GoalStatus::Implement);
+    let mut ctx = fixture.run_real_planning();
+    ctx.request_transition(GoalStatus::Plan, GoalStatus::Implement)
+        .unwrap();
     begin_implementation_phase(&ctx).unwrap();
     drop(ctx);
     // The dead agent's half-finished tracked edit, never committed.
@@ -460,9 +469,8 @@ fn force_stop_mid_implement_with_worktree_preserves_partial_implementation() {
 }
 
 /// Disruption point: the implementation committed its candidate and recorded
-/// it on the Goal, but the Implement → Quality transition was lost. REDO: the
-/// step re-enters Implement and does the work over on top of the preserved
-/// candidate commit.
+/// it on the Goal, but the Implement → Quality transition was lost. Recovery
+/// retains the candidate without repeating implementation.
 #[test]
 fn force_stop_after_implement_commit_before_quality_preserves_the_candidate() {
     let fixture = DisruptionFixture::new("disruption-implement-committed");
@@ -473,8 +481,9 @@ fn force_stop_after_implement_commit_before_quality_preserves_the_candidate() {
 
     fixture.enter_plan_with_worktree();
     fixture.seed_agent_context();
-    let ctx = fixture.run_real_planning();
-    fixture.advance(GoalStatus::Implement);
+    let mut ctx = fixture.run_real_planning();
+    ctx.request_transition(GoalStatus::Plan, GoalStatus::Implement)
+        .unwrap();
     begin_implementation_phase(&ctx).unwrap();
     complete_implementation_planning(
         &ctx,

@@ -1,6 +1,6 @@
 use super::*;
 
-use crate::application::work_items::WorkflowAttemptAuthority;
+use crate::application::work_items::WorkflowStepAuthority;
 use crate::application::workflow::engine::context::WorkflowContext;
 use crate::infrastructure::git::worktrees::{FileGitWorktreeService, GitWorktreeService};
 
@@ -13,7 +13,7 @@ struct RefreshFixture {
     base: String,
     candidate: String,
     target: String,
-    authority: WorkflowAttemptAuthority,
+    authority: WorkflowStepAuthority,
 }
 
 impl RefreshFixture {
@@ -204,7 +204,7 @@ fn attempt_concurrent_refresh(
     worktree: PathBuf,
     work_items: FileWorkItemService,
     candidate: String,
-    authority: WorkflowAttemptAuthority,
+    authority: WorkflowStepAuthority,
     barrier: std::sync::Arc<std::sync::Barrier>,
 ) -> RefineResult<CandidateRefreshOutcome> {
     let mut context = WorkflowContext::new(

@@ -36,6 +36,58 @@ fn fixture(name: &str, count: usize) -> (PathBuf, WorkflowEngine, FileWorkItemSe
 }
 
 #[test]
+fn explicit_new_round_is_admitted_in_the_same_pass_after_a_superseded_failure() {
+    let (root, workflow, items) = fixture("superseded-occurrence-admission", 1);
+    let records = items.clone();
+    let executions = Arc::new(AtomicUsize::new(0));
+    let observed = executions.clone();
+    test_hooks::install(
+        &workflow.runtime_root,
+        Arc::new(move |_, goal, stage, _| {
+            if stage != "executing" {
+                return Ok(());
+            }
+            let attempt = observed.fetch_add(1, Ordering::SeqCst);
+            if attempt == 0 {
+                let current = records.show_goal_detail(goal)?;
+                records.control_workflow(
+                    goal,
+                    &crate::application::work_items::WorkflowControl {
+                        to: GoalStatus::Plan,
+                        reason: "Explicit replacement Round".into(),
+                        context: "Preserve prior evidence".into(),
+                        expected_revision: current["workflow_revision"].as_u64().unwrap(),
+                        request_id: "replace-once".into(),
+                        actor: "Operator".into(),
+                        force: false,
+                        invocation_id: None,
+                    },
+                )?;
+                Err(RefineError::Conflict("old attempt returned late".into()))
+            } else {
+                assert_eq!(
+                    attempt, 1,
+                    "a failed replacement must not retry automatically"
+                );
+                Err(RefineError::Conflict("replacement failure is final".into()))
+            }
+        }),
+    );
+    assert!(workflow.execute_work().is_err());
+    assert_eq!(executions.load(Ordering::SeqCst), 2);
+    let goal = items.show_goal_detail("GOAL1").unwrap();
+    assert_eq!(goal["rounds"].as_array().unwrap().len(), 2);
+    assert!(goal["rounds"][0]["workflow_attempt_authority"].is_object());
+    assert_eq!(
+        goal["rounds"][1]["failure_message"],
+        "replacement failure is final"
+    );
+    assert_eq!(goal["status"], "failed");
+    test_hooks::remove(&workflow.runtime_root);
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
 fn superseded_failure_preserves_new_intent_and_admits_followup_within_poll() {
     let (root, workflow, items) = fixture("superseded-loop", 2);
     let ended = Arc::new(Mutex::new(None));
@@ -46,6 +98,13 @@ fn superseded_failure_preserves_new_intent_and_admits_followup_within_poll() {
     test_hooks::install(
         &workflow.runtime_root,
         Arc::new(move |engine, goal, stage, _| {
+            if goal == "GOAL1" && stage == "before_claim" && end_clock.lock().unwrap().is_some() {
+                // Isolate old-result settlement from executing the explicitly reopened
+                // Goal; the separate same-pass admission regression exercises that work.
+                return Err(RefineError::Degraded(
+                    "Reopened occurrence held for inspection".into(),
+                ));
+            }
             if stage == "executing" {
                 assert_eq!(
                     records.show_goal_summary(goal)?.goal.status,

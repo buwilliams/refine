@@ -19,7 +19,17 @@ impl FileWorkItemService {
                 "Event transition was superseded".into(),
             ));
         }
-        let stale = pending["revision"] != value["workflow_revision"];
+        // The requested Goal snapshot also retains its record CAS precondition;
+        // occurrence authority alone must not overwrite intervening metadata.
+        let stale = pending["revision"] != value["workflow_revision"]
+            || pending["generation"].as_u64().map_or(
+                pending["revision"] != value["workflow_revision"],
+                |generation| {
+                    generation != value["event_generation"].as_u64().unwrap_or(0)
+                        || pending["node_id"] != value["node_id"]
+                        || pending["candidate_commit"] != value["candidate_commit"]
+                },
+            );
         if failed || stale {
             value["pending_event_transition"]["state"] =
                 json!(if stale { "superseded" } else { "failed" });
@@ -63,7 +73,7 @@ impl FileWorkItemService {
     pub fn retry_goal_quality_summary(&self, goal_id: &str) -> RefineResult<GoalSummaryProjection> {
         let current = self.show_goal_summary(goal_id)?;
         validate_goal_operation(&current.goal.status, &GoalOperation::RetryQuality)?;
-        self.set_goal_status_unchecked(goal_id, &GoalStatus::Quality)?;
+        self.retry_workflow_step(goal_id, GoalStatus::Quality)?;
         self.show_goal_summary(goal_id)
     }
 
@@ -73,8 +83,34 @@ impl FileWorkItemService {
     ) -> RefineResult<GoalSummaryProjection> {
         let current = self.show_goal_summary(goal_id)?;
         validate_goal_operation(&current.goal.status, &GoalOperation::RetryGovernance)?;
-        self.set_goal_status_unchecked(goal_id, &GoalStatus::Governance)?;
+        self.retry_workflow_step(goal_id, GoalStatus::Governance)?;
         self.show_goal_summary(goal_id)
+    }
+
+    fn retry_workflow_step(&self, goal_id: &str, status: GoalStatus) -> RefineResult<()> {
+        let (_lock, path, mut value) = self.read_goal_value(goal_id)?;
+        let from = workflow_attempts::goal_status(
+            value
+                .as_object()
+                .ok_or_else(|| RefineError::Serialization("Invalid Goal".into()))?,
+        );
+        validate_goal_operation(
+            &from,
+            &if status == GoalStatus::Quality {
+                GoalOperation::RetryQuality
+            } else {
+                GoalOperation::RetryGovernance
+            },
+        )?;
+        value.as_object_mut().unwrap().entry("workflow_controls").or_insert(json!([])).as_array_mut()
+            .ok_or_else(|| RefineError::Serialization("Invalid workflow controls".into()))?.push(json!({
+                "request_id": uuid::Uuid::new_v4().to_string(), "from": from, "to": status,
+                "reason": "Explicit step retry", "actor": "operator", "at": now_timestamp(), "forced": false
+            }));
+        if let Some(round) = value["rounds"].as_array_mut().and_then(|r| r.last_mut()) {
+            archive_round_for_retry(round, &status)?;
+        }
+        self.write_goal_status_value(&path, &mut value, &status)
     }
 
     pub fn undo_goal_summary(&self, goal_id: &str) -> RefineResult<GoalSummaryProjection> {
@@ -274,9 +310,6 @@ impl FileWorkItemService {
         );
         if target != GoalStatus::Failed {
             clear_latest_round_failure(object);
-        }
-        if !is_automated_status(&target) {
-            clear_latest_round_workflow_attempt(object);
         }
         object.insert("updated".to_string(), Value::String(now_timestamp()));
 

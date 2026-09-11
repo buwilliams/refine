@@ -13,7 +13,7 @@ Plan turns an actionable Round into an inspectable implementation strategy. It m
 
 ## Expected Role
 
-After Todo admission, Workflow pins the Goal, Round, attempt authority, and Git base. `workflow.plan.enter` launches its applicable Skills. Refine supplies each Plan Skill's result contract and collects every accepted plan; no fixed proposal, criticism, revision, or advisory Governance agent sequence is imposed.
+After Todo admission, Workflow pins the Goal, Round, authorized step occurrence, and Git base. `workflow.plan.enter` launches its applicable Skills. Refine supplies each Plan Skill's result contract and collects every accepted plan; no fixed proposal, criticism, revision, or advisory Governance agent sequence is imposed.
 
 A Plan Skill must leave the repository unchanged and return an actionable checklist. Invalid responses emit Plan Error with raw output, diagnostics, and process receipts retained. Refine does not repair the report or repeat the failed work. A blocked or invalid Plan result cannot advance Implement. Infrastructure, authority, and contract failures remain distinct from a Governance finding.
 

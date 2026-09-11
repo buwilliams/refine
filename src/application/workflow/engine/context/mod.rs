@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use serde_json::json;
 
-use crate::application::work_items::{FileWorkItemService, WorkflowAttemptAuthority};
+use crate::application::work_items::{FileWorkItemService, WorkflowStepAuthority};
 use crate::application::workflow::phases::quality::QualityCheckRequest;
 use crate::error::{RefineError, RefineResult};
 use crate::infrastructure::git::worktrees::MergeResult;
@@ -25,7 +25,7 @@ pub struct WorkflowContext<'a> {
     pub node_id: String,
     pub provider: String,
     pub round_idx: usize,
-    pub(crate) attempt_authority: WorkflowAttemptAuthority,
+    pub(crate) attempt_authority: WorkflowStepAuthority,
     pub settings: JsonObject,
     pub work_items: FileWorkItemService,
     pub branch: Option<String>,
@@ -69,10 +69,11 @@ impl<'a> WorkflowContext<'a> {
         node_id: String,
         provider: String,
         round_idx: usize,
-        attempt_authority: WorkflowAttemptAuthority,
+        attempt_authority: WorkflowStepAuthority,
         settings: JsonObject,
-        work_items: FileWorkItemService,
+        mut work_items: FileWorkItemService,
     ) -> Self {
+        work_items.bind_workflow_occurrence(&goal_id, attempt_authority);
         Self {
             runtime_root,
             target_root,
@@ -127,12 +128,14 @@ impl<'a> WorkflowContext<'a> {
                 to.as_str()
             )));
         }
-        self.work_items.advance_claimed_goal_status(
+        self.attempt_authority = self.work_items.advance_claimed_goal_status(
             &self.goal_id,
             self.attempt_authority,
             from.clone(),
             to.clone(),
         )?;
+        self.work_items
+            .bind_workflow_occurrence(&self.goal_id, self.attempt_authority);
         self.log(
             "state",
             &format!(
@@ -195,6 +198,10 @@ impl<'a> WorkflowContext<'a> {
         );
         metadata.insert("node_id".to_string(), json!(&self.node_id));
         metadata.insert("provider".to_string(), json!(&self.provider));
+        metadata.insert(
+            "workflow_step_generation".to_string(),
+            json!(self.attempt_authority.generation),
+        );
         metadata.insert(
             "workflow_revision".to_string(),
             json!(self.attempt_authority.workflow_revision),

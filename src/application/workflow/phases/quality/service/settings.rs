@@ -239,9 +239,10 @@ impl FileQualityService {
                 FileWorkItemService::for_node(&self.refine_dir, &request.node_id)
                     .verify_workflow_attempt(
                         &request.owner_id,
-                        WorkflowAttemptAuthority {
+                        WorkflowStepAuthority {
                             round_idx: request.round_idx,
                             workflow_revision,
+                            generation: request.process_metadata.get("workflow_step_generation").and_then(Value::as_u64).ok_or_else(|| RefineError::Degraded("Quality is missing its authorized step occurrence; inspect retained evidence".into()))?,
                         },
                         workflow_state,
                         &request.node_id,

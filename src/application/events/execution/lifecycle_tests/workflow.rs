@@ -105,9 +105,9 @@ fn authored_todo_start_runs_lifecycle_skills_before_materializing_the_implementa
 }
 
 #[test]
-fn claimed_todo_lifecycle_rechecks_superseded_claims_and_cancellation_on_resume() {
+fn todo_lifecycle_rechecks_superseded_occurrences_and_cancellation_on_resume() {
     for completed in [false, true] {
-        for change in ["claim", "cancel"] {
+        for change in ["retry", "cancel"] {
             let f = Fixture::new();
             let _smoke = SmokeSkill::install(&f.service, &f.temp);
             f.gate("workflow.todo.exit", BindingMode::Blocking);
@@ -149,12 +149,22 @@ fn claimed_todo_lifecycle_rechecks_superseded_claims_and_cancellation_on_resume(
             if change == "cancel" {
                 f.work().cancel_goal_summary("FRESH").unwrap();
             } else {
-                let summary = f.work().show_goal_summary("FRESH").unwrap();
-                let path = f.service.refine_dir.join(summary.goal.json_path);
-                let mut goal: Value = read_json(&path).unwrap();
-                goal["rounds"][0]["workflow_attempt_authority"]["workflow_revision"] =
-                    json!(revision + 1);
-                write_json(&path, &goal).unwrap();
+                let goal = f.work().show_goal_detail("FRESH").unwrap();
+                f.work()
+                    .control_workflow(
+                        "FRESH",
+                        &crate::application::work_items::WorkflowControl {
+                            to: GoalStatus::Todo,
+                            reason: "Explicit same-step retry".into(),
+                            context: String::new(),
+                            expected_revision: goal["workflow_revision"].as_u64().unwrap(),
+                            request_id: "retry-todo".into(),
+                            actor: "Operator".into(),
+                            force: false,
+                            invocation_id: None,
+                        },
+                    )
+                    .unwrap();
             }
             let restarted =
                 FileEventService::with_runtime_root(&f.service.refine_dir, f.temp.join("runtime"));

@@ -37,7 +37,7 @@ fn result_construction_fault_and_panic_settle_without_overwriting_newer_intent()
         let authority = items
             .claim_workflow_attempt("GOAL1", GoalStatus::Todo, round, revision, &request)
             .unwrap();
-        items
+        let authority = items
             .advance_claimed_goal_status("GOAL1", authority, GoalStatus::Todo, GoalStatus::Plan)
             .unwrap();
         let context = WorkflowContext::new(

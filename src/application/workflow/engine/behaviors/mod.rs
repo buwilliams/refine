@@ -102,6 +102,7 @@ impl WorkflowBehavior for WorkflowTodo {
     }
 
     fn advance(&self, ctx: &mut WorkflowContext<'_>) -> RefineResult<WorkflowAdvanceOutcome> {
+        ctx.revalidate_authority(GoalStatus::Todo)?;
         let app_git = FileGitWorktreeService::with_runtime_root(ctx.target_root, ctx.runtime_root);
         if let Some(outcome) = prepare_already_merged_reconciliation(ctx, &app_git)? {
             return Ok(outcome);
@@ -432,6 +433,7 @@ fn materialize_plan_worktree(
     )?;
     let worktree_target = app_git.managed_worktree_path(branch)?;
     with_repository_git_lock(ctx.target_root, || {
+        ctx.revalidate_authority(GoalStatus::Plan)?;
         // The branch is born at the recorded base, never at the shared checkout's
         // HEAD: a human sitting on any branch other than the merge target used to
         // decide where every Round branch started, which made the recorded base a

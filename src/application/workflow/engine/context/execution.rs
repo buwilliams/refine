@@ -26,6 +26,8 @@ pub(crate) fn hydrate_retry_context(
     ctx: &mut WorkflowContext<'_>,
     current: GoalStatus,
 ) -> RefineResult<()> {
+    ctx.revalidate_authority(current.clone())?;
+    ctx.start_status = current.clone();
     let detail = ctx.work_items.show_goal_detail(&ctx.goal_id)?;
     let branch = required_workflow_string(&detail, "branch_name", &ctx.goal_id)?;
     let candidate = required_workflow_string(&detail, "candidate_commit", &ctx.goal_id)?;
@@ -95,6 +97,7 @@ pub(crate) fn hydrate_retry_context(
     {
         let app_git = FileGitWorktreeService::with_runtime_root(ctx.target_root, ctx.runtime_root);
         let detected = with_repository_git_lock(ctx.target_root, || {
+            ctx.revalidate_authority(current.clone())?;
             let target_commit = app_git.resolve_commit(&integration.target_branch)?;
             if !app_git.commit_is_ancestor(&integration.candidate_commit, &target_commit)? {
                 return Ok(None);
@@ -251,6 +254,7 @@ fn ensure_resumed_candidate_worktree(
         .and_then(|operation| operation.request.get("base_commit").and_then(Value::as_str))
         .unwrap_or(base);
     let (worktree, handoff) = with_repository_git_lock(ctx.target_root, || {
+        ctx.revalidate_authority(ctx.start_status.clone())?;
         let worktree = match git.resolve_commit(&format!("refs/heads/{branch}")) {
             Ok(tip) => {
                 if tip != candidate && !matches!(git.commit_is_ancestor(candidate, &tip), Ok(true))
@@ -323,6 +327,14 @@ pub(crate) fn hydrate_plan_or_implement_context(
     branch_pattern: &str,
     target_branch: &str,
 ) -> RefineResult<()> {
+    let observed_status = ctx.work_items.show_goal_summary(&ctx.goal_id)?.goal.status;
+    if !matches!(observed_status, GoalStatus::Plan | GoalStatus::Implement) {
+        return Err(RefineError::Conflict(
+            "Current workflow step does not authorize an implementation workspace".into(),
+        ));
+    }
+    ctx.revalidate_authority(observed_status.clone())?;
+    ctx.start_status = observed_status;
     let detail = ctx.work_items.show_goal_detail(&ctx.goal_id)?;
     let branch = detail
         .get("branch_name")
@@ -348,6 +360,7 @@ pub(crate) fn hydrate_plan_or_implement_context(
         .unwrap_or(git.resolve_commit(target_branch)?);
     let worktree_target = git.managed_worktree_path(&branch)?;
     let (worktree, handoff) = with_repository_git_lock(ctx.target_root, || {
+        ctx.revalidate_authority(ctx.start_status.clone())?;
         // Resumption recreates the branch only when it is gone, and then at the
         // Goal's recorded base rather than at the shared checkout's HEAD — the same
         // birth rule the first materialization follows. An existing branch is reused

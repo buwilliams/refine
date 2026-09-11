@@ -1,21 +1,21 @@
 use crate::application::work_items::{
-    FailureSettlement, FileWorkItemService, WorkflowAttemptAuthority,
+    FailureSettlement, FileWorkItemService, WorkflowStepAuthority,
 };
 use crate::application::workflow::{WorkflowEngine, now_timestamp};
 use crate::error::RefineError;
 use crate::infrastructure::process::supervisor::coordination::with_lock_timeout;
 use std::time::Duration;
 mod evidence;
+mod unresolved;
 
 impl WorkflowEngine {
     pub(crate) fn settle_goal_failure(
         &self,
         goal_id: &str,
-        authority: WorkflowAttemptAuthority,
+        authority: WorkflowStepAuthority,
         failure_stage: &str,
         error: &RefineError,
     ) -> FailureSettlement {
-        self.fence_failed_attempt(goal_id, authority);
         let evidence = evidence::OriginatingFailure::new(goal_id, authority, failure_stage, error);
         let outcome = evidence::contain("settlement", || {
             self.persist_goal_failure(&evidence, authority)
@@ -27,7 +27,7 @@ impl WorkflowEngine {
     fn persist_goal_failure(
         &self,
         evidence: &evidence::OriginatingFailure,
-        authority: WorkflowAttemptAuthority,
+        authority: WorkflowStepAuthority,
     ) -> FailureSettlement {
         let mut outcome = FailureSettlement::UnpersistedEvidence("settlement did not run".into());
         for attempt in 0..3 {

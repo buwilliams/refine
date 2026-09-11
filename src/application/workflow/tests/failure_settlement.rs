@@ -1,5 +1,5 @@
 use super::*;
-use crate::application::work_items::{BulkGoalSelection, BulkGoalUpdate, WorkflowAttemptAuthority};
+use crate::application::work_items::{BulkGoalSelection, BulkGoalUpdate, WorkflowStepAuthority};
 
 #[test]
 fn authoritative_failure_atomically_fails_goal_and_its_originating_round() {
@@ -137,22 +137,21 @@ fn prepare_todo_goal(work_items: &FileWorkItemService, goal_id: &str) {
         .unwrap();
 }
 
-fn claim_and_start(work_items: &FileWorkItemService, goal_id: &str) -> WorkflowAttemptAuthority {
+fn claim_and_start(work_items: &FileWorkItemService, goal_id: &str) -> WorkflowStepAuthority {
     let (round_idx, revision, request) = work_items.authored_goal_commitment(goal_id).unwrap();
     let authority = work_items
         .claim_workflow_attempt(goal_id, GoalStatus::Todo, round_idx, revision, &request)
         .unwrap();
     work_items
         .advance_claimed_goal_status(goal_id, authority, GoalStatus::Todo, GoalStatus::Plan)
-        .unwrap();
-    authority
+        .unwrap()
 }
 
 fn assert_active_replacement_is_clean(
     work_items: &FileWorkItemService,
     goal_id: &str,
     round_idx: usize,
-    authority: WorkflowAttemptAuthority,
+    authority: WorkflowStepAuthority,
 ) {
     let summary = work_items.show_goal_summary(goal_id).unwrap();
     let detail = work_items.show_goal_detail(goal_id).unwrap();
@@ -174,7 +173,7 @@ fn assert_active_replacement_is_clean(
 fn failure_evidence(
     workflow: &WorkflowEngine,
     goal: &str,
-    authority: WorkflowAttemptAuthority,
+    authority: WorkflowStepAuthority,
 ) -> serde_json::Value {
     let evidence = fs::read_dir(workflow.runtime_root.join("workflow-failures"))
         .unwrap()

@@ -273,6 +273,7 @@ impl QualityOperationRunner {
                 "managed_worktree": request.process_metadata.get("managed_worktree"),
                 "managed_worktree": &request.process_metadata["managed_worktree"],
                 "workflow_revision": request.process_metadata.get("workflow_revision"),
+                "workflow_step_generation": request.process_metadata.get("workflow_step_generation"),
                 "quality_proof_mode": request.process_metadata.get("quality_proof_mode"),
                 "target_root": self.target_root.display().to_string(),
                 "refine_dir": self.refine_dir.display().to_string(),
@@ -319,9 +320,10 @@ fn verify_quality_workflow_authority(
         })?;
     work_items.verify_workflow_attempt(
         goal_id,
-        WorkflowAttemptAuthority {
+        WorkflowStepAuthority {
             round_idx,
             workflow_revision,
+            generation: metadata.get("workflow_step_generation").and_then(Value::as_u64).ok_or_else(|| RefineError::Degraded("Quality is missing its authorized step occurrence; inspect retained evidence".into()))?,
         },
         status,
         node_id,
