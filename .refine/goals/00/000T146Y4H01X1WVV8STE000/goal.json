@@ -1,6 +1,6 @@
 {
   "created": "2026-09-11T14:27:52Z",
-  "event_generation": 18,
+  "event_generation": 19,
   "feature_id": null,
   "feature_order": null,
   "id": "00000T146Y4H01X1WVV8STE000",
@@ -11,9 +11,10 @@
   "reporter": "Buddy Williams",
   "round_edit_revision": 59,
   "rounds": [],
-  "status": "backlog",
+  "status": "failed",
   "target_branch": "main",
-  "updated": "2026-09-12T11:31:08Z",
+  "updated": "2026-09-12T11:32:11Z",
+  "workflow_context": "",
   "workflow_controls": [
     {
       "at": "2026-09-12T11:30:16Z",
@@ -47,6 +48,33 @@
       },
       "request_id": "b3a15f68-e330-4b64-9c1e-98af6f3047f2",
       "to": "backlog"
+    },
+    {
+      "at": "2026-09-12T11:32:11Z",
+      "forced": true,
+      "from": "backlog",
+      "integration_performed": false,
+      "integration_requested": false,
+      "overridden_requirements": [
+        "transition_policy",
+        "workflow_evidence_gates"
+      ],
+      "previous_attempt": null,
+      "request": {
+        "actor": "Buddy Williams",
+        "context": "",
+        "expected_revision": 59,
+        "force": true,
+        "invocation_id": null,
+        "reason": "User selected workflow step",
+        "request_id": "item-95c9d9d8-35f5-47b1-8641-bd5b65e7cb42",
+        "to": "failed"
+      },
+      "request_id": "item-95c9d9d8-35f5-47b1-8641-bd5b65e7cb42",
+      "retained_candidate": null,
+      "source_round": 0,
+      "stopped_processes": [],
+      "to": "failed"
     }
   ],
   "workflow_events": [
@@ -108,7 +136,17 @@
       "round_idx": null,
       "to": "backlog",
       "workflow_revision": 59
+    },
+    {
+      "at": "2026-09-12T11:32:11.691483723+00:00",
+      "forced": true,
+      "from": "backlog",
+      "generation": 19,
+      "node_id": "default",
+      "round_idx": null,
+      "to": "failed",
+      "workflow_revision": 60
     }
   ],
-  "workflow_revision": 59
+  "workflow_revision": 60
 }
