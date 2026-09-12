@@ -1,6 +1,6 @@
 {
   "created": "2026-09-11T14:27:52Z",
-  "event_generation": 17,
+  "event_generation": 18,
   "feature_id": null,
   "feature_order": null,
   "id": "00000T146Y4H01X1WVV8STE000",
@@ -9,554 +9,11 @@
   "notes": [],
   "priority": "low",
   "reporter": "Buddy Williams",
-  "round_edit_revision": 58,
-  "rounds": [
-    {
-      "agent_context": {
-        "assembled_at": "2026-09-11T14:27:55Z",
-        "current_round": {
-          "assignee": "Buddy Williams",
-          "prompt": "For the web UI surface, create two new main nav right-aligned dropdown buttons, one for Skills and one for Sites. The right-aligned button order should be Skills, Sites, Settings, and New Goal. Yes, that is a rename of Controls to Settings. Move the menus from Settings (formerly Controls) to the appropriate new menu for Sites and Skills. Add a separator to the new menus for New Skill, New Site, Manage Skills, and Manage Sites. Ensure you use the standardized styles and layout we already have in the app.",
-          "reporter": "Buddy Williams",
-          "round": 1
-        },
-        "goal": {
-          "assignee": "Buddy Williams",
-          "id": "00000T146Y4H01X1WVV8STE000",
-          "name": "For the web UI surface, create two new main nav right-aligned dropdown buttons",
-          "node_id": "default",
-          "priority": "low",
-          "reporter": "Buddy Williams"
-        },
-        "governance": {
-          "configured": false,
-          "constitution": "",
-          "product": "",
-          "rules": []
-        },
-        "guidance_candidates": [],
-        "previous_rounds": [],
-        "version": 1,
-        "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
-      },
-      "assignee": "Buddy Williams",
-      "constitution_state": "unclassified",
-      "created": "2026-09-11T14:27:52Z",
-      "event_configuration": {
-        "events": {
-          "workflow.implement.enter": {
-            "bindings": [
-              {
-                "enabled": true,
-                "id": "default-implement",
-                "inputs": {},
-                "mode": "blocking",
-                "order": 0,
-                "overrides": null,
-                "scope": {
-                  "node_id": null
-                },
-                "skill_id": "default-implement"
-              }
-            ],
-            "enabled": true,
-            "id": "workflow.implement.enter",
-            "kind": "system",
-            "name": "Workflow Implement Enter",
-            "on_success": null,
-            "parameters": [],
-            "scope": {
-              "node_id": null
-            },
-            "source": "workflow.implement.enter"
-          }
-        },
-        "revision": 37,
-        "schema_version": 2,
-        "skills": {
-          "default-implement": {
-            "enabled": true,
-            "id": "default-implement",
-            "name": "Implement",
-            "parameters": [],
-            "prompt": "## Implementation\n\nImplement the current Goal Round using all accepted plans and attached Skills. Inspect existing code, make the complete change, run appropriate verification, and report evidence for each checklist item. Check the plan's assumptions against the code and keep policy in its shared owner. Prefer one correction that explains the affected behavior over separate fixes at each failing call site. Report evidence-backed plan deviations within the Goal's scope and existing authority. Preserve unrelated changes and historical evidence.\n\n### Intent and architecture\n\nReview Refine's relevant documentation files under Refine's runtime at `<refine-runtime>/docs/intent/***/*.*` as the durable product specification.\n\n### Semantic code organization\n\nKeep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.\n",
-            "provenance": "refine-default-v1",
-            "role": "task",
-            "scope": {
-              "node_id": null
-            }
-          }
-        }
-      },
-      "event_results": {
-        "641370ca71fa33302e806750884d09c42faad3a50771287bcd10cd204fd0b0a6": {
-          "candidate_commit": null,
-          "results": {
-            "default-plan": {
-              "artifacts": {
-                "plan": {
-                  "checklist": [
-                    {
-                      "description": "Establish the navigation contract: the cause is that independent Skill and Site entry points are grouped inside Controls. The browser shell owns their placement and shared dropdown behavior; settings_skills.js and knowledge-hub.js already own their lists and actions. Preserve those owners and existing application capabilities. Update the checkout's navigation, Skills, and Knowledge Hub intent docs to describe the requested arrangement.",
-                      "id": "P1"
-                    },
-                    {
-                      "description": "Update src/surfaces/web/static/index.html so the right-aligned actions appear in order: Skills, Sites, Settings, New Goal. Move the existing Skill and Site containers into their respective dropdowns. Rename the Controls button and accessible label to Settings. Reuse shared summary, panel, icon, and menu-row styles from css/base.css; preserve the remaining settings controls and New Goal's related creation actions.",
-                      "id": "P2"
-                    },
-                    {
-                      "description": "Update settings_skills.js and knowledge-hub.js to show existing entries followed by a separator and an action group: New Skill then Manage Skills, or New Site then Manage Sites. New actions open the existing creation modals; management links navigate to #/settings/skills and #/settings/knowledge-hub. Keep these actions available with empty lists, and render list failures separately from the action group. Preserve Skill eligibility, input preflight, agent-tab launch, and Site draft/published URL handling.",
-                      "id": "P3"
-                    },
-                    {
-                      "description": "Bind each list's refresh-on-open listener to its new dropdown while retaining existing load, definition-change, and node-context refresh behavior and stale-response guards. Use common.js's shared topbar menu handling for mutual exclusion, action dismissal, outside clicks, and Escape. Extend shared selectors only where needed. Use shared border and spacing tokens for separators, and verify panels remain usable with long lists and narrow viewports.",
-                      "id": "P4"
-                    },
-                    {
-                      "description": "Update user-facing navigation references in Guide, Skill help, reporter onboarding, and toolbar Todo copy to the new locations. Preserve existing route and element identities where practical, including Node and Reporter selectors, so the label change does not break shell integrations.",
-                      "id": "P5"
-                    },
-                    {
-                      "description": "Update src/surfaces/web_server/tests/static_surface/navigation.rs and add focused browser coverage for action order, exclusive list placement, separators, all four create/manage actions, empty and failed lists, refresh after node or definition changes, Skill launch, and Site opening. Exercise keyboard operation, dismissal, light/dark themes, and desktop/narrow layouts. Proposed checks on the implementation derived from pinned base 9c1be94cf6421854a1c6693b7403b57d8f7576b2: cargo run --manifest-path xtask/Cargo.toml -- test-unit; node --test tests/web_topbar_navigation.test.js tests/web_knowledge_hub.test.js tests/web_node_scope_navigation.test.js tests/web_reporter_onboarding.test.js tests/web_theme.test.js. Require browser cases to execute rather than skip, and report failures separately from verified results.",
-                      "id": "P6"
-                    }
-                  ],
-                  "criticism_resolutions": [],
-                  "summary": "Give Skills and Sites dedicated dropdowns, rename Controls to Settings, and reuse the existing navigation styles and capability owners."
-                }
-              },
-              "binding_id": "default-plan",
-              "evidence": [
-                "Observed HEAD at pinned base 9c1be94cf6421854a1c6693b7403b57d8f7576b2; git status --short was empty. No files or Git state were changed.",
-                "Reviewed runtime documentation under /home/buddy/projects/refine/docs/intent: 01-design.md, 05-surfaces/03-browser/02-nav.md, 03-application/01-agents/02-skills.md, and 03-application/09-knowledge-hub.md.",
-                "index.html currently places nav-knowledge-hub and nav-manual-skills inside nav-context-menu, whose visible label is Controls.",
-                "settings_skills.js and knowledge-hub.js already render the lists and creation actions; both refresh on nav-context-menu opening. Skill rendering includes request and node-generation guards.",
-                "common.js owns closeTopbarMenus, outside-click dismissal, and Escape handling; menu-item dismissal currently references nav-context-panel. base.css owns the shared dropdown and management-row styles.",
-                "Existing navigation static assertions require Controls wording. Browser tests use tests/support/web_app.js and can skip when no browser is available. No tests were run during this observational planning invocation."
-              ],
-              "invocation_id": "641370ca71fa33302e806750884d09c42faad3a50771287bcd10cd204fd0b0a6",
-              "outcome": "success",
-              "role": "plan",
-              "summary": "Completed a read-only implementation plan grounded in the pinned source and runtime intent documentation."
-            }
-          },
-          "source": "workflow.plan.enter",
-          "state": "succeeded"
-        },
-        "a1045a028f7809a7047c154e93a2bcae3272ef453403218208d9408ba4972de9": {
-          "candidate_commit": null,
-          "results": {
-            "default-implement": {
-              "artifacts": {
-                "implementation_evidence": {
-                  "checklist": [
-                    {
-                      "evidence": "Reviewed and updated navigation, Skills, and Knowledge Hub intent docs. Preserved shell ownership of navigation and existing capability owners.",
-                      "id": "workflow.plan.enter:default-plan:P1",
-                      "outcome": "completed"
-                    },
-                    {
-                      "evidence": "Actions now appear as Skills, Sites, Settings, New Goal. Browser and Rust assertions verify order and exclusive list placement; existing Settings controls and creation routes remain.",
-                      "id": "workflow.plan.enter:default-plan:P2",
-                      "outcome": "completed"
-                    },
-                    {
-                      "evidence": "Both lists have separators followed by New and Manage actions. Browser checks verify all four actions, empty/failed lists, Skill eligibility and typed launch, and draft/published Site opening.",
-                      "id": "workflow.plan.enter:default-plan:P3",
-                      "outcome": "completed"
-                    },
-                    {
-                      "evidence": "Refresh-on-open targets the new menus. Added missing Hub node-change and mutation refresh hooks and guarded stale failures. Shared dismissal handles all panels. Chromium verified keyboard opening, Escape, outside clicks, mutual exclusion, and long lists at 1440, 800, and 375 pixels in both themes.",
-                      "id": "workflow.plan.enter:default-plan:P4",
-                      "outcome": "completed"
-                    },
-                    {
-                      "evidence": "Updated Guide, Skill help, reporter onboarding, and Todo copy. Preserved Node, Reporter, context-menu, and route identities. Existing onboarding and managed-terminal Skill browser tests pass.",
-                      "id": "workflow.plan.enter:default-plan:P5",
-                      "outcome": "completed"
-                    },
-                    {
-                      "evidence": "Focused JavaScript and static-surface checks pass without browser skips. Full Rust verification exposed seven unresolved failures outside this change; logs preserve exact identities and diagnostics.",
-                      "id": "workflow.plan.enter:default-plan:P6",
-                      "outcome": "failure"
-                    }
-                  ],
-                  "plan_deviations": [
-                    "Expanded the shared topbar wrapping breakpoint to 1100 pixels and removed overflow clipping so the additional buttons and dropdown panels remain usable.",
-                    "Added Hub refresh hooks because node-context and mutation refresh were absent in the existing code."
-                  ],
-                  "verification": [
-                    "NODE_PATH=/tmp/refine-hub-browser/node_modules node --test tests/web_topbar_navigation.test.js tests/web_knowledge_hub.test.js tests/web_node_scope_navigation.test.js tests/web_reporter_onboarding.test.js tests/web_theme.test.js — 40 passed, zero skipped.",
-                    "NODE_PATH=/tmp/refine-hub-browser/node_modules node --test tests/web_topbar_navigation.test.js — final layout rerun: 9 passed, zero skipped.",
-                    "NODE_PATH=/tmp/refine-hub-browser/node_modules node --test --test-name-pattern='Custom Skills open|reporter|dark mode' tests/web_screen_render.test.js — 2 passed, zero skipped.",
-                    "NODE_PATH=/tmp/refine-hub-browser/node_modules node --test --test-name-pattern='Reporter onboarding selects' tests/web_screen_render.test.js — 1 passed, zero skipped.",
-                    "cargo run --manifest-path xtask/Cargo.toml -- test-unit — failed; complete results in /tmp/refine-nav-unit.log.",
-                    "target/debug/deps/refine-319867d7c2fe875c surfaces::web_server::tests::static_surface --test-threads=1 — after CSS correction: 21 passed.",
-                    "cargo fmt --all -- --check; git diff --check; node --check for every changed JavaScript file — passed.",
-                    "Visually inspected /tmp/refine-nav-narrow.png at 375 pixels."
-                  ]
-                }
-              },
-              "binding_id": "default-implement",
-              "evidence": [
-                "Changes remain in the isolated Round worktree. No Goal state changes, merge, or push occurred.",
-                "Full Rust run: 1288 passed, 8 failed, 7 ignored. Corrected the navigation-related CSS formatting failure; all 21 static-surface tests then passed.",
-                "The seven remaining failures concern agent launch, event execution, legacy state synchronization, architecture directories, process capture, process redaction, and Jira retry recovery. Their source areas are unchanged from the pinned base; no separate baseline run was performed.",
-                "Full failure details remain in /tmp/refine-nav-unit.log."
-              ],
-              "invocation_id": "a1045a028f7809a7047c154e93a2bcae3272ef453403218208d9408ba4972de9",
-              "outcome": "failure",
-              "role": "implement",
-              "summary": "Implemented the requested navigation. Focused checks pass; seven full-suite failures remain in unchanged code areas."
-            }
-          },
-          "source": "workflow.implement.enter",
-          "state": "failed"
-        }
-      },
-      "failure_at": "2026-09-11T14:45:04Z",
-      "failure_category": "workflow",
-      "failure_message": "Skill workflow.implement.enter:default-implement failed: Implemented the requested navigation. Focused checks pass; seven full-suite failures remain in unchanged code areas.",
-      "gate_configurations": {
-        "1:default:workflow.backlog.enter": {
-          "events": {
-            "workflow.backlog.enter": {
-              "bindings": [],
-              "enabled": true,
-              "id": "workflow.backlog.enter",
-              "kind": "system",
-              "name": "Workflow Backlog Enter",
-              "on_success": null,
-              "parameters": [],
-              "scope": {
-                "node_id": null
-              },
-              "source": "workflow.backlog.enter"
-            }
-          },
-          "revision": 37,
-          "schema_version": 2,
-          "skills": {}
-        },
-        "2:default:workflow.todo.enter": {
-          "events": {
-            "workflow.todo.enter": {
-              "bindings": [],
-              "enabled": true,
-              "id": "workflow.todo.enter",
-              "kind": "system",
-              "name": "Workflow Todo Enter",
-              "on_success": null,
-              "parameters": [],
-              "scope": {
-                "node_id": null
-              },
-              "source": "workflow.todo.enter"
-            }
-          },
-          "revision": 37,
-          "schema_version": 2,
-          "skills": {}
-        },
-        "2:default:workflow.todo.exit": {
-          "events": {
-            "workflow.todo.exit": {
-              "bindings": [],
-              "enabled": true,
-              "id": "workflow.todo.exit",
-              "kind": "system",
-              "name": "Workflow Todo Exit",
-              "on_success": null,
-              "parameters": [],
-              "scope": {
-                "node_id": null
-              },
-              "source": "workflow.todo.exit"
-            }
-          },
-          "revision": 37,
-          "schema_version": 2,
-          "skills": {}
-        },
-        "2:default:workflow.todo.success": {
-          "events": {},
-          "revision": 37,
-          "schema_version": 2,
-          "skills": {}
-        },
-        "3:default:workflow.plan.enter": {
-          "events": {
-            "workflow.plan.enter": {
-              "bindings": [
-                {
-                  "enabled": true,
-                  "id": "default-plan",
-                  "inputs": {},
-                  "mode": "blocking",
-                  "order": 0,
-                  "overrides": null,
-                  "scope": {
-                    "node_id": null
-                  },
-                  "skill_id": "default-plan"
-                }
-              ],
-              "enabled": true,
-              "id": "workflow.plan.enter",
-              "kind": "system",
-              "name": "Workflow Plan Enter",
-              "on_success": null,
-              "parameters": [],
-              "scope": {
-                "node_id": null
-              },
-              "source": "workflow.plan.enter"
-            }
-          },
-          "revision": 37,
-          "schema_version": 2,
-          "skills": {
-            "default-plan": {
-              "enabled": true,
-              "id": "default-plan",
-              "name": "Plan",
-              "parameters": [],
-              "prompt": "## Plan\n\nProduce a complete, concise implementation plan for the current Goal Round. Choose the planning method appropriate to the work. For behavior changes, identify the underlying cause, governing concept or invariant, and existing owner before listing edits. Prefer strengthening an existing concept; introduce one only when it clarifies the behavior and reduces special cases. Do not change repository files. \n\n### Guidance\n\n- Thrashing is a real danger with AI agents. To mitigate this, consider if the Goal is merely a symptom of a missing or misused concept in the target app architecture. Feel free to explore other Goals to determine if they have additional insights into this question.\n- Over- or under-specificity can also cause undesirable implementation outcomes. Ensure that the plan has the information it needs for effective implementation, but not unnecessary details.\n- Always use plain language.\n\n### Format\n\nReturn an actionable plan with stable checklist IDs and meaningful verification.\n\nExample:\nTask #1 - short description of the work (what) and the rationale (why)\nTask #2 - short description of the work (what) and the rationale (why)\n(etc.)\n\n### Intent and architecture\n\nReview Refine's relevant documentation files under Refine's runtime at `<refine-runtime>/docs/intent/***/*.*` as the durable product specification.",
-              "provenance": "refine-default-v1",
-              "role": "task",
-              "scope": {
-                "node_id": null
-              }
-            }
-          }
-        },
-        "3:default:workflow.plan.exit": {
-          "events": {
-            "workflow.plan.exit": {
-              "bindings": [],
-              "enabled": true,
-              "id": "workflow.plan.exit",
-              "kind": "system",
-              "name": "Workflow Plan Exit",
-              "on_success": null,
-              "parameters": [],
-              "scope": {
-                "node_id": null
-              },
-              "source": "workflow.plan.exit"
-            }
-          },
-          "revision": 37,
-          "schema_version": 2,
-          "skills": {}
-        },
-        "3:default:workflow.plan.success": {
-          "events": {},
-          "revision": 37,
-          "schema_version": 2,
-          "skills": {}
-        },
-        "4:default:workflow.implement.enter": {
-          "events": {
-            "workflow.implement.enter": {
-              "bindings": [
-                {
-                  "enabled": true,
-                  "id": "default-implement",
-                  "inputs": {},
-                  "mode": "blocking",
-                  "order": 0,
-                  "overrides": null,
-                  "scope": {
-                    "node_id": null
-                  },
-                  "skill_id": "default-implement"
-                }
-              ],
-              "enabled": true,
-              "id": "workflow.implement.enter",
-              "kind": "system",
-              "name": "Workflow Implement Enter",
-              "on_success": null,
-              "parameters": [],
-              "scope": {
-                "node_id": null
-              },
-              "source": "workflow.implement.enter"
-            }
-          },
-          "revision": 37,
-          "schema_version": 2,
-          "skills": {
-            "default-implement": {
-              "enabled": true,
-              "id": "default-implement",
-              "name": "Implement",
-              "parameters": [],
-              "prompt": "## Implementation\n\nImplement the current Goal Round using all accepted plans and attached Skills. Inspect existing code, make the complete change, run appropriate verification, and report evidence for each checklist item. Check the plan's assumptions against the code and keep policy in its shared owner. Prefer one correction that explains the affected behavior over separate fixes at each failing call site. Report evidence-backed plan deviations within the Goal's scope and existing authority. Preserve unrelated changes and historical evidence.\n\n### Intent and architecture\n\nReview Refine's relevant documentation files under Refine's runtime at `<refine-runtime>/docs/intent/***/*.*` as the durable product specification.\n\n### Semantic code organization\n\nKeep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.\n",
-              "provenance": "refine-default-v1",
-              "role": "task",
-              "scope": {
-                "node_id": null
-              }
-            }
-          }
-        },
-        "5:default:workflow.failed.enter": {
-          "events": {
-            "workflow.failed.enter": {
-              "bindings": [],
-              "enabled": true,
-              "id": "workflow.failed.enter",
-              "kind": "system",
-              "name": "Workflow Failed Enter",
-              "on_success": null,
-              "parameters": [],
-              "scope": {
-                "node_id": null
-              },
-              "source": "workflow.failed.enter"
-            }
-          },
-          "revision": 37,
-          "schema_version": 2,
-          "skills": {}
-        }
-      },
-      "governance_candidate_commit": "",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
-      "governance_rule_actions": [],
-      "guidance_decision": null,
-      "implementation_plan": {
-        "binding": {
-          "base_commit": "9c1be94cf6421854a1c6693b7403b57d8f7576b2",
-          "context_digest": "83751b8796f8cea2ad5480041d60e8a9927b9b60ac69b8103c953435aff064a8",
-          "context_version": 1,
-          "goal_id": "00000T146Y4H01X1WVV8STE000",
-          "implementation_branch": "refine/00000T146Y4H01X1WVV8STE000/round-1",
-          "round_idx": 0,
-          "target_branch": "main"
-        },
-        "final_plan": {
-          "completed_at": "2026-09-11T14:29:41Z",
-          "git_after": {
-            "branch": "refine/00000T146Y4H01X1WVV8STE000/round-1",
-            "head_commit": "9c1be94cf6421854a1c6693b7403b57d8f7576b2",
-            "status_porcelain": []
-          },
-          "git_before": {
-            "branch": "refine/00000T146Y4H01X1WVV8STE000/round-1",
-            "head_commit": "9c1be94cf6421854a1c6693b7403b57d8f7576b2",
-            "status_porcelain": []
-          },
-          "result": {
-            "checklist": [
-              {
-                "description": "Establish the navigation contract: the cause is that independent Skill and Site entry points are grouped inside Controls. The browser shell owns their placement and shared dropdown behavior; settings_skills.js and knowledge-hub.js already own their lists and actions. Preserve those owners and existing application capabilities. Update the checkout's navigation, Skills, and Knowledge Hub intent docs to describe the requested arrangement.",
-                "id": "workflow.plan.enter:default-plan:P1"
-              },
-              {
-                "description": "Update src/surfaces/web/static/index.html so the right-aligned actions appear in order: Skills, Sites, Settings, New Goal. Move the existing Skill and Site containers into their respective dropdowns. Rename the Controls button and accessible label to Settings. Reuse shared summary, panel, icon, and menu-row styles from css/base.css; preserve the remaining settings controls and New Goal's related creation actions.",
-                "id": "workflow.plan.enter:default-plan:P2"
-              },
-              {
-                "description": "Update settings_skills.js and knowledge-hub.js to show existing entries followed by a separator and an action group: New Skill then Manage Skills, or New Site then Manage Sites. New actions open the existing creation modals; management links navigate to #/settings/skills and #/settings/knowledge-hub. Keep these actions available with empty lists, and render list failures separately from the action group. Preserve Skill eligibility, input preflight, agent-tab launch, and Site draft/published URL handling.",
-                "id": "workflow.plan.enter:default-plan:P3"
-              },
-              {
-                "description": "Bind each list's refresh-on-open listener to its new dropdown while retaining existing load, definition-change, and node-context refresh behavior and stale-response guards. Use common.js's shared topbar menu handling for mutual exclusion, action dismissal, outside clicks, and Escape. Extend shared selectors only where needed. Use shared border and spacing tokens for separators, and verify panels remain usable with long lists and narrow viewports.",
-                "id": "workflow.plan.enter:default-plan:P4"
-              },
-              {
-                "description": "Update user-facing navigation references in Guide, Skill help, reporter onboarding, and toolbar Todo copy to the new locations. Preserve existing route and element identities where practical, including Node and Reporter selectors, so the label change does not break shell integrations.",
-                "id": "workflow.plan.enter:default-plan:P5"
-              },
-              {
-                "description": "Update src/surfaces/web_server/tests/static_surface/navigation.rs and add focused browser coverage for action order, exclusive list placement, separators, all four create/manage actions, empty and failed lists, refresh after node or definition changes, Skill launch, and Site opening. Exercise keyboard operation, dismissal, light/dark themes, and desktop/narrow layouts. Proposed checks on the implementation derived from pinned base 9c1be94cf6421854a1c6693b7403b57d8f7576b2: cargo run --manifest-path xtask/Cargo.toml -- test-unit; node --test tests/web_topbar_navigation.test.js tests/web_knowledge_hub.test.js tests/web_node_scope_navigation.test.js tests/web_reporter_onboarding.test.js tests/web_theme.test.js. Require browser cases to execute rather than skip, and report failures separately from verified results.",
-                "id": "workflow.plan.enter:default-plan:P6"
-              }
-            ],
-            "summary": "workflow.plan.enter:default-plan: Give Skills and Sites dedicated dropdowns, rename Controls to Settings, and reuse the existing navigation styles and capability owners."
-          },
-          "started_at": "2026-09-11T14:27:55Z"
-        },
-        "phase": "implement",
-        "phase_started_at": "2026-09-11T14:29:42Z",
-        "proposal": {
-          "completed_at": "2026-09-11T14:29:41Z",
-          "git_after": {
-            "branch": "refine/00000T146Y4H01X1WVV8STE000/round-1",
-            "head_commit": "9c1be94cf6421854a1c6693b7403b57d8f7576b2",
-            "status_porcelain": []
-          },
-          "git_before": {
-            "branch": "refine/00000T146Y4H01X1WVV8STE000/round-1",
-            "head_commit": "9c1be94cf6421854a1c6693b7403b57d8f7576b2",
-            "status_porcelain": []
-          },
-          "result": {
-            "checklist": [
-              {
-                "description": "Establish the navigation contract: the cause is that independent Skill and Site entry points are grouped inside Controls. The browser shell owns their placement and shared dropdown behavior; settings_skills.js and knowledge-hub.js already own their lists and actions. Preserve those owners and existing application capabilities. Update the checkout's navigation, Skills, and Knowledge Hub intent docs to describe the requested arrangement.",
-                "id": "workflow.plan.enter:default-plan:P1"
-              },
-              {
-                "description": "Update src/surfaces/web/static/index.html so the right-aligned actions appear in order: Skills, Sites, Settings, New Goal. Move the existing Skill and Site containers into their respective dropdowns. Rename the Controls button and accessible label to Settings. Reuse shared summary, panel, icon, and menu-row styles from css/base.css; preserve the remaining settings controls and New Goal's related creation actions.",
-                "id": "workflow.plan.enter:default-plan:P2"
-              },
-              {
-                "description": "Update settings_skills.js and knowledge-hub.js to show existing entries followed by a separator and an action group: New Skill then Manage Skills, or New Site then Manage Sites. New actions open the existing creation modals; management links navigate to #/settings/skills and #/settings/knowledge-hub. Keep these actions available with empty lists, and render list failures separately from the action group. Preserve Skill eligibility, input preflight, agent-tab launch, and Site draft/published URL handling.",
-                "id": "workflow.plan.enter:default-plan:P3"
-              },
-              {
-                "description": "Bind each list's refresh-on-open listener to its new dropdown while retaining existing load, definition-change, and node-context refresh behavior and stale-response guards. Use common.js's shared topbar menu handling for mutual exclusion, action dismissal, outside clicks, and Escape. Extend shared selectors only where needed. Use shared border and spacing tokens for separators, and verify panels remain usable with long lists and narrow viewports.",
-                "id": "workflow.plan.enter:default-plan:P4"
-              },
-              {
-                "description": "Update user-facing navigation references in Guide, Skill help, reporter onboarding, and toolbar Todo copy to the new locations. Preserve existing route and element identities where practical, including Node and Reporter selectors, so the label change does not break shell integrations.",
-                "id": "workflow.plan.enter:default-plan:P5"
-              },
-              {
-                "description": "Update src/surfaces/web_server/tests/static_surface/navigation.rs and add focused browser coverage for action order, exclusive list placement, separators, all four create/manage actions, empty and failed lists, refresh after node or definition changes, Skill launch, and Site opening. Exercise keyboard operation, dismissal, light/dark themes, and desktop/narrow layouts. Proposed checks on the implementation derived from pinned base 9c1be94cf6421854a1c6693b7403b57d8f7576b2: cargo run --manifest-path xtask/Cargo.toml -- test-unit; node --test tests/web_topbar_navigation.test.js tests/web_knowledge_hub.test.js tests/web_node_scope_navigation.test.js tests/web_reporter_onboarding.test.js tests/web_theme.test.js. Require browser cases to execute rather than skip, and report failures separately from verified results.",
-                "id": "workflow.plan.enter:default-plan:P6"
-              }
-            ],
-            "summary": "workflow.plan.enter:default-plan: Give Skills and Sites dedicated dropdowns, rename Controls to Settings, and reuse the existing navigation styles and capability owners."
-          },
-          "started_at": "2026-09-11T14:27:55Z"
-        },
-        "schema_version": 2,
-        "started_at": "2026-09-11T14:27:55Z",
-        "state": "in_progress",
-        "updated_at": "2026-09-11T14:29:42Z"
-      },
-      "implementation_report": null,
-      "implementation_reported_at": null,
-      "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
-      "prompt": "For the web UI surface, create two new main nav right-aligned dropdown buttons, one for Skills and one for Sites. The right-aligned button order should be Skills, Sites, Settings, and New Goal. Yes, that is a rename of Controls to Settings. Move the menus from Settings (formerly Controls) to the appropriate new menu for Sites and Skills. Add a separator to the new menus for New Skill, New Site, Manage Skills, and Manage Sites. Ensure you use the standardized styles and layout we already have in the app.",
-      "quality_checked_at": "",
-      "quality_details": "",
-      "quality_message": "",
-      "quality_state": "unclassified",
-      "reporter": "Buddy Williams",
-      "rule_state": "unclassified",
-      "updated": "2026-09-11T14:45:04Z",
-      "workflow_attempt_authority": {
-        "claimed_at": "2026-09-11T14:27:53Z",
-        "round_idx": 0,
-        "workflow_revision": 2
-      },
-      "workflow_reconciliation": null,
-      "workflow_recovery": null
-    }
-  ],
+  "round_edit_revision": 59,
+  "rounds": [],
   "status": "backlog",
   "target_branch": "main",
-  "updated": "2026-09-12T11:30:19Z",
+  "updated": "2026-09-12T11:31:08Z",
   "workflow_controls": [
     {
       "at": "2026-09-12T11:30:16Z",
@@ -579,61 +36,27 @@
       },
       "request_id": "0b81e702-0aa0-4d69-9ac4-7380b1e7eed4",
       "to": "backlog"
+    },
+    {
+      "at": "2026-09-12T11:31:08Z",
+      "forced": true,
+      "from": "backlog",
+      "request": {
+        "actor": "operator",
+        "reason": "Explicit Round deletion"
+      },
+      "request_id": "b3a15f68-e330-4b64-9c1e-98af6f3047f2",
+      "to": "backlog"
     }
   ],
   "workflow_events": [
-    {
-      "at": "2026-09-11T14:27:52.512340696+00:00",
-      "forced": false,
-      "from": null,
-      "generation": 1,
-      "node_id": "default",
-      "round_idx": 0,
-      "to": "backlog"
-    },
-    {
-      "at": "2026-09-11T14:27:52.516760953+00:00",
-      "forced": false,
-      "from": "backlog",
-      "generation": 2,
-      "node_id": "default",
-      "round_idx": 0,
-      "to": "todo"
-    },
-    {
-      "at": "2026-09-11T14:27:55.215008520+00:00",
-      "forced": false,
-      "from": "todo",
-      "generation": 3,
-      "node_id": "default",
-      "round_idx": 0,
-      "to": "plan"
-    },
-    {
-      "at": "2026-09-11T14:29:41.992072852+00:00",
-      "forced": false,
-      "from": "plan",
-      "generation": 4,
-      "node_id": "default",
-      "round_idx": 0,
-      "to": "implement"
-    },
-    {
-      "at": "2026-09-11T14:45:04.727907564+00:00",
-      "forced": true,
-      "from": "implement",
-      "generation": 5,
-      "node_id": "default",
-      "round_idx": 0,
-      "to": "failed"
-    },
     {
       "at": "2026-09-12T10:32:51.178242957+00:00",
       "forced": false,
       "from": "failed",
       "generation": 11,
       "node_id": "default",
-      "round_idx": 1,
+      "round_idx": 0,
       "to": "todo",
       "workflow_revision": 46
     },
@@ -643,7 +66,7 @@
       "from": "todo",
       "generation": 12,
       "node_id": "default",
-      "round_idx": 1,
+      "round_idx": 0,
       "to": "backlog",
       "workflow_revision": 47
     },
@@ -653,7 +76,7 @@
       "from": "backlog",
       "generation": 13,
       "node_id": "default",
-      "round_idx": 1,
+      "round_idx": 0,
       "to": "todo",
       "workflow_revision": 48
     },
@@ -663,7 +86,7 @@
       "from": "todo",
       "generation": 14,
       "node_id": "default",
-      "round_idx": 1,
+      "round_idx": 0,
       "to": "plan",
       "workflow_revision": 52
     },
@@ -673,19 +96,19 @@
       "from": "plan",
       "generation": 15,
       "node_id": "default",
-      "round_idx": 1,
+      "round_idx": 0,
       "to": "failed",
       "workflow_revision": 56
     },
     {
-      "at": "2026-09-12T11:30:19.707046907+00:00",
+      "at": "2026-09-12T11:31:08.917690913+00:00",
       "from": "backlog",
-      "generation": 17,
+      "generation": 18,
       "node_id": "default",
-      "round_idx": 0,
+      "round_idx": null,
       "to": "backlog",
-      "workflow_revision": 58
+      "workflow_revision": 59
     }
   ],
-  "workflow_revision": 58
+  "workflow_revision": 59
 }
