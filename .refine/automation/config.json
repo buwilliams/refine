@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "revision": 40,
+  "revision": 41,
   "skills": {
     "default-governance": {
       "id": "default-governance",
@@ -41,7 +41,7 @@
     "default-quality": {
       "id": "default-quality",
       "name": "Quality",
-      "prompt": "## Quality review\n\nRun tests to ensure the Goal's implementation passes meaningful tests. Do not remove meaningful tests. Remove deprecated or meaningless tests. Use the best available tools for the testing the Goal. The quality gate passes when the system is operational and meaningful tests have passed.\n\nIf issues outside the Goal’s scope block progress, investigate and fix them or use an evidence-backed workaround, preserving required checks and documenting what you changed.\n",
+      "prompt": "## Quality review\n\nAssess and correct the implementation. Run meaningful tests, fix blocking failures, and rerun until they pass, including blockers outside the Goal’s scope. Preserve meaningful tests; remove deprecated or meaningless tests. Use the best available tools.\n\nFinding failures is part of Quality’s work, not a final failure outcome. Report success once corrections are verified. Stop unsuccessfully only when a blocker cannot be resolved within your authority or available environment, and explain it. Governance reviews how the overall Goal came together.\n",
       "role": "task",
       "enabled": true,
       "scope": {
