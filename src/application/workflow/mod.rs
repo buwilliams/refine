@@ -121,6 +121,6 @@ fn now_timestamp() -> String {
 mod tests;
 
 use agents::{round_agent_context, selected_agent_context};
-use engine::{agent_worktree_cwd, implementation_branch_name, setting_string};
+use engine::{agent_worktree_cwd, setting_string};
 use governance::GovernanceEvaluation;
 use recovery::{CandidateRefreshOutcome, refresh_candidate_for_target_advancement};

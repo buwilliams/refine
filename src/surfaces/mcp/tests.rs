@@ -293,3 +293,16 @@ fn skills_replace_event_tools_and_preserve_typed_manual_parameters() {
     );
     assert!(request["body"].get("goal_id").is_none());
 }
+
+#[test]
+fn round_delete_tool_maps_exact_round_and_revision_to_shared_capability() {
+    let response = call(
+        json!({"jsonrpc":"2.0","id":20,"method":"tools/call","params":{
+            "name":"refine_delete_round","arguments":{"goal_id":"GOAL1","round_idx":1,"expected_revision":42}
+        }}),
+    );
+    let request = &response["result"]["structuredContent"];
+    assert_eq!(request["method"], "DELETE");
+    assert_eq!(request["path"], "/work/goals/GOAL1/rounds/1");
+    assert_eq!(request["body"]["expected_revision"], 42);
+}

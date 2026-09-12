@@ -75,7 +75,7 @@ function browserRuntime({
   };
 }
 
-test("bulk status offers review and done without automated workflow states", async () => {
+test("bulk status offers every workflow step as an explicit human assignment", async () => {
   const browser = browserRuntime();
 
   await browser.runtime.openStatus();
@@ -84,8 +84,9 @@ test("bulk status offers review and done without automated workflow states", asy
   assert.match(browser.modalHtml(), /<option value="review">review<\/option>/);
   assert.match(browser.modalHtml(), /<option value="done">done<\/option>/);
   assert.match(browser.modalHtml(), /<option value="cancelled">cancelled<\/option>/);
-  assert.match(browser.modalHtml(), /Cancelled intentionally stops selected active/);
-  assert.match(browser.modalHtml(), /Done remains protected/);
+  for (const step of ["plan", "implement", "quality", "governance"]) assert.ok(browser.modalHtml().includes(`<option value="${step}">${step}</option>`));
+  assert.match(browser.modalHtml(), /stops current agent work/);
+  assert.match(browser.modalHtml(), /Done changes status only/);
   assert.doesNotMatch(browser.modalHtml(), /<option value="in-progress">/);
   assert.doesNotMatch(browser.modalHtml(), /<option value="qa">/);
   assert.doesNotMatch(browser.modalHtml(), /<option value="ready-merge">/);

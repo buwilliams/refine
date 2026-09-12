@@ -4,7 +4,7 @@
 
 - **Goal State Is Authority**: synchronized Goal status, node assignment, Round, and semantic evidence decide what work may advance.
 - **Execution Is Local**: workers and process identifiers are transient observations on one node.
-- **Evidence Before Transition**: semantic evidence is durable before the Goal state that depends on it.
+- **Human Decisions Supersede Automation**: explicit assignments can bypass automated requirements; stopped and superseded workers cannot veto them.
 - **Conflicts Preserve Newer Decisions**: stale workers cannot overwrite reassignment, cancellation, a new Round, or another transition.
 - **Settlement Is Occurrence-Fenced**: failure changes Goal status and originating Round metadata together only while that workflow step occurrence remains current.
 - **Receipt-Based Restart**: replacing a process preserves accepted results; failed or interrupted work requires an explicit workflow decision before another attempt.
@@ -73,3 +73,5 @@ Legacy `workflow_attempt_authority` fields remain readable provenance. Legacy `w
 ## Judgment and coordination
 
 The AI decides when to stop and whether work succeeds, using the Goal, context, and applicable Skill instructions. Refine requires a current response identity and a reported decision, not a proof of satisfactory work. References to evidence in this contract mean retained execution history, accepted decisions, or identities protecting concrete Git actions. They do not introduce required supporting lists, test commands, checklist coverage, or user-authored acceptance criteria. Quality and Governance Skills may express such expectations for the AI to interpret; Refine does not grade them independently.
+
+Explicit Round deletion is a human exception to automatic history retention. Its shared capability confirms current process exit, fences stale results, removes the Round and associated records, and compacts remaining references. Git retains recoverable history. A cleanup journal may exist only while removal is incomplete; success removes it.

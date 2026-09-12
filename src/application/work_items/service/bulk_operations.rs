@@ -21,11 +21,31 @@ impl FileWorkItemService {
             let Some(status) = GoalStatus::parse_wire(&raw_value) else {
                 return Err(RefineError::InvalidInput("invalid status".to_string()));
             };
-            if !is_bulk_target_allowed(&status) {
-                return Err(RefineError::Conflict(
-                    "Bulk status updates cannot enter automated workflow states".to_string(),
-                ));
+            let ids = self.select_bulk_goal_ids(&selection)?;
+            #[cfg(test)]
+            if let Some(hook) = &self.after_bulk_goal_selection_hook {
+                hook();
             }
+            let mut updated = Vec::new();
+            let mut failures = Vec::new();
+            for id in ids {
+                match self.override_goal_status(&id, status.clone()) {
+                    Ok(_) => updated.push(id),
+                    Err(error) => {
+                        failures.push(serde_json::json!({"id": id, "error": error.to_string()}))
+                    }
+                }
+            }
+            return Ok(BulkUpdateResult {
+                updated: updated.len(),
+                ids: updated,
+                field,
+                value: raw_value,
+                skipped: 0,
+                skipped_details: Vec::new(),
+                failed: failures.len(),
+                failures,
+            });
         }
         if field == "reporter" && !valid_reporter_name(&raw_value) {
             return Err(RefineError::InvalidInput(

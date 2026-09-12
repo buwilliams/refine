@@ -188,7 +188,7 @@ impl InProcessWebServer {
         };
         let service = self.work_item_service(refine_dir);
         let mut goal = match status {
-            Some(status) => match service.transition_goal_status(goal_id, status) {
+            Some(status) => match service.override_goal_status(goal_id, status) {
                 Ok(goal) => goal,
                 Err(error) => return error_response(error),
             },

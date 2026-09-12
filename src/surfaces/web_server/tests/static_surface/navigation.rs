@@ -480,13 +480,10 @@ fn web_server_accepts_static_ui_bulk_api_aliases() {
         })),
     });
     assert_eq!(bulk_cancel.status, 200);
-    assert_eq!(bulk_cancel.body["updated"], 1);
-    assert_eq!(bulk_cancel.body["ids"], json!(["GOAL3"]));
-    assert_eq!(bulk_cancel.body["skipped"], 1);
-    assert_eq!(
-        bulk_cancel.body["skipped_details"][0],
-        json!({"id": "GOAL1", "reason": "status:done"})
-    );
+    assert_eq!(bulk_cancel.body["updated"], 2);
+    assert_eq!(bulk_cancel.body["ids"], json!(["GOAL1", "GOAL3"]));
+    assert_eq!(bulk_cancel.body["skipped"], 0);
+    assert_eq!(bulk_cancel.body["failed"], 0);
     assert_eq!(
         FileWorkItemService::new(&refine_dir)
             .show_goal_summary("GOAL3")

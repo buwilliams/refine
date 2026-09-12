@@ -3,6 +3,24 @@ use crate::infrastructure::git::worktrees::{FileGitWorktreeService, ManagedWorkt
 use serde_json::Value;
 
 impl WorkflowContext<'_> {
+    pub(crate) fn round_branch(&self) -> RefineResult<String> {
+        let detail = self.work_items.show_goal_detail(&self.goal_id)?;
+        Ok(detail["rounds"][self.round_idx]["workspace_branch"]
+            .as_str()
+            .map(str::to_string)
+            .unwrap_or_else(|| {
+                execution::implementation_branch_name(
+                    &crate::application::workflow::setting_string(
+                        &self.settings,
+                        "branch_name_pattern",
+                        "refine/{goal_id}",
+                    ),
+                    &self.goal_id,
+                    self.round_idx,
+                )
+            }))
+    }
+
     pub(crate) fn managed_worktree(&self) -> RefineResult<ManagedWorktree> {
         self.workspace_for_mode(false)
     }
@@ -87,7 +105,9 @@ pub(crate) fn validate_round_workspace_branch(
     branch_pattern: &str,
 ) -> RefineResult<()> {
     let binding = &detail["rounds"][round_idx]["implementation_plan"]["binding"];
-    let expected = if binding.is_object() {
+    let expected = if let Some(branch) = detail["rounds"][round_idx]["workspace_branch"].as_str() {
+        branch.to_string()
+    } else if binding.is_object() {
         if binding["goal_id"].as_str() != Some(goal_id)
             || binding["round_idx"].as_u64() != Some(round_idx as u64)
         {

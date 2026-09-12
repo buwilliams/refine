@@ -2,6 +2,121 @@
 use super::*;
 
 impl FileProcessSupervisor {
+    /// Explicit Round deletion uses the same exit proof and artifact leases as
+    /// normal retirement, including records whose process has already exited.
+    pub(crate) fn delete_round_process_records(
+        &self,
+        goal_id: &str,
+        round_idx: usize,
+        edit_revision: u64,
+    ) -> RefineResult<()> {
+        let mut records = std::collections::BTreeMap::new();
+        for directory in [self.processes_dir(), self.process_history_dir()] {
+            if !directory.exists() {
+                continue;
+            }
+            for entry in fs::read_dir(directory).map_err(|e| RefineError::Io(e.to_string()))? {
+                let path = entry.map_err(|e| RefineError::Io(e.to_string()))?.path();
+                if path.extension().is_none_or(|ext| ext != "json") {
+                    continue;
+                }
+                let bytes = fs::read(&path).map_err(|e| RefineError::Io(e.to_string()))?;
+                let Ok(process) = serde_json::from_slice::<ManagedProcess>(&bytes) else {
+                    continue;
+                };
+                let metadata = process
+                    .details
+                    .as_deref()
+                    .and_then(|v| serde_json::from_str::<Value>(v).ok())
+                    .unwrap_or(Value::Null);
+                if metadata["goal_id"] == goal_id
+                    && metadata["round_idx"]
+                        .as_u64()
+                        .is_some_and(|index| index >= round_idx as u64)
+                    && metadata["round_edit_revision"].as_u64().unwrap_or(0) < edit_revision
+                {
+                    records.insert(process.id.clone(), process);
+                }
+            }
+        }
+        for group in self.owned_groups()? {
+            let metadata = group
+                .process
+                .details
+                .as_deref()
+                .and_then(|v| serde_json::from_str::<Value>(v).ok())
+                .unwrap_or(Value::Null);
+            if metadata["goal_id"] == goal_id
+                && metadata["round_idx"]
+                    .as_u64()
+                    .is_some_and(|index| index >= round_idx as u64)
+                && metadata["round_edit_revision"].as_u64().unwrap_or(0) < edit_revision
+            {
+                records
+                    .entry(group.process.id.clone())
+                    .or_insert(group.process);
+            }
+        }
+        for mut process in records.into_values() {
+            if self.group_pending(&process)? {
+                return Err(RefineError::Conflict(
+                    "Round still owns running processes".into(),
+                ));
+            }
+            let mut metadata: Value = serde_json::from_str(process.details.as_deref().unwrap())
+                .map_err(|e| RefineError::Serialization(e.to_string()))?;
+            if metadata["round_idx"].as_u64().unwrap() > round_idx as u64 {
+                metadata["round_idx"] = json!(metadata["round_idx"].as_u64().unwrap() - 1);
+                metadata["round_edit_revision"] = json!(edit_revision);
+                process.details = Some(metadata.to_string());
+                let bytes = serde_json::to_vec(&process)
+                    .map_err(|e| RefineError::Serialization(e.to_string()))?;
+                for path in [
+                    self.processes_dir().join(format!("{}.json", process.id)),
+                    self.process_history_path(&process.id),
+                ] {
+                    if path.exists() {
+                        write_json_atomically(&path, &bytes, "Round process indexes")?;
+                    }
+                }
+                let group_path = self.group_path(&process.id);
+                if group_path.exists() {
+                    let mut group: Value = serde_json::from_slice(
+                        &fs::read(&group_path).map_err(|e| RefineError::Io(e.to_string()))?,
+                    )
+                    .map_err(|e| RefineError::Serialization(e.to_string()))?;
+                    group["process"] = serde_json::to_value(&process)
+                        .map_err(|e| RefineError::Serialization(e.to_string()))?;
+                    write_json_atomically(
+                        &group_path,
+                        &serde_json::to_vec(&group)
+                            .map_err(|e| RefineError::Serialization(e.to_string()))?,
+                        "Round group indexes",
+                    )?;
+                }
+                continue;
+            }
+            self.remove_process_artifacts(&process)?;
+            if self
+                .processes_dir()
+                .join(format!("{}.json", process.id))
+                .exists()
+                || self.process_history_path(&process.id).exists()
+            {
+                return Err(RefineError::Conflict("Round output is still being consumed; retry deletion after the stopped attempt settles".into()));
+            }
+            remove_file_if_present(&self.group_path(&process.id), "deleted Round group")?;
+            if let Some(proof) = metadata["launch_scope"]["proof_path"]
+                .as_str()
+                .map(PathBuf::from)
+                && proof.parent() == Some(self.runtime_root.join("owned-scopes").as_path())
+            {
+                remove_file_if_present(&proof, "deleted Round exit proof")?;
+            }
+        }
+        Ok(())
+    }
+
     /// Hold transient process artifacts while a workflow-owned consumer finishes reading them.
     ///
     /// The filesystem lock is released automatically if the consumer exits, so later recovery can

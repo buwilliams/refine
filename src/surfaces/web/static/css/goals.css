@@ -406,3 +406,11 @@
 .feature-goals-table tr.drop-after td {
   border-bottom: 2px solid var(--color-primary);
 }
+
+/* Keep every human workflow choice reachable inside the Goal modal. */
+.goal-step-menu .nav-menu-panel {
+  left: 0;
+  right: auto;
+  max-height: min(440px, 60vh);
+  overflow-y: auto;
+}

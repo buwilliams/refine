@@ -342,7 +342,7 @@ pub(crate) fn hydrate_plan_or_implement_context(
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .map(ToString::to_string)
-        .unwrap_or_else(|| implementation_branch_name(branch_pattern, &ctx.goal_id, ctx.round_idx));
+        .unwrap_or(ctx.round_branch()?);
     super::validate_round_workspace_branch(
         &detail,
         &ctx.goal_id,

@@ -3,7 +3,34 @@ use super::*;
 use serde_json::json;
 
 impl FileWorkItemService {
+    /// An explicit surface action selects the exact step; automatic transitions
+    /// continue to use their own policy and occurrence authority.
+    pub fn override_goal_status(
+        &self,
+        id: &str,
+        to: GoalStatus,
+    ) -> RefineResult<GoalSummaryProjection> {
+        self.resume_round_deletion(id)?;
+        let _lock = self.acquire_goal_mutation_lock(id)?;
+        let goal = self.show_goal_detail(id)?;
+        self.control_workflow(
+            id,
+            &WorkflowControl {
+                to,
+                reason: "Explicit user workflow assignment".into(),
+                context: String::new(),
+                expected_revision: workflow_revision(&goal),
+                request_id: uuid::Uuid::new_v4().to_string(),
+                force: true,
+                actor: "operator".into(),
+                invocation_id: None,
+            },
+        )?;
+        self.show_goal_summary(id)
+    }
+
     pub fn control_workflow(&self, id: &str, request: &WorkflowControl) -> RefineResult<Value> {
+        self.resume_round_deletion(id)?;
         self.control_workflow_operation(id, request, false)
     }
 
@@ -42,6 +69,7 @@ impl FileWorkItemService {
         }
         if goal["workflow_integration_control"]["state"] == "pending"
             && request.to != GoalStatus::Cancelled
+            && !request.force
         {
             return Err(RefineError::Conflict("An explicit integration is pending; reconcile its retained operation before another decision".into()));
         }
@@ -93,7 +121,7 @@ impl FileWorkItemService {
             "overridden_requirements":if request.force { json!(["transition_policy","workflow_evidence_gates"]) } else {json!([])},
             "retained_candidate":goal["candidate_commit"],"previous_attempt":goal["rounds"].as_array().and_then(|a|a.last()).and_then(|r|r.get("workflow_attempt_authority"))});
         let old_round = goal["rounds"].as_array().and_then(|a| a.last()).cloned();
-        if request.to == GoalStatus::Plan {
+        if request.to == GoalStatus::Plan && !request.force {
             let prompt = if request.context.trim().is_empty() {
                 request.reason.clone()
             } else {
@@ -112,6 +140,7 @@ impl FileWorkItemService {
         } else {
             if (is_automated_status(&request.to) || request.to == GoalStatus::Todo)
                 && old_round.is_none()
+                && !request.force
             {
                 return Err(RefineError::Conflict(
                     "An executable step requires an authored Round".into(),
@@ -119,6 +148,7 @@ impl FileWorkItemService {
             }
             if matches!(request.to, GoalStatus::Quality | GoalStatus::Governance)
                 && !goal["candidate_commit"].is_string()
+                && !request.force
             {
                 return Err(RefineError::Conflict(
                     "This step requires a retained candidate".into(),
@@ -137,6 +167,17 @@ impl FileWorkItemService {
         }
         receipt["stopped_processes"] =
             json!(self.stop_goal_execution(id, request.invocation_id.as_deref())?);
+        if request.force {
+            goal.as_object_mut()
+                .unwrap()
+                .remove("workflow_requested_step");
+            goal.as_object_mut()
+                .unwrap()
+                .remove("pending_event_transition");
+            if !integrate && goal["workflow_integration_control"]["state"] == "pending" {
+                goal["workflow_integration_control"]["state"] = json!("redirected");
+            }
+        }
         goal.as_object_mut()
             .unwrap()
             .entry("workflow_controls")
@@ -344,7 +385,7 @@ impl FileWorkItemService {
         write_json_atomically(&path, &goal)
     }
 
-    fn stop_goal_execution(
+    pub(super) fn stop_goal_execution(
         &self,
         goal_id: &str,
         caller: Option<&str>,

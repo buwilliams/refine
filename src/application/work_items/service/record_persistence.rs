@@ -8,6 +8,18 @@ pub(super) fn write_json_atomically(path: &std::path::Path, value: &Value) -> Re
     let record_root = workflow_record_root(path);
     let record_key = record_lock_key(path);
     with_record_lock(&record_root, &record_key, || {
+        let deletion = path.with_file_name("round-deletion.json");
+        if deletion.exists() {
+            let plan: Value = serde_json::from_slice(
+                &fs::read(&deletion).map_err(|e| RefineError::Io(e.to_string()))?,
+            )
+            .map_err(|e| RefineError::Serialization(e.to_string()))?;
+            if plan["goal"] != *value {
+                return Err(RefineError::Conflict(
+                    "Round deletion cleanup is pending; resume it before changing the Goal".into(),
+                ));
+            }
+        }
         let expected_revision = workflow_revision(value);
         let current = match fs::read(path) {
             Ok(bytes) => Some(serde_json::from_slice::<Value>(&bytes).map_err(|error| {

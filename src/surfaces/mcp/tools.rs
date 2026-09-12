@@ -36,6 +36,7 @@ enum ToolBinding {
     Passthrough,
     SkillTrigger,
     WorkflowControl,
+    RoundDelete,
 }
 
 /// A capability the MCP surface exposes to clients.
@@ -61,6 +62,23 @@ impl McpTool {
     /// arguments are missing or invalid.
     pub fn build_request(&self, arguments: &Value) -> Result<RequestParts, String> {
         match &self.binding {
+            ToolBinding::RoundDelete => {
+                let id = arguments["goal_id"]
+                    .as_str()
+                    .filter(|id| crate::model::automation::valid_id(id))
+                    .ok_or("valid goal_id is required")?;
+                let index = arguments["round_idx"]
+                    .as_u64()
+                    .ok_or("zero-based round_idx is required")?;
+                let revision = arguments["expected_revision"]
+                    .as_u64()
+                    .ok_or("expected_revision is required")?;
+                Ok(RequestParts {
+                    method: "DELETE".into(),
+                    path: format!("/work/goals/{id}/rounds/{index}"),
+                    body: Some(json!({"expected_revision":revision})),
+                })
+            }
             ToolBinding::WorkflowControl => {
                 let id = arguments["goal_id"].as_str().ok_or("goal_id is required")?;
                 if id.is_empty()
@@ -222,6 +240,12 @@ pub fn tool_catalog() -> Vec<McpTool> {
             description: "Move or explicitly integrate a Goal through shared outcome controls. Read the current workflow_revision first. No Skill is required; forced actions retain override evidence.",
             input_schema: || json!({"type":"object","properties":{"goal_id":{"type":"string"},"action":{"enum":["move","integrate"]},"decision":{"type":"object","properties":{"to":{"type":"string"},"reason":{"type":"string"},"expected_revision":{"type":"integer"},"request_id":{"type":"string"},"force":{"type":"boolean"},"context":{"type":"string"},"actor":{"type":"string"},"invocation_id":{"type":"string"}},"required":["to","reason","expected_revision","request_id"]}},"required":["goal_id","decision"]}),
             binding: ToolBinding::WorkflowControl,
+        },
+        McpTool {
+            name: "refine_delete_round",
+            description: "Explicitly delete a Goal Round and all its records, stop current agents, and park the Goal in Backlog. Read the Goal revision first. round_idx is zero-based; use workflow control to resubmit the remaining Round.",
+            input_schema: || json!({"type":"object","properties":{"goal_id":{"type":"string"},"round_idx":{"type":"integer","minimum":0},"expected_revision":{"type":"integer","minimum":0}},"required":["goal_id","round_idx","expected_revision"]}),
+            binding: ToolBinding::RoundDelete,
         },
         McpTool {
             name: "refine_hub_sites",

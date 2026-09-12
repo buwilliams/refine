@@ -315,15 +315,9 @@ function drawGoalDetail(goal) {
     ? "Attach to the running Goal Agent"
     : "Open a diagnostic Agent with this Goal's recorded context";
 
-  // Dynamic workflow buttons: each state shows the previous/next state
-  // it can move to as back / forward buttons. The user-driven workflow
-  // skips system-owned statuses. Forward from review goes through the
-  // `approve` endpoint. Review rejection uses the new-round form rather than
-  // an unversioned status update.
+  // Review approval remains a separate integration action. Explicit step
+  // assignments use the menu below.
   const workflow = workflowForGoal(goal, latest);
-  const backBtn = workflow.back ? `
-    <button id="btn-state-back" data-testid="goal-state-back">${htmlEscape(workflow.back.label)}</button>
-  ` : "";
   const forwardBtn = workflow.forward ? `
     <button id="btn-state-forward" data-testid="goal-state-forward">${htmlEscape(workflow.forward.label)}</button>
   ` : "";
@@ -333,6 +327,7 @@ function drawGoalDetail(goal) {
   // `<details>` open state is local UI state the server knows nothing about, so
   // it has to be rendered back or the next refresh closes it under the user.
   const actionMenuOpen = !!container.querySelector("#goal-action-menu")?.open;
+  const stepMenuOpen = !!container.querySelector(".goal-step-menu")?.open;
   const noteComposerOpen = !!container.querySelector(".note-composer")?.open;
   _goalDetailView = { goal, workflow };
   recordFeatureBlockingNotice(goal, featureBlockingNotice);
@@ -344,8 +339,15 @@ function drawGoalDetail(goal) {
         <span class="priority-pill priority-${goal.priority || "low"}" data-testid="goal-priority-pill">priority: ${goal.priority || "low"}</span>
       </div>
       <div class="actions" style="margin-bottom:10px" data-testid="goal-workflow-actions">
-        ${backBtn}
-        ${forwardBtn}
+        <details class="nav-menu goal-step-menu" data-testid="goal-step-menu"${stepMenuOpen ? " open" : ""}>
+          <summary class="btn" aria-label="Set workflow step" data-testid="goal-step-toggle">Todo ▾</summary>
+          <div class="nav-menu-panel">
+            ${["backlog", "todo", "plan", "implement", "quality", "governance", "review", "done", "failed", "cancelled"].map(step =>
+              `<button type="button" class="nav-menu-item" data-goal-step="${step}" data-testid="goal-step-${step}">${workflowStatusLabel(step)}</button>`).join("")}
+            <p class="muted small">Moves stop active agents. Done changes status without merging code.</p>
+          </div>
+        </details>
+        ${goal.status === "review" ? forwardBtn : ""}
         <div class="goal-action-group">
           <button class="goal-action-primary" id="btn-open-agent" data-testid="goal-open-agent"
                   ${canOpenAgent ? "" : "disabled"}
@@ -453,6 +455,36 @@ function bindGoalDetailControls() {
   const liveGoal = () => _goalDetailView.goal || {};
   const liveWorkflow = () => _goalDetailView.workflow || {};
 
+  $$("[data-goal-step]").forEach(el => bindOnce(el, "click", async () => {
+    const goal = liveGoal();
+    const step = el.dataset.goalStep;
+    el.closest("details").open = false;
+    try {
+      await api("POST", `/api/workflow/goals/${encodeURIComponent(goal.id)}/move`, {
+        to: step, reason: "User selected workflow step", force: true,
+        expected_revision: goal.workflow_revision || 0, request_id: hubId(), actor: state.lastReporter || "operator",
+      });
+      toast(`Moved to ${workflowStatusLabel(step)}`, "info");
+      await loadGoalDetail(goal.id);
+    } catch (error) { await showActionError(error); }
+  }));
+  $$("[data-round-delete]").forEach(el => bindOnce(el, "click", async event => {
+    event.preventDefault();
+    event.stopPropagation();
+    const goal = liveGoal();
+    const index = Number(el.dataset.roundDelete);
+    const confirmed = await modalConfirm(
+      `Delete Round ${index + 1} and all of its records? Current agent work will stop and the Goal will return to Backlog. You can then select Todo or another workflow step for the remaining Round.`,
+      { title: "Delete Round", okLabel: "Delete Round", danger: true },
+    );
+    if (!confirmed) return;
+    try {
+      await api("DELETE", `/api/goals/${encodeURIComponent(goal.id)}/rounds/${index}`, { expected_revision: goal.workflow_revision || 0 });
+      _goalRoundFormDraft = null;
+      toast("Round deleted", "info");
+      await loadGoalDetail(goal.id);
+    } catch (error) { await showActionError(error); }
+  }));
   bindOnce($("#btn-open-agent"), "click", () => {
     const goal = liveGoal();
     if (goal.rounds?.at(-1)?.event_configuration && ["plan", "implement", "quality", "governance"].includes(goal.status)) {
@@ -880,6 +912,9 @@ function renderRound(rnd, idx, isLatest, prevRoundOpen = {}, prevPlanHistoryOpen
           · assignee ${htmlEscape(rnd.assignee || "(none)")}
           · ${fmtTime(rnd.created)}
         </span>
+        <button type="button" class="secondary danger round-delete" data-round-delete="${idx}" data-testid="goal-round-delete" aria-label="Delete Round ${idx + 1}" title="Delete Round ${idx + 1}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 15h10l1-15M10 11v6M14 11v6"/></svg>
+        </button>
       </summary>
       <div class="round-body">
         <dl class="pair">

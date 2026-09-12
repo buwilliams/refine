@@ -32,15 +32,15 @@ fn file_work_item_service_bulk_updates_deletes_and_assigns_goals() {
             BulkGoalUpdate::Status("todo".to_string()),
         )
         .unwrap();
-    assert_eq!(status_result.updated, 2);
-    assert_eq!(status_result.skipped, 1);
+    assert_eq!(status_result.updated, 3);
+    assert_eq!(status_result.skipped, 0);
     assert_eq!(
         service.show_goal_summary("GOAL1").unwrap().goal.status,
         GoalStatus::Todo
     );
     assert_eq!(
         service.show_goal_summary("GOAL3").unwrap().goal.status,
-        GoalStatus::Quality
+        GoalStatus::Todo
     );
 
     let reporter_result = service
@@ -169,8 +169,8 @@ fn file_work_item_service_bulk_status_allows_review_and_done() {
             BulkGoalUpdate::Status("review".to_string()),
         )
         .unwrap();
-    assert_eq!(review_result.updated, 1);
-    assert_eq!(review_result.skipped, 1);
+    assert_eq!(review_result.updated, 2);
+    assert_eq!(review_result.skipped, 0);
     assert_eq!(
         service
             .show_goal_summary("REVIEW_TARGET")
@@ -193,9 +193,8 @@ fn file_work_item_service_bulk_status_allows_review_and_done() {
             BulkGoalUpdate::Status("done".to_string()),
         )
         .unwrap();
-    assert_eq!(done_result.updated, 2);
-    assert_eq!(done_result.skipped, 1);
-    assert_eq!(done_result.skipped_details[0].reason, "status:quality");
+    assert_eq!(done_result.updated, 3);
+    assert_eq!(done_result.skipped, 0);
     for id in ["REVIEW_TARGET", "DONE_TARGET"] {
         assert_eq!(
             service.show_goal_summary(id).unwrap().goal.status,
@@ -204,14 +203,14 @@ fn file_work_item_service_bulk_status_allows_review_and_done() {
     }
     assert_eq!(
         service.show_goal_summary("AUTOMATED").unwrap().goal.status,
-        GoalStatus::Quality
+        GoalStatus::Done
     );
 
     fs::remove_dir_all(temp_root).unwrap();
 }
 
 #[test]
-fn bulk_review_and_done_revalidate_status_after_selection() {
+fn bulk_override_supersedes_automated_changes_but_revalidates_node_ownership() {
     let temp_root = unique_temp_dir("work-item-bulk-status-selection-race");
     let target_root = temp_root.join("target");
     let refine_dir = target_root.join(".refine");
@@ -253,16 +252,15 @@ fn bulk_review_and_done_revalidate_status_after_selection() {
             BulkGoalUpdate::Status("review".to_string()),
         )
         .unwrap();
-    assert_eq!(review_result.updated, 0);
-    assert_eq!(review_result.skipped, 1);
-    assert_eq!(review_result.skipped_details[0].reason, "status:plan");
+    assert_eq!(review_result.updated, 1);
+    assert_eq!(review_result.skipped, 0);
     assert_eq!(
         service
             .show_goal_summary("CLAIMED_AFTER_SELECTION")
             .unwrap()
             .goal
             .status,
-        GoalStatus::Plan
+        GoalStatus::Review
     );
 
     let done_result = service
@@ -274,16 +272,15 @@ fn bulk_review_and_done_revalidate_status_after_selection() {
             BulkGoalUpdate::Status("done".to_string()),
         )
         .unwrap();
-    assert_eq!(done_result.updated, 0);
-    assert_eq!(done_result.skipped, 1);
-    assert_eq!(done_result.skipped_details[0].reason, "status:plan");
+    assert_eq!(done_result.updated, 1);
+    assert_eq!(done_result.skipped, 0);
     assert_eq!(
         service
             .show_goal_summary("CLAIMED_AFTER_SELECTION")
             .unwrap()
             .goal
             .status,
-        GoalStatus::Plan
+        GoalStatus::Done
     );
 
     let status_mutator = FileWorkItemService::new(&refine_dir);
@@ -303,16 +300,15 @@ fn bulk_review_and_done_revalidate_status_after_selection() {
             BulkGoalUpdate::Status("done".to_string()),
         )
         .unwrap();
-    assert_eq!(automated_result.updated, 0);
-    assert_eq!(automated_result.skipped, 1);
-    assert_eq!(automated_result.skipped_details[0].reason, "status:quality");
+    assert_eq!(automated_result.updated, 1);
+    assert_eq!(automated_result.skipped, 0);
     assert_eq!(
         service
             .show_goal_summary("AUTOMATED_AFTER_SELECTION")
             .unwrap()
             .goal
             .status,
-        GoalStatus::Quality
+        GoalStatus::Done
     );
 
     let node_mutator = FileWorkItemService::new(&refine_dir);
@@ -333,8 +329,13 @@ fn bulk_review_and_done_revalidate_status_after_selection() {
         )
         .unwrap();
     assert_eq!(moved_result.updated, 0);
-    assert_eq!(moved_result.skipped, 1);
-    assert_eq!(moved_result.skipped_details[0].reason, "node:remote-node");
+    assert_eq!(moved_result.failed, 1);
+    assert!(
+        moved_result.failures[0]["error"]
+            .as_str()
+            .unwrap()
+            .contains("remote-node")
+    );
     let moved = service.show_goal_summary("MOVED_AFTER_SELECTION").unwrap();
     assert_eq!(moved.goal.status, GoalStatus::Todo);
     assert_eq!(moved.goal.node_id.as_deref(), Some("remote-node"));

@@ -617,6 +617,7 @@ pub(super) fn explicit_target_root_path(command: &Commands) -> Option<&PathBuf> 
             | GoalAction::NoteEdit { target_root, .. }
             | GoalAction::NoteDelete { target_root, .. }
             | GoalAction::Round { target_root, .. }
+            | GoalAction::RoundDelete { target_root, .. }
             | GoalAction::Start { target_root, .. }
             | GoalAction::Cancel { target_root, .. }
             | GoalAction::Retry { target_root, .. }

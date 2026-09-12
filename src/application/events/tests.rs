@@ -1295,3 +1295,68 @@ fn settings_retirement_requires_valid_skills_and_successful_archival() {
     assert!(super::migration::retire_settings(&service.refine_dir).is_err());
     assert!(source.exists());
 }
+
+#[test]
+fn deleted_round_invocation_cannot_be_recreated_by_late_skill_output() {
+    use crate::application::work_items::FileWorkItemService;
+    let fixture = Fixture::new();
+    let service = fixture.service();
+    let work = FileWorkItemService::new(&service.refine_dir);
+    work.create_goal_summary("Delete round", Some("GOAL1"))
+        .unwrap();
+    work.append_goal_round_summary("GOAL1", "User", "Original")
+        .unwrap();
+    let config = service.config().unwrap();
+    let invocation = EventInvocation {
+        id: "late-result".into(),
+        event: config.events.values().next().unwrap().clone(),
+        config_revision: config.revision,
+        context: InvocationContext {
+            node_id: "default".into(),
+            target_root: fixture.0.clone(),
+            cwd: fixture.0.clone(),
+            workspace: None,
+            lifecycle: None,
+            provider: "smoke-ai".into(),
+            goal_id: Some("GOAL1".into()),
+            round_idx: Some(0),
+            workflow_revision: None,
+            candidate_commit: None,
+            data: json!({"goal":context::goal_context(&work.show_goal_detail("GOAL1").unwrap())}),
+            metadata: Default::default(),
+        },
+        bindings: Vec::new(),
+        state: InvocationState::Running,
+        results: Default::default(),
+        attempts: Vec::new(),
+        created_at: "2026-09-12T00:00:00Z".into(),
+        completed_at: None,
+        error: None,
+        action_applied: false,
+    };
+    service.save_invocation(&invocation).unwrap();
+    let revision = work.show_goal_detail("GOAL1").unwrap()["workflow_revision"]
+        .as_u64()
+        .unwrap();
+    work.delete_goal_round("GOAL1", 0, revision).unwrap();
+    assert!(!service.invocation_path(&invocation.id).unwrap().exists());
+    let mut late = invocation.clone();
+    late.state = InvocationState::Succeeded;
+    // A user may still hold the Goal lock while a stopped callback drains.
+    // Callback rejection must not wait for that lock and invert lock ordering.
+    let goal_lock = crate::infrastructure::process::supervisor::coordination::acquire_record_lock(
+        &service.refine_dir,
+        "GOAL1",
+    )
+    .unwrap();
+    let worker = service.clone();
+    let (send, receive) = std::sync::mpsc::channel();
+    let callback = std::thread::spawn(move || {
+        send.send(worker.save_invocation(&late).is_err()).unwrap();
+    });
+    let rejected = receive.recv_timeout(std::time::Duration::from_secs(2));
+    drop(goal_lock);
+    callback.join().unwrap();
+    assert_eq!(rejected.unwrap(), true);
+    assert!(!service.invocation_path(&invocation.id).unwrap().exists());
+}

@@ -58,3 +58,36 @@ fn goal_round_append_and_edit_use_shared_file_work_item_service() {
     assert!(written.contains("\"prompt\": \"Revised prompt\""));
     fs::remove_dir_all(temp_root).unwrap();
 }
+
+#[test]
+fn goal_round_delete_uses_one_based_number_and_revision() {
+    let root = unique_temp_dir("cli-round-delete");
+    let service = crate::application::work_items::FileWorkItemService::new(root.join(".refine"));
+    service
+        .create_goal_summary("Delete retry", Some("GOAL1"))
+        .unwrap();
+    for prompt in ["original", "failed retry"] {
+        service
+            .append_goal_round_summary("GOAL1", "User", prompt)
+            .unwrap();
+    }
+    assert!(Cli::try_parse_from(["refine", "goal", "round-delete", "GOAL1", "0"]).is_err());
+    dispatch(
+        Cli::try_parse_from([
+            "refine",
+            "goal",
+            "round-delete",
+            "GOAL1",
+            "2",
+            "--target-root",
+            root.to_str().unwrap(),
+        ])
+        .unwrap(),
+    )
+    .unwrap();
+    let goal = service.show_goal_detail("GOAL1").unwrap();
+    assert_eq!(goal["rounds"].as_array().unwrap().len(), 1);
+    assert_eq!(goal["rounds"][0]["prompt"], "original");
+    assert_eq!(goal["status"], "backlog");
+    fs::remove_dir_all(root).unwrap();
+}

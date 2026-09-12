@@ -798,6 +798,13 @@ impl InProcessWebServer {
             return self.handle_goal_note(request);
         }
 
+        if request.method == "DELETE"
+            && request.path.starts_with("/work/goals/")
+            && request.path.contains("/rounds/")
+        {
+            return self.handle_goal_round_delete(request);
+        }
+
         if request.method == "POST"
             && request.path.starts_with("/work/goals/")
             && request.path.ends_with("/rounds")

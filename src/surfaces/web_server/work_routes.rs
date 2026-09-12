@@ -20,8 +20,8 @@ use crate::application::projects::projection::{
     PROJECTION_SNAPSHOT_FILE, PageRequest, ProjectionQuery,
 };
 use crate::application::work_items::{
-    BulkFeatureSelection, BulkFeatureUpdate, BulkGoalSelection, BulkGoalUpdate,
-    FeatureGoalAuthoringRequest, FileWorkItemService, GoalAuthoringRequest,
+    BulkFeatureSelection, BulkFeatureUpdate, BulkGoalSelection, FeatureGoalAuthoringRequest,
+    FileWorkItemService, GoalAuthoringRequest,
 };
 use crate::application::workers::FileRunnerWorkerService;
 use crate::application::workflow::WorkflowEngine;

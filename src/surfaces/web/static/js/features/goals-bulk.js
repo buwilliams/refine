@@ -9,6 +9,10 @@ const BULK_STATUS_OPTIONS = [
   { value: "__last_workflow_state", label: "(Last workflow state)" },
   { value: "backlog", label: "backlog" },
   { value: "todo", label: "todo" },
+  { value: "plan", label: "plan" },
+  { value: "implement", label: "implement" },
+  { value: "quality", label: "quality" },
+  { value: "governance", label: "governance" },
   { value: "review", label: "review" },
   { value: "done", label: "done" },
   { value: "failed", label: "failed" },
@@ -73,11 +77,9 @@ async function openBulkModal(field) {
         ${BULK_STATUS_OPTIONS.map((s) => `<option value="${s.value}">${htmlEscape(s.label)}</option>`).join("")}
       </select>
       <p class="muted small" style="margin-top:6px">
-        Last workflow state sends failed Quality attempts back to quality, failed integration
-        attempts back to governance, other failed Goals back to todo, and leaves active
-        automation and Review alone. Cancelled intentionally stops selected active,
-        failed, or Review Goals; Done remains protected. Decline Review by submitting
-        a new round when the work should continue.
+        Selecting a workflow step stops current agent work and moves every selected Goal
+        to that step, overriding normal workflow restrictions. Done changes status only;
+        it does not merge code. Last workflow state retains its automatic retry behavior.
       </p>`;
   } else if (field === "reporter") {
     const opts = (state.reporters || [])

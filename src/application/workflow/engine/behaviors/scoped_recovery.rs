@@ -122,11 +122,7 @@ pub(super) fn begin_scoped_recovery_round(
         }
         Some((source_workspace, worktree_git))
     };
-    let branch = implementation_branch_name(
-        setting_string(&ctx.settings, "branch_name_pattern", "refine/{goal_id}").as_str(),
-        &ctx.goal_id,
-        ctx.round_idx,
-    );
+    let branch = ctx.round_branch()?;
     let target_branch = setting_string(&ctx.settings, "merge_target_branch", "main");
     // Same invariant as the ordinary path: the durable Todo→Plan status write
     // lands before any Git mutation.

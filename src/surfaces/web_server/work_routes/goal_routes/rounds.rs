@@ -1,6 +1,37 @@
 use super::*;
 
 impl InProcessWebServer {
+    pub(crate) fn handle_goal_round_delete(&self, request: ApiRequest) -> ApiResponse {
+        let refine_dir = require_refine_dir!(self, "delete Goal rounds");
+        let Some((id, index)) = request
+            .path
+            .strip_prefix("/work/goals/")
+            .and_then(|rest| rest.split_once("/rounds/"))
+        else {
+            return goal_id_required();
+        };
+        let Some(index) = index.parse::<usize>().ok() else {
+            return invalid_round_body();
+        };
+        let Some(revision) = request
+            .body
+            .as_ref()
+            .and_then(|body| body["expected_revision"].as_u64())
+        else {
+            return ApiResponse::json(
+                400,
+                json!({"error":{"code":"invalid_revision","message":"expected_revision is required"}}),
+            );
+        };
+        match self
+            .work_item_service(refine_dir)
+            .delete_goal_round(id, index, revision)
+        {
+            Ok(goal) => ApiResponse::json(200, json!({"deleted":true,"goal":goal.goal})),
+            Err(error) => error_response(error),
+        }
+    }
+
     pub(crate) fn handle_goal_round_append(&self, request: ApiRequest) -> ApiResponse {
         let refine_dir = require_refine_dir!(self, "append Goal rounds");
         let Some(goal_id) = request

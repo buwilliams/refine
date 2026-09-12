@@ -1,7 +1,9 @@
 //! Durable occurrence records and recoverable history indexes.
 use super::FileEventService;
 use crate::error::{RefineError, RefineResult};
-use crate::infrastructure::process::supervisor::coordination::with_record_lock;
+use crate::infrastructure::process::supervisor::coordination::{
+    acquire_record_lock, with_record_lock,
+};
 use crate::infrastructure::storage::automation::{read_json, write_json};
 use crate::model::automation::*;
 use serde::{Deserialize, Serialize};
@@ -93,6 +95,13 @@ impl FileEventService {
             &format!("event-{}", invocation.id),
             || {
                 let path = self.invocation_path(&invocation.id)?;
+                let _history_lock = invocation
+                    .context
+                    .goal_id
+                    .as_ref()
+                    .map(|id| acquire_record_lock(&self.refine_dir, &format!("round-history-{id}")))
+                    .transpose()?;
+                self.validate_round_history(invocation)?;
                 if path.exists() {
                     let current = self.invocation(&invocation.id)?;
                     if current.state == InvocationState::Cancelled
@@ -121,7 +130,38 @@ impl FileEventService {
         )
     }
 
+    fn validate_round_history(&self, invocation: &EventInvocation) -> RefineResult<()> {
+        if let Some(id) = &invocation.context.goal_id
+            && let Ok(current) =
+                crate::application::work_items::FileWorkItemService::new(&self.refine_dir)
+                    .show_goal_summary(id)
+        {
+            // The history lock serializes deletion with this atomic-file read.
+            // Do not acquire the Goal lock here: workflow decisions already take
+            // Goal then history, including when they stop a running callback.
+            let goal: Value = read_json(&self.refine_dir.join(&current.goal.json_path))?;
+            if goal["round_edit_revision"].as_u64().unwrap_or(0)
+                > invocation.context.data["goal"]["round_edit_revision"]
+                    .as_u64()
+                    .unwrap_or(0)
+            {
+                return Err(RefineError::Conflict(
+                    "Round history changed; stale Skill output cannot recreate removed records"
+                        .into(),
+                ));
+            }
+        }
+        Ok(())
+    }
+
     fn write_invocation_indexes(&self, invocation: &EventInvocation) -> RefineResult<()> {
+        let _history_lock = invocation
+            .context
+            .goal_id
+            .as_ref()
+            .map(|id| acquire_record_lock(&self.refine_dir, &format!("round-history-{id}")))
+            .transpose()?;
+        self.validate_round_history(invocation)?;
         let history = self.refine_dir.join("automation/history").join(format!(
             "{}-{}.json",
             invocation.created_at.replace(':', "-"),

@@ -6,7 +6,6 @@ use crate::application::work_items::{FileWorkItemService, WorkflowStepAuthority}
 use crate::application::workflow::phases::quality::QualityCheckRequest;
 use crate::error::{RefineError, RefineResult};
 use crate::infrastructure::git::worktrees::MergeResult;
-use crate::infrastructure::observability::logs::FileLogService;
 use crate::infrastructure::process::subprocess::workflow_subprocess_metadata;
 use crate::model::JsonObject;
 use crate::model::goal::RoundIntegration;
@@ -157,9 +156,10 @@ impl<'a> WorkflowContext<'a> {
         details
             .entry("node_id".to_string())
             .or_insert_with(|| json!(&self.node_id));
-        FileLogService::new(self.refine_dir()).append_round_log(
+        self.work_items.append_workflow_round_log(
             &self.goal_id,
             self.round_idx,
+            self.attempt_authority.workflow_revision,
             LogEntry {
                 datetime: now_timestamp(),
                 severity: "info".to_string(),

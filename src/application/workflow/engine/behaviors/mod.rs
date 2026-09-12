@@ -27,9 +27,9 @@ use crate::application::workflow::recovery::candidate_handoff::{
     register_candidate_handoff, retain_candidate_handoff_after_failure, settle_candidate_handoff,
 };
 use crate::application::workflow::{
-    CandidateRefreshOutcome, GovernanceEvaluation, agent_worktree_cwd, implementation_branch_name,
-    json_object, now_timestamp, refresh_candidate_for_target_advancement, round_agent_context,
-    selected_agent_context, setting_string,
+    CandidateRefreshOutcome, GovernanceEvaluation, agent_worktree_cwd, json_object, now_timestamp,
+    refresh_candidate_for_target_advancement, round_agent_context, selected_agent_context,
+    setting_string,
 };
 use crate::error::{MergeConflictStage, RefineError, RefineResult};
 use crate::infrastructure::git::with_repository_git_lock;
@@ -111,11 +111,7 @@ impl WorkflowBehavior for WorkflowTodo {
         if let Some(outcome) = begin_scoped_recovery_round(ctx, &app_git)? {
             return Ok(outcome);
         }
-        let branch = implementation_branch_name(
-            setting_string(&ctx.settings, "branch_name_pattern", "refine/{goal_id}").as_str(),
-            &ctx.goal_id,
-            ctx.round_idx,
-        );
+        let branch = ctx.round_branch()?;
         let target_branch = setting_string(&ctx.settings, "merge_target_branch", "main");
         // The base is pinned from the local ref, so the local ref is brought up to
         // its remote first. Advisory: the Round starts on whatever the ref holds if

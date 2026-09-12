@@ -9,6 +9,7 @@ mod goal_filters;
 mod integration_recovery;
 mod persistence;
 mod record_persistence;
+mod round_deletion;
 mod round_helpers;
 mod rounds_and_metadata;
 mod validation;
@@ -41,8 +42,8 @@ use crate::model::feature::{
 use crate::model::goal::{Goal, GoalIndexProjection, GoalPriority};
 use crate::model::workflow::{
     FeatureOperation, GoalOperation, GoalStatus, feature_operation_allowed, goal_operation_allowed,
-    is_automated_status, is_bulk_target_allowed, is_feature_cancel_status,
-    is_feature_protected_status, is_terminal_status, user_status_transition,
+    is_automated_status, is_feature_cancel_status, is_feature_protected_status, is_terminal_status,
+    user_status_transition,
 };
 
 use super::types::*;

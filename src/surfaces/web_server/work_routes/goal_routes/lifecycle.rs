@@ -39,7 +39,7 @@ impl InProcessWebServer {
 
         match self
             .work_item_service(refine_dir)
-            .transition_goal_status(goal_id, status)
+            .override_goal_status(goal_id, status)
         {
             Ok(goal) => ApiResponse::json(200, json!({"goal": goal.goal})),
             Err(error) => error_response(error),

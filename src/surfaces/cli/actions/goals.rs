@@ -124,6 +124,19 @@ pub enum GoalAction {
         #[arg(long)]
         edit_latest: bool,
     },
+    /// Delete a Round and its records, stop current work, and park the Goal in backlog.
+    RoundDelete {
+        id: String,
+        /// One-based Round number shown in the Goal modal.
+        #[arg(value_parser = clap::value_parser!(u64).range(1..))]
+        round: u64,
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
+        target_root: Option<PathBuf>,
+        /// Reject deletion if the Goal changed since this revision was inspected.
+        #[arg(long)]
+        expected_revision: Option<u64>,
+    },
     /// Queue a Goal for the agent workflow: moves backlog work to todo so automation can start it.
     Start {
         /// Goal id.

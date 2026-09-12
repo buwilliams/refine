@@ -234,3 +234,107 @@ fn unresolved_step_outcome_is_superseded_by_explicit_retry_with_evidence_retaine
     );
     fs::remove_dir_all(root).unwrap();
 }
+
+#[test]
+fn human_assignment_can_select_every_step_without_candidate_or_new_round() {
+    let root = unique_temp_dir("human-workflow-assignment");
+    let service = FileWorkItemService::new(root.join(".refine"));
+    service
+        .create_goal_summary("Repairable", Some("GOAL1"))
+        .unwrap();
+    service
+        .append_goal_round_summary("GOAL1", "Operator", "Keep this request")
+        .unwrap();
+    for status in [
+        GoalStatus::Failed,
+        GoalStatus::Todo,
+        GoalStatus::Plan,
+        GoalStatus::Implement,
+        GoalStatus::Quality,
+        GoalStatus::Governance,
+        GoalStatus::Review,
+        GoalStatus::Done,
+        GoalStatus::Cancelled,
+        GoalStatus::Backlog,
+    ] {
+        service
+            .override_goal_status("GOAL1", status.clone())
+            .unwrap();
+        let goal = service.show_goal_detail("GOAL1").unwrap();
+        assert_eq!(goal["status"], status.as_str());
+        assert_eq!(goal["rounds"].as_array().unwrap().len(), 1);
+        assert_eq!(goal["rounds"][0]["prompt"], "Keep this request");
+        assert!(goal["candidate_commit"].is_null());
+        assert!(goal["workflow_requested_step"].is_null());
+    }
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn human_assignment_stops_owned_agent_and_supersedes_its_claim() {
+    use crate::infrastructure::process::subprocess::{FileProcessSupervisor, ManagedProcessSpec};
+    use crate::infrastructure::process::subprocess::{ProcessOwner, ProcessSupervisor};
+    let root = unique_temp_dir("human-workflow-stop");
+    let mut service = FileWorkItemService::new(root.join(".refine"));
+    service.active_node_root = Some(root.join("run"));
+    service
+        .create_goal_summary("Repairable", Some("GOAL1"))
+        .unwrap();
+    service
+        .append_goal_round_summary("GOAL1", "Operator", "Request")
+        .unwrap();
+    service
+        .override_goal_status("GOAL1", GoalStatus::Implement)
+        .unwrap();
+    let (round, revision, prompt) = service.authored_goal_commitment("GOAL1").unwrap();
+    let authority = service
+        .claim_workflow_attempt("GOAL1", GoalStatus::Implement, round, revision, &prompt)
+        .unwrap();
+    let supervisor = FileProcessSupervisor::new(root.join("run/agents"));
+    let process = supervisor.launch(ManagedProcessSpec {
+        owner: ProcessOwner::Agent, command: "/bin/sleep".into(), args: vec!["60".into()],
+        cwd: None, env: Vec::new(), stdin: None, limits: None, authorization_command: None, sensitive: false,
+        metadata: serde_json::from_value(json!({"goal_id":"GOAL1","node_id":"default","round_idx":0,"isolated_process_group":true})).unwrap(),
+    }).unwrap();
+    service
+        .override_goal_status("GOAL1", GoalStatus::Todo)
+        .unwrap();
+    assert!(!supervisor.group_pending(&process).unwrap());
+    assert!(
+        service
+            .verify_workflow_attempt("GOAL1", authority, GoalStatus::Implement, "default")
+            .is_err()
+    );
+    assert_eq!(service.show_goal_detail("GOAL1").unwrap()["status"], "todo");
+    let revision = service.show_goal_detail("GOAL1").unwrap()["workflow_revision"]
+        .as_u64()
+        .unwrap();
+    service.delete_goal_round("GOAL1", 0, revision).unwrap();
+    assert!(
+        !supervisor
+            .process_history_dir()
+            .join(format!("{}.json", process.id))
+            .exists()
+    );
+    assert!(
+        !supervisor
+            .processes_dir()
+            .join(format!("{}.json", process.id))
+            .exists()
+    );
+    assert!(
+        !supervisor
+            .owned_groups()
+            .unwrap()
+            .iter()
+            .any(|group| group.process.id == process.id)
+    );
+    for path in [process.stdout_path, process.stderr_path]
+        .into_iter()
+        .flatten()
+    {
+        assert!(!std::path::Path::new(&path).exists());
+    }
+    fs::remove_dir_all(root).unwrap();
+}
