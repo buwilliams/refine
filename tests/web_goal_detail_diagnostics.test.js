@@ -68,6 +68,7 @@ test("Governance and Quality details render structured evidence as readable JSON
     product_state: "passed",
     constitution_state: "passed",
     meta_rule_state: "passed",
+    governance_rule_actions: [{ action: "repair", reason: "Retain this evidence" }],
     governance_details: {
       phase: "post_implementation",
       violations: [{ rule: 9, reason: "SSE transport required" }],
@@ -81,6 +82,8 @@ test("Governance and Quality details render structured evidence as readable JSON
     },
   });
 
+  assert.doesNotMatch(governance + quality, /<details|<summary/);
+  assert.match(governance, /Retain this evidence/);
   assert.match(governance, /&quot;phase&quot;: &quot;post_implementation&quot;/);
   assert.match(governance, /&quot;violations&quot;:/);
   assert.doesNotMatch(governance, /\[object Object\]/);
@@ -204,4 +207,15 @@ test("Governance displays only the AI decision regardless of legacy grades", () 
   }
   const failed = runtime.governance({ rule_state: "failed", product_state: "passed", constitution_state: "passed" });
   assert.match(failed, /class="status-pill failed"[^>]*>failed</);
+});
+
+
+test("Skill contract failure leads with the recorded cause and retains invocation context inline", () => {
+  const runtime = goalDetailRuntime();
+  const message = "Skill output contract failed: Skill invocation abc123 required bindings [default-quality] cannot authorize a gate: Error; Skill result identity does not match this invocation";
+  const html = runtime.failure({ status: "failed" }, { failure_message: message });
+  assert.match(html, /goal-failure-message">Skill result identity does not match this invocation<\/p>/);
+  assert.ok(html.includes(message));
+  assert.doesNotMatch(html, /<details|<summary/);
+  assert.ok(html.indexOf("goal-failure-message") < html.indexOf("Skill invocation abc123"));
 });

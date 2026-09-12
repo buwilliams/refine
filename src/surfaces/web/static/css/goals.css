@@ -430,7 +430,22 @@
 .round-tab-panel h3, .round-tab-panel h4 { margin: 0 0 10px; font-size: 1rem; }
 .round-diagnostic + .round-diagnostic { margin-top: 20px; }
 .round-request, .round-report-text { white-space: pre-wrap; line-height: 1.6; }
-.round-log { max-height: 320px; overflow: auto; margin-top: 12px; }
+.round-log { margin-top: 24px; }
 .round-log-entry { padding: 8px 0; border-bottom: 1px solid var(--color-border-subtle); white-space: pre-wrap; }
 
 .round-plan-text { white-space: pre-wrap; line-height: 1.6; }
+
+.round-history { overflow-wrap: anywhere; }
+.round-history > .round-diagnostic + .round-diagnostic { margin-top: 24px; }
+.round-history pre {
+  max-height: none;
+  overflow: visible;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  color: var(--muted);
+}
+.round-failure-reason { font-size: 1.05rem; font-weight: 600; line-height: 1.6; }
+.round-recorded-error { font-size: .875rem; line-height: 1.6; }

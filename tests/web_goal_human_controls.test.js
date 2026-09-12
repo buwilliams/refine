@@ -46,10 +46,10 @@ test("every Goal step is selectable and Round deletion uses its inspected revisi
       loadGoalDetail = async () => {};
       window.realBindRoundFormSubmit = bindRoundFormSubmit;
       bindRoundFormSubmit = () => {};
-      window.goal = { id: "GOAL1", name: "Repair", status: "failed", workflow_revision: 42,
+      window.goal = { id: "GOAL1", name: "Repair", status: "failed", workflow_revision: 42, workflow_controls: [{ source_round: 2, at: "today", from: "failed", to: "todo", request: { reason: "Retry after repair" } }],
         rounds: [
           { prompt: "Original", created: "first", failure_message: "Original attempt error", logs: [{ severity: "error", message: "First Round log" }] },
-          { prompt: "Failed retry", created: "second", event_results: { plan: { generation: 3, results: { planner: { role: "plan", outcome: "success", summary: "Task #1 - Restore the navigation plan." } } } }, failure_message: "Retry attempt error", logs: [{ severity: "error", message: "Second Round log" }] }
+          { prompt: "Failed retry", created: "second", event_results: { plan: { generation: 3, results: { planner: { role: "plan", outcome: "success", summary: "Task #1 - Restore the navigation plan." } } } }, failure_message: "Retry attempt error", logs: [{ severity: "error", message: "Second Round log", details: { evidence: "Full diagnostic evidence\n".repeat(60), invocation: "a".repeat(256) } }] }
         ] };
       drawGoalDetail(goal);
     });
@@ -60,6 +60,17 @@ test("every Goal step is selectable and Round deletion uses its inspected revisi
     assert.equal(await page.getByText("Status and history", { exact: true }).count(), 0);
     await latestRound.getByRole("tab", { name: "Activity", exact: true }).click();
     assert.match(await latestRound.getByRole("tabpanel").textContent(), /Second Round log/);
+    const activity = latestRound.getByRole("tabpanel");
+    assert.equal(await activity.locator("details").count(), 0);
+    assert.match(await activity.textContent(), /Retry after repair/);
+    assert.match(await activity.textContent(), /Full diagnostic evidence/);
+    assert.equal(await activity.locator("h3").first().textContent(), "Why this Round failed");
+    for (const element of await activity.locator(".round-history, .round-log, pre").all()) {
+      const style = await element.evaluate(el => ({ overflow: getComputedStyle(el).overflowY, maxHeight: getComputedStyle(el).maxHeight, fits: el.scrollWidth <= el.clientWidth + 1 }));
+      assert.equal(style.overflow, "visible");
+      assert.equal(style.maxHeight, "none");
+      assert.equal(style.fits, true, "long diagnostics should wrap without horizontal scrolling");
+    }
     await page.evaluate(() => drawGoalDetail(goal));
     assert.equal(await latestRound.getByRole("tab", { name: "Activity", exact: true }).getAttribute("aria-selected"), "true");
     await latestRound.getByRole("tab", { name: "Activity", exact: true }).focus();

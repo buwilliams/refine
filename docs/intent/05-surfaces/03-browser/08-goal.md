@@ -66,3 +66,5 @@ The Goal status tag is the sole top-level failure summary. Do not repeat it in g
 Workflow visualization cards subtly highlight the selected status filter. Multiple selected statuses each receive the same highlight; an all-status selection is visually neutral. Selection must survive filtered-table refreshes and route reloads.
 
 Round plan display reads both recorded Plan Skill results and legacy implementation-plan records. Moving to a Skill-driven workflow must not hide an already recorded plan.
+
+Activity leads with why the Round failed, with the recorded cause visible before gate results and event history. When a Skill contract error includes an explicit cause after invocation metadata, surface that cause first while retaining the complete recorded error. Diagnostic evidence, rule actions, workflow decisions, and log details are inline, without nested disclosure toggles or boxed panels. Long evidence wraps; the modal owns vertical scrolling, with no additional Activity or log scrollbar.

@@ -961,17 +961,17 @@ function renderRoundHistory(goal, round, idx, isLatest) {
     pending_workflow_outcome: isLatest ? goal.pending_workflow_outcome : null };
   const notice = isLatest ? computeFeatureBlockingNotice(goal) : null;
   return `<div class="round-history" data-testid="goal-round-history">
-    ${notice ? `<p class="muted small">${htmlEscape(notice.message)}</p>` : ""}
     ${renderFailureSummary(roundGoal, historyRound)}
+    ${notice ? `<p class="muted small">${htmlEscape(notice.message)}</p>` : ""}
     ${renderQualitySummary(round)}
     ${renderGovernanceSummary(round)}
     ${typeof renderWorkflowOutcome === "function" ? renderWorkflowOutcome(roundGoal) : ""}
-    ${logs.length ? `<div class="round-log" data-testid="goal-round-log">${logs.map(log => `<div class="round-log-entry"><div class="muted small">${htmlEscape(log.datetime || "")} · ${htmlEscape(log.severity || "info")}${log.category ? ` · ${htmlEscape(log.category)}` : ""}</div><div>${htmlEscape(log.message || "")}</div>${log.details ? `<details><summary>Details</summary><pre>${htmlEscape(diagnosticDetailsText(log.details))}</pre></details>` : ""}</div>`).join("")}</div>` : `<p class="muted small">No log entries recorded for this Round.</p>`}
+    ${logs.length ? `<section class="round-log" data-testid="goal-round-log"><h3>Event history</h3>${logs.map(log => `<div class="round-log-entry"><div class="muted small">${htmlEscape(log.datetime || "")} · ${htmlEscape(log.severity || "info")}${log.category ? ` · ${htmlEscape(log.category)}` : ""}</div><div>${htmlEscape(log.message || "")}</div>${log.details ? `<pre class="round-evidence">${htmlEscape(diagnosticDetailsText(log.details))}</pre>` : ""}</div>`).join("")}</section>` : `<p class="muted small">No log entries recorded for this Round.</p>`}
   </div>`;
 }
 
 // A Goal can fail after every gate it reached passed — an integration that
-// found the branch tip moved, for one — so the reason gets its own card above
+// found the branch tip moved, for one — so the reason appears first above
 // the gate summaries rather than being inferred from them.
 function goalFailureEvidence(goal, round) {
   if (!round) return null;
@@ -1005,21 +1005,22 @@ function renderFailureSummary(goal, round) {
   if (!failure) {
     return "";
   }
-  const details = diagnosticDetailsText({
-    category: failure.category,
-    message: failure.message,
-    occurred_at: failure.at || null,
-    evidence: failure.log_details,
-  });
+  // Keep the complete recorded message, but lead with the contract's explicit
+  // cause when its invocation metadata otherwise buries that cause.
+  const contractCause = failure.message.startsWith("Skill output contract failed:")
+    ? failure.message.match(/;\s*(Skill result[^;]+)$/)?.[1]
+    : null;
+  const headline = contractCause || failure.message;
   return `
     <div class="round-diagnostic" data-testid="goal-failure-summary">
-      <h3>Failure</h3>
+      <h3>Why this Round failed</h3>
+      <p class="round-failure-reason" data-testid="goal-failure-message">${htmlEscape(headline)}</p>
       <div class="row" style="gap:8px;flex-wrap:wrap">
         ${failure.category ? `<span class="status-pill failed" data-testid="goal-failure-category">${htmlEscape(failure.category)}</span>` : ""}
         ${failure.at ? `<span class="muted small" data-testid="goal-failure-at">${fmtTime(failure.at)}</span>` : ""}
       </div>
-      <p style="margin-bottom:6px" data-testid="goal-failure-message">${htmlEscape(failure.message)}</p>
-      <details data-testid="goal-failure-details"><summary>Details</summary><pre>${htmlEscape(details)}</pre></details>
+      ${contractCause ? `<p class="muted small">The Skill result was rejected, so it could not authorize the workflow gate.</p><p class="round-recorded-error">${htmlEscape(failure.message)}</p>` : ""}
+      ${failure.log_details ? `<pre class="round-evidence" data-testid="goal-failure-details">${htmlEscape(diagnosticDetailsText(failure.log_details))}</pre>` : ""}
     </div>`;
 }
 
@@ -1037,16 +1038,16 @@ function renderGovernanceSummary(round) {
         <span class="status-pill ${reviewStateClass(state)}" data-testid="goal-governance-decision">${htmlEscape(state)}</span>
       </div>
       ${round.governance_message ? `<p style="margin-bottom:6px" data-testid="goal-governance-message">${htmlEscape(round.governance_message)}</p>` : ""}
-      ${round.governance_details ? `<details data-testid="goal-governance-details"><summary>Details</summary><pre>${htmlEscape(diagnosticDetailsText(round.governance_details))}</pre></details>` : ""}
+      ${round.governance_details ? `<pre class="round-evidence" data-testid="goal-governance-details">${htmlEscape(diagnosticDetailsText(round.governance_details))}</pre>` : ""}
       ${actions.length ? `
-        <details style="margin-top:8px" data-testid="goal-governance-actions">
-          <summary>Rule actions (${actions.length})</summary>
+        <section style="margin-top:16px" data-testid="goal-governance-actions">
+          <h4>Rule actions (${actions.length})</h4>
           ${actions.map((a) => `
-            <div class="log-entry info" data-testid="goal-governance-action">
+            <div class="round-log-entry" data-testid="goal-governance-action">
               <div>${htmlEscape(a.action || "")}${a.text ? `: ${htmlEscape(a.text)}` : ""}</div>
               ${a.reason ? `<div class="meta">${htmlEscape(a.reason)}</div>` : ""}
             </div>`).join("")}
-        </details>` : ""}
+        </section>` : ""}
     </div>`;
 }
 
@@ -1062,7 +1063,7 @@ function renderQualitySummary(round) {
         ${round.quality_checked_at ? `<span class="muted small" data-testid="goal-quality-checked-at">${fmtTime(round.quality_checked_at)}</span>` : ""}
       </div>
       ${round.quality_message ? `<p style="margin-bottom:6px" data-testid="goal-quality-message">${htmlEscape(round.quality_message)}</p>` : ""}
-      ${round.quality_details ? `<details data-testid="goal-quality-details"><summary>Details</summary><pre>${htmlEscape(diagnosticDetailsText(round.quality_details))}</pre></details>` : ""}
+      ${round.quality_details ? `<pre class="round-evidence" data-testid="goal-quality-details">${htmlEscape(diagnosticDetailsText(round.quality_details))}</pre>` : ""}
     </div>`;
 }
 
