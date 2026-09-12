@@ -3,7 +3,7 @@
   "branch_name": "refine/DR16616E32E978A0FD32BDC482/round-1",
   "candidate_commit": null,
   "created": "2026-09-12T10:48:19Z",
-  "event_generation": 3,
+  "event_generation": 4,
   "feature_id": null,
   "feature_order": null,
   "id": "DR16616E32E978A0FD32BDC482",
@@ -45,11 +45,11 @@
       "created": "2026-09-12T10:48:19Z",
       "event_configuration": {
         "events": {
-          "workflow.plan.enter": {
+          "workflow.implement.enter": {
             "bindings": [
               {
                 "enabled": true,
-                "id": "default-plan",
+                "id": "default-implement",
                 "inputs": {},
                 "mode": "blocking",
                 "order": 0,
@@ -57,36 +57,56 @@
                 "scope": {
                   "node_id": null
                 },
-                "skill_id": "default-plan"
+                "skill_id": "default-implement"
               }
             ],
             "enabled": true,
-            "id": "workflow.plan.enter",
+            "id": "workflow.implement.enter",
             "kind": "system",
-            "name": "Workflow Plan Enter",
+            "name": "Workflow Implement Enter",
             "on_success": null,
             "parameters": [],
             "scope": {
               "node_id": null
             },
-            "source": "workflow.plan.enter"
+            "source": "workflow.implement.enter"
           }
         },
         "revision": 40,
         "schema_version": 2,
         "skills": {
-          "default-plan": {
+          "default-implement": {
             "enabled": true,
-            "id": "default-plan",
-            "name": "Plan",
+            "id": "default-implement",
+            "name": "Implement",
             "parameters": [],
-            "prompt": "## Plan\n\nProduce a complete, concise implementation plan for the current Goal Round. Choose the planning method appropriate to the work. For behavior changes, identify the underlying cause, governing concept or invariant, and existing owner before listing edits. Prefer strengthening an existing concept; introduce one only when it clarifies the behavior and reduces special cases. Do not change repository files. \n\n### Guidance\n\n- Thrashing is a real danger with AI agents. To mitigate this, consider if the Goal is merely a symptom of a missing or misused concept in the target app architecture. Feel free to explore other Goals to determine if they have additional insights into this question.\n- Over- or under-specificity can also cause undesirable implementation outcomes. Ensure that the plan has the information it needs for effective implementation, but not unnecessary details.\n- Always use plain language.\n\n### Format\n\nReturn an actionable plan with stable checklist IDs and meaningful verification.\n\nExample:\nTask #1 - short description of the work (what) and the rationale (why)\nTask #2 - short description of the work (what) and the rationale (why)\n(etc.)\n\n### Intent and architecture\n\nReview Refine's relevant documentation files under Refine's runtime at `<refine-runtime>/docs/intent/***/*.*` as the durable product specification.",
+            "prompt": "## Implementation\n\nImplement the current Goal Round using all accepted plans and attached Skills. Inspect existing code, make the complete change, run appropriate verification, and report evidence for each checklist item. Check the plan's assumptions against the code and keep policy in its shared owner. Prefer one correction that explains the affected behavior over separate fixes at each failing call site. Report evidence-backed plan deviations within the Goal's scope and existing authority. Preserve unrelated changes and historical evidence.\n\n### Intent and architecture\n\nReview Refine's relevant documentation files under Refine's runtime at `<refine-runtime>/docs/intent/***/*.*` as the durable product specification.\n\n### Semantic code organization\n\nKeep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.\n\nIf issues outside the Goal’s scope block progress, investigate and fix them or use an evidence-backed workaround, preserving required checks and documenting what you changed.\n",
             "provenance": "refine-default-v1",
             "role": "task",
             "scope": {
               "node_id": null
             }
           }
+        }
+      },
+      "event_results": {
+        "46cc166000d2c92dced0f8751203c73980baa2b5585c42468015b2864142d2c5": {
+          "candidate_commit": null,
+          "generation": 3,
+          "results": {
+            "default-plan": {
+              "artifacts": null,
+              "binding_id": "default-plan",
+              "evidence": [],
+              "invocation_id": "46cc166000d2c92dced0f8751203c73980baa2b5585c42468015b2864142d2c5",
+              "outcome": "success",
+              "role": "plan",
+              "summary": "The historical cause was plan aggregation prefixing checklist IDs with binding identity, followed by exact comparison against implementation-reported IDs. Commit 39dfb90d already removed both mechanisms and is included in this Round's base. Runtime intent documentation confirms the governing invariant: planning reports are context; workflow permission follows valid Skill decisions and current workflow authority. Existing owners are implementation_planning::planning_context, SkillResult validation, and Event workflow gates. This Round should protect the existing correction with focused regression coverage, without introducing ID normalization.\n\nTask #1 - Add a regression in the existing workflow test harness using the reported P1–P11 case: retain a historical plan with workflow.plan.enter:default-plan: prefixes and return successful implementation evidence with unqualified IDs. Verify the authorized implementation completes and records its candidate without checklist comparison or a repair launch.\n\nTask #2 - Extend planning handoff coverage to two Plan Skills that both use P1. Verify their reports retain separate binding identities and unchanged artifact IDs. Also verify historical finalized plans remain readable when Event planning reports are absent. This protects provenance without creating another checklist authority.\n\nTask #3 - Verify the decision boundary using existing Event tests: optional or differently shaped evidence must not veto success, while invalid invocation/binding identity, explicit failure/error, and superseded workflow authority must still prevent advancement. Add only missing coverage; correct production code only if these regressions expose a remaining enforcement path.\n\nTask #4 - Run the affected workflow and Event tests, then the repository's required Rust checks. Report results and identify 39dfb90d as the existing behavioral correction. The reporter's installed version remains unverified; do not claim their node is repaired or modify historical Goal state.\n\nNo repository files were changed during planning.\n\n"
+            }
+          },
+          "round_idx": 0,
+          "source": "workflow.plan.enter",
+          "state": "succeeded"
         }
       },
       "failure_at": "",
@@ -204,6 +224,78 @@
               }
             }
           }
+        },
+        "3:default:workflow.plan.exit": {
+          "events": {
+            "workflow.plan.exit": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.plan.exit",
+              "kind": "system",
+              "name": "Workflow Plan Exit",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.plan.exit"
+            }
+          },
+          "revision": 40,
+          "schema_version": 2,
+          "skills": {}
+        },
+        "3:default:workflow.plan.success": {
+          "events": {},
+          "revision": 40,
+          "schema_version": 2,
+          "skills": {}
+        },
+        "4:default:workflow.implement.enter": {
+          "events": {
+            "workflow.implement.enter": {
+              "bindings": [
+                {
+                  "enabled": true,
+                  "id": "default-implement",
+                  "inputs": {},
+                  "mode": "blocking",
+                  "order": 0,
+                  "overrides": null,
+                  "scope": {
+                    "node_id": null
+                  },
+                  "skill_id": "default-implement"
+                }
+              ],
+              "enabled": true,
+              "id": "workflow.implement.enter",
+              "kind": "system",
+              "name": "Workflow Implement Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.implement.enter"
+            }
+          },
+          "revision": 40,
+          "schema_version": 2,
+          "skills": {
+            "default-implement": {
+              "enabled": true,
+              "id": "default-implement",
+              "name": "Implement",
+              "parameters": [],
+              "prompt": "## Implementation\n\nImplement the current Goal Round using all accepted plans and attached Skills. Inspect existing code, make the complete change, run appropriate verification, and report evidence for each checklist item. Check the plan's assumptions against the code and keep policy in its shared owner. Prefer one correction that explains the affected behavior over separate fixes at each failing call site. Report evidence-backed plan deviations within the Goal's scope and existing authority. Preserve unrelated changes and historical evidence.\n\n### Intent and architecture\n\nReview Refine's relevant documentation files under Refine's runtime at `<refine-runtime>/docs/intent/***/*.*` as the durable product specification.\n\n### Semantic code organization\n\nKeep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.\n\nIf issues outside the Goal’s scope block progress, investigate and fix them or use an evidence-backed workaround, preserving required checks and documenting what you changed.\n",
+              "provenance": "refine-default-v1",
+              "role": "task",
+              "scope": {
+                "node_id": null
+              }
+            }
+          }
         }
       },
       "governance_candidate_commit": "",
@@ -223,7 +315,7 @@
       "quality_state": "unclassified",
       "reporter": "ethan.jacobson@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-09-12T10:48:23Z",
+      "updated": "2026-09-12T10:49:30Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-12T10:48:21Z",
         "generation": 2,
@@ -234,9 +326,9 @@
       "workflow_recovery": null
     }
   ],
-  "status": "plan",
+  "status": "implement",
   "target_branch": "main",
-  "updated": "2026-09-12T10:48:23Z",
+  "updated": "2026-09-12T10:49:30Z",
   "workflow_events": [
     {
       "at": "2026-09-12T10:48:19.606429117+00:00",
@@ -267,7 +359,17 @@
       "round_idx": 0,
       "to": "plan",
       "workflow_revision": 6
+    },
+    {
+      "at": "2026-09-12T10:49:29.856022559+00:00",
+      "forced": false,
+      "from": "plan",
+      "generation": 4,
+      "node_id": "default",
+      "round_idx": 0,
+      "to": "implement",
+      "workflow_revision": 13
     }
   ],
-  "workflow_revision": 9
+  "workflow_revision": 14
 }

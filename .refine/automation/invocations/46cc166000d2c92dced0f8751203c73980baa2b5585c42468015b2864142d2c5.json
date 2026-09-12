@@ -182,11 +182,46 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "succeeded",
+  "results": {
+    "default-plan": {
+      "invocation_id": "46cc166000d2c92dced0f8751203c73980baa2b5585c42468015b2864142d2c5",
+      "binding_id": "default-plan",
+      "role": "plan",
+      "outcome": "success",
+      "summary": "The historical cause was plan aggregation prefixing checklist IDs with binding identity, followed by exact comparison against implementation-reported IDs. Commit 39dfb90d already removed both mechanisms and is included in this Round's base. Runtime intent documentation confirms the governing invariant: planning reports are context; workflow permission follows valid Skill decisions and current workflow authority. Existing owners are implementation_planning::planning_context, SkillResult validation, and Event workflow gates. This Round should protect the existing correction with focused regression coverage, without introducing ID normalization.\n\nTask #1 - Add a regression in the existing workflow test harness using the reported P1–P11 case: retain a historical plan with workflow.plan.enter:default-plan: prefixes and return successful implementation evidence with unqualified IDs. Verify the authorized implementation completes and records its candidate without checklist comparison or a repair launch.\n\nTask #2 - Extend planning handoff coverage to two Plan Skills that both use P1. Verify their reports retain separate binding identities and unchanged artifact IDs. Also verify historical finalized plans remain readable when Event planning reports are absent. This protects provenance without creating another checklist authority.\n\nTask #3 - Verify the decision boundary using existing Event tests: optional or differently shaped evidence must not veto success, while invalid invocation/binding identity, explicit failure/error, and superseded workflow authority must still prevent advancement. Add only missing coverage; correct production code only if these regressions expose a remaining enforcement path.\n\nTask #4 - Run the affected workflow and Event tests, then the repository's required Rust checks. Report results and identify 39dfb90d as the existing behavioral correction. The reporter's installed version remains unverified; do not claim their node is repaired or modify historical Goal state.\n\nNo repository files were changed during planning.\n\n",
+      "evidence": [],
+      "artifacts": null
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "default-plan",
+      "checkout": {
+        "observation": {
+          "branch": "refine/DR16616E32E978A0FD32BDC482/round-1",
+          "head_commit": "5bf2c25bc437e30e48b78dc0c173469b5f6587b3",
+          "status_porcelain": []
+        },
+        "tree": "a121e1e28c51512e9edc7ce62627b3fa214911a3"
+      },
+      "checkout_recorded": true,
+      "diagnostic": null,
+      "observational_violation": false,
+      "operation_id": null,
+      "process_id": "proc-1789210104699-37687-108",
+      "prompt_bytes": 9059,
+      "provider_session_id": null,
+      "purpose": "work",
+      "raw_output": "{\n  \"binding_id\": \"default-plan\",\n  \"invocation_id\": \"46cc166000d2c92dced0f8751203c73980baa2b5585c42468015b2864142d2c5\",\n  \"outcome\": \"success\",\n  \"role\": \"plan\",\n  \"summary\": \"The historical cause was plan aggregation prefixing checklist IDs with binding identity, followed by exact comparison against implementation-reported IDs. Commit 39dfb90d already removed both mechanisms and is included in this Round's base. Runtime intent documentation confirms the governing invariant: planning reports are context; workflow permission follows valid Skill decisions and current workflow authority. Existing owners are implementation_planning::planning_context, SkillResult validation, and Event workflow gates. This Round should protect the existing correction with focused regression coverage, without introducing ID normalization.\\n\\nTask #1 - Add a regression in the existing workflow test harness using the reported P1–P11 case: retain a historical plan with workflow.plan.enter:default-plan: prefixes and return successful implementation evidence with unqualified IDs. Verify the authorized implementation completes and records its candidate without checklist comparison or a repair launch.\\n\\nTask #2 - Extend planning handoff coverage to two Plan Skills that both use P1. Verify their reports retain separate binding identities and unchanged artifact IDs. Also verify historical finalized plans remain readable when Event planning reports are absent. This protects provenance without creating another checklist authority.\\n\\nTask #3 - Verify the decision boundary using existing Event tests: optional or differently shaped evidence must not veto success, while invalid invocation/binding identity, explicit failure/error, and superseded workflow authority must still prevent advancement. Add only missing coverage; correct production code only if these regressions expose a remaining enforcement path.\\n\\nTask #4 - Run the affected workflow and Event tests, then the repository's required Rust checks. Report results and identify 39dfb90d as the existing behavioral correction. The reporter's installed version remains unverified; do not claim their node is repaired or modify historical Goal state.\\n\\nNo repository files were changed during planning.\\n\\n\"\n}",
+      "received_at": "2026-09-12T10:49:28.391397270+00:00",
+      "started_at": "2026-09-12T10:48:24.675350704+00:00",
+      "workflow_revision": 2
+    }
+  ],
   "created_at": "2026-09-12T10:48:24.197187142+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-12T10:49:28.856235861+00:00",
   "error": null,
   "action_applied": false
 }
