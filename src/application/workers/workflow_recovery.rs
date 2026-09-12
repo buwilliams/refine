@@ -65,7 +65,7 @@ impl FileRunnerWorkerService {
         };
         let now = chrono::Utc::now().timestamp_millis();
         if let Some(worker) = live.first() {
-            let health = assess_worker(&self.runtime_root, worker, target.as_deref(), now);
+            let health = assess_worker(&self.runtime_root, worker, target.as_deref());
             if health.healthy {
                 let _ =
                     std::fs::remove_file(self.runtime_root.join("workflow-target-transition.json"));

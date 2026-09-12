@@ -1,5 +1,7 @@
 use super::*;
-use crate::application::workflow::health::{assess_worker, assess_workflow_health};
+use crate::application::workflow::health::{
+    assess_worker_with_clock as assess_worker, assess_workflow_health,
+};
 use crate::infrastructure::process::subprocess::scheduler_observation::{
     SchedulerObservation, current_os_identity,
 };
@@ -117,10 +119,10 @@ fn ownership_pid_reuse_and_duplicate_workers_fail_closed() {
     let worker = launch(&root, &token, "/bin/sleep", &["60"], true);
     let mut tick = observation(&root, &worker);
     tick.write(&root).unwrap();
-    assert!(assess_worker(&root, &worker, None, tick.tick_ms).healthy);
+    assert!(assess_worker(&root, &worker, None, || tick.tick_ms).healthy);
     tick.process_id = "another-registration".into();
     tick.write(&root).unwrap();
-    assert!(!assess_worker(&root, &worker, None, tick.tick_ms).healthy);
+    assert!(!assess_worker(&root, &worker, None, || tick.tick_ms).healthy);
     let supervisor = FileProcessSupervisor::new(&root);
     let mut group = supervisor.owned_groups().unwrap().remove(0);
     group
@@ -152,36 +154,65 @@ fn ownership_pid_reuse_and_duplicate_workers_fail_closed() {
 }
 
 #[test]
+fn health_reads_the_scheduler_observation_before_sampling_time() {
+    let root = root("workflow-health-clock-order");
+    let token = uuid::Uuid::new_v4().to_string();
+    let worker = launch(&root, &token, "/bin/sleep", &["60"], true);
+    let mut tick = observation(&root, &worker);
+    tick.write(&root).unwrap();
+    let now = tick.tick_ms;
+    // Publish a later observation exactly when the assessor samples its clock.
+    // Sampling before reading would consume this later tick and falsely stop a
+    // healthy worker. Sampling after reading assesses the earlier snapshot.
+    let health = assess_worker(&root, &worker, None, || {
+        tick.tick_ms = now + 1;
+        tick.completed_cycle_ms = Some(now + 1);
+        tick.write(&root).unwrap();
+        now
+    });
+    assert!(health.healthy, "{health:?}");
+    assert_eq!(health.observation.unwrap().tick_ms, now);
+    // A timestamp genuinely ahead of the assessment clock remains invalid.
+    assert!(!assess_worker(&root, &worker, None, || now).healthy);
+    assert!(assess_worker(&root, &worker, None, || now + 1).healthy);
+    stop_all(&root);
+    std::fs::remove_dir_all(root.parent().unwrap().parent().unwrap()).unwrap();
+}
+
+#[test]
 fn stale_ticks_missing_corrupt_target_changed_and_long_work_are_distinct() {
     let root = root("workflow-health-cases");
     let token = uuid::Uuid::new_v4().to_string();
     let worker = launch(&root, &token, "/bin/sleep", &["60"], true);
     let now = chrono::Utc::now().timestamp_millis();
-    assert_eq!(assess_worker(&root, &worker, None, now).state, "starting");
-    assert!(!assess_worker(&root, &worker, None, now + 31_000).healthy);
+    assert_eq!(
+        assess_worker(&root, &worker, None, || now).state,
+        "starting"
+    );
+    assert!(!assess_worker(&root, &worker, None, || now + 31_000).healthy);
     let mut tick = observation(&root, &worker);
     tick.node_id = Some("foreign-node".into());
     tick.write(&root).unwrap();
     assert_eq!(
-        assess_worker(&root, &worker, None, now).state,
+        assess_worker(&root, &worker, None, || now).state,
         "unavailable"
     );
     tick.node_id = None;
     tick.active_attempts.insert("LONG-GOAL".into());
     tick.write(&root).unwrap();
-    assert!(assess_worker(&root, &worker, None, tick.tick_ms + 29_999).healthy);
+    assert!(assess_worker(&root, &worker, None, || tick.tick_ms + 29_999).healthy);
     assert_eq!(
-        assess_worker(&root, &worker, None, tick.tick_ms + 30_000).state,
+        assess_worker(&root, &worker, None, || tick.tick_ms + 30_000).state,
         "stalled"
     );
     assert_eq!(
-        assess_worker(&root, &worker, Some(&root), tick.tick_ms).state,
+        assess_worker(&root, &worker, Some(&root), || tick.tick_ms).state,
         "draining"
     );
     tick.active_attempts.clear();
     tick.write(&root).unwrap();
     assert_eq!(
-        assess_worker(&root, &worker, Some(&root), tick.tick_ms).state,
+        assess_worker(&root, &worker, Some(&root), || tick.tick_ms).state,
         "target_changed"
     );
     FileProcessSupervisor::new(&root)

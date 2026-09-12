@@ -57,13 +57,27 @@ pub fn assess_worker(
     root: &Path,
     process: &ManagedProcess,
     target: Option<&Path>,
-    now: i64,
+) -> WorkflowHealth {
+    assess_worker_with_clock(root, process, target, || {
+        chrono::Utc::now().timestamp_millis()
+    })
+}
+
+pub(crate) fn assess_worker_with_clock(
+    root: &Path,
+    process: &ManagedProcess,
+    target: Option<&Path>,
+    clock: impl FnOnce() -> i64,
 ) -> WorkflowHealth {
     let incarnation = workflow_incarnation(process);
     let snapshot = incarnation
         .as_deref()
         .ok_or_else(|| RefineError::Degraded("worker incarnation is unavailable".into()))
         .and_then(|token| SchedulerObservation::read(root, token));
+    // Read the observation before sampling time: the scheduling thread can publish
+    // a newer tick during the read. A time captured by the caller can make that
+    // healthy tick look future-dated and trigger termination of the worker.
+    let now = clock();
     let started = process.started_at.parse::<i64>().ok().or_else(|| {
         chrono::DateTime::parse_from_rfc3339(&process.started_at)
             .ok()
@@ -178,12 +192,7 @@ pub fn assess_workflow_health(root: &Path) -> WorkflowHealth {
         .active_app
         .map(PathBuf::from);
         let mut health = if live.len() == 1 {
-            assess_worker(
-                root,
-                &live[0],
-                target.as_deref(),
-                chrono::Utc::now().timestamp_millis(),
-            )
+            assess_worker(root, &live[0], target.as_deref())
         } else {
             WorkflowHealth::unavailable(
                 "unavailable",
