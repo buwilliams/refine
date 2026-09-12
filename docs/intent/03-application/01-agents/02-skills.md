@@ -38,3 +38,5 @@ Goal-bound Skills carry a pinned workspace admission through ordered bindings, d
 ## Future Direction
 
 Improve reuse, discovery, and context selection while keeping authored instructions readable. Additional result contracts should remain Refine-owned so richer execution does not turn Skill editing into schema programming.
+
+Runtime completion instructions define response transport and identity, not substantive pass/fail rules. Skill instructions and current user authorization govern the decision; the wrapper must not turn discovered or unresolved findings into an automatic failure verdict.
