@@ -95,9 +95,8 @@ fn actual_non_ticking_worker_is_stopped_before_replacement_tick_is_accepted() {
     assert!(!assess_workflow_health(&root).healthy);
     assert!(service.ensure_background_worker(WORKFLOW_RUNNER).is_err());
     assert!(!FileProcessSupervisor::process_is_alive(&old).unwrap());
-    // The bounded backoff cannot launch another process immediately.
-    assert!(service.ensure_background_worker(WORKFLOW_RUNNER).is_err());
-    thread::sleep(Duration::from_millis(1100));
+    // Complete exit permits replacement on the next tick, without carrying
+    // forward the failed-stop backoff.
     let BackgroundWorkerEnsure::Running(replacement) =
         service.ensure_background_worker(WORKFLOW_RUNNER).unwrap()
     else {

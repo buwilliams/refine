@@ -152,6 +152,9 @@ impl FileRunnerWorkerService {
                 match self.stop_workflow_incarnation(&record.worker) {
                     Ok(()) => {
                         record.stopped = true;
+                        // Backoff throttles failed stops, not a successful ownership handoff.
+                        // The next tick may launch; a failed launch sets its own delay.
+                        record.retry_after_ms = 0;
                         record.failure =
                             "old worker and owned groups exited; awaiting replacement tick".into();
                     }
