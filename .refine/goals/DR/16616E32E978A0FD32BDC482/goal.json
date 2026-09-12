@@ -11,7 +11,7 @@
   "node_id": "default",
   "notes": [],
   "priority": "low",
-  "reporter": "ethan.jacobson@insurity.com",
+  "reporter": "Ethan Jacobson",
   "rounds": [
     {
       "agent_context": {
@@ -41,7 +41,7 @@
         "version": 1,
         "workflow_summary": "Refine gives this Goal Agent an isolated worktree, the current Round, and available planning context. Follow the Goal and applicable Skill instructions and use your judgment to decide when to stop. Quality and Governance agents make their own decisions using their Skills before integration and human Review. Refine coordinates workflow transitions and Git actions. Do not directly advance Goal state, approve, merge, or push."
       },
-      "assignee": "ethan.jacobson@insurity.com",
+      "assignee": "Ethan Jacobson",
       "created": "2026-09-12T10:48:19Z",
       "event_configuration": {
         "events": {
@@ -353,7 +353,7 @@
       "quality_details": "",
       "quality_message": "",
       "quality_state": "unclassified",
-      "reporter": "ethan.jacobson@insurity.com",
+      "reporter": "Ethan Jacobson",
       "rule_state": "unclassified",
       "updated": "2026-09-12T10:49:30Z",
       "workflow_attempt_authority": {
@@ -466,5 +466,5 @@
       "workflow_revision": 16
     }
   ],
-  "workflow_revision": 16
+  "workflow_revision": 17
 }
