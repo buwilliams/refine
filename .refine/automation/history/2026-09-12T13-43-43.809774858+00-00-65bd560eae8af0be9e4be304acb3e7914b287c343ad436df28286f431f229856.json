@@ -1,5 +1,5 @@
 {
-  "completed_at": null,
+  "completed_at": "2026-09-12T13:46:12.464092634+00:00",
   "config_revision": 40,
   "created_at": "2026-09-12T13:43:43.809774858+00:00",
   "error": null,
@@ -9,11 +9,11 @@
     "name": "Workflow Implement Enter",
     "source": "workflow.implement.enter"
   },
-  "execution_state": "running",
-  "gate": "missing",
+  "execution_state": "succeeded",
+  "gate": "satisfied",
   "goal_id": "00000T146Y4H01X1WVV8STE000",
   "id": "65bd560eae8af0be9e4be304acb3e7914b287c343ad436df28286f431f229856",
   "node_id": "default",
-  "result_count": 0,
-  "state": "running"
+  "result_count": 1,
+  "state": "succeeded"
 }
