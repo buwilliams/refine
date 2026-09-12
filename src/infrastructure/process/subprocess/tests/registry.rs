@@ -252,3 +252,35 @@ fn file_process_supervisor_cleans_deferred_artifacts_after_handoff_release() {
 
     fs::remove_dir_all(temp_root).unwrap();
 }
+
+#[test]
+fn goal_output_survives_cleanup_until_explicit_round_deletion() {
+    let root = unique_temp_dir("retained-goal-output");
+    let supervisor = FileProcessSupervisor::new(&root);
+    fs::create_dir_all(supervisor.processes_dir()).unwrap();
+    let stdout = supervisor.processes_dir().join("goal.stdout.log");
+    fs::write(&stdout, "Quality progress\n").unwrap();
+    supervisor
+        .register(ManagedProcess {
+            id: "goal-output".into(),
+            owner: ProcessOwner::Agent,
+            pid: None,
+            state: "exited".into(),
+            label: Some("Quality".into()),
+            details: Some(serde_json::json!({"goal_id":"G1","round_idx":0}).to_string()),
+            stdout_path: Some(stdout.to_string_lossy().into()),
+            stderr_path: None,
+            stdin_path: None,
+            limits: None,
+            started_at: "1789220775661".into(),
+            exit_code: Some(0),
+        })
+        .unwrap();
+    supervisor.cleanup("goal-output").unwrap();
+    assert_eq!(fs::read_to_string(&stdout).unwrap(), "Quality progress\n");
+    assert!(supervisor.process_history_path("goal-output").exists());
+    supervisor.delete_round_process_records("G1", 0, 1).unwrap();
+    assert!(!stdout.exists());
+    assert!(!supervisor.process_history_path("goal-output").exists());
+    fs::remove_dir_all(root).unwrap();
+}

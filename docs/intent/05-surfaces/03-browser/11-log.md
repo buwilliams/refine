@@ -11,3 +11,5 @@ Search runs against retained records, including messages, structured details, an
 Live tails use byte cursors and bounded pages. Repeated reads do not duplicate output or skip entries when a page fills. Filters affect presentation and search, not what the system records. Node/project switches and stale search responses must never mix scopes. Retained logs remain evidence; UI changes do not delete their records.
 
 Raw process output without per-line timestamps uses the log file's last-write time for archive ordering and receipt time while tailing, explicitly labelled as approximate. All sources use comparable timestamps; lines from the same stream retain byte-offset order. Recent agent output must not sort behind historical workflow events merely because process metadata uses Unix milliseconds.
+
+Settling a Goal agent retains its raw stdout/stderr and process metadata for the log reader. Completion must not erase progress history. Explicit Round deletion removes these retained records and streams with the rest of that Round.

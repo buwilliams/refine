@@ -96,7 +96,7 @@ impl FileProcessSupervisor {
                 }
                 continue;
             }
-            self.remove_process_artifacts(&process)?;
+            self.retire_process_artifacts(&process, false)?;
             if self
                 .processes_dir()
                 .join(format!("{}.json", process.id))
@@ -172,6 +172,19 @@ impl FileProcessSupervisor {
     }
 
     pub(super) fn remove_process_artifacts(&self, process: &ManagedProcess) -> RefineResult<()> {
+        let retain_logs = process
+            .details
+            .as_deref()
+            .and_then(|details| serde_json::from_str::<Value>(details).ok())
+            .is_some_and(|details| details["goal_id"].as_str().is_some_and(|id| !id.is_empty()));
+        self.retire_process_artifacts(process, retain_logs)
+    }
+
+    fn retire_process_artifacts(
+        &self,
+        process: &ManagedProcess,
+        retain_logs: bool,
+    ) -> RefineResult<()> {
         if (Self::requires_group_ownership(process) || self.group_path(&process.id).exists())
             && self.group_pending(process).unwrap_or(true)
         {
@@ -183,12 +196,16 @@ impl FileProcessSupervisor {
         if !self.artifacts_may_retire(process)? {
             return Ok(());
         }
-        let removed = self.remove_process_artifacts_locked(process);
+        let removed = self.remove_process_artifacts_locked(process, retain_logs);
         FileExt::unlock(&lock).ok();
         removed
     }
 
-    fn remove_process_artifacts_locked(&self, process: &ManagedProcess) -> RefineResult<()> {
+    fn remove_process_artifacts_locked(
+        &self,
+        process: &ManagedProcess,
+        retain_logs: bool,
+    ) -> RefineResult<()> {
         let handoff_path = self.artifact_handoff_path(&process.id);
         // A live workflow consumer owns the transcript through this lease. Reconciliation may
         // already persist a truthful terminal state, but deletion waits until consumption ends.
@@ -217,9 +234,29 @@ impl FileProcessSupervisor {
                 )));
             }
         };
+        if retain_logs {
+            let mut archived = process.clone();
+            archived.stdin_path = None;
+            fs::create_dir_all(self.process_history_dir())
+                .map_err(|e| RefineError::Io(e.to_string()))?;
+            write_json_atomically(
+                &self.process_history_path(&process.id),
+                &serde_json::to_vec(&archived)
+                    .map_err(|e| RefineError::Serialization(e.to_string()))?,
+                "retained Goal process logs",
+            )?;
+        }
         for path in [
-            process.stdout_path.as_deref(),
-            process.stderr_path.as_deref(),
+            if retain_logs {
+                None
+            } else {
+                process.stdout_path.as_deref()
+            },
+            if retain_logs {
+                None
+            } else {
+                process.stderr_path.as_deref()
+            },
             process.stdin_path.as_deref(),
         ]
         .into_iter()
@@ -258,7 +295,11 @@ impl FileProcessSupervisor {
             }
         }
         let history_path = self.process_history_path(&process.id);
-        match fs::remove_file(&history_path) {
+        match if retain_logs {
+            Ok(())
+        } else {
+            fs::remove_file(&history_path)
+        } {
             Ok(()) => {}
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
             Err(error) => {
