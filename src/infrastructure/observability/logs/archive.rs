@@ -86,6 +86,15 @@ pub(crate) fn query_archive(
             }
             for file in fs::read_dir(dir).map_err(|e| RefineError::Io(e.to_string()))? {
                 let path = file.map_err(|e| RefineError::Io(e.to_string()))?.path();
+                // Legacy agents keep completion signals beside process records.
+                // They are output artifacts, not ManagedProcess envelopes.
+                if path
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .is_some_and(|name| name.ends_with(".signal.json"))
+                {
+                    continue;
+                }
                 if path.extension().and_then(|s| s.to_str()) != Some("json") {
                     continue;
                 }
@@ -328,6 +337,12 @@ mod tests {
             )
             .unwrap();
         }
+        fs::create_dir_all(runtime.join("processes")).unwrap();
+        fs::write(
+            runtime.join("processes/goal-agent-legacy.signal.json"),
+            r#"{"state":"complete","message":"legacy completion"}"#,
+        )
+        .unwrap();
         let stdout = runtime.join("out.log");
         fs::write(&stdout, "first raw line\nsecond raw line\n").unwrap();
         fs::write(runtime.join("process-history/p1.json"), json!({"id":"p1","owner":"agent","pid":null,"state":"exited","label":"codex","details":json!({"goal_id":"GOAL1"}).to_string(),"stdout_path":stdout,"stderr_path":null,"stdin_path":null,"limits":null,"started_at":"2026-09-12T12:00:00Z","exit_code":0}).to_string()).unwrap();
