@@ -19,7 +19,10 @@ function renderWorkflowVisualization({
   statuses = workflowStatuses(),
   hrefForStatus = null,
   className = "",
+  selectedStatuses = [],
 } = {}) {
+  const selected = new Set(selectedStatuses);
+  const showSelection = selected.size > 0 && !statuses.every(status => selected.has(status));
   const classes = ["card-grid", "workflow-status-grid", className]
     .filter(Boolean)
     .join(" ");
@@ -27,6 +30,7 @@ function renderWorkflowVisualization({
     <section class="${classes}">
       ${statuses.map((s) => {
         const count = counts[s] || 0;
+        const isSelected = showSelection && selected.has(s);
         const agentManaged = AGENT_MANAGED_WORKFLOW_STATUSES.has(s);
         const label = workflowStatusLabel(s);
         const displayLabel = workflowVisualizationLabel(s);
@@ -36,7 +40,7 @@ function renderWorkflowVisualization({
             <div class="workflow-status-label">${displayLabel}</div>
           </div>
           <div class="workflow-status-count">${fmtCount(count)}</div>`;
-        const attrs = `class="card workflow-status-card ${s}${agentManaged ? " workflow-status-card-agent" : ""}" data-testid="workflow-status-${htmlEscape(s)}" title="${count} ${label} goal${count === 1 ? "" : "s"}${agentManaged ? " - agent-managed automation" : ""}"`;
+        const attrs = `class="card workflow-status-card ${s}${agentManaged ? " workflow-status-card-agent" : ""}${isSelected ? " workflow-status-selected" : ""}"${isSelected ? ' aria-current="true"' : ""} data-testid="workflow-status-${htmlEscape(s)}" title="${count} ${label} goal${count === 1 ? "" : "s"}${agentManaged ? " - agent-managed automation" : ""}"`;
         const href = hrefForStatus ? hrefForStatus(s) : "";
         return href
           ? `<a ${attrs} href="${htmlEscape(href)}" style="text-decoration:none;color:inherit">${body}</a>`

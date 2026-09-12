@@ -75,6 +75,7 @@ async function renderGoalsList() {
     <div id="goals-workflow" class="goals-workflow" data-testid="goals-workflow">
       ${renderWorkflowVisualization({
         counts: {},
+        selectedStatuses: f.status ? [f.status] : [],
         hrefForStatus: (status) => goalsWorkflowStatusHash(status, f),
         className: "goals-workflow-grid",
       })}
@@ -324,6 +325,7 @@ function drawGoalsWorkflowVisualization(filter, counts) {
   if (!root) return;
   renderInto(root, renderWorkflowVisualization({
     counts,
+    selectedStatuses: filter.status ? [filter.status] : [],
     hrefForStatus: (status) => goalsWorkflowStatusHash(status, filter),
     className: "goals-workflow-grid",
   }));

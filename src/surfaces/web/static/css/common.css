@@ -1503,3 +1503,10 @@ select {
 .toast.success { background: var(--ok); }
 .toast.warn { background: var(--warn); }
 .toast.error { background: var(--error); }
+
+/* Filter selection is quieter than the workflow's semantic status colors. */
+.workflow-status-grid > .workflow-status-card.workflow-status-selected {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--color-border-subtle));
+  background: color-mix(in srgb, var(--accent) 6%, var(--color-surface-raised));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 15%, transparent);
+}
