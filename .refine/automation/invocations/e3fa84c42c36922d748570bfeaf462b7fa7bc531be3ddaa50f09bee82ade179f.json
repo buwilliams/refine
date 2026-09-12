@@ -101,11 +101,47 @@
       }
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "error",
+  "results": {
+    "trigger-2124c51c-8d1f-44b7-8a07-7a989a68227f": {
+      "invocation_id": "e3fa84c42c36922d748570bfeaf462b7fa7bc531be3ddaa50f09bee82ade179f",
+      "binding_id": "trigger-2124c51c-8d1f-44b7-8a07-7a989a68227f",
+      "role": "task",
+      "outcome": "error",
+      "summary": "Could not queue fetch-goals-from-email: this invocation's completion contract does not contain invocation_id, so the required startup-email-<invocation_id> request ID cannot be constructed. No command was run.",
+      "evidence": [],
+      "artifacts": null
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "trigger-2124c51c-8d1f-44b7-8a07-7a989a68227f",
+      "checkout": {
+        "observation": {
+          "branch": "main",
+          "head_commit": "e4aa1619781e8e3c10b2f83801c09461bfea3652",
+          "status_porcelain": []
+        },
+        "tree": "a82b53ade73ab6b60745d41b1a45bb5e8afe5765"
+      },
+      "checkout_recorded": true,
+      "diagnostic": null,
+      "host_bound_result": true,
+      "observational_violation": false,
+      "operation_id": null,
+      "process_id": "proc-1789221806836-1330538-2",
+      "prompt_bytes": 2162,
+      "provider_session_id": null,
+      "purpose": "work",
+      "raw_output": "{\"outcome\":\"error\",\"summary\":\"Could not queue fetch-goals-from-email: this invocation's completion contract does not contain invocation_id, so the required startup-email-<invocation_id> request ID cannot be constructed. No command was run.\"}",
+      "received_at": "2026-09-12T14:03:36.345906267+00:00",
+      "started_at": "2026-09-12T14:03:26.789671447+00:00",
+      "workflow_revision": null
+    }
+  ],
   "created_at": "2026-09-12T14:03:25.531325973+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-12T14:03:36.396696350+00:00",
   "error": null,
   "action_applied": false
 }
