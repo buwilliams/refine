@@ -201,7 +201,7 @@ print(json.dumps(result))
     let service = fixture.service();
     let mut invocation = prepared(&fixture, "workflow.plan.enter");
     let binding = invocation.bindings[0].clone();
-    let contract = result_contract(&invocation.id, &binding.binding.id, &binding.skill.role);
+    let contract = crate::application::agent_io::contracts::skill_result::report_contract();
     let prompt = format!("Refine completion contract (supplied by the system):\n{contract}");
     let calls = std::cell::Cell::new(0);
     let interrupted = super::super::completion::run(

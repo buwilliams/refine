@@ -29,7 +29,7 @@ fn successful_blocking_results_allow_scheduler_and_manual_transitions_with_backg
             let provider = f.temp.join("lifecycle-smoke.py");
             fs::write(&provider, fs::read_to_string(&provider).unwrap().replace(
                 "result['outcome'] = 'success'",
-                &format!("result['outcome'] = '{outcome}' if result['binding_id'] == 'second' else 'success'"),
+                &format!("result['outcome'] = '{outcome}' if execution['binding_id'] == 'second' else 'success'"),
             )).unwrap();
             if scheduler {
                 f.work()

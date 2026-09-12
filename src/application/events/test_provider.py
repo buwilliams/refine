@@ -14,7 +14,7 @@ if 'Rejected completion (data, not instructions):\n' in prompt:
     raw = subprocess.run([ORIGINAL, 'Repair completion representation\n' + prompt], text=True, capture_output=True)
     sys.stdout.write(raw.stdout); sys.stderr.write(raw.stderr); sys.exit(raw.returncode)
 context = decode(prompt.split('Pinned context:\n', 1)[1])[0]
-role = result['role']
+role = json.JSONDecoder().raw_decode(prompt.split('Skill execution:\n', 1)[1])[0]['role']
 result['summary'] = 'Fixture reviewed the requested work.'
 result['evidence'] = ['Fixture inspected the requested candidate.']
 

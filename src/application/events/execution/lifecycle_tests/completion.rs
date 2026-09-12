@@ -85,7 +85,7 @@ fn settlement_rechecks_required_entry_records_after_later_skills_complete() {
             _ => unreachable!(),
         };
         let replacement = format!(
-            "if result['binding_id'] == 'workflow-todo-exit-gate':\n p = pathlib.Path({})\n record = json.loads(p.read_text())\n {change}\n p.write_text(json.dumps(record))\nresult['outcome'] = 'success'",
+            "if execution['binding_id'] == 'workflow-todo-exit-gate':\n p = pathlib.Path({})\n record = json.loads(p.read_text())\n {change}\n p.write_text(json.dumps(record))\nresult['outcome'] = 'success'",
             serde_json::to_string(&f.service.invocation_path(&entry.id).unwrap()).unwrap(),
         );
         fs::write(

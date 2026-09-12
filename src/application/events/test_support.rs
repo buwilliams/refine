@@ -48,11 +48,12 @@ if prompt.startswith('Repair only'):
 context = decode(prompt.split('Pinned context:\n', 1)[1])[0]
 parameters = decode(prompt.split('Parameters:\n', 1)[1])[0]
 result = decode(prompt.split('Refine completion contract (supplied by the system):\n', 1)[1])[0]
+execution = decode(prompt.split('Skill execution:\n', 1)[1])[0]
 cwd = pathlib.Path.cwd()
 assert str(cwd) == context['system']['workspace']
 assert str(cwd) == parameters.get('workspace', str(cwd))
 assert not any(k in os.environ for k in ('GIT_DIR','GIT_WORK_TREE','GIT_INDEX_FILE','GIT_COMMON_DIR'))
-with pathlib.Path('launches.txt').open('a') as f: f.write(result['binding_id'] + '\n')
+with pathlib.Path('launches.txt').open('a') as f: f.write(execution['binding_id'] + '\n')
 pathlib.Path('skill-output.txt').write_text('lifecycle output\n')
 subprocess.run(['git','add','skill-output.txt'], check=True)
 result['outcome'] = 'success'

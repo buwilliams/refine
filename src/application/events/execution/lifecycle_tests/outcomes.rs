@@ -89,7 +89,7 @@ fn required_success_failure_opens_error_handling_and_only_an_explicit_decision_r
         let script = f.temp.join("lifecycle-smoke.py");
         fs::write(&script, fs::read_to_string(&script).unwrap().replace(
             "result['outcome'] = 'success'",
-            "result['outcome'] = 'failure' if result['binding_id'].endswith('-success-gate') else 'success'",
+            "result['outcome'] = 'failure' if execution['binding_id'].endswith('-success-gate') else 'success'",
         )).unwrap();
         f.request_todo();
         f.dispatch();

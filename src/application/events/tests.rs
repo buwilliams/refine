@@ -186,7 +186,7 @@ contract = json.loads(prompt.split('Refine completion contract (supplied by the 
 contract['outcome'] = 'failure' if prompt.startswith('FAIL') else 'success'
 contract['summary'] = 'Observed ' + contract['outcome']
 path = pathlib.Path('launches.txt')
-with path.open('a') as f: f.write(contract['binding_id'] + '\n')
+with path.open('a') as f: f.write(('first' if prompt.startswith('FAIL') else 'second') + '\n')
 print(json.dumps(contract))
 "#).unwrap();
     std::fs::set_permissions(&provider, std::fs::Permissions::from_mode(0o755)).unwrap();
@@ -332,7 +332,7 @@ prompt=' '.join(sys.argv[1:])
 decode=json.JSONDecoder().raw_decode
 result=decode(prompt.split('Refine completion contract (supplied by the system):\n',1)[1])[0]
 context=decode(prompt.split('Pinned context:\n',1)[1])[0]
-role=result['role']
+role=json.JSONDecoder().raw_decode(prompt.split('Skill execution:\n',1)[1])[0]['role']
 result.pop('summary', None)
 if role=='governance' and (fixture/'decline').exists(): result['outcome']='failure'
 if role=='task':

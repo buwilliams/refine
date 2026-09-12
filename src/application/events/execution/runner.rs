@@ -207,11 +207,7 @@ impl FileEventService {
                     json!(seconds("agent_hard_cap_seconds", 7200)),
                 );
                 let contract =
-                    crate::application::agent_io::contracts::skill_result::result_contract(
-                        id,
-                        &pinned.binding.id,
-                        &pinned.skill.role,
-                    );
+                    crate::application::agent_io::contracts::skill_result::report_contract();
                 let observational = invocation
                     .context
                     .data
@@ -220,11 +216,12 @@ impl FileEventService {
                     == Some(true);
                 let authority = "Follow the Skill instructions and current user authorization. Use supported Refine commands for Goal changes. Preserve confirmation boundaries and retained work. A workflow change supersedes this invocation; its old result cannot advance the new work.";
                 let prompt = format!(
-                    "{}\n\nAttached Skills:\n{}\n\nParameters:\n{}\n\nPinned context:\n{}\n\nRefine completion contract (supplied by the system):\n{}\nReturn one JSON object matching this contract. {authority} Identity fields must be copied exactly. Use outcome failure for findings and error for execution faults. Use your judgment to decide when to stop and which outcome to report. The summary, evidence, and artifacts fields are optional context; no checklist, test commands, supporting evidence, or recovery proposal is required by Refine. {}",
+                    "{}\n\nAttached Skills:\n{}\n\nParameters:\n{}\n\nPinned context:\n{}\n\nSkill execution:\n{}\n\nRefine completion contract (supplied by the system):\n{}\nReturn one JSON object matching this contract. {authority} Refine attaches invocation, binding, and role identity to your response; do not include identity fields. Use outcome failure for findings and error for execution faults. Use your judgment to decide when to stop and which outcome to report. The summary, evidence, and artifacts fields are optional context; no checklist, test commands, supporting evidence, or recovery proposal is required by Refine. {}",
                     pinned.skill.prompt,
                     contexts,
                     json!(pinned.parameters),
                     invocation.context.data,
+                    json!({"binding_id": pinned.binding.id, "role": pinned.skill.role}),
                     contract,
                     if observational {
                         "This invocation is observational: do not change files or Git state. Report your decision about the current work."

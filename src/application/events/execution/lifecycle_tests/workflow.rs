@@ -228,7 +228,7 @@ fn todo_admission_rechecks_entry_workspace_after_exit_skills_complete() {
     let retained = f.temp.join("retained-entry-workspace");
     let script = f.temp.join("lifecycle-smoke.py");
     let replacement = format!(
-        "if result['binding_id'] == 'workflow-todo-exit-gate':\n pathlib.Path({}).rename({})\nresult['outcome'] = 'success'",
+        "if execution['binding_id'] == 'workflow-todo-exit-gate':\n pathlib.Path({}).rename({})\nresult['outcome'] = 'success'",
         serde_json::to_string(&entry.context.cwd).unwrap(),
         serde_json::to_string(&retained).unwrap(),
     );
