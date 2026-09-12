@@ -352,11 +352,11 @@ function drawGoalDetail(goal) {
         ${goal.status === "review" ? forwardBtn : ""}
         <button class="secondary" type="button" id="btn-watch-logs" data-testid="goal-action-watch-logs">View Logs</button>
         <div class="goal-action-group">
-          <button class="goal-action-primary" id="btn-open-agent" data-testid="goal-open-agent"
+          <button class="goal-action-primary secondary" id="btn-open-agent" data-testid="goal-open-agent"
                   ${canOpenAgent ? "" : "disabled"}
                   title="${htmlEscape(openAgentTitle)}">${eventAgents ? "Skill runs" : "Open Agent"}</button>
           <details class="nav-menu goal-action-menu" id="goal-action-menu"${actionMenuOpen ? " open" : ""}>
-            <summary class="btn goal-action-more" aria-label="More Goal actions" data-testid="goal-action-menu-toggle"></summary>
+            <summary class="btn goal-action-more secondary" aria-label="More Goal actions" data-testid="goal-action-menu-toggle"></summary>
             <div class="nav-menu-panel goal-action-panel">
 
               <button class="nav-menu-item" type="button" id="btn-reporter" data-testid="goal-action-reporter">Reporter</button>

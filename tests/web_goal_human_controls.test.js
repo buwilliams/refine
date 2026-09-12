@@ -99,7 +99,11 @@ test("every Goal step is selectable and Round deletion uses its inspected revisi
     assert.match(firstLog, /First Round log/);
     assert.doesNotMatch(firstLog, /Second Round log/);
     assert.equal(await page.getByTestId("goal-step-toggle").getAttribute("class"),
-      await page.getByTestId("goal-action-menu-toggle").getAttribute("class"));
+      (await page.getByTestId("goal-action-menu-toggle").getAttribute("class")).replace(" secondary", ""));
+    const logColor = await page.getByTestId("goal-action-watch-logs").evaluate(el => getComputedStyle(el).backgroundColor);
+    for (const id of ["goal-open-agent", "goal-action-menu-toggle"]) {
+      assert.equal(await page.getByTestId(id).evaluate(el => getComputedStyle(el).backgroundColor), logColor);
+    }
     await page.getByTestId("goal-step-primary").click();
     assert.equal(await page.evaluate(() => requests.at(-1).body.to), "todo");
     for (const step of ["backlog", "todo", "plan", "implement", "quality", "governance", "review", "done", "failed", "cancelled"]) {
