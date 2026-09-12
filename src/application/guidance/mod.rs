@@ -124,7 +124,7 @@ impl FileNextActionsService {
                     &mut suggestions,
                     "inspect-workflow-health",
                     &format!(
-                        "{}; {waiting} continuously eligible Todo Goals waiting over 30 seconds; last scheduler tick {last_tick}",
+                        "{}; {waiting} continuously eligible Goals waiting over 30 seconds; last scheduler tick {last_tick}",
                         health.reason
                     ),
                     &health.remedy,

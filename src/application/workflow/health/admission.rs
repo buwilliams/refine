@@ -1,4 +1,4 @@
-//! Continuously eligible Todo observation, independent of the worker being diagnosed.
+//! Independent reconciliation of eligible work against live execution ownership.
 use super::*;
 use crate::application::projects::projection::ActiveGoalIndex;
 use crate::application::workflow::WorkflowEngine;
@@ -14,6 +14,8 @@ pub struct AdmissionHealth {
     pub runtime_root: PathBuf,
     pub target_root: PathBuf,
     pub node_id: String,
+    #[serde(default)]
+    pub scheduler_incarnation: Option<String>,
     pub observer_pid: u32,
     pub observer_os_identity: String,
     pub checked_at_ms: i64,
@@ -81,6 +83,7 @@ fn sample_admission(
     let eligibility = SchedulingEligibility::new(index.goals());
     let mut active = BTreeSet::new();
     let mut delayed = BTreeSet::new();
+    let mut scheduler_incarnation = None;
     for root in [runtime.to_path_buf(), runtime.join("agents")] {
         let supervisor = FileProcessSupervisor::new(root);
         for process in supervisor.capacity_processes()? {
@@ -114,6 +117,7 @@ fn sample_admission(
             && current_os_identity(snapshot.pid)?.as_ref() == Some(&snapshot.os_identity)
             && snapshot.target_root.as_deref() == Some(target)
         {
+            scheduler_incarnation = Some(token);
             active.extend(snapshot.active_attempts);
             delayed.extend(
                 snapshot
@@ -169,13 +173,14 @@ fn sample_admission(
             if let Some(reason) = reason {
                 cause = reason.clone();
                 blocked_goals.insert(goal.id.clone(), reason);
-            } else if goal.status == GoalStatus::Todo {
+            } else {
                 ids.push(goal.id.clone());
             }
         }
     }
     let previous = previous.filter(|p| {
-        p.target_root == target
+        p.scheduler_incarnation == scheduler_incarnation
+            && p.target_root == target
             && p.node_id == policy.active_node_id
             && p.observer_pid == std::process::id()
             && (0..3_000).contains(&(now - p.checked_at_ms))
@@ -196,11 +201,12 @@ fn sample_admission(
     if !free_capacity {
         cause = "capacity is occupied".into();
     } else if !eligible_since_ms.is_empty() {
-        cause = "eligible Todo work awaiting admission".into();
+        cause = "eligible workflow work awaiting admission".into();
     } else if cause.is_empty() {
-        cause = "no eligible Todo work".into();
+        cause = "no eligible workflow work".into();
     }
     Ok(AdmissionHealth {
+        scheduler_incarnation,
         runtime_root: runtime
             .canonicalize()
             .map_err(|e| RefineError::Io(e.to_string()))?,

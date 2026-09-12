@@ -1,5 +1,5 @@
-//! Worker replacement does not authorize another provider attempt. Completed
-//! occurrence receipts may be consumed; interrupted work requires an Error decision.
+//! Distinguish completed Skill decisions from unfinished work whose owner was lost.
+//! Reuse receipts and keep unfinished occurrences schedulable in their current step.
 use crate::application::events::FileEventService;
 use crate::application::work_items::WorkflowStepAuthority;
 use crate::error::RefineResult;
@@ -97,7 +97,7 @@ mod tests {
     use serde_json::json;
 
     #[test]
-    fn restart_preserves_completed_occurrence_and_fails_interrupted_work_without_relaunch() {
+    fn restart_preserves_completed_occurrence_and_keeps_unfinished_work_schedulable() {
         for completed in [false, true] {
             let root =
                 std::env::temp_dir().join(format!("refine-step-restart-{}", uuid::Uuid::new_v4()));
@@ -203,7 +203,7 @@ mod tests {
             } else {
                 assert_eq!(
                     items.show_goal_summary("GOAL1").unwrap().goal.status,
-                    GoalStatus::Failed
+                    GoalStatus::Plan
                 );
             }
             assert!(!root.join("runtime/agents/processes").exists());

@@ -176,3 +176,53 @@ fn missing_group_recovery_preserves_unverified_or_replaced_evidence() {
         );
     }
 }
+
+#[test]
+fn later_lifetime_evidence_clears_cached_ownership_uncertainty() {
+    let fixture = CompletedScope::new();
+    let mut group = fixture.group.clone();
+    group.ownership_gap = Some("earlier guardian observation was inconclusive".into());
+    fixture.owner.write_owned_group(&group).unwrap();
+    let observed = fixture.owner.observe_owned_group(&group).unwrap();
+    assert!(observed.confirmed_exit);
+    assert!(observed.ownership_gap.is_none());
+    assert!(!fixture.owner.group_pending(&fixture.process).unwrap());
+}
+
+#[test]
+fn expired_execution_epoch_releases_all_ownership_without_signalling_reused_pids() {
+    let fixture = CompletedScope::new();
+    let mut group = fixture.group.clone();
+    let previous = format!("linux:{}:42", uuid::Uuid::new_v4());
+    let scope = group.launch_scope.as_mut().unwrap();
+    scope.guardian_identity = Some(previous.clone());
+    scope.guardian_pid = std::process::id();
+    fs::write(&scope.proof_path, b"").unwrap();
+    group.witnesses = BTreeMap::from([(std::process::id(), previous)]);
+    group.ownership_gap = Some("guardian disappeared before settling".into());
+    let mut metadata: Value =
+        serde_json::from_str(group.process.details.as_deref().unwrap()).unwrap();
+    metadata["launch_scope"] = serde_json::to_value(&group.launch_scope).unwrap();
+    group.process.details = Some(metadata.to_string());
+    fixture.owner.write_process(&group.process).unwrap();
+    fixture.owner.write_owned_group(&group).unwrap();
+    let observed = fixture
+        .owner
+        .stop_owned_group(&group, Duration::from_millis(100))
+        .unwrap();
+    assert!(observed.confirmed_exit);
+    assert!(observed.ownership_gap.is_none());
+    assert!(os_process_identity(std::process::id()).unwrap().is_some());
+    assert!(!fixture.owner.group_pending(&group.process).unwrap());
+
+    // Mixed-epoch witnesses are contradictory, not evidence of complete exit.
+    group.witnesses.insert(
+        std::process::id(),
+        os_process_identity(std::process::id()).unwrap().unwrap(),
+    );
+    fixture.owner.write_owned_group(&group).unwrap();
+    assert!(matches!(
+        fixture.owner.assess_owned_group(&group).unwrap(),
+        OwnershipAssessment::Unverified { .. }
+    ));
+}

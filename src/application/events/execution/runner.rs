@@ -123,6 +123,57 @@ impl FileEventService {
                 operations.ensure_cancellation_processes_exited(previous)?;
             }
         }
+        // Only a currently admitted workflow owner may continue an unfinished
+        // occurrence. The workspace lease and authority checks exclude competing
+        // coordinators; complete scope exit excludes surviving agent descendants.
+        if launch_metadata.is_some()
+            && invocation.context.goal_id.is_some()
+            && invocation
+                .event
+                .source
+                .as_deref()
+                .is_some_and(|source| source.starts_with("workflow."))
+            && (invocation.context.metadata.contains_key("started_bindings")
+                || invocation
+                    .context
+                    .metadata
+                    .contains_key("interrupted_resume"))
+        {
+            validate_authority()?;
+            for root in [runtime.to_path_buf(), runtime.join("agents")] {
+                let owner =
+                    crate::infrastructure::process::subprocess::FileProcessSupervisor::new(root);
+                for process in owner.capacity_processes()? {
+                    let details: Value =
+                        serde_json::from_str(process.details.as_deref().unwrap_or("{}"))
+                            .map_err(|e| RefineError::Serialization(e.to_string()))?;
+                    if details["event_invocation_id"] != id {
+                        continue;
+                    }
+                    owner
+                        .terminate_and_confirm_exit(&process, std::time::Duration::from_secs(2))?;
+                }
+            }
+            validate_authority()?;
+            if let Some(started) = invocation.context.metadata.remove("started_bindings") {
+                invocation
+                    .context
+                    .metadata
+                    .entry("interrupted_launches")
+                    .or_insert_with(|| json!([]))
+                    .as_array_mut()
+                    .ok_or_else(|| {
+                        RefineError::Serialization("invalid interrupted launch history".into())
+                    })?
+                    .push(json!({"started_bindings":started,"reconciled_at":now()}));
+            }
+            invocation.context.metadata.remove("interrupted_resume");
+            invocation
+                .context
+                .metadata
+                .insert("resuming_work".into(), json!(true));
+            self.save_accepted_invocation(&invocation, &validate_authority)?;
+        }
         let operation = with_record_lock(&self.refine_dir, &format!("event-{id}"), || {
             if self.invocation(id)?.state == InvocationState::Cancelled {
                 return Err(RefineError::Conflict(
@@ -215,8 +266,15 @@ impl FileEventService {
                     .and_then(Value::as_bool)
                     == Some(true);
                 let authority = "Follow the Skill instructions and current user authorization. Use supported Refine commands for Goal changes. Preserve confirmation boundaries and retained work. A workflow change supersedes this invocation; its old result cannot advance the new work.";
+                let continuation = if invocation.context.metadata.get("resuming_work")
+                    == Some(&json!(true))
+                {
+                    "Previous execution was interrupted. Inspect retained work and output, preserve completed changes, and continue the unfinished work."
+                } else {
+                    ""
+                };
                 let prompt = format!(
-                    "{}\n\nAttached Skills:\n{}\n\nParameters:\n{}\n\nPinned context:\n{}\n\nSkill execution:\n{}\n\nRefine completion contract (supplied by the system):\n{}\nReturn one JSON object matching this contract. {authority} Refine attaches invocation, binding, and role identity to your response; do not include identity fields. Use your judgment to decide when to stop and which outcome to report. The summary, evidence, and artifacts fields are optional context; no checklist, test commands, supporting evidence, or recovery proposal is required by Refine. {}",
+                    "{}\n\nAttached Skills:\n{}\n\nParameters:\n{}\n\nPinned context:\n{}\n\nSkill execution:\n{}\n\nRefine completion contract (supplied by the system):\n{}\nReturn one JSON object matching this contract. {authority} {continuation} Refine attaches invocation, binding, and role identity to your response; do not include identity fields. Use your judgment to decide when to stop and which outcome to report. The summary, evidence, and artifacts fields are optional context; no checklist, test commands, supporting evidence, or recovery proposal is required by Refine. {}",
                     pinned.skill.prompt,
                     contexts,
                     json!(pinned.parameters),

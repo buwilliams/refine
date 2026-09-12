@@ -156,6 +156,7 @@ pub(crate) fn assess_worker_with_clock(
             format!("scheduler evidence unavailable: {error}"),
         ),
     };
+    apply_admission_assessment(root, target, now, &mut health);
     if !health.healthy {
         health.remedy = format!(
             "refine system doctor; refine system status --port {}",
@@ -217,22 +218,12 @@ pub fn assess_workflow_health(root: &Path) -> WorkflowHealth {
             health.state = "detached".into();
             health.reason = "no target app is attached; scheduler is ticking".into();
         }
-        health.admission = admission::read_admission(
+        apply_admission_assessment(
             root,
             target.as_deref(),
             chrono::Utc::now().timestamp_millis(),
+            &mut health,
         );
-        if let Some(admission) = &health.admission {
-            let waiting = admission.waiting_count(chrono::Utc::now().timestamp_millis());
-            health.waiting_todo_count = waiting;
-            if waiting > 0 && health.healthy {
-                health.healthy = false;
-                health.state = "admission_stalled".into();
-                health.reason = format!(
-                    "{waiting} continuously eligible Todo Goals have waited over 30 seconds with free capacity"
-                );
-            }
-        }
         let recovery = root.join("workflow-recovery.json");
         if recovery.exists() {
             let value: serde_json::Value = serde_json::from_slice(
@@ -266,5 +257,34 @@ pub fn enrich_status(root: &Path, value: &mut serde_json::Value) {
             object.insert("daemon_healthy".into(), serde_json::json!(false));
         }
         object.insert("daemon_maintenance".into(), maintenance);
+    }
+}
+
+// The supervisor and diagnostic surfaces consume the same work-ownership
+// assessment. A ticking scheduler alone does not prove eligible work is owned.
+fn apply_admission_assessment(
+    root: &Path,
+    target: Option<&Path>,
+    now: i64,
+    health: &mut WorkflowHealth,
+) {
+    health.admission = admission::read_admission(root, target, now);
+    if let Some(admission) = &health.admission {
+        let same_owner = health.observation.as_ref().is_some_and(|worker| {
+            admission.scheduler_incarnation.as_deref() == Some(worker.incarnation.as_str())
+        });
+        let waiting = if same_owner || health.observation.is_none() {
+            admission.waiting_count(now)
+        } else {
+            0
+        };
+        health.waiting_todo_count = waiting;
+        if waiting > 0 && same_owner && health.healthy {
+            health.healthy = false;
+            health.state = "admission_stalled".into();
+            health.reason = format!(
+                "{waiting} continuously eligible Goals have no execution owner after 30 seconds with free capacity"
+            );
+        }
     }
 }

@@ -236,8 +236,54 @@ impl LaunchScope {
         Ok(bytes)
     }
     pub(super) fn proof(&self, group: &OwnedGroup) -> RefineResult<bool> {
+        if self.execution_epoch_ended(group)? {
+            return Ok(true);
+        }
         let bytes = self.read_proof(group)?;
         Ok(bytes.len() == 15 && &bytes[8..] == b"exited\n")
+    }
+    // Ownership is bounded by the kernel lifetime that created it. A changed
+    // execution epoch proves all descendants exited, even without a final
+    // guardian receipt. Missing or mixed identity evidence never grants exit.
+    fn execution_epoch_ended(&self, group: &OwnedGroup) -> RefineResult<bool> {
+        fn epoch(identity: &str) -> Option<uuid::Uuid> {
+            let mut parts = identity.split(':');
+            if parts.next()? != "linux" {
+                return None;
+            }
+            let boot = uuid::Uuid::parse_str(parts.next()?).ok()?;
+            parts.next()?.parse::<u64>().ok()?;
+            if parts.next().is_some() || boot.is_nil() {
+                return None;
+            }
+            Some(boot)
+        }
+        let Some(previous) = self.guardian_identity.as_deref().and_then(epoch) else {
+            return Ok(false);
+        };
+        let current = os_process_identity(std::process::id())?;
+        let Some(current) = current.as_deref().and_then(epoch) else {
+            return Ok(false);
+        };
+        if previous == current
+            || group.launch_scope.as_ref() != Some(self)
+            || group
+                .witnesses
+                .values()
+                .any(|id| epoch(id) != Some(previous))
+        {
+            return Ok(false);
+        }
+        let metadata: Value =
+            serde_json::from_str(group.process.details.as_deref().unwrap_or("{}"))
+                .map_err(|e| RefineError::Serialization(e.to_string()))?;
+        let recorded: Option<Self> = metadata
+            .get("launch_scope")
+            .cloned()
+            .map(serde_json::from_value)
+            .transpose()
+            .map_err(|e| RefineError::Serialization(e.to_string()))?;
+        Ok(recorded.as_ref() == Some(self))
     }
     pub(super) fn alive(&self) -> RefineResult<bool> {
         Ok(self.guardian_identity.is_some()

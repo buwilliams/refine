@@ -580,3 +580,122 @@ print(json.dumps(result))
         );
     }
 }
+
+#[cfg(target_os = "linux")]
+#[test]
+fn admitted_workflow_continues_interrupted_work_once_in_the_same_round() {
+    let _env = crate::infrastructure::agents::invocation::smoke_ai_env_lock()
+        .lock()
+        .unwrap_or_else(|p| p.into_inner());
+    let fixture = Fixture::new();
+    fixture.repository();
+    let _restore = provider(
+        &fixture,
+        r#"
+import json,sys,pathlib
+prompt=' '.join(sys.argv[1:])
+assert 'Previous execution was interrupted' in prompt
+result=json.JSONDecoder().raw_decode(prompt.split('Refine completion contract (supplied by the system):\n',1)[1])[0]
+with pathlib.Path('work-count').open('a') as f: f.write('work\n')
+print(json.dumps(result))
+"#,
+    );
+    let service = fixture.service();
+    let items = crate::application::work_items::FileWorkItemService::new(&service.refine_dir);
+    items
+        .create_goal_summary("Continue", Some("GOAL1"))
+        .unwrap();
+    items
+        .append_goal_round_summary("GOAL1", "Human", "Retain existing work")
+        .unwrap();
+    items
+        .set_goal_status_unchecked("GOAL1", &crate::model::workflow::GoalStatus::Plan)
+        .unwrap();
+    let git = FileGitWorktreeService::new(&fixture.0);
+    let branch = "refine/GOAL1/round-1";
+    let base = git.resolve_commit("main").unwrap();
+    let cwd = git
+        .ensure_worktree_from_base(branch, &git.managed_worktree_path(branch).unwrap(), &base)
+        .unwrap();
+    items
+        .update_goal_git_refs("GOAL1", branch, "main", &base, None)
+        .unwrap();
+    let goal = items.show_goal_detail("GOAL1").unwrap();
+    let mut invocation = service
+        .prepare(
+            "workflow.plan.enter",
+            InvocationContext {
+                node_id: "default".into(),
+                target_root: fixture.0.clone(),
+                cwd: cwd.clone().into(),
+                workspace: None,
+                lifecycle: None,
+                provider: "smoke-ai".into(),
+                goal_id: Some("GOAL1".into()),
+                round_idx: Some(0),
+                workflow_revision: goal["workflow_revision"].as_u64(),
+                candidate_commit: None,
+                data: json!({"goal":goal}),
+                metadata: Default::default(),
+            },
+            Default::default(),
+            "continue-plan",
+        )
+        .unwrap();
+    invocation.state = InvocationState::Running;
+    invocation.context.metadata.insert(
+        "started_bindings".into(),
+        json!({invocation.bindings[0].binding.id.clone():"interrupted"}),
+    );
+    service.save_invocation(&invocation).unwrap();
+    use crate::infrastructure::process::subprocess::{
+        FileProcessSupervisor, ManagedProcessSpec, ProcessOwner, ProcessSupervisor,
+    };
+    let old_owner = FileProcessSupervisor::new(fixture.0.join("runtime/agents"));
+    let old_process = old_owner
+        .launch(ManagedProcessSpec {
+            owner: ProcessOwner::Runner,
+            command: "/bin/sleep".into(),
+            args: vec!["60".into()],
+            cwd: None,
+            env: Vec::new(),
+            stdin: None,
+            limits: None,
+            authorization_command: None,
+            sensitive: false,
+            metadata: serde_json::from_value(json!({
+                "event_invocation_id": invocation.id, "goal_id":"GOAL1",
+                "isolated_process_group":true
+            }))
+            .unwrap(),
+        })
+        .unwrap();
+    let completed = service
+        .execute_with_metadata(&invocation.id, Some(&Default::default()), || Ok(()))
+        .unwrap();
+    assert!(!old_owner.group_pending(&old_process).unwrap());
+    assert_eq!(completed.state, InvocationState::Succeeded, "{completed:?}");
+    assert_eq!(
+        completed.context.metadata["interrupted_launches"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    assert_eq!(completed.context.round_idx, Some(0));
+    let repeated = service
+        .execute_with_metadata(&invocation.id, Some(&Default::default()), || Ok(()))
+        .unwrap();
+    assert_eq!(repeated, completed);
+    assert_eq!(
+        std::fs::read_to_string(std::path::Path::new(&cwd).join("work-count")).unwrap(),
+        "work\n"
+    );
+    assert_eq!(
+        items.show_goal_detail("GOAL1").unwrap()["rounds"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+}

@@ -114,8 +114,12 @@ fn feature_order_and_gaps_do_not_look_like_stalled_admission() {
         .unwrap();
     let now = chrono::Utc::now().timestamp_millis();
     let snapshot = sample_admission(&root, &target, None, now).unwrap();
-    assert!(snapshot.eligible_since_ms.is_empty());
-    assert_eq!(snapshot.cause, "Feature ordering blocks this Goal");
+    assert!(snapshot.eligible_since_ms.contains_key("GOAL1"));
+    assert!(!snapshot.eligible_since_ms.contains_key("GOAL2"));
+    assert_eq!(
+        snapshot.blocked_goals["GOAL2"],
+        "Feature ordering blocks this Goal"
+    );
     items.cancel_goal_summary("GOAL1").unwrap();
     let first = sample_admission(&root, &target, None, now).unwrap();
     assert!(first.eligible_since_ms.contains_key("GOAL2"));
@@ -461,5 +465,129 @@ fn admission_uses_the_pinned_occurrence_requirement_after_configuration_changes(
             .unwrap_or(0),
         generation
     );
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn every_executable_step_is_monitored_for_missing_execution_ownership() {
+    for status in [
+        GoalStatus::Todo,
+        GoalStatus::Plan,
+        GoalStatus::Implement,
+        GoalStatus::Quality,
+        GoalStatus::Governance,
+    ] {
+        let (root, target, items) = fixture();
+        for step in [
+            GoalStatus::Plan,
+            GoalStatus::Implement,
+            GoalStatus::Quality,
+            GoalStatus::Governance,
+        ] {
+            if items.show_goal_detail("GOAL1").unwrap()["status"] == status.as_str() {
+                break;
+            }
+            items.advance_automated_goal_status("GOAL1", step).unwrap();
+        }
+        let now = chrono::Utc::now().timestamp_millis();
+        let first = sample_admission(&root, &target, None, now).unwrap();
+        assert!(
+            first.eligible_since_ms.contains_key("GOAL1"),
+            "{status:?}: {first:?}"
+        );
+        let mut observed = first;
+        for tick in 1..=31 {
+            observed =
+                sample_admission(&root, &target, Some(&observed), now + tick * 1000).unwrap();
+        }
+        assert_eq!(observed.waiting_count(now + 31_000), 1, "{status:?}");
+        std::fs::remove_dir_all(root).unwrap();
+    }
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn supervisor_reconciles_unowned_work_even_when_scheduler_ticks_are_fresh() {
+    use crate::infrastructure::process::subprocess::{
+        ManagedProcessSpec, ProcessOwner, ProcessSupervisor,
+    };
+    let (root, target, _) = fixture();
+    let supervisor = FileProcessSupervisor::new(&root);
+    let token = uuid::Uuid::new_v4().to_string();
+    let worker = supervisor
+        .launch(ManagedProcessSpec {
+            owner: ProcessOwner::Runner,
+            command: "/bin/sleep".into(),
+            args: vec!["60".into()],
+            cwd: None,
+            env: Vec::new(),
+            stdin: None,
+            limits: None,
+            authorization_command: None,
+            sensitive: false,
+            metadata: serde_json::from_value(serde_json::json!({"worker_kind":"workflow",
+            "workflow_incarnation":token, "isolated_process_group":true}))
+            .unwrap(),
+        })
+        .unwrap();
+    let now = chrono::Utc::now().timestamp_millis();
+    SchedulerObservation {
+        runtime_root: root.canonicalize().unwrap(),
+        process_id: worker.id.clone(),
+        pid: worker.pid.unwrap(),
+        os_identity: current_os_identity(worker.pid.unwrap()).unwrap().unwrap(),
+        incarnation: token,
+        target_root: Some(target.clone()),
+        node_id: Some("default".into()),
+        sequence: 1,
+        tick_ms: now,
+        tick_monotonic_ms: None,
+        completed_cycle_monotonic_ms: None,
+        completed_cycle_ms: Some(now),
+        active_attempts: BTreeSet::new(),
+        failure: None,
+        retry_delays: Default::default(),
+    }
+    .write(&root)
+    .unwrap();
+
+    let registry =
+        crate::application::projects::registry::FileProjectRegistryService::new(&root, None);
+    let mut apps = registry.load().unwrap();
+    apps.active_app = Some(target.display().to_string());
+    registry.save(&apps).unwrap();
+    let mut admission = sample_admission(&root, &target, None, now).unwrap();
+    admission
+        .eligible_since_ms
+        .insert("GOAL1".into(), now - 31_000);
+    std::fs::write(
+        root.join("workflow-admission.json"),
+        serde_json::to_vec(&admission).unwrap(),
+    )
+    .unwrap();
+    let health = super::super::assess_worker(&root, &worker, Some(&target));
+    assert_eq!(health.state, "admission_stalled", "{health:?}");
+    // A stale observation from an older scheduler must not condemn its replacement.
+    admission.scheduler_incarnation = Some("previous-incarnation".into());
+    std::fs::write(
+        root.join("workflow-admission.json"),
+        serde_json::to_vec(&admission).unwrap(),
+    )
+    .unwrap();
+    assert!(super::super::assess_worker(&root, &worker, Some(&target)).healthy);
+    admission.scheduler_incarnation = workflow_incarnation(&worker);
+    std::fs::write(
+        root.join("workflow-admission.json"),
+        serde_json::to_vec(&admission).unwrap(),
+    )
+    .unwrap();
+    let service = crate::application::workers::FileRunnerWorkerService::new(&root);
+    assert!(service.ensure_background_worker("workflow").is_err());
+    let recovery: Value =
+        serde_json::from_slice(&std::fs::read(root.join("workflow-recovery.json")).unwrap())
+            .unwrap();
+    assert_eq!(recovery["worker"]["id"], worker.id);
+    assert_eq!(recovery["stopped"], true);
+    assert!(!FileProcessSupervisor::process_is_alive(&worker).unwrap());
     std::fs::remove_dir_all(root).unwrap();
 }

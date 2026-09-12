@@ -295,9 +295,10 @@ impl FileProcessSupervisor {
         let (assessment, members) = self.assess_group_members(&expected)?;
         let mut group = expected.clone();
         group.confirmed_exit = matches!(assessment, OwnershipAssessment::Exited);
-        if let OwnershipAssessment::Unverified { reason } = assessment {
-            group.ownership_gap = Some(reason);
-        }
+        group.ownership_gap = match assessment {
+            OwnershipAssessment::Unverified { reason } => Some(reason),
+            _ => None,
+        };
         // Retain every identity witness: disappearance cannot erase an earlier coverage gap.
         group.witnesses.extend(members);
         if group.witnesses != latest.witnesses

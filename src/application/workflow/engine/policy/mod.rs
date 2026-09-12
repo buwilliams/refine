@@ -185,8 +185,8 @@ impl WorkflowEngine {
         Ok(())
     }
 
-    /// Stops interrupted execution and opens its error outcome without rerunning work.
-    /// Evidence and candidate state remain available for explicit workflow control.
+    /// Reconcile missing execution ownership while retaining the current workflow step.
+    /// Completed failure verdicts still require an explicit workflow decision.
     pub fn recover_interrupted_goals(&self, detail: &str) -> RefineResult<usize> {
         let Some(refine_dir) = self.refine_dir()? else {
             return Ok(0);
@@ -241,14 +241,20 @@ impl WorkflowEngine {
                 // ordinary exact-candidate path. It does not invoke failed work again.
                 continue;
             }
-            if goal.status == GoalStatus::Todo {
-                if !receipts.started
-                    && self
-                        .unresolved_workflow_outcome(&goal.id, &current)?
-                        .is_none()
-                {
+            if unresolved.is_none() {
+                // Loss of an execution owner is not a Skill verdict. The admitted
+                // occurrence will reconcile its old launch and resume in-place.
+                if !receipts.started {
                     continue;
                 }
+                logs.append_round_log(&goal.id, round_idx, LogEntry {
+                    datetime: now_timestamp(), severity: "info".into(), category: "workflow".into(),
+                    message: format!("Execution ownership released; {} remains scheduled for continuation", goal.status.as_str()),
+                    details: Some(json_object(json!({"reason":detail,"checkpoint":goal.status.as_str(),"automatic_restart":true}))),
+                    actions: Vec::new(), actor: Some("refine".into()), goal_id: Some(goal.id.clone()),
+                })?;
+                recovered += 1;
+                continue;
             }
             match work_items.interrupt_workflow_if_current(
                 &goal.id,

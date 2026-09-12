@@ -40,26 +40,27 @@ impl FileProcessSupervisor {
         if self.runtime_root.canonicalize().ok().as_ref() != Some(&group.runtime_root) {
             return Err(RefineError::Conflict("owned group runtime changed".into()));
         }
-        // Legacy confirmed_exit booleans came from empty scans. They are not lifetime proof.
-        let mut gap = group.ownership_gap.clone();
+        // Cached uncertainty is diagnostic history, not a permanent veto on
+        // newer authoritative lifetime evidence. Reassess the launch owner.
         #[cfg(target_os = "linux")]
-        if gap.is_none() {
-            match &group.launch_scope {
-                Some(scope) => {
-                    if scope.proof(group)? { return Ok((OwnershipAssessment::Exited, BTreeMap::new())); }
-                    if !scope.alive()? {
-                        // Reread after liveness: a guardian can finish its proof between probes.
-                        if scope.proof(group)? { return Ok((OwnershipAssessment::Exited, BTreeMap::new())); }
-                        gap = Some("launch ownership guardian disappeared without complete exit proof".into());
-                    }
+        let gap = match &group.launch_scope {
+            Some(scope) => {
+                if scope.proof(group)? {
+                    return Ok((OwnershipAssessment::Exited, BTreeMap::new()));
                 }
-                None => gap = Some("registration has no complete launch-time ownership coverage; descendants may have escaped observation".into()),
+                if scope.alive()? {
+                    None
+                } else if scope.proof(group)? {
+                    // The guardian can publish its receipt between probes.
+                    return Ok((OwnershipAssessment::Exited, BTreeMap::new()));
+                } else {
+                    Some("launch ownership guardian disappeared without complete exit proof".into())
+                }
             }
-        }
+            None => Some("registration has no complete launch-time ownership coverage; descendants may have escaped observation".into()),
+        };
         #[cfg(not(target_os = "linux"))]
-        if gap.is_none() {
-            gap = Some("complete ownership inspection is unavailable on this platform".into());
-        }
+        let gap = Some("complete ownership inspection is unavailable on this platform".into());
         let members = if group.pgid.is_none() && gap.is_some() {
             BTreeMap::new()
         } else {

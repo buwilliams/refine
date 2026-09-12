@@ -4,7 +4,7 @@
 
 - **Semantic Ownership Is Synchronized**: Goal status and node assignment say which node may advance the work.
 - **Worker Ownership Is Transient**: a node may track its current workers in memory and local process records.
-- **Completed Evidence Is Reusable**: replacement workers consume accepted receipts; failed or interrupted work requires a workflow decision before another attempt.
+- **Completed Evidence Is Reusable**: replacement workers consume accepted receipts; failed verdicts require a workflow decision before another attempt; unfinished work continues after prior execution ownership is proven released.
 - **Idempotence Over Reservation**: workers prove or reuse semantic results instead of reserving durable execution slots.
 - **Cancellation Is Goal Intent**: cancellation changes the Goal first; stopping local execution is cleanup.
 
@@ -21,7 +21,7 @@ The synchronized Goal answers the first question. Node-local runtime state answe
 
 A node schedules a Goal only when its status is actionable and its `node_id` names that node. The scheduler keeps an in-memory set to avoid launching the same Goal twice in one runner and observes live managed processes for soft capacity. These are efficiency controls, not authority.
 
-Each worker receives the Goal, Round, selected context, and semantic instructions. Before a transition or consequential side effect it rereads the synchronized Goal. If the step occurrence, status, node, or Round changed, it stops. The existing Goal lifecycle generation identifies an occurrence even when a step name repeats. A daemon restart may replace the execution process and consume completed planning, Git, quality, and integration receipts. It does not authorize another attempt after a failed or interrupted step.
+Each worker receives the Goal, Round, selected context, and semantic instructions. Before a transition or consequential side effect it rereads the synchronized Goal. If the step occurrence, status, node, or Round changed, it stops. The existing Goal lifecycle generation identifies an occurrence even when a step name repeats. A daemon restart may replace the execution process and consume completed planning, Git, quality, and integration receipts. It does not authorize another attempt after a failed verdict. An interrupted execution with no completed verdict remains scheduled in the current step and Round; a replacement continues retained work only after prior execution is proven stopped.
 
 Two nodes may briefly believe work is available because synchronization is delayed. Durable state convergence decides the outcome. In the clear reassignment-versus-start race, an automated start by the previously authoritative node wins over a concurrent queued reassignment. Ambiguous lifecycle conflicts remain visible for resolution rather than being hidden by timestamps or local runtime records.
 
