@@ -1,0 +1,100 @@
+{
+  "id": "1eb1cab1e75d289120d057ee51d7a0fe819750ec107ad4daf7a8729a12681a57",
+  "event": {
+    "id": "custom",
+    "name": "Fetch Goals from Email",
+    "kind": "custom",
+    "source": null,
+    "enabled": true,
+    "scope": {
+      "node_id": null
+    },
+    "parameters": [],
+    "bindings": [
+      {
+        "id": "trigger-2748a40c-20f1-4533-851a-d3d752e56013",
+        "skill_id": "fetch-goals-from-email",
+        "enabled": true,
+        "mode": "blocking",
+        "order": 0,
+        "scope": {
+          "node_id": "default"
+        },
+        "overrides": null,
+        "inputs": {}
+      }
+    ],
+    "on_success": null
+  },
+  "config_revision": 40,
+  "context": {
+    "node_id": "default",
+    "target_root": "/home/buddy/projects/refine-next",
+    "cwd": "/home/buddy/projects/refine-next",
+    "workspace": null,
+    "lifecycle": null,
+    "provider": "codex",
+    "goal_id": null,
+    "round_idx": null,
+    "workflow_revision": null,
+    "candidate_commit": null,
+    "data": {
+      "event": {},
+      "goal": {
+        "rounds": []
+      },
+      "system": {
+        "node_id": "default",
+        "project_root": "/home/buddy/projects/refine-next",
+        "refine_checkout": "/home/buddy/projects/refine",
+        "refine_executable": "/home/buddy/projects/refine/bin/refine",
+        "runtime_root": "/home/buddy/projects/refine/run/8082",
+        "workspace": "/home/buddy/projects/refine-next"
+      }
+    },
+    "metadata": {
+      "event_operation_id": "1a0955e96b285eed1",
+      "manual_skill_id": "fetch-goals-from-email",
+      "requested_parameters": {},
+      "started_bindings": {
+        "trigger-2748a40c-20f1-4533-851a-d3d752e56013": "2026-09-12T11:26:39.302771040+00:00"
+      }
+    }
+  },
+  "bindings": [
+    {
+      "binding": {
+        "id": "trigger-2748a40c-20f1-4533-851a-d3d752e56013",
+        "skill_id": "fetch-goals-from-email",
+        "enabled": true,
+        "mode": "blocking",
+        "order": 0,
+        "scope": {
+          "node_id": "default"
+        },
+        "overrides": null,
+        "inputs": {}
+      },
+      "skill": {
+        "id": "fetch-goals-from-email",
+        "name": "Fetch Goals from Email",
+        "prompt": "Fetch new email requests into the selected project's Backlog. This Skill authorizes creation of ordinary Goals from the configured mailbox. Use system.refine_executable to run `system fetch-email-goals --runtime-root <system.runtime_root> --target-root <system.project_root>`, passing each value as a separate, safely quoted argument. This one-shot capability owns secret access, the target-bound sender allowlist, MIME extraction, remote acknowledgement, deterministic Goal IDs, and durable retry records. Do not read or print the mail token, author duplicate Goals yourself, rewrite email source, or modify the request ledger. Inspect the JSON result and report the imported or recovered Goal IDs and any errors. A batch is limited to 25 remote messages; if fetched_count equals batch_limit, fetch another batch, up to ten batches per invocation, then report whether more mail may remain. Stop on a failed command and report the retained retry evidence. Fetching does not approve Goals, change Review decisions, or send email replies. Follow docs/runbooks/development-request-email.md for connection errors.",
+        "role": "task",
+        "enabled": true,
+        "scope": {
+          "node_id": "default"
+        },
+        "parameters": [],
+        "provenance": null
+      },
+      "parameters": {}
+    }
+  ],
+  "state": "running",
+  "results": {},
+  "attempts": [],
+  "created_at": "2026-09-12T11:26:32.476044383+00:00",
+  "completed_at": null,
+  "error": null,
+  "action_applied": false
+}
