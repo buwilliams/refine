@@ -83,7 +83,18 @@ impl InProcessWebServer {
         }
 
         if request.method == "GET" && request.path == "/activity" {
-            return self.handle_activity_list(&raw_path);
+            return self.handle_activity_list(&raw_path, None);
+        }
+
+        if request.method == "POST" && request.path == "/activity/tail" {
+            return self.handle_activity_list(
+                &raw_path,
+                request
+                    .body
+                    .as_ref()
+                    .and_then(|body| body.get("cursors"))
+                    .cloned(),
+            );
         }
 
         if request.method == "POST" && request.path == "/activity/cleanup" {
@@ -1009,6 +1020,7 @@ fn should_refresh_projection_after_mutation(path: &str) -> bool {
         && path != "/hub"
         && !path.starts_with("/hub/")
         && path != "/work/goals"
+        && path != "/activity/tail"
         && path != "/sync"
         && path != "/cache/rebuild"
         && !path.starts_with("/system/source/")

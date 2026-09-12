@@ -287,7 +287,7 @@ test("Goal log stream renders safe formatted messages and validated action links
   assert.match(panel, /data-testid="goal-log-search"/);
   assert.match(panel, /data-testid="goal-log-order-head"/);
   assert.match(panel, /data-testid="goal-log-order-tail"/);
-  assert.match(panel, /aria-pressed="true" title="Newest entries last">Tail/);
+  assert.match(panel, /aria-pressed="true" title="Newest entries last">Newest last/);
 });
 
 test("Goal log search and stream order persist with the toolbar tab", () => {
@@ -301,4 +301,24 @@ test("Goal log search and stream order persist with the toolbar tab", () => {
   const saved = runtime.storedGoalLogState().tabs[runtime.goalLogTabId("GOAL1")];
   assert.equal(saved.logQuery, "agent failure");
   assert.equal(saved.logOrder, "head");
+});
+
+test("a late retained-history search cannot overwrite newer filters", async () => {
+  const runtime = browserRuntime();
+  const tab = installGoalLogTab(runtime);
+  const requests = [];
+  runtime.setApi((_method, url) => new Promise(resolve => requests.push({ url, resolve })));
+  tab.logQuery = "old";
+  const oldRequest = runtime.loadGoalLogTail(tab, { redraw: false });
+  tab.logQuery = "new";
+  tab.logFilters = { log_type: "stderr" };
+  const newRequest = runtime.loadGoalLogTail(tab, { redraw: false });
+  assert.match(requests[1].url, /q=new/);
+  assert.match(requests[1].url, /log_type=stderr/);
+  requests[1].resolve({ activity: [{ ...goalLog(2), message: "new", log_type: "stderr" }], page: { total: 1 } });
+  await newRequest;
+  requests[0].resolve({ activity: [{ ...goalLog(1), message: "old" }], page: { total: 1 } });
+  await oldRequest;
+  assert.equal(tab.logEntries[0].message, "new");
+  assert.equal(tab.logQuery, "new");
 });

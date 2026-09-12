@@ -360,7 +360,7 @@ async function api(method, path, body, options = {}) {
       }
       throw err;
     }
-    if (method !== "GET") {
+    if (method !== "GET" && !path.startsWith("/api/activity/tail?")) {
       // The screen the user is on refreshes itself after its own mutation, and
       // SSE announces the change to every other screen. Forcing an 11-request
       // prefetch burst here multiplied every click into a page-load's worth of
@@ -1803,7 +1803,6 @@ function scheduleRouteDataRefresh() {
     // Refresh only the table on background updates so an active workflow
     // keystroke in the search box isn't interrupted by a full re-render.
     if (state.currentRoute === "goals") refreshGoalsTable();
-    if (state.currentRoute === "logs") loadLogs();
     if (["settings", "node", "project"].includes(state.currentRoute || "")) {
       refreshCurrentSettingsSurface();
     }
@@ -1845,7 +1844,6 @@ function initSSE() {
     // and reconnect so a missed frame can never leave the workflow UI stale.
     if (state.currentRoute === "dashboard") refreshDashboard();
     if (state.currentRoute === "goals") refreshGoalsTable();
-    if (state.currentRoute === "logs") loadLogs();
     if (state.currentRoute === "changes") loadChanges();
     if (["settings", "node", "project"].includes(state.currentRoute || "")) {
       refreshCurrentSettingsSurface({ force: true });
@@ -1875,7 +1873,6 @@ function initSSE() {
     // screen doesn't blink back to `Loading…` on every event.
     if (typeof scheduleAgentStatusRefresh === "function") scheduleAgentStatusRefresh();
     if (state.currentRoute === "dashboard") refreshDashboard();
-    if (state.currentRoute === "logs") loadLogs();
     if (state.currentRoute === "changes") loadChanges();
   });
   sseSource.addEventListener("goal_log_added", (e) => {
@@ -1903,7 +1900,6 @@ function initSSE() {
   sseSource.addEventListener("state_sync_health", () => {
     invalidateScreenDataCache();
     if (state.currentRoute === "dashboard") refreshDashboard();
-    if (state.currentRoute === "logs") loadLogs();
     if (["settings", "node", "project"].includes(state.currentRoute || "")) {
       refreshCurrentSettingsSurface();
     }
@@ -1968,9 +1964,6 @@ function initSSE() {
     if (typeof refreshTargetAppToggle === "function") refreshTargetAppToggle();
     if (typeof refreshSourceUpdateNav === "function") refreshSourceUpdateNav({ quiet: true });
     scheduleRouteDataRefresh();
-  });
-  sseSource.addEventListener("round_log_added", () => {
-    if (state.currentRoute === "logs") loadLogs();
   });
   sseSource.addEventListener("system_operation", (e) => {
     if (!sseEventChanged("SystemOperation", e)) return;

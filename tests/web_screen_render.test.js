@@ -1004,7 +1004,7 @@ test("every converted screen boots and paints", { skip: SKIP }, async () => {
       ["#/goals", '[data-testid="goals-table"]'],
       ["#/features", "#features-table"],
       ["#/changes", '[data-testid="changes-visualization-panel"]'],
-      ["#/logs", "#logs-visualization"],
+      ["#/logs", '[data-testid="toolbar-system-panel"]'],
       ["#/node", "#settings-content"],
     ]) {
       await assertScreenRenders(app, { route, marker });

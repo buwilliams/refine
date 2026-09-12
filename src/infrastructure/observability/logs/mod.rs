@@ -1,3 +1,4 @@
+pub(crate) mod archive;
 use std::collections::VecDeque;
 use std::fs::{self, OpenOptions};
 use std::io::{BufRead, BufReader, Write};

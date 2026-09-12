@@ -3,7 +3,7 @@
 ## Key Ideas
 
 - **Orientation First**: nav should tell the user where they are and which app/node context is active.
-- **Primary Work Paths**: Dashboard, Features, Goals, Changes, and Logs are first-class routes.
+- **Primary Work Paths**: Dashboard, Features, Goals, and Changes are first-class routes.
 - **Context Controls**: app status, reporter, agent status, command palette, and create actions belong in the shell.
 - **Stable Entry Points**: nav should be predictable enough for repeated daily use and future agent-driven UI control.
 
@@ -23,7 +23,7 @@ Reporter selection remains local to the browser and can always be changed or cre
 
 `Controls > Node`, immediately beside Reporter, displays and switches the runtime-local active Node for the attached app. The selector is reconciled from project status and the non-archived Node registry, shows display names for orientation, and keeps Node IDs authoritative for selection and activation. With no attached app it remains disabled and shows `No node` rather than implying an active context.
 
-The current browser shell uses Dashboard, Features, Goals, Changes, and Logs as the main nav items. Management actions live in context menus so the main nav stays focused on work. The bright primary create action is `+ New Goal`, with related creation flows available nearby.
+The current browser shell uses Dashboard, Features, Goals, and Changes as the main nav items. Management actions live in context menus so the main nav stays focused on work. The bright primary create action is `+ New Goal`, with related creation flows available nearby.
 
 The `Controls > Settings` management entry consolidates Node and Governance configuration and uses Processes (`/#/settings/processes`) as its stable destination so local runtime work is immediately visible. This entry does not change the adjacent active Node selector or its context-switching behavior.
 

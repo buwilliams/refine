@@ -280,15 +280,15 @@ fn static_system_log_exposes_sources_and_diagnostic_details() {
     assert!(commands.contains(r#"details: { operation_id: response.operation.id }"#));
     assert!(toolbar.contains("details: payload?.details ?? null"));
     assert!(toolbar.contains("function systemOperationDetailEntries"));
-    assert!(toolbar.contains(r#"data-testid="system-log-status""#));
-    assert!(toolbar.contains(r#"data-testid="system-log-category""#));
-    assert!(toolbar.contains(r#"data-testid="system-log-details""#));
-    assert!(toolbar.contains(r#"data-testid="system-log-detail""#));
+    assert!(toolbar.contains(r#"class="goal-log-severity""#));
+    assert!(toolbar.contains(r#"class="goal-log-category""#));
+    assert!(toolbar.contains(r#"class="log-inline-details""#));
+    assert!(toolbar.contains("function highlightLogText"));
     assert!(toolbar.contains("existing.category !== item.category"));
     assert!(toolbar.contains("formatSystemOperationDetails(existing.details) !== itemDetails"));
-    assert!(toolbar_css.contains(".system-log-status"));
-    assert!(toolbar_css.contains(".system-log-category"));
-    assert!(toolbar_css.contains(".system-log-detail dd"));
+    assert!(toolbar_css.contains(".goal-log-severity"));
+    assert!(toolbar_css.contains(".goal-log-category"));
+    assert!(toolbar_css.contains(".log-inline-details"));
 }
 
 #[test]

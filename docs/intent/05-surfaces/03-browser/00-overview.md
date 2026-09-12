@@ -23,7 +23,7 @@ Current implementation details that matter to intent:
 
 - the web UI is a vanilla JavaScript single-page app with no frontend build step;
 - the shell contains a topbar, banners, `#main`, toolbar dock, and Guide panel;
-- hash routing drives Dashboard, Features, Goals, Changes, Logs, Settings, Node, Project, modals, import, and Plan flows;
+- hash routing drives Dashboard, Features, Goals, Changes, Settings, Node, Project, modals, import, and Plan flows;
 - static assets call the local daemon API for product and runtime state;
 - initial loads and reconnects reconcile authoritative HTTP state once, while SSE exclusively drives subsequent live updates and background-operation progress;
 - local and remote browser sessions should expose the same product semantics.

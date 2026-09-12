@@ -102,3 +102,5 @@ toolbar sessions; it does not alter Goal diagnostics, Agent in Worktree, or the
 planning, implementation, Quality, and Governance workflow agents.
 
 Future versions may add fleet-level views for active Goals, pending approvals, process health, Goal evidence, and multiple native agents while retaining lazy creation and explicit lifecycle ownership.
+
+System and Goal log tabs share the flat reader described in [Logs](11-log.md). System tails all application and raw process output only after Start tail; normal system notices continue with tail stopped. Filters distinguish source type from severity. Search reaches retained history, and reading older entries suspends automatic scroll following.

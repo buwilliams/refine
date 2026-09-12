@@ -413,3 +413,36 @@ fn web_server_rejects_retired_supervisor_routes() {
     assert_eq!(terminal.body["error"]["code"], "invalid_input");
     remove_temp_dir(&temp_root);
 }
+
+#[test]
+fn toolbar_archive_tail_reads_cursors_without_recording_a_mutation() {
+    let temp_root = unique_temp_dir("toolbar-log-tail");
+    let mut server = server_with_projection();
+    server.target_root = Some(temp_root.clone());
+    server.handle(ApiRequest {
+        method: "POST".into(),
+        path: "/api/activity/ui-error".into(),
+        body: Some(json!({"message":"retained toolbar error"})),
+    });
+    let first = server.handle(ApiRequest {
+        method: "POST".into(),
+        path: "/api/activity/tail?archive=1&tail=1&limit=200".into(),
+        body: Some(json!({"cursors":{}})),
+    });
+    assert_eq!(first.status, 200, "{:?}", first.body);
+    assert!(
+        first.body["activity"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|row| row["message"] == "retained toolbar error")
+    );
+    let next = server.handle(ApiRequest {
+        method: "POST".into(),
+        path: "/api/activity/tail?archive=1&tail=1&limit=200".into(),
+        body: Some(json!({"cursors":first.body["cursors"]})),
+    });
+    assert_eq!(next.status, 200);
+    assert!(next.body["activity"].as_array().unwrap().is_empty());
+    fs::remove_dir_all(temp_root).unwrap();
+}

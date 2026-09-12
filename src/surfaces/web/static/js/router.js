@@ -11,7 +11,6 @@ const routes = {
   goals_new: renderGoalNew,
   goals_import: renderGoalImport,
   goals_plan: renderGoalPlan,
-  logs: renderLogs,
   changes: renderChanges,
   settings: renderSettings,
 };
@@ -37,7 +36,7 @@ function parseHash() {
     return { route: "features_detail", id: parts[1] };
   }
   if (parts[0] === "chat") return { route: "chat_redirect" };
-  if (parts[0] === "logs") return { route: "logs" };
+  if (parts[0] === "logs") return { route: "logs_redirect" };
   if (parts[0] === "changes") return { route: "changes" };
   if (["system", "settings", "node", "governance", "project"].includes(parts[0])) {
     const retired = ["governance", "quality", "guidance", "events", "releases"];
@@ -57,6 +56,13 @@ function navigate() {
     typeof guardNewGoalNavigation === "function" &&
     guardNewGoalNavigation({ destinationHash, continueNavigation: navigate })
   ) {
+    return;
+  }
+  if (r.route === "logs_redirect") {
+    const params = new URLSearchParams(location.hash.split("?")[1] || "");
+    const goalId = params.get("goal_id");
+    if (goalId) openGoalLogTail({ goalId }); else openSystemLogs();
+    location.hash = "#/";
     return;
   }
   if (r.route === "chat_redirect") {

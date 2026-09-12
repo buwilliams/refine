@@ -1,34 +1,11 @@
-# Log
+# Logs
 
-## Key Ideas
+The Toolbar is the browser's single log reader. Logs have no main navigation screen. Legacy Logs links open the corresponding Toolbar tab. A visible View Logs button on the Goal modal opens that Goal's log tab.
 
-- **Durable Evidence**: logs explain what happened across workflow, UI, agents, processes, and system operations.
-- **Filterable Activity**: users should be able to search and narrow logs by severity, category, actor, Goal, and time.
-- **Shared Table Pattern**: Logs should align with other list surfaces.
-- **UI Errors Matter**: browser-visible failures should become activity, not disappear after a toast.
+System receives normal operational events by default. An explicit Start tail / Stop tail control enables or stops following all retained application activity, Round logs, and raw agent/process stdout and stderr. Collection is off by default for System, including after reload or project switching. Stopping tail never stops agents, processes, or ordinary system notices.
 
-## Purpose
+Goal log tabs follow the selected Goal's complete retained history across Rounds and managed processes. Both viewers use a flat chronological stream with inline details, one scrollbar, and no per-entry expansion controls. Following does not pull the reader away when they scroll back. Older pages stop following until the user starts it again.
 
-The Log surface exists to make Refine auditable. It lets users and agents inspect system activity, workflow events, UI errors, process messages, and other evidence after the fact.
+Search runs against retained records, including messages, structured details, and raw output; it is not limited to the browser's recent buffer or the bounded activity projection. Type (application event, Round log, operation log, API activity, stdout, stderr) is independent of severity. Category, actor, and process filters combine with text search. Raw stderr is not automatically treated as an application error. Counts and pagination make older matches reachable. Source identity remains visible; raw output without recorded line timestamps identifies its time as process start or receipt time rather than claiming an exact event time.
 
-Logs should reduce mystery. When a Goal failed, an import completed, a UI action errored, or a background job started, the system should leave a trail.
-
-## Expected Role
-
-The Logs UI should be a dense investigation surface. It should use filters, facets, sorting, pagination, details expansion, and visualization to help users find relevant evidence quickly.
-
-Current implementation details that matter to intent:
-
-- Logs read activity through `/api/activity`;
-- filters include severity, category, actor, Goal ID, search text, period, limit, page, sort, and direction;
-- UI errors can be recorded into activity;
-- server-provided facets populate filter controls;
-- boundary pagination supports large log sets.
-
-Logs should complement the Toolbar System log. System is for immediate operational notices; Logs are for durable investigation and audit.
-
-## Future Direction
-
-Future logs should support agent-readable provenance. Agents should be able to summarize evidence, find root causes, compare attempts, and explain why a workflow moved or stopped.
-
-The Log surface should become a high-trust evidence layer for autonomous software composition.
+Live tails use byte cursors and bounded pages. Repeated reads do not duplicate output or skip entries when a page fills. Filters affect presentation and search, not what the system records. Node/project switches and stale search responses must never mix scopes. Retained logs remain evidence; UI changes do not delete their records.

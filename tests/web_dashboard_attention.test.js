@@ -134,7 +134,7 @@ test("browser SSE reconciles state sync surfaces from authoritative endpoints", 
   );
   assert.match(common, /addEventListener\("state_sync_health"/);
   assert.match(common, /state\.currentRoute === "dashboard"\) refreshDashboard\(\)/);
-  assert.match(common, /state\.currentRoute === "logs"\) loadLogs\(\)/);
+  assert.doesNotMatch(common, /loadLogs\(/);
   assert.match(common, /refreshCurrentSettingsSurface\(\)/);
 });
 

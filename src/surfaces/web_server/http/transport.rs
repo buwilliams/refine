@@ -198,6 +198,7 @@ impl LocalHttpDaemon {
                 .and_then(|body| serde_json::from_slice(&body).ok()),
         });
         if method != "GET"
+            && normalize_api_path(&path) != "/activity/tail"
             && response.status < 400
             && let Some(runtime_root) = self.server.runtime_root.as_ref()
             && let Err(error) =

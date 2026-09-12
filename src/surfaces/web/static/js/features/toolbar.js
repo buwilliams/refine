@@ -10,13 +10,6 @@ const AGENT_TERMINAL_MODES = new Set(["agent", "plan", "goal", "standalone", "sk
 const SYSTEM_OPERATION_LOG_LIMIT = 250;
 const GOAL_LOG_TAIL_LIMIT = 200;
 const GOAL_LOG_DEFAULT_ORDER = "tail";
-const SYSTEM_LOG_FILTERS = [
-  { status: "info", label: "Info" },
-  { status: "start", label: "Started" },
-  { status: "queued", label: "Queued" },
-  { status: "complete", label: "Completed" },
-  { status: "error", label: "Errors" },
-];
 const FILES_TREE_MAX_DEPTH = 3;
 const FILES_TREE_MAX_ENTRIES = 200;
 const FILES_SEARCH_MAX_RESULTS = 20;
@@ -39,7 +32,7 @@ const chatState = {
 };
 const systemOperationState = {
   messages: [],
-  filters: new Set(),
+  logTab: { mode: "system", logEntries: [], logQuery: "", logFollowing: false },
 };
 const filesState = {
   path: "",
@@ -180,11 +173,7 @@ function loadChatStateFromStorage() {
       if (typeof parsed.fullscreen === "boolean") {
         chatState.fullscreen = parsed.fullscreen;
       }
-      if (Array.isArray(parsed.systemFilters)) {
-        systemOperationState.filters = new Set(
-          parsed.systemFilters.map((item) => String(item || "").trim()).filter(Boolean),
-        );
-      }
+
     }
   } catch {}
   ensureStandaloneTab();
@@ -213,6 +202,8 @@ function saveChatStateToStorage() {
           : undefined,
         logQuery: t.mode === "goal_logs" ? String(t.logQuery || "") : undefined,
         logOrder: t.mode === "goal_logs" ? normalizeGoalLogOrder(t.logOrder) : undefined,
+        logFilters: t.mode === "goal_logs" ? t.logFilters : undefined,
+        logFollowing: t.mode === "goal_logs" ? t.logFollowing : undefined,
     };
   }
   try {
@@ -221,7 +212,6 @@ function saveChatStateToStorage() {
       version: CHAT_TABS_STORAGE_VERSION,
       open: chatState.open, bodyHeight: chatState.bodyHeight,
       fullscreen: chatState.fullscreen,
-      systemFilters: [...systemOperationState.filters],
     }));
   } catch {}
 }
@@ -263,7 +253,8 @@ function resetChatForProjectSwitch() {
   chatState.open = false;
   chatState.bodyHeight = null;
   chatState.fullscreen = false;
-  systemOperationState.filters.clear();
+  systemOperationState.messages = [];
+  systemOperationState.logTab = { mode: "system", logEntries: [], logQuery: "", logFollowing: false };
   resetFilesState();
   resetTodoState();
   resetTerminalState();
@@ -403,6 +394,7 @@ async function createToolbarTab(mode, options = {}) {
     const existing = Object.keys(chatState.tabs).find((id) => chatState.tabs[id]?.mode === "todo");
     if (existing) return activateToolbarTab(existing);
   }
+  if (mode === "system" && chatState.bodyHeight === null) chatState.bodyHeight = Math.min(420, Math.floor(window.innerHeight * .5));
   const tabId = nextToolbarTabId(mode);
   chatState.tabs[tabId] = normalizeInteractiveTerminalTab({
     goalId: null,
@@ -433,6 +425,7 @@ function goalLogTabId(goalId) {
 function openGoalLogTail({ goalId, goalName = "" } = {}) {
   if (!goalId) return;
   ensureStandaloneTab();
+  if (chatState.bodyHeight === null) chatState.bodyHeight = Math.min(420, Math.floor(window.innerHeight * .5));
   const tabId = goalLogTabId(goalId);
   if (!chatState.tabs[tabId]) {
     chatState.tabs[tabId] = {
@@ -454,8 +447,8 @@ function openGoalLogTail({ goalId, goalName = "" } = {}) {
   chatState.activeTabId = tabId;
   chatState.open = true;
   saveChatStateToStorage();
+  chatState.tabs[tabId].logsLoaded = false;
   drawToolbar();
-  loadGoalLogTail(chatState.tabs[tabId]);
 }
 
 async function renderGoalPlan() {
@@ -636,7 +629,7 @@ function drawToolbar() {
   `, () => {
     if (filesActive) bindFilesPanel(root);
     if (todoActive) bindTodoPanel(root);
-    if (systemActive) bindSystemPanel(root);
+    if (systemActive) bindGoalLogPanel(root, systemOperationState.logTab);
     if (terminalActive) bindTerminalPanel(root, active);
     if (goalLogsActive) bindGoalLogPanel(root, active);
 
@@ -723,6 +716,7 @@ function goalLogSearchText(entry) {
     ? entry.actions.flatMap((action) => [action?.label, action?.href, action?.command])
     : [];
   return [
+    entry?.id, entry?.goal_id, entry?.process_id, entry?.operation_id, entry?.log_type,
     entry?.datetime,
     entry?.severity,
     entry?.category,
@@ -736,7 +730,7 @@ function goalLogSearchText(entry) {
 function visibleGoalLogEntries(tab) {
   const query = String(tab?.logQuery || "").trim().toLocaleLowerCase();
   const entries = normalizeGoalLogEntries(tab?.logEntries)
-    .filter((entry) => !query || goalLogSearchText(entry).includes(query));
+    .filter((entry) => (!query || goalLogSearchText(entry).includes(query)) && Object.entries(tab.logFilters || {}).every(([key,value]) => !value || String(entry[key] || "").toLowerCase().includes(value.toLowerCase())));
   return normalizeGoalLogOrder(tab?.logOrder) === "head" ? entries.reverse() : entries;
 }
 
@@ -763,30 +757,65 @@ function mergeGoalLogEntries(...groups) {
     .slice(-GOAL_LOG_TAIL_LIMIT);
 }
 
-async function loadGoalLogTail(tab, { redraw = true } = {}) {
-  if (!tab?.goalId || tab.logsLoading) return;
+let toolbarLogTimer = null;
+function logIsFollowing(tab) { return tab.mode === "system" ? tab.logFollowing === true : tab.logFollowing !== false; }
+function openSystemLogs() {
+  const id = Object.keys(chatState.tabs).find(id => chatState.tabs[id].mode === "system");
+  return id ? activateToolbarTab(id) : createToolbarTab("system");
+}
+function scheduleToolbarLogTail() {
+  if (toolbarLogTimer) return;
+  toolbarLogTimer = setTimeout(async () => {
+    toolbarLogTimer = null;
+    const tabs = Object.values(chatState.tabs).filter(tab => tab.mode === "goal_logs");
+    if (Object.values(chatState.tabs).some(tab => tab.mode === "system")) tabs.push(systemOperationState.logTab);
+    await Promise.allSettled(tabs.filter(tab => logIsFollowing(tab) && !tab.logPage).map(tab => loadGoalLogTail(tab, { redraw: false, tail: true })));
+    if (tabs.some(logIsFollowing)) scheduleToolbarLogTail();
+  }, 1500);
+  toolbarLogTimer?.unref?.();
+}
+async function loadGoalLogTail(tab, { redraw = true, tail = false } = {}) {
+  const sequence = (tab.logRequest || 0) + 1;
+  if (tail && tab.logsLoading) return;
+  tab.logRequest = sequence;
+  const generation = typeof captureNodeContextGeneration === "function" ? captureNodeContextGeneration() : null;
   tab.logsLoading = true;
   tab.logsError = "";
-  if (redraw && chatState.tabs[chatState.activeTabId] === tab) drawToolbar();
-  const params = new URLSearchParams({
-    goal_id: tab.goalId,
-    limit: String(GOAL_LOG_TAIL_LIMIT),
-    offset: "0",
-    sort: "datetime",
-    // Fetch the newest page, then mergeGoalLogEntries presents it oldest-first.
-    dir: "desc",
-  });
+  const activeTab = currentToolbarTab();
+  if (redraw && (activeTab === tab || (activeTab?.mode === "system" && tab === systemOperationState.logTab))) {
+    const status = $("#toolbar-dock")?.querySelector('[data-testid="goal-log-status"]');
+    if (status) status.textContent = "Searching retained logs…";
+  }
+  const params = new URLSearchParams({ archive: "1", limit: String(GOAL_LOG_TAIL_LIMIT), offset: String((tab.logPage || 0) * GOAL_LOG_TAIL_LIMIT), sort: "datetime", dir: "desc" });
+  if (tab.goalId) params.set("goal_id", tab.goalId);
+  if (tab.logQuery) params.set("q", tab.logQuery);
+  for (const [key, value] of Object.entries(tab.logFilters || {})) if (value) params.set(key, value);
+  if (tail) params.set("tail", "1");
   try {
-    const data = await api("GET", `/api/activity?${params}`);
-    // Preserve SSE entries that may arrive while the historical request is in flight.
-    tab.logEntries = mergeGoalLogEntries(data.activity, tab.logEntries);
+    const data = tail
+      ? await api("POST", `/api/activity/tail?${params}`, { cursors: tab.logCursors || {} }, { recordError: false })
+      : await api("GET", `/api/activity?${params}`, undefined, { recordError: false });
+    if (tab.logRequest !== sequence || (generation !== null && !isNodeContextGenerationCurrent(generation))) return;
+    const previousIds = new Set(normalizeGoalLogEntries(tab.logEntries).map(goalLogEntryKey));
+    if (tail && typeof tab.logTotal === "number") tab.logTotal += normalizeGoalLogEntries(data.activity).filter(entry => !previousIds.has(goalLogEntryKey(entry))).length;
+    tab.logEntries = tail ? mergeGoalLogEntries(tab.logEntries, data.activity) : mergeGoalLogEntries(data.activity);
+    tab.logCursors = data.cursors || {};
+    if (!tail) { tab.logTotal = data.page?.total; tab.logHasMore = data.page?.has_more; }
+    tab.archiveLoaded = true;
     tab.logsLoaded = true;
   } catch (error) {
-    tab.logsError = error?.message || "Could not load Goal logs.";
+    if (tab.logRequest === sequence) tab.logsError = error?.message || "Could not load logs.";
   } finally {
-    tab.logsLoading = false;
-    saveChatStateToStorage();
-    if (chatState.tabs[chatState.activeTabId] === tab) drawToolbar();
+    if (tab.logRequest === sequence) {
+      tab.logsLoading = false;
+      saveChatStateToStorage();
+      const visible = currentToolbarTab();
+      if (visible === tab || (visible?.mode === "system" && tab === systemOperationState.logTab)) {
+        const root = $("#toolbar-dock");
+        if (redraw || !updateGoalLogPanel(root, tab)) drawToolbar();
+      }
+      if (logIsFollowing(tab)) scheduleToolbarLogTail();
+    }
   }
 }
 
@@ -794,7 +823,7 @@ function handleGoalLogSseEvent(entry) {
   const goalId = String(entry?.goal_id || "");
   if (!goalId) return;
   const tab = chatState.tabs[goalLogTabId(goalId)];
-  if (!tab || tab.mode !== "goal_logs") return;
+  if (!tab || tab.mode !== "goal_logs" || !logIsFollowing(tab) || tab.archiveLoaded) return;
   const entries = normalizeGoalLogEntries(tab.logEntries);
   const key = goalLogEntryKey(entry);
   if (entries.some((candidate) => goalLogEntryKey(candidate) === key)) return;
@@ -810,18 +839,14 @@ function handleGoalLogSseEvent(entry) {
 function renderGoalLogPanel(tab) {
   const order = normalizeGoalLogOrder(tab.logOrder);
   const query = String(tab.logQuery || "");
+  const isSystem = tab.mode === "system";
+  const following = logIsFollowing(tab);
   return `
-    <div class="goal-log-panel" data-testid="toolbar-goal-log-panel">
+    <div class="goal-log-panel" data-testid="${isSystem ? "toolbar-system-panel" : "toolbar-goal-log-panel"}">
       <div class="goal-log-header">
-        <span class="goal-log-live" aria-label="Following live Goal logs"><span aria-hidden="true"></span>Following</span>
-        <a class="chat-goal-link"
-           href="#/goals/${encodeURIComponent(tab.goalId)}"
-           data-testid="goal-log-goal-link">
-          Goal ${htmlEscape(tab.goalId.slice(0, 10))}…
-        </a>
-        <a class="chat-goal-link"
-           href="#/logs?goal_id=${encodeURIComponent(tab.goalId)}"
-           data-testid="goal-log-full-link">Open full logs</a>
+        <button class="secondary small" type="button" id="btn-log-follow" aria-pressed="${following}" data-testid="log-follow">${following ? "Stop tail" : "Start tail"}</button>
+        <span class="muted small">${following ? "Following new output" : isSystem ? "Normal system events continue" : "Tail stopped"}</span>
+        ${!isSystem ? `<a class="chat-goal-link" href="#/goals/${encodeURIComponent(tab.goalId)}" data-testid="goal-log-goal-link">Goal ${htmlEscape(tab.goalId)}</a>` : ""}
         <span class="spacer"></span>
         <span class="muted small" data-testid="goal-log-status">${htmlEscape(goalLogStatus(tab))}</span>
         <button class="secondary small" type="button" id="btn-goal-log-refresh"
@@ -831,22 +856,28 @@ function renderGoalLogPanel(tab) {
         <label class="goal-log-search" for="goal-log-search">
           <span aria-hidden="true">${toolbarIcon("search")}</span>
           <input type="search" id="goal-log-search" value="${htmlEscape(query)}"
-                 autocomplete="off" placeholder="Search this trail"
-                 data-testid="goal-log-search" aria-label="Search Goal logs">
+                 autocomplete="off" placeholder="Search all retained messages, details, and output…"
+                 data-testid="goal-log-search" aria-label="Search logs">
         </label>
         <button class="secondary small goal-log-clear" type="button" id="btn-goal-log-clear"
                 data-testid="goal-log-search-clear" ${query ? "" : "disabled"}>Clear</button>
         <div class="goal-log-order" role="group" aria-label="Log stream order">
           <button class="secondary small ${order === "head" ? "active" : ""}" type="button"
                   data-goal-log-order="head" data-testid="goal-log-order-head"
-                  aria-pressed="${order === "head"}" title="Newest entries first">Head</button>
+                  aria-pressed="${order === "head"}" title="Newest entries first">Newest first</button>
           <button class="secondary small ${order === "tail" ? "active" : ""}" type="button"
                   data-goal-log-order="tail" data-testid="goal-log-order-tail"
-                  aria-pressed="${order === "tail"}" title="Newest entries last">Tail</button>
+                  aria-pressed="${order === "tail"}" title="Newest entries last">Newest last</button>
         </div>
       </div>
+      <div class="goal-log-controls log-filters">
+        ${[["log_type", "Type", ["event", "round", "operation", "api", "stdout", "stderr"]], ["severity", "Severity", ["info", "warn", "error", "unknown"]]].map(([key, label, values]) => `<label>${label}<select data-log-filter="${key}" aria-label="${label}"><option value="">All</option>${values.map(value => `<option value="${value}" ${tab.logFilters?.[key] === value ? "selected" : ""}>${({ event: "Application", round: "Round", operation: "Operation", api: "API", stdout: "Stdout", stderr: "Stderr", unknown: "Unclassified" })[value] || value}</option>`).join("")}</select></label>`).join("")}
+        ${[["category", "Category"], ["actor", "Actor"], ["process_id", "Process"]].map(([key,label]) => `<label>${label}<input type="text" data-log-filter="${key}" aria-label="${label}" value="${htmlEscape(tab.logFilters?.[key] || "")}" placeholder="Any ${label.toLowerCase()}"></label>`).join("")}
+        <button class="secondary small" data-log-page="newer" ${!tab.logPage ? "disabled" : ""}>Newer</button>
+        <button class="secondary small" data-log-page="older" ${!tab.logHasMore ? "disabled" : ""}>Older</button>
+      </div>
       <div class="goal-log-tail" id="goal-log-tail" role="log" aria-live="polite"
-           aria-label="Live logs for Goal ${htmlEscape(tab.goalId)}"
+           aria-label="${isSystem ? "System logs" : `Logs for Goal ${htmlEscape(tab.goalId)}`}"
            data-testid="goal-log-tail">
         <div id="goal-log-lines">${renderGoalLogLines(tab)}</div>
       </div>
@@ -857,6 +888,7 @@ function goalLogStatus(tab) {
   if (tab.logsLoading) return "Loading…";
   if (tab.logsError) return tab.logsError;
   const total = normalizeGoalLogEntries(tab.logEntries).length;
+  if (typeof tab.logTotal === "number") return `${total} shown · ${tab.logTotal} matches in retained history · page ${(tab.logPage || 0) + 1}`;
   const visible = visibleGoalLogEntries(tab).length;
   return String(tab.logQuery || "").trim()
     ? `${visible} of ${total} matching ${total === 1 ? "entry" : "entries"}`
@@ -865,30 +897,41 @@ function goalLogStatus(tab) {
 
 function renderGoalLogLines(tab) {
   const entries = visibleGoalLogEntries(tab);
-  if (entries.length) return entries.map(renderGoalLogLine).join("");
+  if (entries.length) return entries.map(entry => renderGoalLogLine(entry, tab.logQuery)).join("");
   if (tab.logsError) {
     return `<div class="goal-log-empty" data-testid="goal-log-empty">${htmlEscape(tab.logsError)}</div>`;
   }
   const query = String(tab.logQuery || "").trim();
   return `<div class="goal-log-empty" data-testid="goal-log-empty">${query
-    ? `No recent logs match “${htmlEscape(query)}”.`
-    : "Waiting for Goal activity."}</div>`;
+    ? `No logs match “${htmlEscape(query)}”.`
+    : tab.mode === "system" ? "Waiting for system activity. Start tail to include raw agent and process output." : "Waiting for Goal activity."}</div>`;
 }
 
-function renderGoalLogLine(entry) {
+function highlightLogText(value, query) {
+  const text = String(value || ""), needle = String(query || "").trim().toLowerCase();
+  if (!needle) return htmlEscape(text);
+  let result = "", start = 0, index;
+  while ((index = text.toLowerCase().indexOf(needle, start)) !== -1) {
+    result += htmlEscape(text.slice(start, index)) + "<mark>" + htmlEscape(text.slice(index, index + needle.length)) + "</mark>";
+    start = index + needle.length;
+  }
+  return result + htmlEscape(text.slice(start));
+}
+function renderGoalLogLine(entry, query = "") {
   const severity = normalizeSystemLogStatus(entry.severity);
   const details = goalLogDetailsText(entry.details);
   const actor = String(entry.actor || "").trim();
   return `
     <div class="goal-log-line goal-log-${htmlEscape(severity)}" data-testid="goal-log-line">
-      <span class="goal-log-time">${htmlEscape(formatSystemLogTime(entry.datetime))}</span>
+      <span class="goal-log-time" title="${htmlEscape(entry.timestamp_kind === "process_started" ? `Process started ${entry.datetime}; raw output has no recorded line timestamp` : entry.datetime || "")}">${htmlEscape(formatSystemLogTime(entry.datetime))}</span>
       <span class="goal-log-severity">[${htmlEscape(entry.severity || "info")}]</span>
+      ${entry.log_type ? `<span class="goal-log-type">[${htmlEscape(entry.log_type)}]</span>` : ""}
+      ${entry.process_id ? `<span class="goal-log-process">[${htmlEscape(entry.process_id)}]</span>` : ""}
       <span class="goal-log-category">[${htmlEscape(entry.category || "activity")}]</span>
       ${actor ? `<span class="goal-log-actor">[${htmlEscape(actor)}]</span>` : ""}
-      <span class="goal-log-message">
-        ${mdInline(String(entry.message || ""))}${renderGoalLogActions(entry.actions)}
-        ${details ? `<details><summary>Details</summary><pre>${htmlEscape(details)}</pre></details>` : ""}
-      </span>
+      ${entry.goal_id ? `<a class="goal-log-goal" href="#/goals/${encodeURIComponent(entry.goal_id)}">${htmlEscape(entry.goal_id)}</a>` : ""}
+      ${entry.round ? `<span class="goal-log-round">[Round ${htmlEscape(entry.round)}]</span>` : ""}
+      <span class="goal-log-message">${query ? highlightLogText(entry.message, query) : mdInline(String(entry.message || ""))}${renderGoalLogActions(entry.actions)}${details ? `<pre class="log-inline-details">${highlightLogText(details, query)}</pre>` : ""}</span>
     </div>`;
 }
 
@@ -916,14 +959,36 @@ function updateGoalLogPanel(root, tab) {
   const lines = root.querySelector("#goal-log-lines");
   const status = root.querySelector('[data-testid="goal-log-status"]');
   if (!lines || !status) return false;
+  const viewport = root.querySelector("#goal-log-tail");
+  const pinned = viewport && viewport.scrollHeight - viewport.clientHeight - viewport.scrollTop < 40;
   renderInto(lines, renderGoalLogLines(tab));
   status.textContent = goalLogStatus(tab);
-  scrollGoalLogEdge(tab, root.querySelector("#goal-log-tail"));
+  const older = root.querySelector('[data-log-page="older"]');
+  const newer = root.querySelector('[data-log-page="newer"]');
+  if (older) older.disabled = !tab.logHasMore;
+  if (newer) newer.disabled = !tab.logPage;
+  if (pinned && logIsFollowing(tab)) scrollGoalLogEdge(tab, viewport);
   return true;
 }
 
 function bindGoalLogPanel(root, boundTab) {
-  const liveTab = () => currentToolbarTab() || boundTab;
+  const liveTab = () => boundTab.mode === "system" ? systemOperationState.logTab : boundTab;
+  let searchTimer;
+  const reload = () => {
+    const tab = liveTab(); tab.logPage = 0; tab.logCursors = {}; tab.logRequest = (tab.logRequest || 0) + 1; tab.logsLoading = false;
+    clearTimeout(searchTimer); searchTimer = setTimeout(() => loadGoalLogTail(tab), 250);
+  };
+  bindOnce(root.querySelector("#btn-log-follow"), "click", () => {
+    const tab = liveTab(); tab.logFollowing = !logIsFollowing(tab); tab.logRequest = (tab.logRequest || 0) + 1; tab.logsLoading = false;
+    if (tab.logFollowing) { tab.logPage = 0; loadGoalLogTail(tab, { tail: true }); }
+    drawToolbar();
+  });
+  root.querySelectorAll("[data-log-filter]").forEach(input => bindOnce(input, input.tagName === "SELECT" ? "change" : "input", () => {
+    const tab = liveTab(); tab.logFilters = { ...tab.logFilters, [input.dataset.logFilter]: input.value }; reload();
+  }));
+  root.querySelectorAll("[data-log-page]").forEach(button => bindOnce(button, "click", () => {
+    const tab = liveTab(); tab.logFollowing = false; tab.logPage = Math.max(0, (tab.logPage || 0) + (button.dataset.logPage === "older" ? 1 : -1)); loadGoalLogTail(tab);
+  }));
   bindOnce(root.querySelector("#btn-goal-log-refresh"), "click", () => {
     liveTab().logsLoaded = false;
     loadGoalLogTail(liveTab());
@@ -932,12 +997,15 @@ function bindGoalLogPanel(root, boundTab) {
   const clear = root.querySelector("#btn-goal-log-clear");
   bindOnce(search, "input", (event) => {
     liveTab().logQuery = event.currentTarget.value;
+    reload();
     if (clear) clear.disabled = !liveTab().logQuery;
     updateGoalLogPanel(root, liveTab());
     saveChatStateToStorage();
   });
   bindOnce(clear, "click", () => {
     liveTab().logQuery = "";
+    liveTab().logFilters = {};
+    reload();
     if (search) {
       search.value = "";
       search.focus();
@@ -971,11 +1039,14 @@ function recordSystemOperation(payload, redraw = true) {
   if (!item.message) return;
   if (isDuplicateSystemOperation(item)) return;
   systemOperationState.messages.push(item);
+  const tab = systemOperationState.logTab;
+  const entry = { ...item, id: payload?.details?.activity_id || `system:${item.timestamp}:${item.message}`, datetime: item.timestamp, goal_id: payload?.details?.goal_id, severity: ["warn", "error"].includes(item.status) ? item.status : "info", details: item.details, operation_status: item.status, log_type: "event" };
+  if (!tab.logPage) tab.logEntries = mergeGoalLogEntries(tab.logEntries, [entry]);
   if (systemOperationState.messages.length > SYSTEM_OPERATION_LOG_LIMIT) {
     systemOperationState.messages = systemOperationState.messages.slice(-SYSTEM_OPERATION_LOG_LIMIT);
   }
   if (redraw && chatState.open && currentToolbarTab()?.mode === "system") {
-    drawToolbar();
+    if (!updateGoalLogPanel($("#toolbar-dock"), tab)) drawToolbar();
   }
 }
 
@@ -996,120 +1067,7 @@ function isDuplicateSystemOperation(item) {
 }
 
 function renderSystemPanel() {
-  const messages = systemOperationState.messages.slice(-SYSTEM_OPERATION_LOG_LIMIT);
-  const activeFilters = activeSystemLogFilters(messages);
-  const visibleMessages = !activeFilters.size
-    ? messages
-    : messages.filter((item) => activeFilters.has(item.status));
-  const countLabel = !activeFilters.size
-    ? `${messages.length} / ${SYSTEM_OPERATION_LOG_LIMIT}`
-    : `${visibleMessages.length} of ${messages.length}`;
-  return `
-    <div class="system-panel" data-testid="toolbar-system-panel">
-      <div class="system-panel-header" data-testid="toolbar-system-header">
-        <span>System operations</span>
-        ${renderSystemLogFilters(messages, activeFilters)}
-        <span class="muted small" data-testid="system-log-count">${countLabel}</span>
-      </div>
-      <div class="system-log" role="log" aria-live="polite" aria-label="Recent system operations"
-           data-testid="system-log">
-        ${visibleMessages.length
-          ? visibleMessages.map(renderSystemLogLine).join("")
-          : `<div class="system-log-empty" data-testid="system-log-empty">${activeFilters.size || messages.length ? "No system activity matches this filter." : "Waiting for system activity."}</div>`}
-      </div>
-    </div>`;
-}
-
-function renderSystemLogFilters(messages, activeFilters) {
-  const options = systemLogFilterOptions(messages);
-  return `
-    <div class="system-log-filters" aria-label="Filter system operations">
-      <label class="system-log-filter${!activeFilters.size ? " active" : ""}">
-        <input type="checkbox"
-               data-system-log-filter="all"
-               data-testid="system-log-filter-all"
-               ${!activeFilters.size ? "checked" : ""}
-               aria-label="Show all system operations">
-        <span>All</span>
-      </label>
-      ${options.map((option) => `
-        <label class="system-log-filter system-log-filter-${option.status}${activeFilters.has(option.status) ? " active" : ""}">
-          <input type="checkbox"
-                 data-system-log-filter="${htmlEscape(option.status)}"
-                 data-testid="system-log-filter-${htmlEscape(option.status)}"
-                 ${activeFilters.has(option.status) ? "checked" : ""}
-                 aria-label="Show ${htmlEscape(option.label.toLowerCase())} system operations">
-          <span>${htmlEscape(option.label)}</span>
-        </label>`).join("")}
-    </div>`;
-}
-
-function systemLogFilterOptions(messages) {
-  const options = [...SYSTEM_LOG_FILTERS];
-  const knownStatuses = new Set(options.map((option) => option.status));
-  for (const item of messages) {
-    if (knownStatuses.has(item.status)) continue;
-    knownStatuses.add(item.status);
-    options.push({ status: item.status, label: systemLogStatusLabel(item.status) });
-  }
-  return options;
-}
-
-function activeSystemLogFilters(messages) {
-  const knownStatuses = new Set(systemLogFilterOptions(messages).map((option) => option.status));
-  return new Set([...systemOperationState.filters].filter((status) => knownStatuses.has(status)));
-}
-
-function bindSystemPanel(root) {
-  $$("[data-system-log-filter]", root).forEach((el) => {
-    bindOnce(el, "change", () => {
-      const filter = el.dataset.systemLogFilter || "all";
-      if (filter === "all") {
-        systemOperationState.filters.clear();
-      } else if (systemOperationState.filters.has(filter)) {
-        systemOperationState.filters.delete(filter);
-      } else {
-        systemOperationState.filters.add(filter);
-      }
-      saveChatStateToStorage();
-      drawToolbar();
-    });
-  });
-}
-
-function systemLogStatusLabel(status) {
-  return String(status || "info")
-    .split(/[-_]+/)
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ") || "Info";
-}
-
-function renderSystemLogLine(item) {
-  const time = formatSystemLogTime(item.timestamp);
-  const details = systemOperationDetailEntries(item.details);
-  return `
-    <div class="system-log-line system-log-${item.status}"
-         data-testid="system-log-line"
-         data-system-log-status="${htmlEscape(item.status)}"
-         data-system-log-category="${htmlEscape(item.category)}">
-      <time class="system-log-time" datetime="${htmlEscape(item.timestamp)}" title="${htmlEscape(item.timestamp)}">${htmlEscape(time)}</time>
-      <div class="system-log-body">
-        <div class="system-log-headline">
-          <span class="system-log-status" data-testid="system-log-status">${htmlEscape(systemLogStatusLabel(item.status))}</span>
-          <span class="system-log-category" data-testid="system-log-category">${htmlEscape(item.category)}</span>
-          <span class="system-log-message" data-testid="system-log-message">${htmlEscape(item.message)}</span>
-        </div>
-        ${details.length ? `
-          <dl class="system-log-details" data-testid="system-log-details">
-            ${details.map(([key, value]) => `
-              <div class="system-log-detail" data-testid="system-log-detail">
-                <dt>${htmlEscape(key)}</dt>
-                <dd>${htmlEscape(value)}</dd>
-              </div>`).join("")}
-          </dl>` : ""}
-      </div>
-    </div>`;
+  return renderGoalLogPanel(systemOperationState.logTab);
 }
 
 function systemOperationDetailEntries(details) {

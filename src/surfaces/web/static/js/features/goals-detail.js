@@ -350,6 +350,7 @@ function drawGoalDetail(goal) {
           </details>
         </div>
         ${goal.status === "review" ? forwardBtn : ""}
+        <button class="secondary" type="button" id="btn-watch-logs" data-testid="goal-action-watch-logs">View Logs</button>
         <div class="goal-action-group">
           <button class="goal-action-primary" id="btn-open-agent" data-testid="goal-open-agent"
                   ${canOpenAgent ? "" : "disabled"}
@@ -357,7 +358,7 @@ function drawGoalDetail(goal) {
           <details class="nav-menu goal-action-menu" id="goal-action-menu"${actionMenuOpen ? " open" : ""}>
             <summary class="btn goal-action-more" aria-label="More Goal actions" data-testid="goal-action-menu-toggle"></summary>
             <div class="nav-menu-panel goal-action-panel">
-              <button class="nav-menu-item" type="button" id="btn-watch-logs" data-testid="goal-action-watch-logs">Watch Logs</button>
+
               <button class="nav-menu-item" type="button" id="btn-reporter" data-testid="goal-action-reporter">Reporter</button>
               <button class="nav-menu-item" type="button" id="btn-assignee" data-testid="goal-action-assignee">Assignee</button>
               <button class="nav-menu-item" type="button" id="btn-rename" data-testid="goal-action-rename">Rename</button>
@@ -501,7 +502,7 @@ function bindGoalDetailControls() {
     } else { openAgentDock({ goalId: goal.id, goalStatus: goal.status }); }
   });
   bindOnce($("#btn-watch-logs"), "click", () => {
-    closeGoalActionMenu();
+    closeGoalDetailModal({ navigateAway: true });
     openGoalLogTail({ goalId: liveGoal().id, goalName: liveGoal().name });
   });
   // Workflow back / forward buttons. Forward from `review` calls the

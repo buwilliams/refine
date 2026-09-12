@@ -212,7 +212,7 @@ registerNavigationCommand("nav.dashboard", "Dashboard", "#/", ["home"]);
 registerNavigationCommand("nav.features", "Features", "#/features", ["feature", "planning"]);
 registerNavigationCommand("nav.goals", "Goals", "#/goals", ["issues", "work"]);
 registerNavigationCommand("nav.changes", "Changes", "#/changes", ["merges"]);
-registerNavigationCommand("nav.logs", "Logs", "#/logs", ["activity"]);
+registerCommand({ id: "toolbar.logs", title: "View System logs", group: "Toolbar", aliases: ["logs", "activity"], run: () => openSystemLogs() });
 for (const [surfaceKey, surface] of Object.entries(SETTINGS_SURFACES || {})) {
   const label = surface.title || surfaceKey;
   for (const tab of surface.tabs || []) {
@@ -526,16 +526,6 @@ registerCommand({
     }
     history.replaceState(null, "", "#/changes");
     renderChanges();
-  },
-});
-
-registerCommand({
-  id: "logs.clear_filters",
-  title: "Logs: clear filters",
-  group: "Logs",
-  aliases: ["clear-logs"],
-  run: () => {
-    location.hash = "#/logs";
   },
 });
 

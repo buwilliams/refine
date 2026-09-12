@@ -167,7 +167,6 @@ async function refreshNodeContextRoute({ preservedDirty = [] } = {}) {
   if (route === "dashboard" && typeof refreshDashboard === "function") return refreshDashboard();
   if (route === "goals" && typeof refreshGoalsTable === "function") return refreshGoalsTable();
   if (route === "features" && typeof refreshFeaturesTable === "function") return refreshFeaturesTable();
-  if (route === "logs" && typeof loadLogs === "function") return loadLogs();
   if (route === "changes" && typeof loadChanges === "function") return loadChanges();
   if (["settings", "node", "project"].includes(route || "")) {
     return refreshCurrentSettingsSurface({ force: true });

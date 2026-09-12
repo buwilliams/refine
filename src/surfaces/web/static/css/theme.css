@@ -60,8 +60,7 @@ html[data-theme="dark"] .table tbody tr:hover td {
 }
 html[data-theme="dark"] .panel-header,
 html[data-theme="dark"] .filter-shell > summary,
-html[data-theme="dark"] .changes-visualization-head,
-html[data-theme="dark"] .logs-visualization-head {
+html[data-theme="dark"] .changes-visualization-head {
   background: linear-gradient(to bottom, var(--color-surface-raised), var(--color-surface));
 }
 
@@ -69,10 +68,7 @@ html[data-theme="dark"] .workflow-status-grid > .workflow-status-card-agent,
 html[data-theme="dark"] .workflow-status-grid .workflow-agent-indicator {
   border-color: #31517f;
 }
-html[data-theme="dark"] .status-pill.quality,
-html[data-theme="dark"] .system-log-filter-complete,
-html[data-theme="dark"] .system-log-complete .system-log-message,
-html[data-theme="dark"] .system-log-complete .system-log-status {
+html[data-theme="dark"] .status-pill.quality {
   color: #5eead4;
 }
 html[data-theme="dark"] .status-pill.governance {

@@ -813,82 +813,7 @@ select {
 .log-entry.info  { border-color: var(--info); }
 .log-entry .meta { color: var(--muted); font-size: 11px; }
 .log-entry pre { font-size: 11px; }
-.logs-table {
-  table-layout: fixed;
-}
-.logs-entry-cell {
-  padding: 0;
-}
-.logs-entry-meta {
-  display: grid;
-  grid-template-columns:
-    minmax(150px, 1.2fr)
-    minmax(86px, 0.7fr)
-    minmax(120px, 1fr)
-    minmax(120px, 1fr)
-    minmax(120px, 1fr);
-}
-.logs-entry-meta-item,
-.logs-entry-message {
-  min-width: 0;
-  padding: 10px 12px;
-}
-.logs-entry-meta-label {
-  display: none;
-}
-.logs-entry-meta-value {
-  display: block;
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-.logs-entry-message {
-  display: grid;
-  grid-template-columns: 1fr;
-  border-top: 1px solid var(--color-border-subtle);
-}
-.logs-message-cell {
-  overflow-wrap: anywhere;
-}
-.logs-message-body {
-  min-width: 0;
-}
-.logs-message-text {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-.logs-message-cell pre {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
 @media (max-width: 760px) {
-  .logs-table.mobile-card-table td.logs-entry-cell {
-    display: block;
-    padding: 8px 2px;
-  }
-  .logs-table.mobile-card-table td.logs-entry-cell::before {
-    content: none;
-  }
-  .logs-entry-meta {
-    display: grid;
-    grid-template-columns: minmax(92px, 34%) minmax(0, 1fr);
-    gap: 6px 10px;
-  }
-  .logs-entry-meta-item {
-    display: contents;
-  }
-  .logs-entry-meta-label {
-    display: block;
-    color: var(--color-text-muted);
-    font-size: 11px;
-    font-weight: 750;
-    letter-spacing: 0;
-    text-transform: uppercase;
-  }
-  .logs-entry-message {
-    grid-template-columns: minmax(92px, 34%) minmax(0, 1fr);
-    gap: 6px 10px;
-    padding: 6px 0;
-  }
 }
 .log-severity {
   display: inline-block;
@@ -1084,16 +1009,14 @@ select {
 }
 .filter-shell-body .filter-bar { margin-bottom: 0; }
 
-.changes-visualization-panel,
-.logs-visualization-panel {
+.changes-visualization-panel {
   margin-bottom: 14px;
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-lg);
   background: var(--color-surface);
   box-shadow: var(--shadow-card);
 }
-.changes-visualization-head,
-.logs-visualization-head {
+.changes-visualization-head {
   min-height: 44px;
   padding: 6px 10px;
   display: flex;
@@ -1103,8 +1026,7 @@ select {
   background: linear-gradient(to bottom, #ffffff, #fbfcfe);
 }
 :where(.segmented-control),
-.changes-period-control,
-.logs-period-control {
+.changes-period-control {
   display: inline-flex;
   align-items: center;
   gap: 2px;
@@ -1114,8 +1036,7 @@ select {
   background: var(--color-surface-muted);
 }
 :where(.segmented-control) button,
-.changes-period-control button,
-.logs-period-control button {
+.changes-period-control button {
   height: 28px;
   padding: 0 10px;
   border: 0;
@@ -1128,16 +1049,13 @@ select {
 }
 :where(.segmented-control) button[aria-pressed="true"],
 .changes-period-control button.active,
-.changes-period-control button[aria-pressed="true"],
-.logs-period-control button.active,
-.logs-period-control button[aria-pressed="true"] {
+.changes-period-control button[aria-pressed="true"] {
   background: var(--color-surface);
   color: var(--color-text);
   box-shadow: var(--shadow-sm);
 }
 :where(.segmented-control) button:hover:not(:disabled),
-.changes-period-control button:hover:not(:disabled),
-.logs-period-control button:hover:not(:disabled) {
+.changes-period-control button:hover:not(:disabled) {
   background: var(--color-surface);
   border-color: transparent;
   color: var(--color-text);
@@ -1146,15 +1064,13 @@ select {
 #logs-visualization {
   padding: 12px;
 }
-.changes-visualization-grid,
-.logs-visualization-grid {
+.changes-visualization-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
   gap: 8px;
   overflow-x: hidden;
 }
-.changes-visualization-bucket,
-.logs-visualization-bucket {
+.changes-visualization-bucket {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -1166,38 +1082,31 @@ select {
 }
 .changes-bucket-label,
 .changes-bucket-total,
-.changes-bucket-linked,
-.logs-bucket-label,
-.logs-bucket-total,
-.logs-visualization-counts {
+.changes-bucket-linked {
   min-width: 0;
   line-height: 1.2;
 }
-.changes-bucket-label,
-.logs-bucket-label {
+.changes-bucket-label {
   display: block;
   width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.changes-bucket-total,
-.logs-bucket-total {
+.changes-bucket-total {
   display: block;
   color: var(--color-text);
   font-size: 20px;
   font-weight: 750;
 }
-.changes-visualization-bar,
-.logs-visualization-bar {
+.changes-visualization-bar {
   height: 6px;
   width: 100%;
   border-radius: 999px;
   background: var(--color-surface-muted);
   overflow: hidden;
 }
-.changes-visualization-bar > span,
-.logs-visualization-bar > span {
+.changes-visualization-bar > span {
   display: block;
   height: 100%;
   border-radius: 999px;
@@ -1205,56 +1114,23 @@ select {
 .changes-visualization-bar > span {
   background: var(--accent);
 }
-.logs-visualization-bar {
-  display: flex;
-}
-.logs-visualization-bar > span {
-  flex: 0 0 auto;
-}
-.logs-visualization-bar > span.error {
-  background: var(--color-danger);
-}
-.logs-visualization-bar > span.warn {
-  background: var(--color-warning);
-}
-.logs-visualization-bar > span.info {
-  background: var(--accent);
-}
 .changes-bucket-linked {
   color: var(--color-text-muted);
   font-size: 12px;
   white-space: nowrap;
 }
-.logs-visualization-counts {
-  display: flex;
-  flex-wrap: nowrap;
-  gap: 8px;
-  color: var(--color-text-muted);
-  font-size: 12px;
-  white-space: nowrap;
-  overflow: hidden;
-}
-.logs-visualization-counts span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
 @media (max-width: 720px) {
-  .changes-visualization-head,
-  .logs-visualization-head {
+  .changes-visualization-head {
     justify-content: flex-start;
     overflow-x: auto;
   }
-  .changes-period-control,
-  .logs-period-control {
+  .changes-period-control {
     flex: 0 0 auto;
   }
-  .changes-visualization-grid,
-  .logs-visualization-grid {
+  .changes-visualization-grid {
     grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
   }
-  .changes-bucket-total,
-  .logs-bucket-total {
+  .changes-bucket-total {
     font-size: 18px;
   }
 }

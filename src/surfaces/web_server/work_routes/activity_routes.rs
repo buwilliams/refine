@@ -9,8 +9,12 @@ use super::{
 };
 
 impl InProcessWebServer {
-    pub(crate) fn handle_activity_list(&self, raw_path: &str) -> ApiResponse {
-        let Some(_) = (match self.current_refine_dir() {
+    pub(crate) fn handle_activity_list(
+        &self,
+        raw_path: &str,
+        cursors: Option<Value>,
+    ) -> ApiResponse {
+        let Some(refine_dir) = (match self.current_refine_dir() {
             Ok(refine_dir) => refine_dir,
             Err(error) => return error_response(error),
         }) else {
@@ -20,6 +24,33 @@ impl InProcessWebServer {
             Ok(projection) => projection,
             Err(error) => return error_response(error),
         };
+        if query_param(raw_path, "archive").as_deref() == Some("1") {
+            use crate::infrastructure::observability::logs::archive::{
+                ArchiveQuery, query_archive,
+            };
+            let root = refine_dir;
+            let goals = projection.goals.keys().cloned().collect::<Vec<_>>();
+            let query = ArchiveQuery {
+                goal_id: query_param(raw_path, "goal_id"),
+                q: query_param(raw_path, "q").unwrap_or_default(),
+                filters: ["severity", "category", "actor", "log_type", "process_id"]
+                    .into_iter()
+                    .filter_map(|key| {
+                        query_param(raw_path, key).map(|value| (key.to_string(), value))
+                    })
+                    .collect(),
+                offset: bounded_query_usize(raw_path, "offset", 0, usize::MAX),
+                limit: bounded_query_usize(raw_path, "limit", 200, 1000),
+                tail: query_param(raw_path, "tail").as_deref() == Some("1"),
+                cursors: cursors
+                    .and_then(|value| serde_json::from_value(value).ok())
+                    .unwrap_or_default(),
+            };
+            return match query_archive(&root, self.runtime_root.as_deref(), &goals, query) {
+                Ok(value) => ApiResponse::json(200, value),
+                Err(error) => error_response(error),
+            };
+        }
         let limit = bounded_query_usize(raw_path, "limit", 50, 1000);
         let offset = bounded_query_usize(raw_path, "offset", 0, usize::MAX);
         let result = projection.list_activity(ActivityProjectionQuery {
