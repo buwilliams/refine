@@ -64,3 +64,5 @@ As AI systems improve, the Goal surface may become less about manual editing and
 The Goal status tag is the sole top-level failure summary. Do not repeat it in generic Goal failure banners. Each Round owns its status and history section, containing its failure explanation, quality and governance results, workflow decisions, and logs. These details expand within that Round instead of competing with the Goal title, prompt, and primary actions.
 
 Workflow visualization cards subtly highlight the selected status filter. Multiple selected statuses each receive the same highlight; an all-status selection is visually neutral. Selection must survive filtered-table refreshes and route reloads.
+
+Round plan display reads both recorded Plan Skill results and legacy implementation-plan records. Moving to a Skill-driven workflow must not hide an already recorded plan.

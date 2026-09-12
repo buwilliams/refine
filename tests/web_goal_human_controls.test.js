@@ -49,13 +49,14 @@ test("every Goal step is selectable and Round deletion uses its inspected revisi
       window.goal = { id: "GOAL1", name: "Repair", status: "failed", workflow_revision: 42,
         rounds: [
           { prompt: "Original", created: "first", failure_message: "Original attempt error", logs: [{ severity: "error", message: "First Round log" }] },
-          { prompt: "Failed retry", created: "second", failure_message: "Retry attempt error", logs: [{ severity: "error", message: "Second Round log" }] }
+          { prompt: "Failed retry", created: "second", event_results: { plan: { generation: 3, results: { planner: { role: "plan", outcome: "success", summary: "Task #1 - Restore the navigation plan." } } } }, failure_message: "Retry attempt error", logs: [{ severity: "error", message: "Second Round log" }] }
         ] };
       drawGoalDetail(goal);
     });
     assert.equal(await page.locator('[data-testid="goal-round-delete"] svg').count(), 2);
     assert.equal(await page.locator("#btn-workflow-control").count(), 0);
     assert.equal(await page.getByTestId("goal-failure-banner").count(), 0);
+    assert.match(await page.getByTestId("goal-implementation-plan-summary").textContent(), /Task #1 - Restore the navigation plan/);
     assert.equal(await page.locator('.goal-detail > [data-testid="goal-failure-summary"]').count(), 0);
     assert.equal(await page.locator('[data-testid="goal-round"] [data-testid="goal-failure-summary"]').count(), 2);
     const firstLog = await page.getByTestId("goal-round-log").first().textContent();

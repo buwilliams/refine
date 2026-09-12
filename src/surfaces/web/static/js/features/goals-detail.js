@@ -845,6 +845,17 @@ function renderImplementationChecklist(items, implementation) {
 
 function renderImplementationPlan(rnd, idx, prevPlanHistoryOpen = {}) {
   const plan = rnd?.implementation_plan;
+  const recordedPlans = Object.values(rnd?.event_results || {})
+    .sort((a, b) => (b.generation || 0) - (a.generation || 0))
+    .map(event => Object.values(event.results || {}).filter(result =>
+      result.role === "plan" && result.outcome === "success" && result.summary))
+    .find(results => results.length);
+  if (recordedPlans) {
+    return `<section class="implementation-plan" data-testid="goal-implementation-plan" aria-labelledby="implementation-plan-title-${idx}">
+      <h4 id="implementation-plan-title-${idx}">Implementation Plan</h4>
+      ${recordedPlans.map(result => `<div class="round-plan-text" data-testid="goal-implementation-plan-summary">${htmlEscape(result.summary)}</div>`).join("")}
+    </section>`;
+  }
   if (!plan) return "";
   const finalPlan = plan.final_plan?.result;
   const proposal = plan.proposal?.result;
