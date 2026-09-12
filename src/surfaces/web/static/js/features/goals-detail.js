@@ -12,6 +12,7 @@ async function renderGoalDetail(r) {
 
 let _goalModalRoot = null;
 let _goalRoundFormDraft = null;
+const _goalRoundTabs = new Map();
 // The goal and workflow most recently drawn. The detail controls are bound once
 // and outlive the render that bound them, so they resolve the goal and its
 // available transitions through here instead of closing over one render's values
@@ -433,6 +434,32 @@ function drawGoalDetail(goal) {
 }
 
 function bindGoalDetailControls() {
+  $$(".round-tabs [role=tab]").forEach(tab => {
+    const select = (target, focus = false) => {
+      const body = target.closest(".round-body");
+      _goalRoundTabs.set(body.dataset.roundTabKey, target.dataset.roundTab);
+      body.querySelectorAll("[role=tab]").forEach(button => {
+        const active = button === target;
+        button.setAttribute("aria-selected", String(active));
+        button.tabIndex = active ? 0 : -1;
+      });
+      body.querySelectorAll("[role=tabpanel]").forEach(panel => {
+        panel.hidden = panel.dataset.roundPanel !== target.dataset.roundTab;
+      });
+      if (focus) target.focus();
+    };
+    bindOnce(tab, "click", () => select(tab));
+    bindOnce(tab, "keydown", event => {
+      const tabs = Array.from(tab.parentElement.querySelectorAll("[role=tab]"));
+      const index = tabs.indexOf(tab);
+      const next = event.key === "ArrowRight" ? (index + 1) % tabs.length
+        : event.key === "ArrowLeft" ? (index + tabs.length - 1) % tabs.length
+        : event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : null;
+      if (next === null) return;
+      event.preventDefault();
+      select(tabs[next], true);
+    });
+  });
   const liveGoal = () => _goalDetailView.goal || {};
   const liveWorkflow = () => _goalDetailView.workflow || {};
 
@@ -864,7 +891,7 @@ function renderImplementationPlan(rnd, idx, prevPlanHistoryOpen = {}) {
   const phase = plan.phase || "unknown";
   const planState = plan.state || "in_progress";
   const phaseLabel = planState === "in_progress" ? phase : planState;
-  return `<section class="card implementation-plan" data-testid="goal-implementation-plan" aria-labelledby="implementation-plan-title-${idx}" style="margin-top:12px">
+  return `<section class="implementation-plan" data-testid="goal-implementation-plan" aria-labelledby="implementation-plan-title-${idx}" style="margin-top:12px">
     <div class="row" style="align-items:center;gap:8px">
       <h4 id="implementation-plan-title-${idx}" style="margin:0">Implementation Plan</h4>
       <span class="status-pill ${planState === "completed" ? "done" : planState === "failed" ? "failed" : "plan"}" data-testid="goal-implementation-plan-phase">${htmlEscape(phaseLabel)}</span>
@@ -887,6 +914,19 @@ function renderRound(rnd, idx, isLatest, prevRoundOpen = {}, prevPlanHistoryOpen
   // historical behavior.
   const key = String(idx);
   const roundOpen = key in prevRoundOpen ? prevRoundOpen[key] : isLatest;
+  const plan = renderImplementationPlan(rnd, idx, prevPlanHistoryOpen);
+  const tabKey = JSON.stringify([goal.id || "", goal.round_edit_revision || 0, rnd.created || "", idx]);
+  const selected = _goalRoundTabs.get(tabKey) || (plan ? "plan" : "request");
+  const panels = {
+    request: `<div class="round-request" data-testid="goal-round-detail-prompt">${htmlEscape(rnd.prompt || "")}</div>`,
+    plan: plan || `<p class="muted">No plan has been recorded for this Round yet.</p>`,
+    report: rnd.implementation_report ? `<section class="implementation-report" data-testid="goal-implementation-report">
+      <h4>Implementation report</h4>
+      ${rnd.implementation_reported_at ? `<p class="muted small" data-testid="goal-implementation-reported-at">${fmtTime(rnd.implementation_reported_at)}</p>` : ""}
+      <div class="round-report-text" data-testid="goal-implementation-report-body">${htmlEscape(rnd.implementation_report)}</div>
+    </section>` : `<p class="muted">No implementation report has been recorded for this Round yet.</p>`,
+    activity: renderRoundHistory(goal, rnd, idx, isLatest),
+  };
   return `
     <details class="round" data-round-idx="${idx}" data-testid="goal-round" ${roundOpen ? "open" : ""}>
       <summary class="round-head" data-testid="goal-round-summary">
@@ -902,47 +942,32 @@ function renderRound(rnd, idx, isLatest, prevRoundOpen = {}, prevPlanHistoryOpen
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 15h10l1-15M10 11v6M14 11v6"/></svg>
         </button>
       </summary>
-      <div class="round-body">
-        <dl class="pair">
-          <dt>prompt</dt><dd data-testid="goal-round-detail-prompt">${htmlEscape(rnd.prompt || "").replace(/\n/g, "<br>")}</dd>
-        </dl>
-        ${renderRoundHistory(goal, rnd, idx, isLatest, prevPlanHistoryOpen)}
-        ${renderImplementationPlan(rnd, idx, prevPlanHistoryOpen)}
-        ${rnd.implementation_report ? `
-          <div class="card implementation-report" data-testid="goal-implementation-report" style="margin-top:12px">
-            <div class="row" style="align-items:center;gap:8px">
-              <h4 style="margin:0">Implementation report</h4>
-              <span class="muted small">what changed, why, and verification</span>
-              <span class="spacer"></span>
-              ${rnd.implementation_reported_at
-                ? `<span class="muted small" data-testid="goal-implementation-reported-at">${fmtTime(rnd.implementation_reported_at)}</span>`
-                : ""}
-            </div>
-            <div data-testid="goal-implementation-report-body" style="margin-top:8px;white-space:pre-wrap">${htmlEscape(rnd.implementation_report)}</div>
-          </div>` : ""}
+      <div class="round-body" data-round-tab-key="${htmlEscape(tabKey)}">
+        <div class="round-tabs" role="tablist" aria-label="Round ${idx + 1} content">
+          ${Object.keys(panels).map(name => `<button type="button" role="tab" id="round-${idx}-tab-${name}" data-round-tab="${name}" aria-controls="round-${idx}-panel-${name}" aria-selected="${name === selected}" tabindex="${name === selected ? 0 : -1}">${name[0].toUpperCase() + name.slice(1)}</button>`).join("")}
+        </div>
+        ${Object.entries(panels).map(([name, content]) => `<div class="round-tab-panel" role="tabpanel" id="round-${idx}-panel-${name}" data-round-panel="${name}" aria-labelledby="round-${idx}-tab-${name}" tabindex="0"${name === selected ? "" : " hidden"}>${content}</div>`).join("")}
       </div>
     </details>
   `;
 }
 
-function renderRoundHistory(goal, round, idx, isLatest, previousOpen) {
+function renderRoundHistory(goal, round, idx, isLatest) {
   const logs = round.logs || [];
   const errors = logs.filter(log => log.severity === "error");
   const historyRound = { ...round, latest_error_log: round.latest_error_log || errors.at(-1) };
   const roundGoal = { ...goal, status: isLatest ? goal.status : (round.failure_message || errors.length) ? "failed" : "done",
     workflow_controls: (goal.workflow_controls || []).filter(control => control.source_round === idx + 1),
     pending_workflow_outcome: isLatest ? goal.pending_workflow_outcome : null };
-  const key = `${idx}:status`;
   const notice = isLatest ? computeFeatureBlockingNotice(goal) : null;
-  return `<details class="round-history" data-plan-history="status" data-round-idx="${idx}" data-testid="goal-round-history"${previousOpen[key] ? " open" : ""}>
-    <summary>Status and history${logs.length ? ` · ${logs.length} log entries` : ""}</summary>
+  return `<div class="round-history" data-testid="goal-round-history">
     ${notice ? `<p class="muted small">${htmlEscape(notice.message)}</p>` : ""}
     ${renderFailureSummary(roundGoal, historyRound)}
     ${renderQualitySummary(round)}
     ${renderGovernanceSummary(round)}
     ${typeof renderWorkflowOutcome === "function" ? renderWorkflowOutcome(roundGoal) : ""}
     ${logs.length ? `<div class="round-log" data-testid="goal-round-log">${logs.map(log => `<div class="round-log-entry"><div class="muted small">${htmlEscape(log.datetime || "")} · ${htmlEscape(log.severity || "info")}${log.category ? ` · ${htmlEscape(log.category)}` : ""}</div><div>${htmlEscape(log.message || "")}</div>${log.details ? `<details><summary>Details</summary><pre>${htmlEscape(diagnosticDetailsText(log.details))}</pre></details>` : ""}</div>`).join("")}</div>` : `<p class="muted small">No log entries recorded for this Round.</p>`}
-  </details>`;
+  </div>`;
 }
 
 // A Goal can fail after every gate it reached passed — an integration that
@@ -987,7 +1012,7 @@ function renderFailureSummary(goal, round) {
     evidence: failure.log_details,
   });
   return `
-    <div class="card" style="margin:0 0 14px" data-testid="goal-failure-summary">
+    <div class="round-diagnostic" data-testid="goal-failure-summary">
       <h3>Failure</h3>
       <div class="row" style="gap:8px;flex-wrap:wrap">
         ${failure.category ? `<span class="status-pill failed" data-testid="goal-failure-category">${htmlEscape(failure.category)}</span>` : ""}
@@ -1006,7 +1031,7 @@ function renderGovernanceSummary(round) {
   const actions = round.governance_rule_actions || [];
   const state = governance.state;
   return `
-    <div class="card" style="margin:0 0 14px" data-testid="goal-governance-summary">
+    <div class="round-diagnostic" data-testid="goal-governance-summary">
       <h3>Governance</h3>
       <div class="row" style="gap:8px;flex-wrap:wrap">
         <span class="status-pill ${reviewStateClass(state)}" data-testid="goal-governance-decision">${htmlEscape(state)}</span>
@@ -1030,7 +1055,7 @@ function renderQualitySummary(round) {
     return "";
   }
   return `
-    <div class="card" style="margin:0 0 14px" data-testid="goal-quality-summary">
+    <div class="round-diagnostic" data-testid="goal-quality-summary">
       <h3>Quality</h3>
       <div class="row" style="gap:8px;flex-wrap:wrap">
         <span class="status-pill ${reviewStateClass(round.quality_state, "quality")}" data-testid="goal-quality-state">quality: ${htmlEscape(normalizeReviewState(round.quality_state))}</span>

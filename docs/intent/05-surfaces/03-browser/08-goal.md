@@ -61,7 +61,7 @@ Future Goals should carry richer evidence: screenshots, test output, design rati
 
 As AI systems improve, the Goal surface may become less about manual editing and more about approving, redirecting, and auditing autonomous work.
 
-The Goal status tag is the sole top-level failure summary. Do not repeat it in generic Goal failure banners. Each Round owns its status and history section, containing its failure explanation, quality and governance results, workflow decisions, and logs. These details expand within that Round instead of competing with the Goal title, prompt, and primary actions.
+The Goal status tag is the sole top-level failure summary. Do not repeat it in generic Goal failure banners. Each Round is the only collapsible container. Inside it, a flat Request / Plan / Report / Activity tab row shares one unboxed content area. Plan is selected initially when a recorded plan exists, otherwise Request is selected. Explicit tab choices persist per Goal and Round across refreshes, without transferring to a different Round after deletion. All tabs remain visible with clear empty states. Activity contains the Round failure explanation, quality and governance results, workflow decisions, and logs. Tabs support keyboard arrows, Home/End, visible focus, and accessible tab/panel relationships.
 
 Workflow visualization cards subtly highlight the selected status filter. Multiple selected statuses each receive the same highlight; an all-status selection is visually neutral. Selection must survive filtered-table refreshes and route reloads.
 

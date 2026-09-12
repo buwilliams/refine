@@ -415,10 +415,21 @@
   overflow-y: auto;
 }
 
-.round-history { margin-top: 12px; }
-.round-history > summary { cursor: pointer; color: var(--muted); }
-.round-history > .card { margin: 12px 0 !important; box-shadow: none; }
-.round-history h3 { font-size: 1rem; }
+/* The Round is the container; its tabs share one unboxed content area. */
+.round-tabs { display: flex; gap: 20px; border-bottom: 1px solid var(--color-border-subtle); overflow-x: auto; }
+.round-tabs > button[role="tab"] {
+  flex: 0 0 auto; min-width: 0; padding: 8px 0; border: 0; border-bottom: 2px solid transparent;
+  border-radius: 0; background: transparent; color: var(--muted); box-shadow: none;
+}
+.round-tabs > button[role="tab"]:hover { background: transparent; color: var(--fg); }
+.round-tabs > button[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--accent); }
+.round-tabs > button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.round-tab-panel { padding: 16px 0 4px; }
+.round-tab-panel[hidden] { display: none; }
+.round-tab-panel > section { margin-top: 0 !important; }
+.round-tab-panel h3, .round-tab-panel h4 { margin: 0 0 10px; font-size: 1rem; }
+.round-diagnostic + .round-diagnostic { margin-top: 20px; }
+.round-request, .round-report-text { white-space: pre-wrap; line-height: 1.6; }
 .round-log { max-height: 320px; overflow: auto; margin-top: 12px; }
 .round-log-entry { padding: 8px 0; border-bottom: 1px solid var(--color-border-subtle); white-space: pre-wrap; }
 
