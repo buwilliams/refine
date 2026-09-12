@@ -101,11 +101,46 @@
       }
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "succeeded",
+  "results": {
+    "trigger-2124c51c-8d1f-44b7-8a07-7a989a68227f": {
+      "invocation_id": "00987505bf974ff0ced6301db543d1ce67bd1e6815f7a6d7cba740d330b23687",
+      "binding_id": "trigger-2124c51c-8d1f-44b7-8a07-7a989a68227f",
+      "role": "task",
+      "outcome": "success",
+      "summary": "Queued fetch-goals-from-email once on daemon port 8082. Queued invocation ID: 819e391cbc27e266c6a85313c5ffd91d43cede497466662898ebcef7906761f4. State: pending. Completing startup immediately without waiting for the child Skill.",
+      "evidence": [],
+      "artifacts": null
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "trigger-2124c51c-8d1f-44b7-8a07-7a989a68227f",
+      "checkout": {
+        "observation": {
+          "branch": "main",
+          "head_commit": "5bf2c25bc437e30e48b78dc0c173469b5f6587b3",
+          "status_porcelain": []
+        },
+        "tree": "a121e1e28c51512e9edc7ce62627b3fa214911a3"
+      },
+      "checkout_recorded": true,
+      "diagnostic": null,
+      "observational_violation": false,
+      "operation_id": null,
+      "process_id": "proc-1789213754468-593231-3",
+      "prompt_bytes": 2129,
+      "provider_session_id": null,
+      "purpose": "work",
+      "raw_output": "{\"binding_id\":\"trigger-2124c51c-8d1f-44b7-8a07-7a989a68227f\",\"invocation_id\":\"00987505bf974ff0ced6301db543d1ce67bd1e6815f7a6d7cba740d330b23687\",\"outcome\":\"success\",\"role\":\"task\",\"summary\":\"Queued fetch-goals-from-email once on daemon port 8082. Queued invocation ID: 819e391cbc27e266c6a85313c5ffd91d43cede497466662898ebcef7906761f4. State: pending. Completing startup immediately without waiting for the child Skill.\"}",
+      "received_at": "2026-09-12T11:49:28.131702086+00:00",
+      "started_at": "2026-09-12T11:49:14.417859699+00:00",
+      "workflow_revision": null
+    }
+  ],
   "created_at": "2026-09-12T11:46:36.945654735+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-12T11:49:28.181882507+00:00",
   "error": null,
   "action_applied": false
 }
