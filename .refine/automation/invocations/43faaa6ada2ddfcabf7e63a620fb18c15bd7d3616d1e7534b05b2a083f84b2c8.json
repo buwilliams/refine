@@ -1,0 +1,194 @@
+{
+  "id": "43faaa6ada2ddfcabf7e63a620fb18c15bd7d3616d1e7534b05b2a083f84b2c8",
+  "event": {
+    "id": "workflow.governance.enter",
+    "name": "Workflow Governance Enter",
+    "kind": "system",
+    "source": "workflow.governance.enter",
+    "enabled": true,
+    "scope": {
+      "node_id": null
+    },
+    "parameters": [],
+    "bindings": [
+      {
+        "id": "default-governance",
+        "skill_id": "default-governance",
+        "enabled": true,
+        "mode": "blocking",
+        "order": 0,
+        "scope": {
+          "node_id": null
+        },
+        "overrides": null,
+        "inputs": {}
+      }
+    ],
+    "on_success": null
+  },
+  "config_revision": 43,
+  "context": {
+    "node_id": "default",
+    "target_root": "/home/buddy/projects/refine-next",
+    "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T146Y4H01X1WVV8STE000-round-1",
+    "workspace": {
+      "repository": "/home/buddy/projects/refine-next",
+      "path": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T146Y4H01X1WVV8STE000-round-1",
+      "branch": "refine/00000T146Y4H01X1WVV8STE000/round-1",
+      "commit": null,
+      "allow_rebase": false,
+      "registration": {
+        "common_dir": "/home/buddy/projects/refine-next/.git",
+        "git_dir": "/home/buddy/projects/refine-next/.git/worktrees/refine-00000T146Y4H01X1WVV8STE000-round-1",
+        "identity": "2096:553052:Some(SystemTime { tv_sec: 1789241391, tv_nsec: 645693603 })"
+      }
+    },
+    "lifecycle": null,
+    "provider": "codex",
+    "goal_id": "00000T146Y4H01X1WVV8STE000",
+    "round_idx": 0,
+    "workflow_revision": 125,
+    "candidate_commit": "0a85e69cd47b940e7f0e644d3b0a1290f90a0ebf",
+    "data": {
+      "context": {
+        "assembled_at": "2026-09-12T11:49:57Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "For the web UI surface, create two new main nav right-aligned dropdown buttons, one for Skills and one for Sites. The right-aligned button order should be Skills, Sites, Settings, and New Goal. Yes, that is a rename of Controls to Settings. Move the menus from Settings (formerly Controls) to the appropriate new menu for Sites and Skills. Add a separator to the new menus for New Skill, New Site, Manage Skills, and Manage Sites. Ensure you use the standardized styles and layout we already have in the app.",
+          "reporter": "Buddy Williams",
+          "round": 1
+        },
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000T146Y4H01X1WVV8STE000",
+          "name": "For the web UI surface, create two new main nav right-aligned dropdown buttons",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": false,
+          "constitution": "",
+          "product": "",
+          "rules": []
+        },
+        "guidance_candidates": [],
+        "previous_rounds": [],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree, the current Round, and available planning context. Follow the Goal and applicable Skill instructions and use your judgment to decide when to stop. Quality and Governance agents make their own decisions using their Skills before integration and human Review. Refine coordinates workflow transitions and Git actions. Do not directly advance Goal state, approve, merge, or push."
+      },
+      "event": {},
+      "goal": {
+        "assignee": "Buddy Williams",
+        "base_commit": "4e7f1245a3170ee5ff1ba2e90dbc7c654dfff0b5",
+        "branch_name": "refine/00000T146Y4H01X1WVV8STE000/round-1",
+        "candidate_commit": "0a85e69cd47b940e7f0e644d3b0a1290f90a0ebf",
+        "created": "2026-09-11T14:27:52Z",
+        "event_generation": 40,
+        "feature_id": null,
+        "feature_order": null,
+        "id": "00000T146Y4H01X1WVV8STE000",
+        "name": "For the web UI surface, create two new main nav right-aligned dropdown buttons",
+        "node_id": "default",
+        "notes": [],
+        "priority": "low",
+        "reporter": "Buddy Williams",
+        "round_edit_revision": 59,
+        "rounds": [
+          {
+            "assignee": "Buddy Williams",
+            "created": "2026-09-12T11:40:50Z",
+            "failure_category": "",
+            "failure_message": "",
+            "implementation_plan": {},
+            "implementation_report": "workflow.implement.enter:default-implement: Retained candidate 0a85e69c implements the accepted navigation plan and is ready for Quality. No additional source changes were needed; worktree remains clean.",
+            "implementation_reported_at": "2026-09-12T19:41:04Z",
+            "prompt": "For the web UI surface, create two new main nav right-aligned dropdown buttons, one for Skills and one for Sites. The right-aligned button order should be Skills, Sites, Settings, and New Goal. Yes, that is a rename of Controls to Settings. Move the menus from Settings (formerly Controls) to the appropriate new menu for Sites and Skills. Add a separator to the new menus for New Skill, New Site, Manage Skills, and Manage Sites. Ensure you use the standardized styles and layout we already have in the app.",
+            "quality_agent_report": "workflow.quality.enter:default-quality: Goal-scoped Quality passes at 0a85e69c. Navigation is operational; 343 JavaScript tests and eight Rust navigation checks passed. Full Rust suite: 1,288 passed, eight failed, seven ignored. Parent comparison and isolated reruns support treating these as unrelated baseline/timing failures. No tests weakened or disabled; worktree clean.",
+            "quality_candidate_commit": "0a85e69cd47b940e7f0e644d3b0a1290f90a0ebf",
+            "quality_message": "Quality Skills reported success.",
+            "quality_state": "passed",
+            "reporter": "Buddy Williams",
+            "updated": "2026-09-12T19:52:03Z"
+          }
+        ],
+        "status": "governance",
+        "target_branch": "main",
+        "updated": "2026-09-12T19:52:03Z",
+        "workflow_context": "",
+        "workflow_revision": 153
+      },
+      "system": {
+        "candidate_commit": "0a85e69cd47b940e7f0e644d3b0a1290f90a0ebf",
+        "node_id": "default",
+        "project_root": "/home/buddy/projects/refine-next",
+        "workflow_step": "governance",
+        "workspace": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T146Y4H01X1WVV8STE000-round-1"
+      }
+    },
+    "metadata": {
+      "behavior": "EventSkill",
+      "event_operation_id": "1a0972d4f672a5389",
+      "goal_id": "00000T146Y4H01X1WVV8STE000",
+      "kind": "workflow",
+      "managed_worktree": {
+        "allow_rebase": false,
+        "branch": "refine/00000T146Y4H01X1WVV8STE000/round-1",
+        "commit": null,
+        "path": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T146Y4H01X1WVV8STE000-round-1",
+        "registration": {
+          "common_dir": "/home/buddy/projects/refine-next/.git",
+          "git_dir": "/home/buddy/projects/refine-next/.git/worktrees/refine-00000T146Y4H01X1WVV8STE000-round-1",
+          "identity": "2096:553052:Some(SystemTime { tv_sec: 1789241391, tv_nsec: 645693603 })"
+        },
+        "repository": "/home/buddy/projects/refine-next"
+      },
+      "node_id": "default",
+      "provider": "codex",
+      "round_idx": 0,
+      "started_bindings": {
+        "default-governance": "2026-09-12T19:52:04.826071390+00:00"
+      },
+      "target_app_id": "/home/buddy/projects/refine-next",
+      "workflow_revision": 125,
+      "workflow_state": "governance",
+      "workflow_step_generation": 40
+    }
+  },
+  "bindings": [
+    {
+      "binding": {
+        "id": "default-governance",
+        "skill_id": "default-governance",
+        "enabled": true,
+        "mode": "blocking",
+        "order": 0,
+        "scope": {
+          "node_id": null
+        },
+        "overrides": null,
+        "inputs": {}
+      },
+      "skill": {
+        "id": "default-governance",
+        "name": "Governance",
+        "prompt": "## Governance\n\nReview the Goal against the Governance intent below. Do not edit files, merge, push, or change Goal state. A finding must identify the violated intent or invariant, its concrete consequence, and an actionable recovery request. Group related symptoms by their underlying cause.\n\n### Intent and architecture\n\nReview Refine's relevant documentation files under Refine's runtime at `<refine-runtime>/docs/intent/***/*.*` as the durable product specification.\n\n### Semantic code organization\n\nKeep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.\n\nIf issues outside the Goal’s scope block progress, investigate and fix them or use an evidence-backed workaround, preserving required checks and documenting what you changed.\n",
+        "role": "governance",
+        "enabled": true,
+        "scope": {
+          "node_id": null
+        },
+        "parameters": [],
+        "provenance": "refine-default-v1"
+      },
+      "parameters": {}
+    }
+  ],
+  "state": "running",
+  "results": {},
+  "attempts": [],
+  "created_at": "2026-09-12T19:52:03.908190926+00:00",
+  "completed_at": null,
+  "error": null,
+  "action_applied": false
+}

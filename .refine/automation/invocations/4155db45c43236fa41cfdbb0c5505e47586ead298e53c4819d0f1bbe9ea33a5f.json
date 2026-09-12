@@ -200,11 +200,49 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "succeeded",
+  "results": {
+    "default-quality": {
+      "invocation_id": "4155db45c43236fa41cfdbb0c5505e47586ead298e53c4819d0f1bbe9ea33a5f",
+      "binding_id": "default-quality",
+      "role": "quality",
+      "outcome": "success",
+      "summary": "Goal-scoped Quality passes at 0a85e69c. Navigation is operational; 343 JavaScript tests and eight Rust navigation checks passed. Full Rust suite: 1,288 passed, eight failed, seven ignored. Parent comparison and isolated reruns support treating these as unrelated baseline/timing failures. No tests weakened or disabled; worktree clean.",
+      "evidence": [],
+      "artifacts": {
+        "report": "/home/buddy/projects/refine-next/.git/refine-audits/navigation-00000T146Y4H01X1WVV8STE000-20260912-quality/report.json"
+      }
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "default-quality",
+      "checkout": {
+        "observation": {
+          "branch": "refine/00000T146Y4H01X1WVV8STE000/round-1",
+          "head_commit": "0a85e69cd47b940e7f0e644d3b0a1290f90a0ebf",
+          "status_porcelain": []
+        },
+        "tree": "576ecfeaf4d22c4e72be2f200c826800943da512"
+      },
+      "checkout_recorded": true,
+      "diagnostic": null,
+      "host_bound_result": true,
+      "observational_violation": false,
+      "operation_id": null,
+      "process_id": "proc-1789242067156-173368-2097",
+      "prompt_bytes": 9230,
+      "provider_session_id": null,
+      "purpose": "work",
+      "raw_output": "{\n  \"outcome\": \"success\",\n  \"summary\": \"Goal-scoped Quality passes at 0a85e69c. Navigation is operational; 343 JavaScript tests and eight Rust navigation checks passed. Full Rust suite: 1,288 passed, eight failed, seven ignored. Parent comparison and isolated reruns support treating these as unrelated baseline/timing failures. No tests weakened or disabled; worktree clean.\",\n  \"artifacts\": {\n    \"report\": \"/home/buddy/projects/refine-next/.git/refine-audits/navigation-00000T146Y4H01X1WVV8STE000-20260912-quality/report.json\"\n  }\n}\n",
+      "received_at": "2026-09-12T19:51:57.063095286+00:00",
+      "started_at": "2026-09-12T19:41:07.133655547+00:00",
+      "workflow_revision": 125
+    }
+  ],
   "created_at": "2026-09-12T19:41:06.030005848+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-12T19:51:58.149342447+00:00",
   "error": null,
   "action_applied": false
 }
