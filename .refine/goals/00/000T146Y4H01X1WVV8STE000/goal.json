@@ -1,9 +1,9 @@
 {
   "base_commit": "e4aa1619781e8e3c10b2f83801c09461bfea3652",
   "branch_name": "refine/00000T146Y4H01X1WVV8STE000/round-1",
-  "candidate_commit": "f3945f54b53b4d8ffe46a9699f7dfbb4baf371c1",
+  "candidate_commit": "0a85e69cd47b940e7f0e644d3b0a1290f90a0ebf",
   "created": "2026-09-11T14:27:52Z",
-  "event_generation": 30,
+  "event_generation": 31,
   "feature_id": null,
   "feature_order": null,
   "id": "00000T146Y4H01X1WVV8STE000",
@@ -91,6 +91,31 @@
         }
       },
       "event_results": {
+        "2b405211ea0d5aa0bbd5e189801fd2ef5cd25260c93589452797394824816415": {
+          "candidate_commit": "f3945f54b53b4d8ffe46a9699f7dfbb4baf371c1",
+          "generation": 30,
+          "results": {
+            "default-quality": {
+              "artifacts": {
+                "report": "/tmp/refine-quality-nav-f3945f54/quality-report.json"
+              },
+              "binding_id": "default-quality",
+              "evidence": [
+                "All 343 JavaScript tests passed with zero skips.",
+                "All eight Rust navigation tests passed; responsive layouts visually checked.",
+                "Broad Rust suite: 1284 passed, 12 failed, seven ignored. Nine failures also reproduced on the parent revision.",
+                "git diff --check passed."
+              ],
+              "invocation_id": "2b405211ea0d5aa0bbd5e189801fd2ef5cd25260c93589452797394824816415",
+              "outcome": "failure",
+              "role": "quality",
+              "summary": "Navigation checks pass after correcting the shared Skill-launch test helper. Quality remains failed because 12 broader Rust failures are unresolved. No tests were removed or weakened; the helper correction remains uncommitted."
+            }
+          },
+          "round_idx": 0,
+          "source": "workflow.quality.enter",
+          "state": "failed"
+        },
         "65bd560eae8af0be9e4be304acb3e7914b287c343ad436df28286f431f229856": {
           "candidate_commit": null,
           "generation": 29,
@@ -140,9 +165,9 @@
           "state": "succeeded"
         }
       },
-      "failure_at": "",
-      "failure_category": "",
-      "failure_message": "",
+      "failure_at": "2026-09-12T14:01:16Z",
+      "failure_category": "quality",
+      "failure_message": "Quality findings require an explicit workflow action; automatic recovery is disabled",
       "gate_configurations": {
         "27:default:workflow.todo.enter": {
           "events": {
@@ -379,6 +404,26 @@
               }
             }
           }
+        },
+        "31:default:workflow.failed.enter": {
+          "events": {
+            "workflow.failed.enter": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.failed.enter",
+              "kind": "system",
+              "name": "Workflow Failed Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.failed.enter"
+            }
+          },
+          "revision": 40,
+          "schema_version": 2,
+          "skills": {}
         }
       },
       "governance_rule_actions": [],
@@ -878,8 +923,120 @@
         }
       ],
       "prompt": "For the web UI surface, create two new main nav right-aligned dropdown buttons, one for Skills and one for Sites. The right-aligned button order should be Skills, Sites, Settings, and New Goal. Yes, that is a rename of Controls to Settings. Move the menus from Settings (formerly Controls) to the appropriate new menu for Sites and Skills. Add a separator to the new menus for New Skill, New Site, Manage Skills, and Manage Sites. Ensure you use the standardized styles and layout we already have in the app.",
+      "quality_agent_report": "workflow.quality.enter:default-quality: Navigation checks pass after correcting the shared Skill-launch test helper. Quality remains failed because 12 broader Rust failures are unresolved. No tests were removed or weakened; the helper correction remains uncommitted.",
+      "quality_candidate_commit": "0a85e69cd47b940e7f0e644d3b0a1290f90a0ebf",
+      "quality_checked_at": "2026-09-12T14:01:16Z",
+      "quality_details": {
+        "candidate_commit": "0a85e69cd47b940e7f0e644d3b0a1290f90a0ebf",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T146Y4H01X1WVV8STE000-round-1",
+        "diagnostics": [
+          "Reused Skill review workflow.quality.enter:default-quality for final candidate content: automation/invocations/2b405211ea0d5aa0bbd5e189801fd2ef5cd25260c93589452797394824816415.json"
+        ],
+        "evaluation_scope": "isolated_candidate",
+        "operation_id": "1a095ec1b10d08445",
+        "provider_attempts": [],
+        "quality_proof": {
+          "checked_at": "2026-09-12T14:01:16Z",
+          "checked_candidate_commit": "0a85e69cd47b940e7f0e644d3b0a1290f90a0ebf",
+          "evaluation_scope": "isolated_candidate",
+          "goal_id": "00000T146Y4H01X1WVV8STE000",
+          "operation_id": "1a095ec1b10d08445",
+          "results": [
+            {
+              "command": "",
+              "evidence": "Navigation checks pass after correcting the shared Skill-launch test helper. Quality remains failed because 12 broader Rust failures are unresolved. No tests were removed or weakened; the helper correction remains uncommitted.",
+              "status": "failed",
+              "test": "workflow.quality.enter:default-quality"
+            }
+          ],
+          "round_idx": 0,
+          "schema_version": 1,
+          "skills": {
+            "invocations": {
+              "workflow.quality.enter:default-quality": "2b405211ea0d5aa0bbd5e189801fd2ef5cd25260c93589452797394824816415"
+            },
+            "required_bindings": [
+              "workflow.quality.enter:default-quality"
+            ],
+            "requirements_id": "bd53563cfd4962c90715b5ef4d1c08277f3f076f80a21692eac07da607b7774c"
+          },
+          "source_candidate_commit": "0a85e69cd47b940e7f0e644d3b0a1290f90a0ebf",
+          "state": "failed"
+        },
+        "results": [
+          {
+            "command": "",
+            "evidence": "Navigation checks pass after correcting the shared Skill-launch test helper. Quality remains failed because 12 broader Rust failures are unresolved. No tests were removed or weakened; the helper correction remains uncommitted.",
+            "status": "failed",
+            "test": "workflow.quality.enter:default-quality"
+          }
+        ],
+        "source_candidate_commit": "0a85e69cd47b940e7f0e644d3b0a1290f90a0ebf"
+      },
+      "quality_message": "Quality failed: “workflow.quality.enter:default-quality” — Navigation checks pass after correcting the shared Skill-launch test helper. Quality remains failed because 12 broader Rust failures are unresolved. No tests were removed or weakened; the h….",
+      "quality_requirements": {
+        "candidate_commit": "0a85e69cd47b940e7f0e644d3b0a1290f90a0ebf",
+        "id": "bd53563cfd4962c90715b5ef4d1c08277f3f076f80a21692eac07da607b7774c",
+        "node_id": "default",
+        "required_bindings": [
+          "workflow.quality.enter:default-quality"
+        ],
+        "selected": [
+          {
+            "attachments": [],
+            "binding": {
+              "binding": {
+                "enabled": true,
+                "id": "default-quality",
+                "inputs": {},
+                "mode": "blocking",
+                "order": 0,
+                "overrides": null,
+                "scope": {
+                  "node_id": null
+                },
+                "skill_id": "default-quality"
+              },
+              "parameters": {},
+              "skill": {
+                "enabled": true,
+                "id": "default-quality",
+                "name": "Quality",
+                "parameters": [],
+                "prompt": "## Quality review\n\nRun tests to ensure the Goal's implementation passes meaningful tests. Do not remove meaningful tests. Remove deprecated or meaningless tests. Use the best available tools for the testing the Goal. The quality gate passes when the system is operational and meaningful tests have passed.\n\nIf issues outside the Goal’s scope block progress, investigate and fix them or use an evidence-backed workaround, preserving required checks and documenting what you changed.\n",
+                "provenance": "refine-default-v1",
+                "role": "quality",
+                "scope": {
+                  "node_id": null
+                }
+              }
+            },
+            "contract_version": 1,
+            "key": "workflow.quality.enter:default-quality"
+          }
+        ]
+      },
+      "quality_skill_results": [
+        {
+          "artifacts": {
+            "report": "/tmp/refine-quality-nav-f3945f54/quality-report.json"
+          },
+          "binding_id": "workflow.quality.enter:default-quality",
+          "evidence": [
+            "All 343 JavaScript tests passed with zero skips.",
+            "All eight Rust navigation tests passed; responsive layouts visually checked.",
+            "Broad Rust suite: 1284 passed, 12 failed, seven ignored. Nine failures also reproduced on the parent revision.",
+            "git diff --check passed."
+          ],
+          "invocation_id": "2b405211ea0d5aa0bbd5e189801fd2ef5cd25260c93589452797394824816415",
+          "outcome": "failure",
+          "role": "quality",
+          "summary": "Navigation checks pass after correcting the shared Skill-launch test helper. Quality remains failed because 12 broader Rust failures are unresolved. No tests were removed or weakened; the helper correction remains uncommitted."
+        }
+      ],
+      "quality_state": "failed",
       "reporter": "Buddy Williams",
-      "updated": "2026-09-12T13:46:14Z",
+      "updated": "2026-09-12T14:01:16Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-12T13:42:20Z",
         "generation": 27,
@@ -895,16 +1052,16 @@
         }
       ],
       "workflow_failure_occurrence": {
-        "generation": 25,
+        "generation": 30,
         "round_idx": 0
       },
       "workflow_reconciliation": null,
       "workflow_recovery": null
     }
   ],
-  "status": "quality",
+  "status": "failed",
   "target_branch": "main",
-  "updated": "2026-09-12T13:46:14Z",
+  "updated": "2026-09-12T14:01:16Z",
   "workflow_context": "",
   "workflow_controls": [
     {
@@ -1200,7 +1357,17 @@
       "round_idx": 0,
       "to": "quality",
       "workflow_revision": 102
+    },
+    {
+      "at": "2026-09-12T14:01:16.660884797+00:00",
+      "forced": true,
+      "from": "quality",
+      "generation": 31,
+      "node_id": "default",
+      "round_idx": 0,
+      "to": "failed",
+      "workflow_revision": 110
     }
   ],
-  "workflow_revision": 103
+  "workflow_revision": 110
 }

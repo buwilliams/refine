@@ -198,11 +198,56 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "failed",
+  "results": {
+    "default-quality": {
+      "invocation_id": "2b405211ea0d5aa0bbd5e189801fd2ef5cd25260c93589452797394824816415",
+      "binding_id": "default-quality",
+      "role": "quality",
+      "outcome": "failure",
+      "summary": "Navigation checks pass after correcting the shared Skill-launch test helper. Quality remains failed because 12 broader Rust failures are unresolved. No tests were removed or weakened; the helper correction remains uncommitted.",
+      "evidence": [
+        "All 343 JavaScript tests passed with zero skips.",
+        "All eight Rust navigation tests passed; responsive layouts visually checked.",
+        "Broad Rust suite: 1284 passed, 12 failed, seven ignored. Nine failures also reproduced on the parent revision.",
+        "git diff --check passed."
+      ],
+      "artifacts": {
+        "report": "/tmp/refine-quality-nav-f3945f54/quality-report.json"
+      }
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "default-quality",
+      "checkout": {
+        "observation": {
+          "branch": "refine/00000T146Y4H01X1WVV8STE000/round-1",
+          "head_commit": "f3945f54b53b4d8ffe46a9699f7dfbb4baf371c1",
+          "status_porcelain": [
+            " M tests/support/terminal_browser.js"
+          ]
+        },
+        "tree": "576ecfeaf4d22c4e72be2f200c826800943da512"
+      },
+      "checkout_recorded": true,
+      "diagnostic": null,
+      "host_bound_result": true,
+      "observational_violation": false,
+      "operation_id": null,
+      "process_id": "proc-1789220775644-854084-6714",
+      "prompt_bytes": 9005,
+      "provider_session_id": null,
+      "purpose": "work",
+      "raw_output": "{\n  \"outcome\": \"failure\",\n  \"summary\": \"Navigation checks pass after correcting the shared Skill-launch test helper. Quality remains failed because 12 broader Rust failures are unresolved. No tests were removed or weakened; the helper correction remains uncommitted.\",\n  \"evidence\": [\n    \"All 343 JavaScript tests passed with zero skips.\",\n    \"All eight Rust navigation tests passed; responsive layouts visually checked.\",\n    \"Broad Rust suite: 1284 passed, 12 failed, seven ignored. Nine failures also reproduced on the parent revision.\",\n    \"git diff --check passed.\"\n  ],\n  \"artifacts\": {\n    \"report\": \"/tmp/refine-quality-nav-f3945f54/quality-report.json\"\n  }\n}\n",
+      "received_at": "2026-09-12T14:01:10.784827627+00:00",
+      "started_at": "2026-09-12T13:46:15.623323810+00:00",
+      "workflow_revision": 85
+    }
+  ],
   "created_at": "2026-09-12T13:46:14.519207211+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-12T14:01:12.123718269+00:00",
   "error": null,
   "action_applied": false
 }
