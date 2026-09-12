@@ -146,6 +146,9 @@ function browserRuntime(storage = new Map(), persistentStorage = new Map()) {
   };
   const boundListeners = new WeakMap();
   const context = vm.createContext({
+    captureNodeContextGeneration: () => 0,
+    isNodeContextGenerationCurrent: generation => generation === 0,
+    AbortController,
     // The real helpers live in dom-morph.js and need a browser DOM plus
     // Idiomorph. These stand in with the pre-morph semantics this fake DOM
     // models: replace the content, then run the bind step.
@@ -219,6 +222,7 @@ function browserRuntime(storage = new Map(), persistentStorage = new Map()) {
   vm.runInContext(fs.readFileSync(path.join(staticRoot, "common.js"), "utf8"), context);
   vm.runInContext(fs.readFileSync(path.join(staticRoot, "features/terminal-clipboard.js"), "utf8"), context);
   vm.runInContext(fs.readFileSync(path.join(staticRoot, "features/terminal-keyboard.js"), "utf8"), context);
+  vm.runInContext(fs.readFileSync(path.join(staticRoot, "features/system-recovery.js"), "utf8"), context);
   vm.runInContext(fs.readFileSync(path.join(staticRoot, "features/toolbar.js"), "utf8"), context);
   vm.runInContext(fs.readFileSync(path.join(staticRoot, "features/toolbar-todo.js"), "utf8"), context);
   vm.runInContext(`

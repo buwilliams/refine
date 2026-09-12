@@ -47,3 +47,47 @@ test("Toolbar logs unify type filters, retained search, flat evidence, and opt-i
     assert.deepEqual(app.pageErrors, []);
   } finally { await app.close(); }
 });
+
+
+test("System owns diagnostics and updates sync health while tailing is off", { skip: SKIP }, async () => {
+  let syncStatus = "healthy";
+  const app = await openApp({ fixture(pathname) {
+    const result = apiFixture(pathname);
+    if (pathname === "/api/sync/preview") return { local_state_head: "local", remote_state_head: "remote", merge_base: "base", conflicts: [] };
+    if (pathname === "/api/dashboard") return { ...result,
+      state_sync_health: { status: syncStatus, last_conflict_report_id: syncStatus === "failed" ? "report-1" : null, last_error: syncStatus === "failed" ? "Sync diagnostic detail" : null },
+      needs_attention: [{ kind: "banner", severity: "error", message: "Worker diagnostic detail" }],
+      workflow_health: { state: "recovering", reason: "Awaiting worker" },
+    };
+    return result;
+  }});
+  try {
+    await app.page.goto(`${app.origin}/#/`);
+    await app.page.locator(".dashboard-status-grid").waitFor();
+    assert.equal(await app.page.getByText("Worker diagnostic detail", { exact: true }).count(), 0);
+    assert.equal(await app.page.getByTestId("dashboard-state-sync-health").count(), 0);
+    await app.page.evaluate(() => openSystemLogs());
+    await app.page.getByTestId("toolbar-sync-health").filter({ hasText: "Healthy" }).waitFor();
+    assert.equal(await app.page.getByTestId("log-follow").getAttribute("aria-pressed"), "false");
+    syncStatus = "failed";
+    await app.page.evaluate(() => refreshToolbarSyncHealth(true));
+    await app.page.getByTestId("toolbar-sync-health").filter({ hasText: "Unhealthy" }).waitFor();
+    await app.page.locator("[data-system-diagnostics]").click();
+    const diagnostics = app.page.getByTestId("system-diagnostics");
+    await diagnostics.getByText("Worker diagnostic detail", { exact: true }).waitFor();
+    await diagnostics.getByText("Sync diagnostic detail", { exact: true }).waitFor();
+    await diagnostics.getByTestId("state-recovery-preview").waitFor();
+    assert.equal(await diagnostics.locator("[data-recovery-apply]").isDisabled(), true);
+    assert.equal(await diagnostics.locator('[name="state-recovery-authority"]:checked').count(), 0);
+    await diagnostics.locator('[name="state-recovery-authority"][value="live"]').check();
+    assert.equal(await diagnostics.locator("[data-recovery-apply]").isDisabled(), true);
+    await diagnostics.locator("[data-recovery-confirm]").check();
+    assert.equal(await diagnostics.locator("[data-recovery-apply]").isEnabled(), true);
+    syncStatus = "healthy";
+    await app.page.getByRole("button", { name: "Refresh", exact: true }).click();
+    await app.page.getByTestId("toolbar-sync-health").filter({ hasText: "Healthy" }).waitFor();
+    await diagnostics.getByText("Sync diagnostic detail", { exact: true }).waitFor({ state: "hidden" });
+    await app.page.screenshot({ path: "/tmp/refine-system-diagnostics.png" });
+    assert.deepEqual(app.pageErrors, []);
+  } finally { await app.close(); }
+});

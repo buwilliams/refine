@@ -20,16 +20,9 @@ The Dashboard should provide broad context without replacing deeper surfaces. Us
 Current implementation details that matter to intent:
 
 - dashboard data comes from daemon-backed projection and diagnostic summaries;
-- state-sync health shows the serving node's correlated attempt id and source,
-  last successful reconciliation, failure start, stale boundary, redacted
-  bounded error, and complete conflict-report id and local location when one
-  exists;
-- failed or stale sync is prominent needs-attention state, and all-node counts
-  keep one compact explicit non-authoritative label while degraded; the
-  Dashboard does not load or render the complete path set;
-- a failed sync with a recorded conflict report opens the daemon-backed recovery panel. The Dashboard loads the read-only `sync` preview — classification, both heads, per-path sides, and a domain-terms summary per contested path — without recommending or preselecting authority; choosing live or remote authority and confirming against the reviewed divergence (a local fingerprint of the preview, never a server token) are separate deliberate actions. Individual contested paths may be excepted onto the other side, the same decision the CLI's `--path` names, and changing an exception invalidates the confirmation exactly as changing the authority does;
-- a recovery rejection that does not name a recovery action retains the preview but invalidates confirmation before retry. A `state_moved` rejection — the state diverged again while the recovery was being verified — clears the preview and choice until a fresh preview is reviewed. Successful recovery presents the resulting heads, authority, settled paths, and any retained refs while authoritative state-sync health refreshes and shows the failure cleared;
-- typed state-sync-health SSE updates refresh Dashboard, Nodes, and Logs on failure, stale-threshold crossing, recovery, initial connection, and reconnect;
+- routine state-sync health lives as a compact Healthy/Unhealthy label in Toolbar > System; timestamps, attempt IDs, errors, and report paths do not occupy the Dashboard;
+- all system diagnostics, including worker health, count freshness, synchronization errors, and explicit conflict recovery, belong in Toolbar > System, not Dashboard alerts or content;
+- health events refresh System independently of the current page and log-tail setting;
 - workflow visualization is shared with the Goals screen;
 - an intentionally paused workflow is neutral operating context, not a runtime-worker failure needing attention;
 - target-app and agent status are part of the operating context;
@@ -37,7 +30,7 @@ Current implementation details that matter to intent:
 
 The Dashboard should stay compact and practical. Its job is orientation and routing, not detailed editing.
 
-When the workflow worker is unavailable, the Dashboard presents the shared workflow-health state and reason and exposes its remedy. Missing runtime reachability alone never implies a provider authentication failure. When health evidence is unavailable, the banner directs the operator to runtime status without guessing a cause.
+Toolbar > System is the central place for system health, diagnostics, and remedies. Dashboard attention is reserved for work such as failed Goals and pending reviews. A failed Dashboard read shows a brief availability message pointing to System, without diagnostic internals.
 
 ## Future Direction
 

@@ -8,6 +8,9 @@ function browserRuntime() {
   const context = vm.createContext({
     URLSearchParams,
     location: { hash: "#/" },
+    toolbarSystemDashboard: null,
+    api: null,
+    refreshToolbarSyncHealth: null,
     state: { currentRoute: "dashboard", dashboard: null },
     htmlEscape(value) { return String(value); },
     sharedNodeScopeFromHash() { return "current"; },
@@ -16,7 +19,7 @@ function browserRuntime() {
   });
   for (const file of [
     "../src/surfaces/web/static/js/features/goals-list.js",
-    "../src/surfaces/web/static/js/features/dashboard_state_recovery.js",
+    "../src/surfaces/web/static/js/features/system-recovery.js",
     "../src/surfaces/web/static/js/features/dashboard.js",
   ]) {
     vm.runInContext(fs.readFileSync(path.join(__dirname, file), "utf8"), context);
@@ -25,42 +28,41 @@ function browserRuntime() {
     globalThis.dashboardAttentionTest = {
       goalsHash: (item, reporter, scope) =>
         dashboardAttentionGoalsHash(item, reporter, scope),
-      renderSyncHealth: (dashboard) => renderDashboardStateSyncHealth(dashboard),
-      resetRecovery: () => { dashboardStateRecovery = newDashboardStateRecovery(""); },
-      clearRecoveryForRoute: () => clearDashboardStateRecoveryForRouteChange(),
-      setRecoveryPreview: (preview) => dashboardRecoverySetPreview(preview),
+      resetRecovery: () => { systemStateRecovery = newSystemStateRecovery(""); },
+      clearRecoveryForRoute: () => resetSystemStateRecovery(),
+      setRecoveryPreview: (preview) => systemRecoverySetPreview(preview),
       setRecoveryContext: (dashboard) => {
         state.currentRoute = "dashboard";
-        state.dashboard = dashboard;
-        dashboardStateRecovery = newDashboardStateRecovery(dashboardRecoveryContextKey(dashboard));
+        toolbarSystemDashboard = dashboard;
+        systemStateRecovery = newSystemStateRecovery(systemRecoveryContextKey(dashboard));
       },
       setRecoveryRoute: (route) => { state.currentRoute = route; },
-      renderRecovery: (dashboard) => renderDashboardStateRecovery(dashboard),
-      selectRecoveryAuthority: (authority) => dashboardRecoverySelectAuthority(authority),
-      confirmRecovery: (confirmed, fingerprint) => dashboardRecoverySetConfirmed(confirmed, fingerprint),
-      recoveryFingerprint: () => dashboardRecoveryFingerprint(dashboardStateRecovery.preview),
-      previewFingerprint: (preview) => dashboardRecoveryFingerprint(preview),
-      recoveryReady: () => dashboardRecoveryApplyReady(),
-      recoveryPayload: () => dashboardRecoveryApplyPayload(),
-      exceptRecoveryPath: (path, excepted) => dashboardRecoveryToggleException(path, excepted),
-      handleRecoveryConflict: (error) => dashboardRecoveryHandleConflict(error),
+      renderRecovery: (dashboard) => renderSystemStateRecovery(dashboard),
+      selectRecoveryAuthority: (authority) => systemRecoverySelectAuthority(authority),
+      confirmRecovery: (confirmed, fingerprint) => systemRecoverySetConfirmed(confirmed, fingerprint),
+      recoveryFingerprint: () => systemRecoveryFingerprint(systemStateRecovery.preview),
+      previewFingerprint: (preview) => systemRecoveryFingerprint(preview),
+      recoveryReady: () => systemRecoveryApplyReady(),
+      recoveryPayload: () => systemRecoveryApplyPayload(),
+      exceptRecoveryPath: (path, excepted) => systemRecoveryToggleException(path, excepted),
+      handleRecoveryConflict: (error) => systemRecoveryHandleConflict(error),
       recoveryState: () => ({
-        phase: dashboardStateRecovery.phase,
-        preview: dashboardStateRecovery.preview,
-        authority: dashboardStateRecovery.authority,
-        confirmedFingerprint: dashboardStateRecovery.confirmedFingerprint,
-        previewRefreshRequired: dashboardStateRecovery.previewRefreshRequired,
+        phase: systemStateRecovery.phase,
+        preview: systemStateRecovery.preview,
+        authority: systemStateRecovery.authority,
+        confirmedFingerprint: systemStateRecovery.confirmedFingerprint,
+        previewRefreshRequired: systemStateRecovery.previewRefreshRequired,
       }),
-      setDashboardApi: (implementation) => { dashboardApi = implementation; },
+      setDashboardApi: (implementation) => { api = implementation; },
       setRecoveryUiHooks: (redraw, refresh) => {
-        redrawDashboardRecovery = redraw;
-        refreshDashboard = refresh;
+        redrawSystemRecovery = redraw;
+        refreshToolbarSyncHealth = refresh;
       },
-      applyRecovery: () => applyDashboardStateRecovery(),
-      reconcileRecovery: (dashboard) => reconcileDashboardStateRecovery(dashboard),
+      applyRecovery: () => applySystemStateRecovery(),
+      reconcileRecovery: (dashboard) => reconcileSystemStateRecovery(dashboard),
       completeRecovery: (result) => {
-        dashboardStateRecovery.phase = "success";
-        dashboardStateRecovery.result = result;
+        systemStateRecovery.phase = "success";
+        systemStateRecovery.result = result;
       },
     };
   `, context);
@@ -82,49 +84,10 @@ test("failed Goal recovery attention links to the selected reporter and node sco
   );
 });
 
-test("degraded state sync labels aggregate counts and exposes freshness metadata", () => {
-  const runtime = browserRuntime();
-  const html = runtime.renderSyncHealth({
-    aggregate_counts_authoritative: false,
-    all_node_counts_label: "local projection; non-authoritative",
-    state_sync_health: {
-      status: "failed",
-      last_attempt_at: "2026-08-15T12:00:00Z",
-      last_attempt_id: 42,
-      last_attempt_source: "project_sync_operation",
-      last_success_at: "2026-08-14T12:00:00Z",
-      failure_since: "2026-08-15T11:55:00Z",
-      stale_since: "2026-08-14T12:15:00Z",
-      last_error: "git fetch failed",
-      last_conflict_report_id: "report-42",
-      last_conflict_report_location: "/run/8082/state-sync-conflicts/latest.json",
-    },
-  });
-
-  assert.match(html, /data-state-sync-status="failed"/);
-  assert.match(html, /All-node counts: local projection; non-authoritative/);
-  assert.match(html, /Last attempt.*2026-08-15T12:00:00Z/);
-  assert.match(html, /Attempt.*42 \(project_sync_operation\)/);
-  assert.match(html, /Last success.*2026-08-14T12:00:00Z/);
-  assert.match(html, /Failure since.*2026-08-15T11:55:00Z/);
-  assert.match(html, /Stale since.*2026-08-14T12:15:00Z/);
-  assert.match(html, /Complete conflict report report-42/);
-});
-
-test("dashboard state sync health renders below the workflow status grid", () => {
-  const source = fs.readFileSync(
-    path.join(__dirname, "../src/surfaces/web/static/js/features/dashboard.js"),
-    "utf8",
-  );
-  const dashboardTemplate = source.slice(
-    source.indexOf("renderInto(dash, `"),
-    source.indexOf("`, () => {", source.indexOf("renderInto(dash, `")),
-  );
-
-  assert.ok(
-    dashboardTemplate.indexOf("renderWorkflowVisualization")
-      < dashboardTemplate.indexOf("renderDashboardStateSyncHealth"),
-  );
+test("dashboard keeps sync internals out of its routine overview", () => {
+  const source = fs.readFileSync(path.join(__dirname, "../src/surfaces/web/static/js/features/dashboard.js"), "utf8");
+  assert.doesNotMatch(source, /renderDashboardStateSyncHealth|dashboard-state-sync-health/);
+  assert.doesNotMatch(source, /renderSystemStateRecovery|dashboard-count-authority/);
 });
 
 test("browser SSE reconciles state sync surfaces from authoritative endpoints", () => {
@@ -398,7 +361,7 @@ test("a newer conflict episode replaces retained success with fresh neutral evid
   assert.equal(runtime.recoveryReady(), false);
 });
 
-test("late apply completion cannot restore recovery state after route context changes", async () => {
+test("late apply completion cannot restore recovery state after the System context resets", async () => {
   const runtime = browserRuntime();
   runtime.setRecoveryContext(recoveryDashboard());
   runtime.setRecoveryPreview(recoveryPreview());

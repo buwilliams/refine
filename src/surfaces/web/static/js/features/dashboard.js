@@ -106,7 +106,6 @@ async function refreshDashboard() {
     if (refreshSeq !== dashboardRefreshSeq || state.currentRoute !== "dashboard"
         || !isNodeContextGenerationCurrent(nodeGeneration)) return;
     if (renderNoProjectIfApiDetached(d, "Dashboard")) return;
-    await reconcileDashboardStateRecovery(d);
     if (refreshSeq !== dashboardRefreshSeq || state.currentRoute !== "dashboard"
         || !isNodeContextGenerationCurrent(nodeGeneration)) return;
     state.dashboard = d;
@@ -120,7 +119,7 @@ async function refreshDashboard() {
     if (dash && !hasRenderedDashboard) {
       const waiting = e.name === "AbortError"
         ? "Dashboard is still waiting for the backend. Retrying…"
-        : `Failed to load: ${htmlEscape(e.message)}`;
+        : "Dashboard is temporarily unavailable. See Toolbar > System.";
       dash.innerHTML = `<p class="muted">${waiting}</p>`;
     }
     scheduleDashboardRetry();
@@ -151,39 +150,6 @@ function scheduleDashboardRetry() {
   }, 2000);
 }
 
-function renderDashboardStateSyncHealth(d) {
-  const health = d.state_sync_health;
-  if (!health) return "";
-  const degraded = health.status === "failed" || health.status === "stale";
-  const field = (label, value) => value
-    ? `<span><strong>${htmlEscape(label)}:</strong> ${htmlEscape(value)}</span>`
-    : "";
-  return `
-    <section class="dashboard-sync-health ${degraded ? "degraded" : ""}"
-             data-testid="dashboard-state-sync-health"
-             data-state-sync-status="${htmlEscape(health.status || "unknown")}">
-      <div>
-        <strong>State sync: ${htmlEscape(health.status || "unknown")}</strong>
-        ${d.aggregate_counts_authoritative === false
-          ? `<span class="filter-pill dashboard-count-authority" data-testid="dashboard-count-authority">All-node counts: ${htmlEscape(d.all_node_counts_label || "non-authoritative")}</span>`
-          : ""}
-      </div>
-      <div class="muted small dashboard-sync-health-metadata">
-        ${field("Last attempt", health.last_attempt_at)}
-        ${field("Attempt", health.last_attempt_id
-          ? `${health.last_attempt_id} (${health.last_attempt_source || "unknown"})`
-          : "")}
-        ${field("Last success", health.last_success_at)}
-        ${field("Failure since", health.failure_since)}
-        ${field("Stale since", health.stale_since)}
-      </div>
-      ${health.last_error ? `<div class="small dashboard-sync-error">${htmlEscape(health.last_error)}</div>` : ""}
-      ${health.last_conflict_report_location
-        ? `<div class="muted small dashboard-sync-report">Complete conflict report ${htmlEscape(health.last_conflict_report_id || "")}: ${htmlEscape(health.last_conflict_report_location)}</div>`
-        : ""}
-    </section>`;
-}
-
 function drawDashboard(d, opts = {}) {
   const reviewsForReporter = opts.reviewsForReporter || [];
   const reviewReporter = opts.reporter || "";
@@ -194,25 +160,7 @@ function drawDashboard(d, opts = {}) {
     dashboardReviewSelectedReporter = reviewSelectionKey;
   }
   if (!reviewsForReporter.length) dashboardReviewSelectedIds.clear();
-  // Global banners
-  const banners = (d.needs_attention || []).filter((x) => x.kind === "banner")
-    .map((x) => ({
-      severity: x.severity || "error",
-      message: x.message,
-      action: /Refine cannot reach/i.test(x.message) ? {
-        label: "Re-check auth",
-        onClick: async () => {
-          try {
-            await api("POST", "/api/settings/recheck-auth");
-            toast("Pre-flight re-run requested", "info");
-            await refreshDashboard();
-          } catch (e) {
-            toast(e.message, "error");
-          }
-        },
-      } : null,
-    }));
-  renderBanners(banners);
+  renderBanners([]);
 
   const needsAttention = (d.needs_attention || []).filter((x) => x.kind === "filter");
   const counts = d.counts || {};
@@ -233,8 +181,6 @@ function drawDashboard(d, opts = {}) {
       hrefForStatus: (s) => goalsHash({ status: s, node: scope }),
       className: "dashboard-status-grid",
     })}
-    ${renderDashboardStateSyncHealth(d)}
-    ${renderDashboardStateRecovery(d)}
 
     ${showReviewPanel ? `
     <details class="filter-shell dashboard-collapsible-shell" id="reviews-for-reporter-card" data-testid="dashboard-review-panel"${reviewsShellOpen ? " open" : ""}>
@@ -348,7 +294,6 @@ function drawDashboard(d, opts = {}) {
 
     wireDashboardPanelPersistence("reviews-for-reporter-card");
     wireDashboardPanelPersistence("dashboard-contributor-rankings-shell");
-    wireDashboardStateRecovery();
     wireReviewsForReporter(reviewsForReporter);
   });
 }

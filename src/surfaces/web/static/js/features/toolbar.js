@@ -253,6 +253,9 @@ function resetChatForProjectSwitch() {
   chatState.open = false;
   chatState.bodyHeight = null;
   chatState.fullscreen = false;
+  toolbarSystemDashboard = null;
+  toolbarSystemDiagnosticsOpen = false;
+  resetSystemStateRecovery();
   systemOperationState.messages = [];
   systemOperationState.logTab = { mode: "system", logEntries: [], logQuery: "", logFollowing: false };
   resetFilesState();
@@ -629,7 +632,16 @@ function drawToolbar() {
   `, () => {
     if (filesActive) bindFilesPanel(root);
     if (todoActive) bindTodoPanel(root);
-    if (systemActive) bindGoalLogPanel(root, systemOperationState.logTab);
+    if (systemActive) {
+      bindGoalLogPanel(root, systemOperationState.logTab);
+      wireSystemStateRecovery();
+      bindOnce(root.querySelector("[data-system-diagnostics]"), "click", () => {
+        toolbarSystemDiagnosticsOpen = !toolbarSystemDiagnosticsOpen;
+        drawToolbar();
+      });
+      bindOnce(root.querySelector("[data-system-refresh]"), "click", () => refreshToolbarSyncHealth(true));
+      refreshToolbarSyncHealth();
+    }
     if (terminalActive) bindTerminalPanel(root, active);
     if (goalLogsActive) bindGoalLogPanel(root, active);
 
@@ -836,7 +848,7 @@ function handleGoalLogSseEvent(entry) {
   }
 }
 
-function renderGoalLogPanel(tab) {
+function renderGoalLogPanel(tab, navigation = "") {
   const order = normalizeGoalLogOrder(tab.logOrder);
   const query = String(tab.logQuery || "");
   const isSystem = tab.mode === "system";
@@ -844,6 +856,7 @@ function renderGoalLogPanel(tab) {
   return `
     <div class="goal-log-panel" data-testid="${isSystem ? "toolbar-system-panel" : "toolbar-goal-log-panel"}">
       <div class="goal-log-header">
+        ${isSystem ? navigation + renderToolbarSyncHealth() : ""}
         <button class="secondary small" type="button" id="btn-log-follow" aria-pressed="${following}" data-testid="log-follow">${following ? "Stop tail" : "Start tail"}</button>
         <span class="muted small">${following ? "Following new output" : isSystem ? "Normal system events continue" : "Tail stopped"}</span>
         ${!isSystem ? `<a class="chat-goal-link" href="#/goals/${encodeURIComponent(tab.goalId)}" data-testid="goal-log-goal-link">Goal ${htmlEscape(tab.goalId)}</a>` : ""}
@@ -1066,8 +1079,69 @@ function isDuplicateSystemOperation(item) {
   });
 }
 
+let toolbarSystemDashboard = null;
+let toolbarSystemDiagnosticsOpen = false;
+let toolbarSyncHealth = { generation: null, status: null, request: 0 };
+
+function renderToolbarSyncHealth() {
+  const current = toolbarSyncHealth.generation === captureNodeContextGeneration();
+  const status = current ? toolbarSyncHealth.status : null;
+  const label = status === null ? "Checking…" : status === "healthy" ? "Healthy" : "Unhealthy";
+  return `<span class="toolbar-sync-health ${status === "healthy" ? "healthy" : status ? "unhealthy" : ""}"
+    data-testid="toolbar-sync-health" role="status" aria-label="State sync: ${label}">State sync: ${label}</span>`;
+}
+
+async function refreshToolbarSyncHealth(force = false) {
+  const generation = captureNodeContextGeneration();
+  if (!force && toolbarSyncHealth.generation === generation) return;
+  const request = toolbarSyncHealth.request + 1;
+  toolbarSyncHealth = { generation, status: null, request };
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
+  try {
+    const dashboard = await api("GET", "/api/dashboard?node=current", undefined, { recordError: false, cache: false, signal: controller.signal });
+    if (!isNodeContextGenerationCurrent(generation) || toolbarSyncHealth.request !== request) return;
+    toolbarSystemDashboard = dashboard;
+    toolbarSyncHealth.status = dashboard.state_sync_health?.status || "unknown";
+    await reconcileSystemStateRecovery(dashboard);
+    if (!isNodeContextGenerationCurrent(generation) || toolbarSyncHealth.request !== request) return;
+  } catch {
+    if (!isNodeContextGenerationCurrent(generation) || toolbarSyncHealth.request !== request) return;
+    toolbarSystemDashboard = { needs_attention: [{ kind: "banner", message: "System diagnostics are unavailable. Retry to check current health." }] };
+    toolbarSyncHealth.status = "unknown";
+  } finally {
+    clearTimeout(timeout);
+  }
+  const label = document.querySelector('[data-testid="toolbar-sync-health"]');
+  if (label) label.outerHTML = renderToolbarSyncHealth();
+  if (currentToolbarTab()?.mode === "system" && toolbarSystemDiagnosticsOpen) drawToolbar();
+}
+
 function renderSystemPanel() {
-  return renderGoalLogPanel(systemOperationState.logTab);
+  const dashboard = toolbarSyncHealth.generation === captureNodeContextGeneration() ? toolbarSystemDashboard : null;
+  const issues = (dashboard?.needs_attention || []).filter(item => item.kind === "banner");
+  const unhealthy = issues.some(item => item.severity !== "info");
+  const navigation = `<div class="goal-log-header system-diagnostics-nav">
+    <button class="secondary small" data-system-diagnostics aria-pressed="${toolbarSystemDiagnosticsOpen}">${toolbarSystemDiagnosticsOpen ? "View logs" : `Diagnostics${unhealthy ? " · Unhealthy" : ""}`}</button>
+    ${toolbarSystemDiagnosticsOpen ? renderToolbarSyncHealth() : ""}
+    ${toolbarSystemDiagnosticsOpen ? '<button class="secondary small" data-system-refresh>Refresh</button>' : ""}
+  </div>`;
+  if (!toolbarSystemDiagnosticsOpen) return renderGoalLogPanel(systemOperationState.logTab, navigation);
+  const health = dashboard?.state_sync_health;
+  return navigation + `<div class="system-diagnostics" data-testid="system-diagnostics">
+    ${issues.map(item => `<p>${htmlEscape(item.message || "")}</p>`).join("") || `<p class="muted">${dashboard ? "No system issues reported." : "Checking system health…"}</p>`}
+    ${dashboard?.workflow_health && !issues.some(item => item.workflow_health) ? `<p>Workflow: ${htmlEscape(dashboard.workflow_health.state || "unknown")}${dashboard.workflow_health.reason ? ` — ${htmlEscape(dashboard.workflow_health.reason)}` : ""}</p>` : ""}
+    ${health ? `<dl class="system-recovery-evidence">${[
+      ["Last attempt", health.last_attempt_at], ["Attempt", health.last_attempt_id],
+      ["Source", health.last_attempt_source], ["Last success", health.last_success_at],
+      ["Failure since", health.failure_since], ["Stale since", health.stale_since],
+      ["Conflict report", health.last_conflict_report_id], ["Report location", health.last_conflict_report_location],
+    ].map(([label, value]) => systemRecoveryField(label, value)).join("")}</dl>` : ""}
+    ${health?.last_error ? `<p>${htmlEscape(health.last_error)}</p>` : ""}
+    ${dashboard?.aggregate_counts_authoritative === false ? '<p>All-node counts may be out of date.</p>' : ""}
+    <a href="#/settings/runtime">Runtime settings</a> · <a href="#/settings/workflow">Workflow settings</a>
+    ${dashboard ? renderSystemStateRecovery(dashboard) : ""}
+  </div>`;
 }
 
 function systemOperationDetailEntries(details) {

@@ -1829,14 +1829,15 @@ function initSSE() {
   if (sseSource) sseSource.close();
   sseSource = new EventSource("/api/sse");
   sseSource.onopen = () => {
+    if (typeof refreshToolbarSyncHealth === "function") refreshToolbarSyncHealth(true);
     const reconnected = sseLastErrorNoticeAt > 0;
     sseLastErrorNoticeAt = 0;
     invalidateScreenDataCache();
     reconcilePendingBackgroundOperations();
-    if (reconnected) toast("Live updates reconnected.", "success");
+    if (reconnected) recordSystemOperation({ message: "Live updates reconnected.", status: "info" });
     if (reconnected && typeof reconcileNodeContext === "function") {
       reconcileNodeContext({ external: true }).catch((error) => {
-        toast(`Could not reconcile Node context: ${error.message || error}`, "error");
+        recordSystemOperation({ message: `Could not reconcile Node context: ${error.message || error}`, status: "error" });
       });
     }
     // SSE is a notification transport, not durable state. Reconcile the visible
@@ -1889,6 +1890,7 @@ function initSSE() {
     scheduleRouteDataRefresh();
   });
   sseSource.addEventListener("runtime_change", () => {
+    if (typeof refreshToolbarSyncHealth === "function") refreshToolbarSyncHealth(true);
     invalidateScreenDataCache();
     if (typeof scheduleAgentStatusRefresh === "function") scheduleAgentStatusRefresh();
     if (typeof refreshTargetAppToggle === "function") refreshTargetAppToggle();
@@ -1898,6 +1900,7 @@ function initSSE() {
     }
   });
   sseSource.addEventListener("state_sync_health", () => {
+    if (typeof refreshToolbarSyncHealth === "function") refreshToolbarSyncHealth(true);
     invalidateScreenDataCache();
     if (state.currentRoute === "dashboard") refreshDashboard();
     if (["settings", "node", "project"].includes(state.currentRoute || "")) {
@@ -1978,7 +1981,7 @@ function initSSE() {
     const now = Date.now();
     if (now - sseLastErrorNoticeAt > 30000) {
       sseLastErrorNoticeAt = now;
-      toast("Live updates disconnected. Reconnecting automatically…", "warn");
+      recordSystemOperation({ message: "Live updates disconnected. Reconnecting automatically…", status: "warn" });
     }
     // Keep the EventSource alive: the browser automatically reconnects it and
     // `onopen` above reconciles durable backend truth after transport recovery.
