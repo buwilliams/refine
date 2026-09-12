@@ -154,10 +154,17 @@ pub(crate) fn query_archive(
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
             Err(e) => return Err(RefineError::Io(e.to_string())),
         };
-        let len = file
+        let metadata = file
             .metadata()
-            .map_err(|e| RefineError::Io(e.to_string()))?
-            .len();
+            .map_err(|e| RefineError::Io(e.to_string()))?;
+        let len = metadata.len();
+        // Raw streams do not record a time per line. Use the file's last-write
+        // time for archive placement, explicitly labelled as approximate, rather
+        // than the process start (which is also stored as Unix milliseconds).
+        let modified_at = metadata
+            .modified()
+            .ok()
+            .map(|time| chrono::DateTime::<chrono::Utc>::from(time).to_rfc3339());
         let mut reader = BufReader::new(file);
         let mut position = if query.tail {
             match query.cursors.get(&key) {
@@ -244,13 +251,16 @@ pub(crate) fn query_archive(
                 _ => {
                     let mut entry = meta.clone();
                     entry["id"] = json!(format!("{key}:{at}"));
-                    if query.tail {
-                        entry["datetime"] = json!(chrono::Utc::now().to_rfc3339());
-                    }
+                    entry["datetime"] = json!(if query.tail {
+                        chrono::Utc::now().to_rfc3339()
+                    } else {
+                        modified_at.clone().unwrap_or_default()
+                    });
+                    entry["stream_offset"] = json!(at);
                     entry["timestamp_kind"] = json!(if query.tail {
                         "received"
                     } else {
-                        "process_started"
+                        "file_modified"
                     });
                     entry["message"] = json!(text.trim_end_matches(['\r', '\n']));
                     entry
@@ -345,7 +355,17 @@ mod tests {
         .unwrap();
         let stdout = runtime.join("out.log");
         fs::write(&stdout, "first raw line\nsecond raw line\n").unwrap();
-        fs::write(runtime.join("process-history/p1.json"), json!({"id":"p1","owner":"agent","pid":null,"state":"exited","label":"codex","details":json!({"goal_id":"GOAL1"}).to_string(),"stdout_path":stdout,"stderr_path":null,"stdin_path":null,"limits":null,"started_at":"2026-09-12T12:00:00Z","exit_code":0}).to_string()).unwrap();
+        fs::write(runtime.join("process-history/p1.json"), json!({"id":"p1","owner":"agent","pid":null,"state":"exited","label":"codex","details":json!({"goal_id":"GOAL1"}).to_string(),"stdout_path":stdout,"stderr_path":null,"stdin_path":null,"limits":null,"started_at":"1789214400000","exit_code":0}).to_string()).unwrap();
+        fs::File::options()
+            .write(true)
+            .open(&stdout)
+            .unwrap()
+            .set_times(
+                fs::FileTimes::new().set_modified(
+                    std::time::UNIX_EPOCH + std::time::Duration::from_secs(1789218000),
+                ),
+            )
+            .unwrap();
         let goals = vec!["GOAL1".into()];
         let query = |q: &str| ArchiveQuery {
             goal_id: Some("GOAL1".into()),
@@ -353,6 +373,24 @@ mod tests {
             limit: 200,
             ..Default::default()
         };
+        let newest = query_archive(
+            &state,
+            Some(&runtime),
+            &goals,
+            ArchiveQuery {
+                limit: 1,
+                ..query("")
+            },
+        )
+        .unwrap();
+        assert_eq!(newest["activity"][0]["message"], "second raw line");
+        assert_eq!(newest["activity"][0]["timestamp_kind"], "file_modified");
+        assert!(
+            chrono::DateTime::parse_from_rfc3339(
+                newest["activity"][0]["datetime"].as_str().unwrap()
+            )
+            .is_ok()
+        );
         let old = query_archive(&state, Some(&runtime), &goals, query("old needle")).unwrap();
         assert_eq!(old["page"]["total"], 1);
         assert_eq!(old["activity"][0]["message"], "log 0");

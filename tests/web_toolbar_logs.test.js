@@ -44,6 +44,11 @@ test("Toolbar logs unify type filters, retained search, flat evidence, and opt-i
     await viewLogs.click();
     await app.page.getByTestId("toolbar-goal-log-panel").waitFor();
     assert.equal(await app.page.locator('[data-testid="goal-detail-modal"]').count(), 0);
+    const streamOrder = await app.page.evaluate(() => mergeGoalLogEntries([
+      { id: "stream:100", process_id: "p1", log_type: "stdout", stream_offset: 100, datetime: "2026-09-12T13:00:00Z", message: "later" },
+      { id: "stream:20", process_id: "p1", log_type: "stdout", stream_offset: 20, datetime: "2026-09-12T13:00:00Z", message: "earlier" },
+    ]).map(entry => entry.message));
+    assert.deepEqual(streamOrder, ["earlier", "later"]);
     assert.deepEqual(app.pageErrors, []);
   } finally { await app.close(); }
 });

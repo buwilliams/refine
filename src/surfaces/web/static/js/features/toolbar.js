@@ -764,7 +764,12 @@ function mergeGoalLogEntries(...groups) {
   return [...merged.values()]
     .sort((left, right) => {
       const byTime = String(left.datetime || "").localeCompare(String(right.datetime || ""));
-      return byTime || goalLogEntryKey(left).localeCompare(goalLogEntryKey(right));
+      if (byTime) return byTime;
+      if (left.process_id && left.process_id === right.process_id && left.log_type === right.log_type
+          && Number.isFinite(left.stream_offset) && Number.isFinite(right.stream_offset)) {
+        return left.stream_offset - right.stream_offset;
+      }
+      return goalLogEntryKey(left).localeCompare(goalLogEntryKey(right));
     })
     .slice(-GOAL_LOG_TAIL_LIMIT);
 }
@@ -936,7 +941,7 @@ function renderGoalLogLine(entry, query = "") {
   const actor = String(entry.actor || "").trim();
   return `
     <div class="goal-log-line goal-log-${htmlEscape(severity)}" data-testid="goal-log-line">
-      <span class="goal-log-time" title="${htmlEscape(entry.timestamp_kind === "process_started" ? `Process started ${entry.datetime}; raw output has no recorded line timestamp` : entry.datetime || "")}">${htmlEscape(formatSystemLogTime(entry.datetime))}</span>
+      <span class="goal-log-time" title="${htmlEscape(entry.timestamp_kind === "file_modified" ? `Approximate: log file last updated ${entry.datetime}; raw output has no recorded line timestamp` : entry.timestamp_kind === "received" ? `Received ${entry.datetime}; raw output has no recorded line timestamp` : entry.datetime || "")}">${htmlEscape(formatSystemLogTime(entry.datetime))}</span>
       <span class="goal-log-severity">[${htmlEscape(entry.severity || "info")}]</span>
       ${entry.log_type ? `<span class="goal-log-type">[${htmlEscape(entry.log_type)}]</span>` : ""}
       ${entry.process_id ? `<span class="goal-log-process">[${htmlEscape(entry.process_id)}]</span>` : ""}
