@@ -101,11 +101,47 @@
       }
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "error",
+  "results": {
+    "trigger-2124c51c-8d1f-44b7-8a07-7a989a68227f": {
+      "invocation_id": "881b1e378cce1f20da307e3b66b3f5a1c2f4875050343724cfc40057c656631c",
+      "binding_id": "trigger-2124c51c-8d1f-44b7-8a07-7a989a68227f",
+      "role": "task",
+      "outcome": "error",
+      "summary": "The supplied completion contract contains no invocation_id, so I could not construct the required startup-email-<invocation_id> request ID. No child Skill was queued.",
+      "evidence": [],
+      "artifacts": null
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "trigger-2124c51c-8d1f-44b7-8a07-7a989a68227f",
+      "checkout": {
+        "observation": {
+          "branch": "main",
+          "head_commit": "52e1d08a4e8bfdfa5d589e1f6287e77e8d61c9a6",
+          "status_porcelain": []
+        },
+        "tree": "a7f7f31e791d20b0959e64425ab3a86cee9a6fa2"
+      },
+      "checkout_recorded": true,
+      "diagnostic": null,
+      "host_bound_result": true,
+      "observational_violation": false,
+      "operation_id": null,
+      "process_id": "proc-1789217367606-854084-1",
+      "prompt_bytes": 2162,
+      "provider_session_id": null,
+      "purpose": "work",
+      "raw_output": "{\"outcome\":\"error\",\"summary\":\"The supplied completion contract contains no invocation_id, so I could not construct the required startup-email-<invocation_id> request ID. No child Skill was queued.\"}",
+      "received_at": "2026-09-12T12:49:33.238323680+00:00",
+      "started_at": "2026-09-12T12:49:27.553014976+00:00",
+      "workflow_revision": null
+    }
+  ],
   "created_at": "2026-09-12T12:49:26.362559904+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-12T12:49:33.289325521+00:00",
   "error": null,
   "action_applied": false
 }
