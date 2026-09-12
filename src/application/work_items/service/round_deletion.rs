@@ -115,18 +115,6 @@ impl FileWorkItemService {
             }
             scrub_references(&mut goal, round_idx, true);
             goal["updated"] = json!(now_timestamp());
-            // The receipt contains only the action, never a copy of the deleted Round.
-            goal.as_object_mut()
-                .unwrap()
-                .entry("workflow_controls")
-                .or_insert(json!([]))
-                .as_array_mut()
-                .unwrap()
-                .push(json!({
-                    "request_id":uuid::Uuid::new_v4().to_string(), "forced":true,
-                    "from":current.goal.status, "to":"backlog", "at":now_timestamp(),
-                    "request":{"reason":"Explicit Round deletion", "actor":"operator"}
-                }));
             let mut writes = Vec::new();
             let logs =
                 crate::infrastructure::observability::logs::goal_logs_path(&self.refine_dir, id);
@@ -225,7 +213,8 @@ fn scrub_references(value: &mut Value, removed: usize, root: bool) {
     match value {
         Value::Array(values) => {
             values.retain(|v| {
-                v["round_idx"].as_u64() != Some(removed as u64)
+                v["request"]["reason"] != "Explicit Round deletion"
+                    && v["round_idx"].as_u64() != Some(removed as u64)
                     && v["source_round"].as_u64() != Some(removed as u64 + 1)
             });
             for v in values {
@@ -457,6 +446,14 @@ mod tests {
         service
             .update_goal_git_refs("GOAL1", "refine/GOAL1/round-3", "main", "base", None)
             .unwrap();
+        let path = goal_json_path(&root, "GOAL1");
+        let mut before = service.show_goal_detail("GOAL1").unwrap();
+        before["workflow_controls"] = json!([
+            {"source_round": 1, "request": {"reason": "first decision"}},
+            {"source_round": 2, "request": {"reason": "deleted failure decision"}},
+            {"request": {"reason": "Explicit Round deletion"}}
+        ]);
+        write_json_atomically(&path, &before).unwrap();
         let revision = workflow_revision(&service.show_goal_detail("GOAL1").unwrap());
         assert!(service.delete_goal_round("GOAL1", 1, revision - 1).is_err());
         service.delete_goal_round("GOAL1", 1, revision).unwrap();
@@ -477,6 +474,11 @@ mod tests {
         )
         .unwrap();
         assert!(!goal.to_string().contains("delete me"));
+        assert_eq!(goal["workflow_controls"].as_array().unwrap().len(), 1);
+        assert_eq!(
+            goal["workflow_controls"][0]["request"]["reason"],
+            "first decision"
+        );
         let stale_log = crate::model::log::LogEntry {
             datetime: now_timestamp(),
             severity: "info".into(),
@@ -528,6 +530,18 @@ mod tests {
                 .unwrap()
                 .is_empty()
         );
+        assert!(
+            service.show_goal_detail("GOAL1").unwrap()["workflow_controls"]
+                .as_array()
+                .unwrap()
+                .is_empty()
+        );
+        service
+            .append_goal_round_summary("GOAL1", "User", "Start again")
+            .unwrap();
+        let restarted = service.show_goal_detail("GOAL1").unwrap();
+        assert_eq!(restarted["rounds"].as_array().unwrap().len(), 1);
+        assert_eq!(restarted["rounds"][0]["prompt"], "Start again");
         fs::remove_dir_all(root).unwrap();
     }
 }

@@ -71,6 +71,8 @@ fn blocked_preparation_keeps_real_controller_ticks_and_reserves_its_slot() {
         node_id: None,
         sequence: 0,
         tick_ms: 0,
+        tick_monotonic_ms: None,
+        completed_cycle_monotonic_ms: None,
         completed_cycle_ms: None,
         active_attempts: Default::default(),
         failure: None,

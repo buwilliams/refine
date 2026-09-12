@@ -128,10 +128,13 @@ pub fn process_summary_value_with_chat_sessions(
     }
     append_chat_session_processes(&mut process_values, runtime_root, refine_dir)?;
     let runner_reachable = required_runner_workers_reachable(&process_values);
-    let background_workers = background_worker_values(&process_values, &pause_state);
+    let workflow_health =
+        crate::application::workflow::health::assess_workflow_health(runtime_root);
+    let background_workers =
+        background_worker_values(&process_values, &pause_state, &workflow_health);
     Ok(json!({
         "runner_reachable": runner_reachable,
-        "workflow_health": crate::application::workflow::health::assess_workflow_health(runtime_root),
+        "workflow_health": workflow_health,
         "daemon_maintenance": crate::application::workers::maintenance::inspect_health(runtime_root),
         "paused": pause_state.workflow_paused,
         "workflow_paused": pause_state.workflow_paused,
@@ -607,7 +610,11 @@ fn required_runner_workers_reachable(processes: &[Value]) -> bool {
     })
 }
 
-fn background_worker_values(processes: &[Value], pause_state: &ProcessPauseState) -> Vec<Value> {
+fn background_worker_values(
+    processes: &[Value],
+    pause_state: &ProcessPauseState,
+    workflow_health: &crate::application::workflow::health::WorkflowHealth,
+) -> Vec<Value> {
     let mut worker_kinds = BACKGROUND_RUNNERS
         .into_iter()
         .map(str::to_string)
@@ -640,7 +647,10 @@ fn background_worker_values(processes: &[Value], pause_state: &ProcessPauseState
                 .contains(worker_kind.as_str());
             let globally_paused = pause_state.workflow_paused
                 && matches!(worker_kind.as_str(), "git-sync" | "worktree-cleanup");
-            let status = if process.is_some() {
+            let recovering = worker_kind == "workflow" && !disabled && workflow_health.state == "recovering";
+            let status = if recovering {
+                "recovering"
+            } else if process.is_some() {
                 "running"
             } else if disabled {
                 "stopped"
@@ -649,7 +659,7 @@ fn background_worker_values(processes: &[Value], pause_state: &ProcessPauseState
             } else {
                 "stopped"
             };
-            let mut management_actions = vec![if process.is_some() {
+            let mut management_actions = vec![if process.is_some() || recovering {
                 "stop_background_worker"
             } else {
                 "start_background_worker"
@@ -669,7 +679,9 @@ fn background_worker_values(processes: &[Value], pause_state: &ProcessPauseState
                 "status": status,
                 "pid": process.and_then(|process| process.get("pid")).cloned().unwrap_or(Value::Null),
                 "process_id": process.and_then(|process| process.get("id")).cloned().unwrap_or(Value::Null),
-                "details": if disabled {
+                "details": if recovering {
+                    workflow_health.reason.as_str()
+                } else if disabled {
                     "stopped by user"
                 } else if globally_paused {
                     "waiting for workflow automation to resume"

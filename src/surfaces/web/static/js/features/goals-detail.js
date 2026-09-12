@@ -292,18 +292,16 @@ function drawGoalDetail(goal) {
   });
   const rounds = goal.rounds || [];
   const latest = rounds[rounds.length - 1] || null;
-  const failureBanner = computeFailureBanner(goal, latest);
-  const governanceBanner = computeGovernanceBanner(goal, latest);
   const featureBlockingNotice = computeFeatureBlockingNotice(goal);
   const nodeDisplayName = goal.node_display_name || goal.node_id || "Unknown";
   const nodeOwnerTitle = goal.node_id
     ? `Node owner: ${nodeDisplayName} (${goal.node_id})`
     : `Node owner: ${nodeDisplayName}`;
 
-  const isLatestEditable = (goal.status === "backlog" ||
-                            goal.status === "todo");
-  const canSubmitNewRound = (goal.status === "review" ||
-                             goal.status === "failed");
+  const canEditRequest = goal.status === "backlog" || goal.status === "todo";
+  const isLatestEditable = !!latest && canEditRequest;
+  const canSubmitNewRound = goal.status === "review" || goal.status === "failed" ||
+    (!latest && canEditRequest);
   const hasPreservedDraft = hasPreservedRoundFormDraft(goal.id);
   const cancelEnabled = !["done", "cancelled"].includes(goal.status);
   // During implementation this attaches to the workflow-owned Goal Agent.
@@ -358,7 +356,6 @@ function drawGoalDetail(goal) {
           <details class="nav-menu goal-action-menu" id="goal-action-menu"${actionMenuOpen ? " open" : ""}>
             <summary class="btn goal-action-more" aria-label="More Goal actions" data-testid="goal-action-menu-toggle"></summary>
             <div class="nav-menu-panel goal-action-panel">
-              <button class="nav-menu-item" type="button" id="btn-workflow-control">Control workflow outcome</button>
               <button class="nav-menu-item" type="button" id="btn-watch-logs" data-testid="goal-action-watch-logs">Watch Logs</button>
               <button class="nav-menu-item" type="button" id="btn-reporter" data-testid="goal-action-reporter">Reporter</button>
               <button class="nav-menu-item" type="button" id="btn-assignee" data-testid="goal-action-assignee">Assignee</button>
@@ -380,26 +377,6 @@ function drawGoalDetail(goal) {
         ${goal.branch_name ? ` · branch <code>${goal.branch_name}</code>` : ""}
       </div>
       ${renderGoalFeatureAssociation(goal)}
-      ${typeof renderWorkflowOutcome === "function" ? renderWorkflowOutcome(goal) : ""}
-
-      ${failureBanner ? `
-        <div class="banner ${failureBanner.severity}" data-testid="goal-failure-banner">
-          <span class="banner-msg" data-testid="goal-failure-banner-message">${htmlEscape(failureBanner.message)}</span>
-          <span class="banner-actions">${failureBanner.actionsHtml}</span>
-        </div>` : ""}
-      ${governanceBanner ? `
-        <div class="banner ${governanceBanner.severity}" data-testid="goal-governance-banner">
-          <span class="banner-msg" data-testid="goal-governance-banner-message">${htmlEscape(governanceBanner.message)}</span>
-        </div>` : ""}
-      ${featureBlockingNotice ? `
-        <div class="banner ${featureBlockingNotice.severity}" data-testid="goal-feature-blocking-banner">
-          <span class="banner-msg" data-testid="goal-feature-blocking-banner-message">${htmlEscape(featureBlockingNotice.message)}</span>
-        </div>` : ""}
-
-      ${latest ? renderFailureSummary(goal, latest) : ""}
-      ${latest ? renderGovernanceSummary(latest) : ""}
-      ${latest ? renderQualitySummary(latest) : ""}
-
       <h3>Rounds (${rounds.length})</h3>
       ${rounds.length === 0 ? `<p class="muted">No rounds yet.</p>` :
         rounds.map((rnd, idx) => renderRound(
@@ -407,9 +384,10 @@ function drawGoalDetail(goal) {
           idx === rounds.length - 1,
           prevRoundOpen,
           prevPlanHistoryOpen,
+          goal,
         )).join("")}
 
-      ${(isLatestEditable || hasPreservedDraft) ? `
+      ${(isLatestEditable || (latest && hasPreservedDraft)) ? `
         <div class="card" style="margin-top:14px">
           <h3>Edit latest round</h3>
           ${renderRoundForm("edit", latest, {
@@ -421,8 +399,8 @@ function drawGoalDetail(goal) {
 
       ${canSubmitNewRound ? `
         <div class="card" style="margin-top:14px">
-          <h3>${goal.status === "failed" ? "Submit recovery round" : "Submit follow-up round"}</h3>
-          ${renderRoundForm("submit", null)}
+          <h3>${!latest ? "Add first round" : goal.status === "failed" ? "Submit recovery round" : "Submit follow-up round"}</h3>
+          ${renderRoundForm("submit", null, { draft: !latest ? _goalRoundFormDraft : null })}
         </div>` : ""}
 
       <details class="card notes-card" data-goal-id="${goal.id}" data-testid="goal-notes" style="margin-top:14px" ${notesOpen ? "open" : ""}>
@@ -546,7 +524,6 @@ function bindGoalDetailControls() {
     closeGoalActionMenu();
     await openGoalAssigneeModal(liveGoal());
   });
-  bindOnce($("#btn-workflow-control"), "click", () => openWorkflowControl(liveGoal()).catch(showActionError));
   bindOnce($("#btn-rename"), "click", async () => {
     closeGoalActionMenu();
     const name = await modalPrompt("New name", liveGoal().name,
@@ -893,7 +870,7 @@ function renderImplementationPlan(rnd, idx, prevPlanHistoryOpen = {}) {
   </section>`;
 }
 
-function renderRound(rnd, idx, isLatest, prevRoundOpen = {}, prevPlanHistoryOpen = {}) {
+function renderRound(rnd, idx, isLatest, prevRoundOpen = {}, prevPlanHistoryOpen = {}, goal = {}) {
   // Preserve the user's open/closed choice across re-renders. New rounds
   // (no prior entry in the snapshot) default to "open on latest" — the
   // historical behavior.
@@ -903,13 +880,7 @@ function renderRound(rnd, idx, isLatest, prevRoundOpen = {}, prevPlanHistoryOpen
     <details class="round" data-round-idx="${idx}" data-testid="goal-round" ${roundOpen ? "open" : ""}>
       <summary class="round-head" data-testid="goal-round-summary">
         <strong>Round ${idx + 1}</strong>
-        ${isLatest ? `<span class="status-pill review">latest</span>` : ""}
-        ${isLatest && rnd.rule_state && rnd.rule_state !== "unclassified"
-          ? `<span class="status-pill ${reviewStateClass(rnd.rule_state)}">governance: ${htmlEscape(rnd.rule_state)}</span>`
-          : ""}
-        ${isLatest && rnd.quality_state && rnd.quality_state !== "unclassified"
-          ? `<span class="status-pill ${reviewStateClass(rnd.quality_state, "quality")}">quality: ${htmlEscape(rnd.quality_state)}</span>`
-          : ""}
+        <span class="muted small" data-testid="goal-round-state">${htmlEscape(isLatest ? (goal.status || "latest") : rnd.failure_message ? "failed" : "previous")}${isLatest ? " · latest" : ""}</span>
         <span class="spacer"></span>
         <span class="muted small">
           reporter ${htmlEscape(rnd.reporter || "(none)")}
@@ -924,6 +895,7 @@ function renderRound(rnd, idx, isLatest, prevRoundOpen = {}, prevPlanHistoryOpen
         <dl class="pair">
           <dt>prompt</dt><dd data-testid="goal-round-detail-prompt">${htmlEscape(rnd.prompt || "").replace(/\n/g, "<br>")}</dd>
         </dl>
+        ${renderRoundHistory(goal, rnd, idx, isLatest, prevPlanHistoryOpen)}
         ${renderImplementationPlan(rnd, idx, prevPlanHistoryOpen)}
         ${rnd.implementation_report ? `
           <div class="card implementation-report" data-testid="goal-implementation-report" style="margin-top:12px">
@@ -940,6 +912,26 @@ function renderRound(rnd, idx, isLatest, prevRoundOpen = {}, prevPlanHistoryOpen
       </div>
     </details>
   `;
+}
+
+function renderRoundHistory(goal, round, idx, isLatest, previousOpen) {
+  const logs = round.logs || [];
+  const errors = logs.filter(log => log.severity === "error");
+  const historyRound = { ...round, latest_error_log: round.latest_error_log || errors.at(-1) };
+  const roundGoal = { ...goal, status: isLatest ? goal.status : (round.failure_message || errors.length) ? "failed" : "done",
+    workflow_controls: (goal.workflow_controls || []).filter(control => control.source_round === idx + 1),
+    pending_workflow_outcome: isLatest ? goal.pending_workflow_outcome : null };
+  const key = `${idx}:status`;
+  const notice = isLatest ? computeFeatureBlockingNotice(goal) : null;
+  return `<details class="round-history" data-plan-history="status" data-round-idx="${idx}" data-testid="goal-round-history"${previousOpen[key] ? " open" : ""}>
+    <summary>Status and history${logs.length ? ` · ${logs.length} log entries` : ""}</summary>
+    ${notice ? `<p class="muted small">${htmlEscape(notice.message)}</p>` : ""}
+    ${renderFailureSummary(roundGoal, historyRound)}
+    ${renderQualitySummary(round)}
+    ${renderGovernanceSummary(round)}
+    ${typeof renderWorkflowOutcome === "function" ? renderWorkflowOutcome(roundGoal) : ""}
+    ${logs.length ? `<div class="round-log" data-testid="goal-round-log">${logs.map(log => `<div class="round-log-entry"><div class="muted small">${htmlEscape(log.datetime || "")} · ${htmlEscape(log.severity || "info")}${log.category ? ` · ${htmlEscape(log.category)}` : ""}</div><div>${htmlEscape(log.message || "")}</div>${log.details ? `<details><summary>Details</summary><pre>${htmlEscape(diagnosticDetailsText(log.details))}</pre></details>` : ""}</div>`).join("")}</div>` : `<p class="muted small">No log entries recorded for this Round.</p>`}
+  </details>`;
 }
 
 // A Goal can fail after every gate it reached passed — an integration that
@@ -1114,7 +1106,7 @@ function bindRoundFormSubmit() {
     const kind = form.dataset.kind;
     try {
       const assignee = liveGoal().assignee || reporter;
-      if (kind === "submit") {
+      if (kind === "submit" || !(liveGoal().rounds || []).length) {
         await api("POST", `/api/goals/${liveGoal().id}/rounds`, { reporter, assignee, prompt });
         toast("New round submitted", "info");
       } else {
@@ -1130,6 +1122,7 @@ function bindRoundFormSubmit() {
 }
 
 function computeFailureBanner(goal, latest) {
+  if (!latest) return null;
   const stateBoundary = latestStateBoundary(latest);
   const workflowLog = currentRoundLog(latest?.latest_workflow_log, stateBoundary);
   if (goal.status === "failed") {

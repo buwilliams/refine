@@ -12,6 +12,10 @@ pub struct SchedulerObservation {
     pub node_id: Option<String>,
     pub sequence: u64,
     pub tick_ms: i64,
+    #[serde(default)]
+    pub tick_monotonic_ms: Option<i64>,
+    #[serde(default)]
+    pub completed_cycle_monotonic_ms: Option<i64>,
     pub completed_cycle_ms: Option<i64>,
     pub active_attempts: BTreeSet<String>,
     pub failure: Option<String>,
@@ -58,4 +62,20 @@ impl SchedulerObservation {
 
 pub fn current_os_identity(pid: u32) -> RefineResult<Option<String>> {
     os_process_identity(pid)
+}
+
+/// Host-local elapsed time shared by the worker and its supervisor. Wall time
+/// remains useful for display but can jump when the host corrects its clock.
+pub fn monotonic_millis() -> Option<i64> {
+    #[cfg(unix)]
+    {
+        let mut value = libc::timespec {
+            tv_sec: 0,
+            tv_nsec: 0,
+        };
+        if unsafe { libc::clock_gettime(libc::CLOCK_MONOTONIC, &mut value) } == 0 {
+            return Some(value.tv_sec as i64 * 1000 + value.tv_nsec as i64 / 1_000_000);
+        }
+    }
+    None
 }

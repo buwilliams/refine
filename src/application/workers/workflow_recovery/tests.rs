@@ -55,6 +55,8 @@ fn observation(root: &Path, process: &ManagedProcess) -> SchedulerObservation {
         node_id: None,
         sequence: 1,
         tick_ms: now,
+        tick_monotonic_ms: None,
+        completed_cycle_monotonic_ms: None,
         completed_cycle_ms: Some(now),
         active_attempts: Default::default(),
         failure: None,
@@ -86,6 +88,8 @@ fn actual_non_ticking_worker_is_stopped_before_replacement_tick_is_accepted() {
         0
     );
     tick.tick_ms -= 60_000;
+    tick.tick_monotonic_ms = tick.tick_monotonic_ms.map(|tick| tick - 60_000);
+    tick.completed_cycle_monotonic_ms = tick.tick_monotonic_ms;
     tick.completed_cycle_ms = Some(tick.tick_ms);
     tick.write(&root).unwrap();
     assert!(!assess_workflow_health(&root).healthy);
@@ -107,7 +111,12 @@ fn actual_non_ticking_worker_is_stopped_before_replacement_tick_is_accepted() {
     wait_tick(&root, &replacement);
     service.ensure_background_worker(WORKFLOW_RUNNER).unwrap();
     assert!(assess_workflow_health(&root).healthy);
-    assert!(root.join("workflow-recovery.json").exists());
+    let recovered: WorkflowRecovery =
+        serde_json::from_slice(&std::fs::read(root.join("workflow-recovery.json")).unwrap())
+            .unwrap();
+    assert!(!recovered.pending);
+    assert_eq!(recovered.attempts, 0);
+    assert_eq!(recovered.retry_after_ms, 0);
     stop_all(&root);
     std::fs::remove_dir_all(root.parent().unwrap().parent().unwrap()).unwrap();
 }
@@ -307,6 +316,8 @@ fn termination_failure_and_launch_contention_preserve_worker_and_evidence() {
     let worker = supervisor.launch(spec).unwrap();
     let mut tick = observation(&root, &worker);
     tick.tick_ms -= 60_000;
+    tick.tick_monotonic_ms = tick.tick_monotonic_ms.map(|tick| tick - 60_000);
+    tick.completed_cycle_monotonic_ms = tick.tick_monotonic_ms;
     tick.completed_cycle_ms = Some(tick.tick_ms);
     tick.write(&root).unwrap();
     let lock = std::fs::OpenOptions::new()
@@ -403,6 +414,8 @@ fn recovery_checks_unobserved_descendants_after_parent_reaping_and_registration_
             }
             let mut tick = observation(&root, &worker);
             tick.tick_ms -= 60_000;
+            tick.tick_monotonic_ms = tick.tick_monotonic_ms.map(|tick| tick - 60_000);
+            tick.completed_cycle_monotonic_ms = tick.tick_monotonic_ms;
             tick.completed_cycle_ms = Some(tick.tick_ms);
             tick.write(&root).unwrap();
             let service = FileRunnerWorkerService::new(&root);
@@ -579,6 +592,37 @@ fn complete_exit_receipt_recovers_lost_group_before_launching_a_replacement_work
         root.join("agents/owned-groups")
             .join(format!("{}.json", process.id))
             .exists()
+    );
+    stop_all(&root);
+    std::fs::remove_dir_all(root.parent().unwrap().parent().unwrap()).unwrap();
+}
+
+#[test]
+fn monotonic_freshness_survives_wall_clock_correction_and_still_detects_stalls() {
+    use crate::infrastructure::process::subprocess::scheduler_observation::monotonic_millis;
+    let Some(monotonic) = monotonic_millis() else {
+        return;
+    };
+    let root = root("workflow-monotonic");
+    let worker = launch(
+        &root,
+        &uuid::Uuid::new_v4().to_string(),
+        "/bin/sleep",
+        &["60"],
+        true,
+    );
+    let mut tick = observation(&root, &worker);
+    tick.tick_monotonic_ms = Some(monotonic);
+    tick.completed_cycle_monotonic_ms = Some(monotonic);
+    tick.write(&root).unwrap();
+    for correction in [-60_000, -614, 60_000] {
+        assert!(assess_worker(&root, &worker, None, || tick.tick_ms + correction).healthy);
+    }
+    tick.completed_cycle_monotonic_ms = Some(monotonic - 60_000);
+    tick.write(&root).unwrap();
+    assert_eq!(
+        assess_worker(&root, &worker, None, || tick.tick_ms).state,
+        "stalled"
     );
     stop_all(&root);
     std::fs::remove_dir_all(root.parent().unwrap().parent().unwrap()).unwrap();

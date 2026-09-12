@@ -13,6 +13,6 @@ async function openWorkflowControl(goal) {
 }
 function renderWorkflowOutcome(goal) {
   const pending=goal.pending_workflow_outcome;
-  const controls=goal.workflow_controls||[];
+  const controls=(goal.workflow_controls||[]).filter(c=>c.request?.reason!=="Explicit Round deletion");
   return `${pending?.state==="pending"?`<div class="banner warn" role="status">Handling error: ${htmlEscape(pending.message||"")}</div>`:""}${controls.length?`<details><summary>Workflow decisions (${controls.length})</summary><ul>${controls.slice(-20).map(c=>`<li>${htmlEscape(c.at)} — ${htmlEscape(c.from)} → ${htmlEscape(c.to)}${c.forced?" (explicit override)":""}: ${htmlEscape(c.request?.reason||"")}</li>`).join("")}</ul></details>`:""}`;
 }

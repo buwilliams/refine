@@ -83,7 +83,7 @@ pub(crate) fn assess_worker_with_clock(
             .ok()
             .map(|d| d.timestamp_millis())
     });
-    let starting = started.is_some_and(|t| (0..STARTUP_MS).contains(&(now - t)));
+    let starting = started.is_some_and(|t| (-STARTUP_MS..STARTUP_MS).contains(&(now - t)));
     let mut health = match snapshot {
         Ok(snapshot) => {
             let runtime_matches = root.canonicalize().ok().as_ref() == Some(&snapshot.runtime_root);
@@ -96,11 +96,19 @@ pub(crate) fn assess_worker_with_clock(
                     == Some(&snapshot.os_identity);
             let node_matches = observed_node(root, snapshot.target_root.as_deref()).ok()
                 == Some(snapshot.node_id.clone());
-            let fresh =
-                snapshot.sequence > 0 && (0..SILENCE_MS).contains(&(now - snapshot.tick_ms));
-            let cycle_fresh = snapshot
-                .completed_cycle_ms
-                .is_some_and(|t| (0..SILENCE_MS).contains(&(now - t)));
+            let monotonic =
+                crate::infrastructure::process::subprocess::scheduler_observation::monotonic_millis(
+                );
+            let tick_age = monotonic
+                .zip(snapshot.tick_monotonic_ms)
+                .map(|(now, tick)| now - tick)
+                .unwrap_or(now - snapshot.tick_ms);
+            let cycle_age = monotonic
+                .zip(snapshot.completed_cycle_monotonic_ms)
+                .map(|(now, tick)| now - tick)
+                .or_else(|| snapshot.completed_cycle_ms.map(|tick| now - tick));
+            let fresh = snapshot.sequence > 0 && (0..SILENCE_MS).contains(&tick_age);
+            let cycle_fresh = cycle_age.is_some_and(|age| (0..SILENCE_MS).contains(&age));
             let draining = !target_matches && !snapshot.active_attempts.is_empty();
             let healthy = runtime_matches
                 && identity_matches
@@ -122,13 +130,16 @@ pub(crate) fn assess_worker_with_clock(
                 "stalled"
             };
             let reason = if healthy && draining {
-                "scheduler is draining owned work from the previous target"
+                "scheduler is draining owned work from the previous target".to_string()
             } else if healthy {
-                "workflow scheduler is ticking"
+                "workflow scheduler is ticking".to_string()
             } else if !target_matches {
-                "worker has not observed the active target"
+                "worker has not observed the active target".to_string()
             } else {
-                "scheduler ticks or admission cycles are stale, or worker identity is unverified"
+                format!(
+                    "scheduler health mismatch: runtime={runtime_matches}, identity={identity_matches}, node={node_matches}, tick_age_ms={}, cycle_age_ms={:?}",
+                    tick_age, cycle_age
+                )
             };
             WorkflowHealth {
                 healthy,

@@ -327,3 +327,23 @@ fn proc_resource_observations_report_this_process() {
     assert!(*processor_used_percent >= 0.0);
     assert!(!observations.contains_key(&u32::MAX));
 }
+
+#[test]
+fn recovering_workflow_is_enabled_and_offers_stop_instead_of_start() {
+    let mut health = crate::application::workflow::health::WorkflowHealth::unavailable(
+        "recovering",
+        "awaiting replacement tick",
+    );
+    health.state = "recovering".into();
+    let workers = background_worker_values(&[], &ProcessPauseState::default(), &health);
+    let worker = workers
+        .iter()
+        .find(|v| v["worker_kind"] == "workflow")
+        .unwrap();
+    assert_eq!(worker["status"], "recovering");
+    assert_eq!(worker["disabled"], false);
+    assert_eq!(
+        worker["management_actions"],
+        json!(["stop_background_worker", "pause_workflow"])
+    );
+}

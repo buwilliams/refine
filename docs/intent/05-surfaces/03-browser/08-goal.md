@@ -60,3 +60,5 @@ Workflow controls expose explicit step changes with reason, context, expected re
 Future Goals should carry richer evidence: screenshots, test output, design rationale, dependency traces, risk assessments, and agent reasoning summaries.
 
 As AI systems improve, the Goal surface may become less about manual editing and more about approving, redirecting, and auditing autonomous work.
+
+The Goal status tag is the sole top-level failure summary. Do not repeat it in generic Goal failure banners. Each Round owns its status and history section, containing its failure explanation, quality and governance results, workflow decisions, and logs. These details expand within that Round instead of competing with the Goal title, prompt, and primary actions.

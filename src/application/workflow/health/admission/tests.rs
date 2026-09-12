@@ -400,6 +400,8 @@ fn exited_worker_snapshot_cannot_keep_ghost_capacity_after_replacement() {
         node_id: Some("default".into()),
         sequence: 1,
         tick_ms: now,
+        tick_monotonic_ms: None,
+        completed_cycle_monotonic_ms: None,
         completed_cycle_ms: Some(now),
         active_attempts: BTreeSet::from(["GOAL1".into()]),
         failure: None,

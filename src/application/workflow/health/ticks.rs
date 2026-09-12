@@ -20,6 +20,8 @@ pub(crate) fn scheduler_tick(
     let result = OBSERVATION.with(|state| -> RefineResult<()> {
         let mut state = state.borrow_mut();
         let now = chrono::Utc::now().timestamp_millis();
+        let monotonic =
+            crate::infrastructure::process::subprocess::scheduler_observation::monotonic_millis();
         if state.is_none() {
             let process = FileProcessSupervisor::new(root)
                 .list()?
@@ -48,6 +50,8 @@ pub(crate) fn scheduler_tick(
                 node_id: None,
                 sequence: 0,
                 tick_ms: 0,
+                tick_monotonic_ms: None,
+                completed_cycle_monotonic_ms: None,
                 completed_cycle_ms: None,
                 active_attempts: BTreeSet::new(),
                 failure: None,
@@ -55,7 +59,11 @@ pub(crate) fn scheduler_tick(
             });
         }
         let observation = state.as_mut().unwrap();
-        if !completed && failure.is_none() && now - observation.tick_ms < 500 {
+        let tick_age = monotonic
+            .zip(observation.tick_monotonic_ms)
+            .map(|(now, tick)| now - tick)
+            .unwrap_or(now - observation.tick_ms);
+        if !completed && failure.is_none() && (0..500).contains(&tick_age) {
             return Ok(());
         }
         let target = target
@@ -64,6 +72,7 @@ pub(crate) fn scheduler_tick(
             .map_err(|e| RefineError::Io(e.to_string()))?;
         if target != observation.target_root {
             observation.completed_cycle_ms = None;
+            observation.completed_cycle_monotonic_ms = None;
             observation.node_id = target
                 .as_ref()
                 .and_then(|target| {
@@ -83,8 +92,10 @@ pub(crate) fn scheduler_tick(
         observation.target_root = target;
         observation.sequence = observation.sequence.saturating_add(1);
         observation.tick_ms = now;
+        observation.tick_monotonic_ms = monotonic;
         if completed {
             observation.completed_cycle_ms = Some(now);
+            observation.completed_cycle_monotonic_ms = monotonic;
         }
         observation.active_attempts = active.clone();
         observation.retry_delays.clear();

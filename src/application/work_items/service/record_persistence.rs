@@ -56,6 +56,14 @@ pub(super) fn write_json_atomically(path: &std::path::Path, value: &Value) -> Re
         }
 
         let mut next = value.clone();
+        // Older Round deletion versions wrote Goal-level receipts. They are
+        // removed history too, and disappear durably on the next Goal write.
+        if let Some(controls) = next
+            .get_mut("workflow_controls")
+            .and_then(Value::as_array_mut)
+        {
+            controls.retain(|control| control["request"]["reason"] != "Explicit Round deletion");
+        }
         let event_pending = if is_goal_record(path) {
             crate::application::events::transitions::prepare_write(
                 &record_root,

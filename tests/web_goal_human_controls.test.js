@@ -10,7 +10,7 @@ test("every Goal step is selectable and Round deletion uses its inspected revisi
   try {
     const page = await browser.newPage();
     await page.setContent('<div id="body" class="goal-detail-modal-body"></div>');
-    for (const file of ["base.css", "goals.css"]) {
+    for (const file of ["base.css", "common.css", "modals.css", "goals.css", "theme.css"]) {
       await page.addStyleTag({ path: path.join(__dirname, "../src/surfaces/web/static/css", file) });
     }
     await page.evaluate(() => {
@@ -22,6 +22,7 @@ test("every Goal step is selectable and Round deletion uses its inspected revisi
       window.nodeContextActiveNodeId = () => "default";
       window.workflowStatusLabel = s => s[0].toUpperCase() + s.slice(1);
       window.fmtTime = s => s || "";
+      window.diagnosticDetailsText = value => JSON.stringify(value, null, 2);
       window.bindOnce = (el, event, handler) => el?.addEventListener(event, handler);
       window.renderInto = (container, html, bind) => { container.innerHTML = html; bind(); };
       for (const name of ["renderBanners", "recordFeatureBlockingNotice", "bindFailureBannerActions"]) window[name] = () => {};
@@ -37,16 +38,29 @@ test("every Goal step is selectable and Round deletion uses its inspected revisi
       window.modalConfirm = async () => confirmDeletion;
     });
     await page.addScriptTag({ path: path.join(__dirname, "../src/surfaces/web/static/js/features/goals-detail.js") });
+    await page.addScriptTag({ path: path.join(__dirname, "../src/surfaces/web/static/js/features/workflow-controls.js") });
     await page.evaluate(() => {
+      window.realComputeFailureBanner = computeFailureBanner;
       for (const name of ["computeFailureBanner", "computeGovernanceBanner", "computeFeatureBlockingNotice"]) window[name] = () => null;
       goalDetailContainer = () => document.querySelector("#body");
       loadGoalDetail = async () => {};
+      window.realBindRoundFormSubmit = bindRoundFormSubmit;
       bindRoundFormSubmit = () => {};
       window.goal = { id: "GOAL1", name: "Repair", status: "failed", workflow_revision: 42,
-        rounds: [{ prompt: "Original", created: "first" }, { prompt: "Failed retry", created: "second" }] };
+        rounds: [
+          { prompt: "Original", created: "first", failure_message: "Original attempt error", logs: [{ severity: "error", message: "First Round log" }] },
+          { prompt: "Failed retry", created: "second", failure_message: "Retry attempt error", logs: [{ severity: "error", message: "Second Round log" }] }
+        ] };
       drawGoalDetail(goal);
     });
     assert.equal(await page.locator('[data-testid="goal-round-delete"] svg').count(), 2);
+    assert.equal(await page.locator("#btn-workflow-control").count(), 0);
+    assert.equal(await page.getByTestId("goal-failure-banner").count(), 0);
+    assert.equal(await page.locator('.goal-detail > [data-testid="goal-failure-summary"]').count(), 0);
+    assert.equal(await page.locator('[data-testid="goal-round"] [data-testid="goal-failure-summary"]').count(), 2);
+    const firstLog = await page.getByTestId("goal-round-log").first().textContent();
+    assert.match(firstLog, /First Round log/);
+    assert.doesNotMatch(firstLog, /Second Round log/);
     assert.equal(await page.getByTestId("goal-step-toggle").getAttribute("class"),
       await page.getByTestId("goal-action-menu-toggle").getAttribute("class"));
     await page.getByTestId("goal-step-primary").click();
@@ -70,6 +84,23 @@ test("every Goal step is selectable and Round deletion uses its inspected revisi
     const count = await page.evaluate(() => { confirmDeletion = false; return requests.length; });
     await page.getByRole("button", { name: "Delete Round 1", exact: true }).click();
     assert.equal(await page.evaluate(() => requests.length), count);
+    await page.evaluate(() => {
+      bindRoundFormSubmit = realBindRoundFormSubmit;
+      computeFailureBanner = realComputeFailureBanner;
+      goal = { ...goal, status: "failed", rounds: [], workflow_controls: [
+        { request: { reason: "Explicit Round deletion" } }
+      ] };
+      drawGoalDetail(goal);
+    });
+    assert.equal(await page.getByTestId("goal-failure-banner").count(), 0);
+    assert.equal(await page.getByText(/Workflow decisions/).count(), 0);
+    assert.equal(await page.getByTestId("goal-round-form").getAttribute("data-kind"), "submit");
+    await page.getByTestId("goal-round-prompt").fill("Start again after deleting the last Round");
+    await page.getByTestId("goal-round-submit").click();
+    const firstRound = await page.evaluate(() => requests.at(-1));
+    assert.equal(firstRound.method, "POST");
+    assert.equal(firstRound.path, "/api/goals/GOAL1/rounds");
+    assert.equal(firstRound.body.prompt, "Start again after deleting the last Round");
     assert.deepEqual(await page.evaluate(() => errors), []);
   } finally { await browser.close(); }
 });
