@@ -3,7 +3,7 @@
   "branch_name": "refine/00000T146Y4H01X1WVV8STE000/round-1",
   "candidate_commit": "f3945f54b53b4d8ffe46a9699f7dfbb4baf371c1",
   "created": "2026-09-11T14:27:52Z",
-  "event_generation": 25,
+  "event_generation": 26,
   "feature_id": null,
   "feature_order": null,
   "id": "00000T146Y4H01X1WVV8STE000",
@@ -109,6 +109,26 @@
           "source": "workflow.implement.enter",
           "state": "succeeded"
         },
+        "31c44d9f9b9767d360597510c06e5f863d7cf9710503b58680d5c2c7b069bf34": {
+          "candidate_commit": "f3945f54b53b4d8ffe46a9699f7dfbb4baf371c1",
+          "generation": 25,
+          "results": {
+            "default-quality": {
+              "artifacts": {
+                "fault_kind": "output_contract"
+              },
+              "binding_id": "default-quality",
+              "evidence": [],
+              "invocation_id": "31c44d9f9b9767d360597510c06e5f863d7cf9710503b58680d5c2c7b069bf34",
+              "outcome": "error",
+              "role": "quality",
+              "summary": "Skill result identity does not match this invocation"
+            }
+          },
+          "round_idx": 0,
+          "source": "workflow.quality.enter",
+          "state": "error"
+        },
         "f5e50aa703fa8e68390064c68cb29bb08f24f81701d5dcb904b15d2a81fb9eeb": {
           "candidate_commit": null,
           "generation": 23,
@@ -128,9 +148,9 @@
           "state": "succeeded"
         }
       },
-      "failure_at": "",
-      "failure_category": "",
-      "failure_message": "",
+      "failure_at": "2026-09-12T11:56:51Z",
+      "failure_category": "quality",
+      "failure_message": "Skill output contract failed: Skill invocation 31c44d9f9b9767d360597510c06e5f863d7cf9710503b58680d5c2c7b069bf34 required bindings [default-quality] cannot authorize a gate: Error; Skill result identity does not match this invocation",
       "gate_configurations": {
         "22:default:workflow.todo.enter": {
           "events": {
@@ -367,6 +387,26 @@
               }
             }
           }
+        },
+        "26:default:workflow.failed.enter": {
+          "events": {
+            "workflow.failed.enter": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.failed.enter",
+              "kind": "system",
+              "name": "Workflow Failed Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.failed.enter"
+            }
+          },
+          "revision": 40,
+          "schema_version": 2,
+          "skills": {}
         }
       },
       "governance_rule_actions": [],
@@ -450,20 +490,24 @@
       ],
       "prompt": "For the web UI surface, create two new main nav right-aligned dropdown buttons, one for Skills and one for Sites. The right-aligned button order should be Skills, Sites, Settings, and New Goal. Yes, that is a rename of Controls to Settings. Move the menus from Settings (formerly Controls) to the appropriate new menu for Sites and Skills. Add a separator to the new menus for New Skill, New Site, Manage Skills, and Manage Sites. Ensure you use the standardized styles and layout we already have in the app.",
       "reporter": "Buddy Williams",
-      "updated": "2026-09-12T11:54:31Z",
+      "updated": "2026-09-12T11:56:51Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-12T11:49:55Z",
         "generation": 22,
         "round_idx": 0,
         "workflow_revision": 63
       },
+      "workflow_failure_occurrence": {
+        "generation": 25,
+        "round_idx": 0
+      },
       "workflow_reconciliation": null,
       "workflow_recovery": null
     }
   ],
-  "status": "quality",
+  "status": "failed",
   "target_branch": "main",
-  "updated": "2026-09-12T11:54:31Z",
+  "updated": "2026-09-12T11:56:51Z",
   "workflow_context": "",
   "workflow_controls": [
     {
@@ -677,7 +721,17 @@
       "round_idx": 0,
       "to": "quality",
       "workflow_revision": 81
+    },
+    {
+      "at": "2026-09-12T11:56:51.703307491+00:00",
+      "forced": true,
+      "from": "quality",
+      "generation": 26,
+      "node_id": "default",
+      "round_idx": 0,
+      "to": "failed",
+      "workflow_revision": 84
     }
   ],
-  "workflow_revision": 82
+  "workflow_revision": 84
 }
