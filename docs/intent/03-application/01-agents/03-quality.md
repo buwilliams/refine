@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Quality lets AI judge the work using the Goal, current context, and applicable user-defined Skills. The AI decides which investigation, edits, or checks are useful and when to stop. Users need not supply acceptance criteria or test lists.
+Quality assesses and corrects the work using the Goal, current context, and applicable user-defined Skills. Blocking failures, including pre-existing ones, are work to fix and verify before reporting success. An unsuccessful outcome means an unresolved blocker, not merely that tests initially failed. Governance reviews the overall result. The AI decides which investigation, edits, or checks are useful and when to stop. Users need not supply acceptance criteria or test lists.
 
 ## Behavior
 
