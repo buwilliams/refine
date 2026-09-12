@@ -85,7 +85,7 @@ Each selection creates or opens only the requested surface. Repeated Agent selec
 
 The former automatic and toolbar-specific Supervisor Agent is retired. Upgrade cleanup stops its legacy managed processes and removes its durable session, state, locks, settings, API, and toolbar entry. Refine's process supervisor remains an infrastructure capability and is not an agent profile.
 
-Custom Skills launched from Controls or the command palette open their own agent tab, labeled with the Skill name. Parameters are resolved through the shared Skill service before launch. These sessions use the explicit Skill profile, carry no Goal association, and reuse the normal managed terminal lifecycle, transcript, reconnect, and stop controls.
+Custom Skills launched from Skills or the command palette open their own agent tab, labeled with the Skill name. Parameters are resolved through the shared Skill service before launch. These sessions use the explicit Skill profile, carry no Goal association, and reuse the normal managed terminal lifecycle, transcript, reconnect, and stop controls.
 
 ## Boundary
 

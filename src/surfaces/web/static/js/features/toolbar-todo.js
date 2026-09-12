@@ -309,7 +309,7 @@ function renderTodoPanel() {
       <section class="todo-panel todo-panel-no-reporter" data-testid="toolbar-todo-panel">
         <div class="todo-empty">
           <strong>Choose a Reporter</strong>
-          <span>Todo lists belong to the Reporter selected in Controls.</span>
+          <span>Todo lists belong to the Reporter selected in Settings.</span>
         </div>
       </section>`;
   }

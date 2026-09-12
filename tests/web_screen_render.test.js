@@ -10,7 +10,7 @@ test("Reporter onboarding selects an existing Reporter before routed modal navig
     await onboarding.waitFor();
     assert.equal(await onboarding.getAttribute("aria-labelledby"), "reporter-onboarding-title");
     assert.match(await onboarding.innerText(), /Who are you\?/);
-    assert.match(await onboarding.innerText(), /Controls > Reporter/);
+    assert.match(await onboarding.innerText(), /Settings > Reporter/);
 
     await onboarding.getByRole("button", { name: "Reporter", exact: true }).click();
     await app.page.locator('[data-testid="new-goal-modal"]').waitFor();
@@ -1494,12 +1494,12 @@ test("Custom Skills open a selected agent tab with typed inputs and no Goal cont
     const page = app.page;
     await page.goto(`${app.origin}/#/settings/skills`);
     await page.evaluate(() => { state.currentGoal = "GOAL1"; });
-    await page.locator('#nav-context-menu > summary').click();
+    await page.locator('#nav-skills-menu > summary').click();
     const nav = page.locator('#nav-manual-skills');
     await nav.locator('[data-manual-skill="inspect"]').waitFor();
-    assert.equal(await nav.locator('.nav-menu-label.nav-context-section-label').textContent(),"Skills");
+    assert.equal(await nav.getAttribute('aria-label'),"Skills");
     assert.equal(await nav.locator('[data-manual-skill]').count(),1);
-    assert.equal(await nav.locator('button').last().textContent(),"Add skill...");
+    assert.equal(await nav.locator('button').last().textContent(),"New Skill");
     await nav.locator('[data-manual-skill="inspect"]').click();
     const modal = page.locator('[data-testid="automation-modal"]');
     assert.equal(await modal.locator('[data-parameter-index="0"]').inputValue(),"3");

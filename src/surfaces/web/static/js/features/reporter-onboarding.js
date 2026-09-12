@@ -218,7 +218,7 @@ function openReporterOnboarding(session) {
                ${session.error ? "" : "hidden"}>${htmlEscape(session.error)}</div>
         </form>
         <p class="muted small reporter-onboarding-guidance" id="reporter-onboarding-guidance">
-          You can change this anytime under <strong>Controls &gt; Reporter</strong>.
+          You can change this anytime under <strong>Settings &gt; Reporter</strong>.
         </p>
       </div>
       <div class="modal-actions">

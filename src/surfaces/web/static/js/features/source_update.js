@@ -1,4 +1,4 @@
-// Source update action in Controls.
+// Source update action in Settings.
 
 let _sourceUpdateNavRequest = null;
 let _sourceUpdateNavSnapshot = null;

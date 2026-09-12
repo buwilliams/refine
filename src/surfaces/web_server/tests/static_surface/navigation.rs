@@ -107,9 +107,17 @@ fn static_main_nav_consolidates_context_and_controls() {
         .expect("controls summary should close");
     let summary = &menu[..summary_end];
 
-    assert!(summary.contains(r#"aria-label="Open controls""#));
+    let skills = index.find(r#"id="nav-skills-menu""#).unwrap();
+    let sites = index.find(r#"id="nav-sites-menu""#).unwrap();
+    assert!(skills < sites && sites < menu_start);
+    assert!(menu_end < index.find(r#"id="btn-new-goal""#).unwrap());
+    assert!(index[skills..sites].contains(r#"id="nav-manual-skills""#));
+    assert!(index[sites..menu_start].contains(r#"id="nav-knowledge-hub""#));
+    assert!(!menu.contains("nav-manual-skills"));
+    assert!(!menu.contains("nav-knowledge-hub"));
+    assert!(summary.contains(r#"aria-label="Open settings""#));
     assert!(summary.contains(r#"class="nav-context-icon""#));
-    assert!(summary.contains("<span>Controls</span>"));
+    assert!(summary.contains("<span>Settings</span>"));
     assert!(summary.contains(r#"class="nav-context-main""#));
     assert!(summary.contains(r#"class="nav-context-more" aria-hidden="true""#));
     assert!(!summary.contains("target-app-dot"));

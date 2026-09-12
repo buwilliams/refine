@@ -275,7 +275,7 @@ async function openSkillEditor(original = null, clone = false) {
   function updateTrigger() {
     const source = root.querySelector("[data-trigger-source]").value;
     root.querySelector("[data-automatic-options]").hidden = source === "custom";
-    root.querySelector("[data-trigger-help]").textContent = source === "custom" ? "Run from Controls → Skills or the CLI. Web runs open in an agent tab." : "Runs automatically at this point. Refine supplies the context and expected result.";
+    root.querySelector("[data-trigger-help]").textContent = source === "custom" ? "Run from Skills or the CLI. Web runs open in an agent tab." : "Runs automatically at this point. Refine supplies the context and expected result.";
   }
   root.querySelector("[data-add-parameter]").onclick = () => {
     dirty(); root.querySelector("[data-parameters]").insertAdjacentHTML("beforeend", parameterRows([{}]));
@@ -348,8 +348,8 @@ async function refreshManualSkills() {
   const nodeGeneration = captureNodeContextGeneration();
   const root = document.getElementById("nav-manual-skills");
   if (!root) return;
-  const draw = skills => {
-    renderInto(root, `<div class="nav-menu-label nav-context-section-label">Skills</div>${skills.map(e => `<button class="nav-menu-item nav-control-item nav-management-item" type="button" data-manual-skill="${htmlEscape(e.id)}"><svg class="nav-menu-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="m8 5 11 7-11 7Z"></path></svg><span>${htmlEscape(e.name)}</span></button>`).join("")}<button class="nav-menu-item nav-control-item nav-management-item" type="button" data-add-skill><svg class="nav-menu-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg><span>Add skill...</span></button>`);
+  const draw = (skills, failed = false) => {
+    renderInto(root, `${failed ? '<p class="nav-menu-label" role="status">Skills unavailable</p>' : ""}${skills.map(e => `<button class="nav-menu-item nav-control-item nav-management-item" type="button" data-manual-skill="${htmlEscape(e.id)}"><svg class="nav-menu-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="m8 5 11 7-11 7Z"></path></svg><span>${htmlEscape(e.name)}</span></button>`).join("")}<hr class="nav-menu-separator"><div role="group" aria-label="Skill actions"><button class="nav-menu-item nav-control-item nav-management-item" type="button" data-add-skill><svg class="nav-menu-icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg><span>New Skill</span></button><a class="nav-menu-item nav-management-item" href="#/settings/skills"><svg class="nav-menu-icon" aria-hidden="true" viewBox="0 0 24 24" focusable="false"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M8 8h8M8 12h8M8 16h5"></path></svg><span>Manage Skills</span></a></div>`);
     root.querySelectorAll("[data-manual-skill]").forEach(button => button.onclick = () => { root.closest("details")?.removeAttribute("open"); triggerManualSkill(button.dataset.manualSkill); });
     root.querySelector("[data-add-skill]").onclick = () => { root.closest("details")?.removeAttribute("open"); openSkillEditor(); };
   };
@@ -361,7 +361,7 @@ async function refreshManualSkills() {
     draw(skills);
     for (const event of skills) registerCommand({id: `skill.manual.${event.id}`, title: event.name, group: "Skills", run: () => triggerManualSkill(event.id)});
   } catch (_) {
-    if (generation === manualSkillsGeneration && isNodeContextGenerationCurrent(nodeGeneration)) { draw([]); for (const key of commandRegistry.keys()) if (key.startsWith("skill.manual.")) commandRegistry.delete(key); }
+    if (generation === manualSkillsGeneration && isNodeContextGenerationCurrent(nodeGeneration)) { draw([], true); for (const key of commandRegistry.keys()) if (key.startsWith("skill.manual.")) commandRegistry.delete(key); }
   }
 }
 
@@ -418,5 +418,5 @@ async function openEventHistory(id = null, offset = 0, goalId = null) {
   finally { automationHistoryOpening = false; }
 }
 
-document.getElementById("nav-context-menu")?.addEventListener("toggle", event => { if (event.target.open) refreshManualSkills(); });
+document.getElementById("nav-skills-menu")?.addEventListener("toggle", event => { if (event.target.open) refreshManualSkills(); });
 window.addEventListener("load", () => refreshManualSkills());

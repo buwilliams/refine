@@ -1744,7 +1744,7 @@ document.addEventListener("click", (e) => {
     runCommand("refine.issue.request");
   } else if (e.target.closest("#target-app-indicator")) {
     closeTopbarMenus();
-  } else if (e.target.closest(".nav-context-panel .nav-menu-item")) {
+  } else if (e.target.closest(".nav-menu-panel .nav-menu-item")) {
     closeTopbarMenus();
   } else if (!e.target.closest(".nav-menu")) {
     closeTopbarMenus();
@@ -1752,7 +1752,11 @@ document.addEventListener("click", (e) => {
 });
 
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") closeTopbarMenus();
+  if (e.key === "Escape") {
+    const menu = document.activeElement?.closest(".topbar-actions details[open]");
+    closeTopbarMenus();
+    menu?.querySelector("summary")?.focus();
+  }
 });
 
 // ---- Banners ----------------------------------------------------------------
@@ -1972,6 +1976,7 @@ function initSSE() {
     }
   });
   sseSource.addEventListener("api_mutation", (event) => {
+    if (/hub\/sites/.test(event.data) && typeof refreshKnowledgeHub === "function") refreshKnowledgeHub();
     if (/event-definitions|skills/.test(event.data) && typeof refreshManualSkills === "function") refreshManualSkills();
     if (typeof handleNodeContextMutationEvent === "function") {
       handleNodeContextMutationEvent(event);

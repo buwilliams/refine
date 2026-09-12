@@ -49,14 +49,14 @@ test("Knowledge Hub uses the existing origin and manages sites and paginated rec
   try {
     await page.context().route("**/hub/sites/reports/", route => route.fulfill({ contentType: "text/html", body: "<title>Hosted report</title>Report" }));
     await page.goto(`${app.origin}/#/goals`);
-    await page.getByTestId("context-menu-toggle").click();
+    await page.getByTestId("sites-menu-toggle").click();
     const popupReady = page.waitForEvent("popup");
     await page.locator('[data-hub-open="reports"]').click();
     const popup = await popupReady;
     await popup.waitForURL(`${app.origin}/hub/sites/reports/`);
     assert.equal(await popup.title(), "Hosted report");
     await popup.close();
-    await page.getByTestId("context-menu-toggle").click();
+    await page.getByTestId("sites-menu-toggle").click();
     await page.locator('[data-hub-add]').click();
     assert.equal(await page.locator('[data-name]').getAttribute('id'), 'hub-site-name');
     assert.equal(await page.locator('.modal-body button[data-submit]').count(), 0);
@@ -122,7 +122,7 @@ test("Workflow controls send the Goal revision and explicit override through the
 });
 
 
-test("Hub modal rows open from cells and keyboards; Controls uses the shared menu layout", { skip: SKIP }, async () => {
+test("Hub modal rows open from cells and keyboards; Sites uses the shared menu layout", { skip: SKIP }, async () => {
   const data = hubFixture();
   data.collections.set("events", {revision: "collection-1", item: {id: "events", indexes: {}}});
   data.records.set("one", {revision: "record-1", item: {id: "one", data: {value: 42}}});
@@ -130,7 +130,7 @@ test("Hub modal rows open from cells and keyboards; Controls uses the shared men
   const page = app.page;
   try {
     await page.goto(`${app.origin}/#/goals`);
-    await page.getByTestId("context-menu-toggle").click();
+    await page.getByTestId("sites-menu-toggle").click();
     await page.locator('[data-hub-add]').waitFor();
     const menu = await page.locator('#nav-knowledge-hub button').evaluateAll(buttons => buttons.map(button => ({
       classes: button.className, icons: button.querySelectorAll('svg.nav-menu-icon').length,
@@ -146,7 +146,7 @@ test("Hub modal rows open from cells and keyboards; Controls uses the shared men
       assert.equal(item.width, menu[0].width);
       assert.equal(item.textOffset, menu[0].textOffset);
     }
-    await page.getByTestId("context-menu-toggle").click();
+    await page.getByTestId("sites-menu-toggle").click();
     await page.goto(`${app.origin}/#/settings/knowledge-hub`);
     await page.locator('[data-hub-new-site]').waitFor();
     const tabs = await page.locator('.settings-tab').allTextContents();

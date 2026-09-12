@@ -32,14 +32,34 @@
       <a href="#/logs" data-route="logs" data-testid="nav-logs">Logs</a>
     </nav>
     <div class="topbar-actions">
+      <details class="nav-menu" id="nav-skills-menu">
+        <summary class="nav-context-summary" aria-label="Open skills" data-testid="skills-menu-toggle">
+          <span class="nav-context-main">
+            <svg class="nav-context-icon" aria-hidden="true" viewBox="0 0 24 24" focusable="false"><path d="m8 5 11 7-11 7Z"></path></svg>
+            <span>Skills</span>
+          </span>
+          <span class="nav-context-more" aria-hidden="true"></span>
+        </summary>
+        <div class="nav-menu-panel"><section id="nav-manual-skills" aria-label="Skills"></section></div>
+      </details>
+      <details class="nav-menu" id="nav-sites-menu">
+        <summary class="nav-context-summary" aria-label="Open sites" data-testid="sites-menu-toggle">
+          <span class="nav-context-main">
+            <svg class="nav-context-icon" aria-hidden="true" viewBox="0 0 24 24" focusable="false"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M3 9h18M8 13h8M8 16h5"></path></svg>
+            <span>Sites</span>
+          </span>
+          <span class="nav-context-more" aria-hidden="true"></span>
+        </summary>
+        <div class="nav-menu-panel"><section id="nav-knowledge-hub" aria-label="Sites"></section></div>
+      </details>
       <details class="nav-menu nav-context-menu" id="nav-context-menu">
-        <summary class="nav-context-summary" aria-label="Open controls" data-testid="context-menu-toggle">
+        <summary class="nav-context-summary" aria-label="Open settings" data-testid="context-menu-toggle">
           <span class="nav-context-main">
             <svg class="nav-context-icon" aria-hidden="true" viewBox="0 0 24 24" focusable="false">
               <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"></path>
               <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3A1.7 1.7 0 0 0 10 3v-.2h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z"></path>
             </svg>
-            <span>Controls</span>
+            <span>Settings</span>
           </span>
           <span class="nav-context-more" aria-hidden="true"></span>
         </summary>
@@ -139,8 +159,6 @@
             </svg>
             <span>Settings</span>
           </a>
-          <section id="nav-knowledge-hub" aria-label="Knowledge Hub"></section>
-          <section id="nav-manual-skills" aria-label="Skills"></section>
         </div>
       </details>
       <div class="nav-create-group">

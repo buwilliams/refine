@@ -45,17 +45,22 @@ async function hubSiteUrl(site, published) {
 async function refreshKnowledgeHub() {
   const generation = ++hubGeneration, node = captureNodeContextGeneration();
   const root = document.getElementById("nav-knowledge-hub"); if (!root) return;
-  try {
-    const data = await api("GET", "/api/hub/sites");
-    if (generation !== hubGeneration || !isNodeContextGenerationCurrent(node)) return;
-    renderInto(root, `<div class="nav-menu-label nav-context-section-label">Knowledge Hub</div>${data.sites.map(({item}) => `<button class="nav-menu-item nav-control-item nav-management-item" type="button" data-hub-open="${htmlEscape(item.id)}" data-public="${!!item.publication}"><svg class="nav-menu-icon" aria-hidden="true" viewBox="0 0 24 24" focusable="false"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M3 9h18M8 13h8M8 16h5"></path></svg><span>${htmlEscape(item.name)}</span></button>`).join("")}<button class="nav-menu-item nav-control-item nav-management-item" type="button" data-hub-add><svg class="nav-menu-icon" aria-hidden="true" viewBox="0 0 24 24" focusable="false"><path d="M12 5v14M5 12h14"></path></svg><span>Add site...</span></button>`);
+  const draw = (sites, failed = false) => {
+    renderInto(root, `${failed ? '<p class="nav-menu-label" role="status">Sites unavailable</p>' : ""}${sites.map(({item}) => `<button class="nav-menu-item nav-control-item nav-management-item" type="button" data-hub-open="${htmlEscape(item.id)}" data-public="${!!item.publication}"><svg class="nav-menu-icon" aria-hidden="true" viewBox="0 0 24 24" focusable="false"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M3 9h18M8 13h8M8 16h5"></path></svg><span>${htmlEscape(item.name)}</span></button>`).join("")}<hr class="nav-menu-separator"><div role="group" aria-label="Site actions"><button class="nav-menu-item nav-control-item nav-management-item" type="button" data-hub-add><svg class="nav-menu-icon" aria-hidden="true" viewBox="0 0 24 24" focusable="false"><path d="M12 5v14M5 12h14"></path></svg><span>New Site</span></button><a class="nav-menu-item nav-management-item" href="#/settings/knowledge-hub"><svg class="nav-menu-icon" aria-hidden="true" viewBox="0 0 24 24" focusable="false"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M8 8h8M8 12h8M8 16h5"></path></svg><span>Manage Sites</span></a></div>`);
     root.querySelectorAll("[data-hub-open]").forEach(b => b.onclick = () => {
       const tab = window.open("about:blank", "_blank"); if (tab) tab.opener = null;
       hubSiteUrl(b.dataset.hubOpen, b.dataset.public === "true").then(url => { if (tab) tab.location.replace(url); }).catch(e => {tab?.close(); showActionError(e);});
     });
     root.querySelector("[data-hub-add]").onclick = () => editHubSite();
+  };
+  try {
+    const data = await api("GET", "/api/hub/sites");
+    if (generation !== hubGeneration || !isNodeContextGenerationCurrent(node)) return;
+    draw(data.sites);
     if (typeof registerCommand === "function") registerCommand({id:"hub.manage",title:"Manage Knowledge Hub",group:"Knowledge Hub",run:openKnowledgeHub});
-  } catch (error) { if (generation === hubGeneration) root.textContent = "Knowledge Hub unavailable"; }
+  } catch (error) {
+    if (generation === hubGeneration && isNodeContextGenerationCurrent(node)) draw([], true);
+  }
 }
 function openKnowledgeHub() {
   location.hash = "#/settings/knowledge-hub";
@@ -189,7 +194,7 @@ function editHubRecord(site,collection,record) {
   root.querySelector("[data-write]").onclick=()=>hubAction(root,async()=>{await hubApi(root,"PUT",path,{data:JSON.parse(root.querySelector("[data-data]").value),revision:record?.revision,request_id:hubId()});root._close();await openHubCollection(site,collection);});
   root.querySelector("[data-remove]").onclick=()=>hubAction(root,async()=>{await hubApi(root,"DELETE",path,{revision:record.revision});root._close();await openHubCollection(site,collection);});
 }
-document.getElementById("nav-context-menu")?.addEventListener("toggle",event=>{if(event.target.open)refreshKnowledgeHub();});
+document.getElementById("nav-sites-menu")?.addEventListener("toggle",event=>{if(event.target.open)refreshKnowledgeHub();});
 window.addEventListener("load",refreshKnowledgeHub);
 
 async function* hubImportRecords(file) {
