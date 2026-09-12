@@ -3,7 +3,7 @@
   "branch_name": "refine/00000T146Y4H01X1WVV8STE000/round-1",
   "candidate_commit": "0a85e69cd47b940e7f0e644d3b0a1290f90a0ebf",
   "created": "2026-09-11T14:27:52Z",
-  "event_generation": 40,
+  "event_generation": 41,
   "feature_id": null,
   "feature_order": null,
   "id": "00000T146Y4H01X1WVV8STE000",
@@ -46,49 +46,23 @@
       "created": "2026-09-12T11:40:50Z",
       "event_configuration": {
         "events": {
-          "workflow.governance.enter": {
-            "bindings": [
-              {
-                "enabled": true,
-                "id": "default-governance",
-                "inputs": {},
-                "mode": "blocking",
-                "order": 0,
-                "overrides": null,
-                "scope": {
-                  "node_id": null
-                },
-                "skill_id": "default-governance"
-              }
-            ],
+          "workflow.governance.exit": {
+            "bindings": [],
             "enabled": true,
-            "id": "workflow.governance.enter",
+            "id": "workflow.governance.exit",
             "kind": "system",
-            "name": "Workflow Governance Enter",
+            "name": "Workflow Governance Exit",
             "on_success": null,
             "parameters": [],
             "scope": {
               "node_id": null
             },
-            "source": "workflow.governance.enter"
+            "source": "workflow.governance.exit"
           }
         },
         "revision": 43,
         "schema_version": 2,
-        "skills": {
-          "default-governance": {
-            "enabled": true,
-            "id": "default-governance",
-            "name": "Governance",
-            "parameters": [],
-            "prompt": "## Governance\n\nReview the Goal against the Governance intent below. Do not edit files, merge, push, or change Goal state. A finding must identify the violated intent or invariant, its concrete consequence, and an actionable recovery request. Group related symptoms by their underlying cause.\n\n### Intent and architecture\n\nReview Refine's relevant documentation files under Refine's runtime at `<refine-runtime>/docs/intent/***/*.*` as the durable product specification.\n\n### Semantic code organization\n\nKeep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.\n\nIf issues outside the Goal’s scope block progress, investigate and fix them or use an evidence-backed workaround, preserving required checks and documenting what you changed.\n",
-            "provenance": "refine-default-v1",
-            "role": "task",
-            "scope": {
-              "node_id": null
-            }
-          }
-        }
+        "skills": {}
       },
       "event_results": {
         "4155db45c43236fa41cfdbb0c5505e47586ead298e53c4819d0f1bbe9ea33a5f": {
@@ -109,6 +83,29 @@
           },
           "round_idx": 0,
           "source": "workflow.quality.enter",
+          "state": "succeeded"
+        },
+        "43faaa6ada2ddfcabf7e63a620fb18c15bd7d3616d1e7534b05b2a083f84b2c8": {
+          "candidate_commit": "0a85e69cd47b940e7f0e644d3b0a1290f90a0ebf",
+          "generation": 40,
+          "results": {
+            "default-governance": {
+              "artifacts": null,
+              "binding_id": "default-governance",
+              "evidence": [
+                "Reviewed runtime navigation, Skills, and Knowledge Hub intent under /home/buddy/projects/refine/docs/intent and isolated the Goal changes from ancestor 9c1be94c.",
+                "Retained Quality browser.log records 341 passing tests, zero failures and zero skips, including navigation, keyboard dismissal, stale-context handling, and responsive menus. navigation-rust.log records eight passing checks.",
+                "Full Rust suite remains non-green: 1,288 passed, eight failed, seven ignored. Retained parent comparisons and isolated reruns support unrelated baseline/timing failures.",
+                "Verified pinned HEAD, clean worktree, and passing git diff --check."
+              ],
+              "invocation_id": "43faaa6ada2ddfcabf7e63a620fb18c15bd7d3616d1e7534b05b2a083f84b2c8",
+              "outcome": "success",
+              "role": "governance",
+              "summary": "Governance passes for candidate 0a85e69cd47b940e7f0e644d3b0a1290f90a0ebf. No blocking Goal-scoped findings. The navigation implements Skills, Sites, Settings, and New Goal in order, with separated creation/management actions and shared styling. Existing context selectors and capability boundaries are preserved. Changes stay within existing responsibilities; no structural split is warranted by this patch. No files or Goal state changed; no merge or push performed."
+            }
+          },
+          "round_idx": 0,
+          "source": "workflow.governance.enter",
           "state": "succeeded"
         },
         "497e1a074e6df75deb563fa78767eda334db2c83fdfd2de6872f26de34ef6ec5": {
@@ -161,9 +158,9 @@
           "state": "succeeded"
         }
       },
-      "failure_at": "",
-      "failure_category": "",
-      "failure_message": "",
+      "failure_at": "2026-09-12T19:53:28Z",
+      "failure_category": "governance_candidate_lineage",
+      "failure_message": "Candidate 0a85e69cd47b940e7f0e644d3b0a1290f90a0ebf is stale: recorded base 4e7f1245a3170ee5ff1ba2e90dbc7c654dfff0b5 is not its ancestor",
       "gate_configurations": {
         "36:default:workflow.todo.enter": {
           "events": {
@@ -472,8 +469,82 @@
               }
             }
           }
+        },
+        "40:default:workflow.governance.exit": {
+          "events": {
+            "workflow.governance.exit": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.governance.exit",
+              "kind": "system",
+              "name": "Workflow Governance Exit",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.governance.exit"
+            }
+          },
+          "revision": 43,
+          "schema_version": 2,
+          "skills": {}
+        },
+        "40:default:workflow.governance.success": {
+          "events": {},
+          "revision": 43,
+          "schema_version": 2,
+          "skills": {}
+        },
+        "41:default:workflow.failed.enter": {
+          "events": {
+            "workflow.failed.enter": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.failed.enter",
+              "kind": "system",
+              "name": "Workflow Failed Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.failed.enter"
+            }
+          },
+          "revision": 43,
+          "schema_version": 2,
+          "skills": {}
         }
       },
+      "governance_candidate_commit": "0a85e69cd47b940e7f0e644d3b0a1290f90a0ebf",
+      "governance_checked_at": "2026-09-12T19:53:24Z",
+      "governance_details": {
+        "candidate_commit": "0a85e69cd47b940e7f0e644d3b0a1290f90a0ebf",
+        "configured": true,
+        "failed_actions": [],
+        "phase": "post_implementation",
+        "skill_results": [
+          {
+            "artifacts": null,
+            "binding_id": "workflow.governance.enter:default-governance",
+            "evidence": [
+              "Reviewed runtime navigation, Skills, and Knowledge Hub intent under /home/buddy/projects/refine/docs/intent and isolated the Goal changes from ancestor 9c1be94c.",
+              "Retained Quality browser.log records 341 passing tests, zero failures and zero skips, including navigation, keyboard dismissal, stale-context handling, and responsive menus. navigation-rust.log records eight passing checks.",
+              "Full Rust suite remains non-green: 1,288 passed, eight failed, seven ignored. Retained parent comparisons and isolated reruns support unrelated baseline/timing failures.",
+              "Verified pinned HEAD, clean worktree, and passing git diff --check."
+            ],
+            "invocation_id": "43faaa6ada2ddfcabf7e63a620fb18c15bd7d3616d1e7534b05b2a083f84b2c8",
+            "outcome": "success",
+            "role": "governance",
+            "summary": "Governance passes for candidate 0a85e69cd47b940e7f0e644d3b0a1290f90a0ebf. No blocking Goal-scoped findings. The navigation implements Skills, Sites, Settings, and New Goal in order, with separated creation/management actions and shared styling. Existing context selectors and capability boundaries are preserved. Changes stay within existing responsibilities; no structural split is warranted by this patch. No files or Goal state changed; no merge or push performed."
+          }
+        ],
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T146Y4H01X1WVV8STE000-round-1"
+      },
+      "governance_message": "Governance checks passed.",
+      "governance_recovery_analysis": null,
+      "governance_recovery_round_prompt": null,
       "governance_rule_actions": [],
       "guidance_decision": null,
       "implementation_plan": null,
@@ -2037,7 +2108,8 @@
       ],
       "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "updated": "2026-09-12T19:52:03Z",
+      "rule_state": "passed",
+      "updated": "2026-09-12T19:53:28Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-12T19:29:50Z",
         "generation": 36,
@@ -2065,16 +2137,17 @@
         }
       ],
       "workflow_failure_occurrence": {
-        "generation": 34,
+        "generation": 40,
         "round_idx": 0
       },
+      "workflow_git_remote": "origin",
       "workflow_reconciliation": null,
       "workflow_recovery": null
     }
   ],
-  "status": "governance",
+  "status": "failed",
   "target_branch": "main",
-  "updated": "2026-09-12T19:52:03Z",
+  "updated": "2026-09-12T19:53:28Z",
   "workflow_context": "",
   "workflow_controls": [
     {
@@ -2534,7 +2607,17 @@
       "round_idx": 0,
       "to": "governance",
       "workflow_revision": 152
+    },
+    {
+      "at": "2026-09-12T19:53:28.692779156+00:00",
+      "forced": true,
+      "from": "governance",
+      "generation": 41,
+      "node_id": "default",
+      "round_idx": 0,
+      "to": "failed",
+      "workflow_revision": 159
     }
   ],
-  "workflow_revision": 153
+  "workflow_revision": 159
 }
