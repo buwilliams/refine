@@ -339,14 +339,17 @@ function drawGoalDetail(goal) {
         <span class="priority-pill priority-${goal.priority || "low"}" data-testid="goal-priority-pill">priority: ${goal.priority || "low"}</span>
       </div>
       <div class="actions" style="margin-bottom:10px" data-testid="goal-workflow-actions">
-        <details class="nav-menu goal-step-menu" data-testid="goal-step-menu"${stepMenuOpen ? " open" : ""}>
-          <summary class="btn" aria-label="Set workflow step" data-testid="goal-step-toggle">Todo ▾</summary>
-          <div class="nav-menu-panel">
+        <div class="goal-action-group">
+          <button type="button" class="goal-action-primary" data-goal-step="todo" data-testid="goal-step-primary">Todo</button>
+          <details class="nav-menu goal-action-menu goal-step-menu" data-testid="goal-step-menu"${stepMenuOpen ? " open" : ""}>
+            <summary class="btn goal-action-more" aria-label="Set workflow step" data-testid="goal-step-toggle"></summary>
+            <div class="nav-menu-panel goal-action-panel">
             ${["backlog", "todo", "plan", "implement", "quality", "governance", "review", "done", "failed", "cancelled"].map(step =>
               `<button type="button" class="nav-menu-item" data-goal-step="${step}" data-testid="goal-step-${step}">${workflowStatusLabel(step)}</button>`).join("")}
             <p class="muted small">Moves stop active agents. Done changes status without merging code.</p>
-          </div>
-        </details>
+            </div>
+          </details>
+        </div>
         ${goal.status === "review" ? forwardBtn : ""}
         <div class="goal-action-group">
           <button class="goal-action-primary" id="btn-open-agent" data-testid="goal-open-agent"
@@ -458,7 +461,8 @@ function bindGoalDetailControls() {
   $$("[data-goal-step]").forEach(el => bindOnce(el, "click", async () => {
     const goal = liveGoal();
     const step = el.dataset.goalStep;
-    el.closest("details").open = false;
+    const menu = el.closest(".goal-action-group")?.querySelector("details");
+    if (menu) menu.open = false;
     try {
       await api("POST", `/api/workflow/goals/${encodeURIComponent(goal.id)}/move`, {
         to: step, reason: "User selected workflow step", force: true,
@@ -912,7 +916,7 @@ function renderRound(rnd, idx, isLatest, prevRoundOpen = {}, prevPlanHistoryOpen
           · assignee ${htmlEscape(rnd.assignee || "(none)")}
           · ${fmtTime(rnd.created)}
         </span>
-        <button type="button" class="secondary danger round-delete" data-round-delete="${idx}" data-testid="goal-round-delete" aria-label="Delete Round ${idx + 1}" title="Delete Round ${idx + 1}">
+        <button type="button" class="secondary round-delete" data-round-delete="${idx}" data-testid="goal-round-delete" aria-label="Delete Round ${idx + 1}" title="Delete Round ${idx + 1}">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 15h10l1-15M10 11v6M14 11v6"/></svg>
         </button>
       </summary>

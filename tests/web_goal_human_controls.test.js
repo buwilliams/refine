@@ -47,6 +47,10 @@ test("every Goal step is selectable and Round deletion uses its inspected revisi
       drawGoalDetail(goal);
     });
     assert.equal(await page.locator('[data-testid="goal-round-delete"] svg').count(), 2);
+    assert.equal(await page.getByTestId("goal-step-toggle").getAttribute("class"),
+      await page.getByTestId("goal-action-menu-toggle").getAttribute("class"));
+    await page.getByTestId("goal-step-primary").click();
+    assert.equal(await page.evaluate(() => requests.at(-1).body.to), "todo");
     for (const step of ["backlog", "todo", "plan", "implement", "quality", "governance", "review", "done", "failed", "cancelled"]) {
       await page.getByTestId("goal-step-toggle").click();
       const panel = await page.locator(".goal-step-menu .nav-menu-panel").boundingBox();
