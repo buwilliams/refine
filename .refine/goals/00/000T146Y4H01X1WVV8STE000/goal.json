@@ -3,7 +3,7 @@
   "branch_name": "refine/00000T146Y4H01X1WVV8STE000/round-2",
   "candidate_commit": "48502266e7c46fdb6196e5c629698883bd84326a",
   "created": "2026-09-11T14:27:52Z",
-  "event_generation": 11,
+  "event_generation": 12,
   "feature_id": null,
   "feature_order": null,
   "id": "00000T146Y4H01X1WVV8STE000",
@@ -1344,6 +1344,26 @@
           "revision": 40,
           "schema_version": 2,
           "skills": {}
+        },
+        "12:default:workflow.backlog.enter": {
+          "events": {
+            "workflow.backlog.enter": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.backlog.enter",
+              "kind": "system",
+              "name": "Workflow Backlog Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.backlog.enter"
+            }
+          },
+          "revision": 40,
+          "schema_version": 2,
+          "skills": {}
         }
       },
       "governance_candidate_commit": "",
@@ -1369,9 +1389,9 @@
       "workflow_recovery": null
     }
   ],
-  "status": "todo",
+  "status": "backlog",
   "target_branch": "main",
-  "updated": "2026-09-12T10:32:51Z",
+  "updated": "2026-09-12T10:32:59Z",
   "workflow_events": [
     {
       "at": "2026-09-11T14:27:52.512340696+00:00",
@@ -1476,7 +1496,17 @@
       "round_idx": 2,
       "to": "todo",
       "workflow_revision": 46
+    },
+    {
+      "at": "2026-09-12T10:32:59.594982729+00:00",
+      "forced": false,
+      "from": "todo",
+      "generation": 12,
+      "node_id": "default",
+      "round_idx": 2,
+      "to": "backlog",
+      "workflow_revision": 47
     }
   ],
-  "workflow_revision": 46
+  "workflow_revision": 47
 }
