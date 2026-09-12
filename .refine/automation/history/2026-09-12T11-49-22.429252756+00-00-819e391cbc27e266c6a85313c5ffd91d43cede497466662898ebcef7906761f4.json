@@ -1,5 +1,5 @@
 {
-  "completed_at": null,
+  "completed_at": "2026-09-12T11:49:50.359596585+00:00",
   "config_revision": 40,
   "created_at": "2026-09-12T11:49:22.429252756+00:00",
   "error": null,
@@ -9,11 +9,11 @@
     "name": "Fetch Goals from Email",
     "source": null
   },
-  "execution_state": "running",
-  "gate": "missing",
+  "execution_state": "succeeded",
+  "gate": "satisfied",
   "goal_id": null,
   "id": "819e391cbc27e266c6a85313c5ffd91d43cede497466662898ebcef7906761f4",
   "node_id": "default",
-  "result_count": 0,
-  "state": "running"
+  "result_count": 1,
+  "state": "succeeded"
 }

@@ -90,11 +90,46 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "succeeded",
+  "results": {
+    "trigger-2748a40c-20f1-4533-851a-d3d752e56013": {
+      "invocation_id": "819e391cbc27e266c6a85313c5ffd91d43cede497466662898ebcef7906761f4",
+      "binding_id": "trigger-2748a40c-20f1-4533-851a-d3d752e56013",
+      "role": "task",
+      "outcome": "success",
+      "summary": "Fetch succeeded: fetched_count=0, batch_limit=25, goal_ids=[], errors=[]. No Goals imported or recovered; no further batch needed and no indication more mail remains.",
+      "evidence": [],
+      "artifacts": null
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "trigger-2748a40c-20f1-4533-851a-d3d752e56013",
+      "checkout": {
+        "observation": {
+          "branch": "main",
+          "head_commit": "5bf2c25bc437e30e48b78dc0c173469b5f6587b3",
+          "status_porcelain": []
+        },
+        "tree": "a121e1e28c51512e9edc7ce62627b3fa214911a3"
+      },
+      "checkout_recorded": true,
+      "diagnostic": null,
+      "observational_violation": false,
+      "operation_id": null,
+      "process_id": "proc-1789213768384-593231-35",
+      "prompt_bytes": 2421,
+      "provider_session_id": null,
+      "purpose": "work",
+      "raw_output": "{\"binding_id\":\"trigger-2748a40c-20f1-4533-851a-d3d752e56013\",\"invocation_id\":\"819e391cbc27e266c6a85313c5ffd91d43cede497466662898ebcef7906761f4\",\"outcome\":\"success\",\"role\":\"task\",\"summary\":\"Fetch succeeded: fetched_count=0, batch_limit=25, goal_ids=[], errors=[]. No Goals imported or recovered; no further batch needed and no indication more mail remains.\"}\n",
+      "received_at": "2026-09-12T11:49:50.307514191+00:00",
+      "started_at": "2026-09-12T11:49:28.377819241+00:00",
+      "workflow_revision": null
+    }
+  ],
   "created_at": "2026-09-12T11:49:22.429252756+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-12T11:49:50.359596585+00:00",
   "error": null,
   "action_applied": false
 }
