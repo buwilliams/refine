@@ -1,10 +1,10 @@
 {
-  "id": "bcf2a05e206d74741558403e5821c320d98a691d77d09eb02f5a05c97913532a",
+  "id": "4155db45c43236fa41cfdbb0c5505e47586ead298e53c4819d0f1bbe9ea33a5f",
   "event": {
-    "id": "workflow.implement.enter",
-    "name": "Workflow Implement Enter",
+    "id": "workflow.quality.enter",
+    "name": "Workflow Quality Enter",
     "kind": "system",
-    "source": "workflow.implement.enter",
+    "source": "workflow.quality.enter",
     "enabled": true,
     "scope": {
       "node_id": null
@@ -12,8 +12,8 @@
     "parameters": [],
     "bindings": [
       {
-        "id": "default-implement",
-        "skill_id": "default-implement",
+        "id": "default-quality",
+        "skill_id": "default-quality",
         "enabled": true,
         "mode": "blocking",
         "order": 0,
@@ -48,7 +48,7 @@
     "goal_id": "00000T146Y4H01X1WVV8STE000",
     "round_idx": 0,
     "workflow_revision": 125,
-    "candidate_commit": null,
+    "candidate_commit": "0a85e69cd47b940e7f0e644d3b0a1290f90a0ebf",
     "data": {
       "context": {
         "agent_context": {
@@ -78,6 +78,7 @@
           "version": 1,
           "workflow_summary": "Refine gives this Goal Agent an isolated worktree, the current Round, and available planning context. Follow the Goal and applicable Skill instructions and use your judgment to decide when to stop. Quality and Governance agents make their own decisions using their Skills before integration and human Review. Refine coordinates workflow transitions and Git actions. Do not directly advance Goal state, approve, merge, or push."
         },
+        "implementation_report": "workflow.implement.enter:default-implement: Retained candidate 0a85e69c implements the accepted navigation plan and is ready for Quality. No additional source changes were needed; worktree remains clean.",
         "plans": [
           {
             "artifacts": null,
@@ -100,9 +101,9 @@
         "assignee": "Buddy Williams",
         "base_commit": "4e7f1245a3170ee5ff1ba2e90dbc7c654dfff0b5",
         "branch_name": "refine/00000T146Y4H01X1WVV8STE000/round-1",
-        "candidate_commit": null,
+        "candidate_commit": "0a85e69cd47b940e7f0e644d3b0a1290f90a0ebf",
         "created": "2026-09-11T14:27:52Z",
-        "event_generation": 38,
+        "event_generation": 39,
         "feature_id": null,
         "feature_order": null,
         "id": "00000T146Y4H01X1WVV8STE000",
@@ -119,31 +120,31 @@
             "failure_category": "",
             "failure_message": "",
             "implementation_plan": {},
-            "implementation_report": "workflow.implement.enter:default-implement: Retained implementation is verified and ready for Quality. No new deviations, repository edits, or Goal-state changes. Full repository suite was not run.",
-            "implementation_reported_at": "2026-09-12T13:46:12Z",
+            "implementation_report": "workflow.implement.enter:default-implement: Retained candidate 0a85e69c implements the accepted navigation plan and is ready for Quality. No additional source changes were needed; worktree remains clean.",
+            "implementation_reported_at": "2026-09-12T19:41:04Z",
             "prompt": "For the web UI surface, create two new main nav right-aligned dropdown buttons, one for Skills and one for Sites. The right-aligned button order should be Skills, Sites, Settings, and New Goal. Yes, that is a rename of Controls to Settings. Move the menus from Settings (formerly Controls) to the appropriate new menu for Sites and Skills. Add a separator to the new menus for New Skill, New Site, Manage Skills, and Manage Sites. Ensure you use the standardized styles and layout we already have in the app.",
             "quality_agent_report": "workflow.quality.enter:default-quality: Navigation checks pass after correcting the shared Skill-launch test helper. Quality remains failed because 12 broader Rust failures are unresolved. No tests were removed or weakened; the helper correction remains uncommitted.",
             "reporter": "Buddy Williams",
-            "updated": "2026-09-12T19:30:58Z"
+            "updated": "2026-09-12T19:41:05Z"
           }
         ],
-        "status": "implement",
+        "status": "quality",
         "target_branch": "main",
-        "updated": "2026-09-12T19:30:58Z",
+        "updated": "2026-09-12T19:41:05Z",
         "workflow_context": "",
-        "workflow_revision": 136
+        "workflow_revision": 143
       },
       "system": {
-        "candidate_commit": null,
+        "candidate_commit": "0a85e69cd47b940e7f0e644d3b0a1290f90a0ebf",
         "node_id": "default",
         "project_root": "/home/buddy/projects/refine-next",
-        "workflow_step": "implement",
+        "workflow_step": "quality",
         "workspace": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T146Y4H01X1WVV8STE000-round-1"
       }
     },
     "metadata": {
       "behavior": "EventSkill",
-      "event_operation_id": "1a0971a03662a5386",
+      "event_operation_id": "1a0972345892a5387",
       "goal_id": "00000T146Y4H01X1WVV8STE000",
       "kind": "workflow",
       "managed_worktree": {
@@ -162,19 +163,19 @@
       "provider": "codex",
       "round_idx": 0,
       "started_bindings": {
-        "default-implement": "2026-09-12T19:31:00.165526088+00:00"
+        "default-quality": "2026-09-12T19:41:06.939695935+00:00"
       },
       "target_app_id": "/home/buddy/projects/refine-next",
       "workflow_revision": 125,
-      "workflow_state": "implement",
-      "workflow_step_generation": 38
+      "workflow_state": "quality",
+      "workflow_step_generation": 39
     }
   },
   "bindings": [
     {
       "binding": {
-        "id": "default-implement",
-        "skill_id": "default-implement",
+        "id": "default-quality",
+        "skill_id": "default-quality",
         "enabled": true,
         "mode": "blocking",
         "order": 0,
@@ -185,10 +186,10 @@
         "inputs": {}
       },
       "skill": {
-        "id": "default-implement",
-        "name": "Implement",
-        "prompt": "## Implementation\n\nImplement the current Goal Round using all accepted plans and attached Skills. Inspect existing code, make the complete change, run appropriate verification, and report evidence for each checklist item. Check the plan's assumptions against the code and keep policy in its shared owner. Prefer one correction that explains the affected behavior over separate fixes at each failing call site. Report evidence-backed plan deviations within the Goal's scope and existing authority. Preserve unrelated changes and historical evidence.\n\n### Intent and architecture\n\nReview Refine's relevant documentation files under Refine's runtime at `<refine-runtime>/docs/intent/***/*.*` as the durable product specification.\n\n### Semantic code organization\n\nKeep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.\n\nIf issues outside the Goal’s scope block progress, investigate and fix them or use an evidence-backed workaround, preserving required checks and documenting what you changed.\n",
-        "role": "implement",
+        "id": "default-quality",
+        "name": "Quality",
+        "prompt": "## Quality review\n\nRun tests to ensure the Goal's implementation passes meaningful tests. Do not remove meaningful tests. Remove deprecated or meaningless tests. Use the best available tools for the testing the Goal. The quality gate passes when the system is operational and meaningful tests have passed.\n\nIf issues outside the Goal’s scope block progress, investigate and fix them or use an evidence-backed workaround, preserving required checks and documenting what you changed.\n",
+        "role": "quality",
         "enabled": true,
         "scope": {
           "node_id": null
@@ -199,55 +200,11 @@
       "parameters": {}
     }
   ],
-  "state": "succeeded",
-  "results": {
-    "default-implement": {
-      "invocation_id": "bcf2a05e206d74741558403e5821c320d98a691d77d09eb02f5a05c97913532a",
-      "binding_id": "default-implement",
-      "role": "implement",
-      "outcome": "success",
-      "summary": "Retained candidate 0a85e69c implements the accepted navigation plan and is ready for Quality. No additional source changes were needed; worktree remains clean.",
-      "evidence": [
-        "Verified Skills, Sites, Settings, and + New Goal order, shared styling, separators, creation actions, and management destinations.",
-        "Verified existing feature ownership, typed Skill launches, draft/published Site links, refresh races, and preserved Settings controls.",
-        "81 selected JavaScript tests passed with zero skips; eight Rust navigation tests passed.",
-        "Recovered all 12 historical failure identities. Broad candidate run: 1287 passed, nine failed, seven ignored. All nine failures also occurred on the Git parent; one executable-location failure subsequently passed on both revisions.",
-        "Remaining baseline failures, verification deviations, exact commands, and checklist evidence are preserved in the report. Full-suite success is not claimed."
-      ],
-      "artifacts": {
-        "report": "/home/buddy/projects/refine-next/.git/refine-audits/navigation-00000T146Y4H01X1WVV8STE000-20260912-implementation/implementation-report.json"
-      }
-    }
-  },
-  "attempts": [
-    {
-      "attempt": 0,
-      "binding_id": "default-implement",
-      "checkout": {
-        "observation": {
-          "branch": "refine/00000T146Y4H01X1WVV8STE000/round-1",
-          "head_commit": "0a85e69cd47b940e7f0e644d3b0a1290f90a0ebf",
-          "status_porcelain": []
-        },
-        "tree": "576ecfeaf4d22c4e72be2f200c826800943da512"
-      },
-      "checkout_recorded": true,
-      "diagnostic": null,
-      "host_bound_result": true,
-      "observational_violation": false,
-      "operation_id": null,
-      "process_id": "proc-1789241460378-173368-240",
-      "prompt_bytes": 9959,
-      "provider_session_id": null,
-      "purpose": "work",
-      "raw_output": "{\n  \"outcome\": \"success\",\n  \"summary\": \"Retained candidate 0a85e69c implements the accepted navigation plan and is ready for Quality. No additional source changes were needed; worktree remains clean.\",\n  \"evidence\": [\n    \"Verified Skills, Sites, Settings, and + New Goal order, shared styling, separators, creation actions, and management destinations.\",\n    \"Verified existing feature ownership, typed Skill launches, draft/published Site links, refresh races, and preserved Settings controls.\",\n    \"81 selected JavaScript tests passed with zero skips; eight Rust navigation tests passed.\",\n    \"Recovered all 12 historical failure identities. Broad candidate run: 1287 passed, nine failed, seven ignored. All nine failures also occurred on the Git parent; one executable-location failure subsequently passed on both revisions.\",\n    \"Remaining baseline failures, verification deviations, exact commands, and checklist evidence are preserved in the report. Full-suite success is not claimed.\"\n  ],\n  \"artifacts\": {\n    \"report\": \"/home/buddy/projects/refine-next/.git/refine-audits/navigation-00000T146Y4H01X1WVV8STE000-20260912-implementation/implementation-report.json\"\n  }\n}\n",
-      "received_at": "2026-09-12T19:41:02.561371310+00:00",
-      "started_at": "2026-09-12T19:31:00.356503510+00:00",
-      "workflow_revision": 125
-    }
-  ],
-  "created_at": "2026-09-12T19:30:59.277703737+00:00",
-  "completed_at": "2026-09-12T19:41:03.659831905+00:00",
+  "state": "running",
+  "results": {},
+  "attempts": [],
+  "created_at": "2026-09-12T19:41:06.030005848+00:00",
+  "completed_at": null,
   "error": null,
   "action_applied": false
 }
