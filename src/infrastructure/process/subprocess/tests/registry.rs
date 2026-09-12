@@ -276,6 +276,13 @@ fn goal_output_survives_cleanup_until_explicit_round_deletion() {
             exit_code: Some(0),
         })
         .unwrap();
+    let mut stale = supervisor.inspect_terminal("goal-output").unwrap();
+    stale.state = "running".into();
+    supervisor.remove_process_artifacts(&stale).unwrap();
+    assert_eq!(
+        supervisor.inspect_terminal("goal-output").unwrap().state,
+        "exited"
+    );
     supervisor.cleanup("goal-output").unwrap();
     assert_eq!(fs::read_to_string(&stdout).unwrap(), "Quality progress\n");
     assert!(supervisor.process_history_path("goal-output").exists());

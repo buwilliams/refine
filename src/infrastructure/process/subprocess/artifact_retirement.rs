@@ -236,6 +236,19 @@ impl FileProcessSupervisor {
         };
         if retain_logs {
             let mut archived = process.clone();
+            // cleanup may carry the pre-stop snapshot. Never reintroduce a
+            // running record after its owned scope has demonstrably exited.
+            if archived.state == "running" {
+                if let Ok(terminal) = self.inspect_terminal(&process.id)
+                    && terminal.pid == process.pid
+                    && terminal.started_at == process.started_at
+                    && terminal.state != "running"
+                {
+                    archived = terminal;
+                } else {
+                    archived.state = "interrupted".into();
+                }
+            }
             archived.stdin_path = None;
             fs::create_dir_all(self.process_history_dir())
                 .map_err(|e| RefineError::Io(e.to_string()))?;
