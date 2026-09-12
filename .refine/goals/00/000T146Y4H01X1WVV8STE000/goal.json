@@ -1,9 +1,9 @@
 {
-  "base_commit": "3fc1d86edfdd26daf771da47099010bf17b02257",
+  "base_commit": "4e7f1245a3170ee5ff1ba2e90dbc7c654dfff0b5",
   "branch_name": "refine/00000T146Y4H01X1WVV8STE000/round-1",
   "candidate_commit": null,
   "created": "2026-09-11T14:27:52Z",
-  "event_generation": 36,
+  "event_generation": 37,
   "feature_id": null,
   "feature_order": null,
   "id": "00000T146Y4H01X1WVV8STE000",
@@ -44,6 +44,52 @@
       },
       "assignee": "Buddy Williams",
       "created": "2026-09-12T11:40:50Z",
+      "event_configuration": {
+        "events": {
+          "workflow.plan.enter": {
+            "bindings": [
+              {
+                "enabled": true,
+                "id": "default-plan",
+                "inputs": {},
+                "mode": "blocking",
+                "order": 0,
+                "overrides": null,
+                "scope": {
+                  "node_id": null
+                },
+                "skill_id": "default-plan"
+              }
+            ],
+            "enabled": true,
+            "id": "workflow.plan.enter",
+            "kind": "system",
+            "name": "Workflow Plan Enter",
+            "on_success": null,
+            "parameters": [],
+            "scope": {
+              "node_id": null
+            },
+            "source": "workflow.plan.enter"
+          }
+        },
+        "revision": 43,
+        "schema_version": 2,
+        "skills": {
+          "default-plan": {
+            "enabled": true,
+            "id": "default-plan",
+            "name": "Plan",
+            "parameters": [],
+            "prompt": "## Plan\n\nProduce a complete, concise implementation plan for the current Goal Round. Choose the planning method appropriate to the work. For behavior changes, identify the underlying cause, governing concept or invariant, and existing owner before listing edits. Prefer strengthening an existing concept; introduce one only when it clarifies the behavior and reduces special cases. Do not change repository files. \n\n### Guidance\n\n- Thrashing is a real danger with AI agents. To mitigate this, consider if the Goal is merely a symptom of a missing or misused concept in the target app architecture. Feel free to explore other Goals to determine if they have additional insights into this question.\n- Over- or under-specificity can also cause undesirable implementation outcomes. Ensure that the plan has the information it needs for effective implementation, but not unnecessary details.\n- Always use plain language.\n\n### Format\n\nReturn an actionable plan with stable checklist IDs and meaningful verification.\n\nExample:\nTask #1 - short description of the work (what) and the rationale (why)\nTask #2 - short description of the work (what) and the rationale (why)\n(etc.)\n\n### Intent and architecture\n\nReview Refine's relevant documentation files under Refine's runtime at `<refine-runtime>/docs/intent/***/*.*` as the durable product specification.",
+            "provenance": "refine-default-v1",
+            "role": "task",
+            "scope": {
+              "node_id": null
+            }
+          }
+        }
+      },
       "failure_at": "",
       "failure_category": "",
       "failure_message": "",
@@ -67,6 +113,78 @@
           "revision": 43,
           "schema_version": 2,
           "skills": {}
+        },
+        "36:default:workflow.todo.exit": {
+          "events": {
+            "workflow.todo.exit": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.todo.exit",
+              "kind": "system",
+              "name": "Workflow Todo Exit",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.todo.exit"
+            }
+          },
+          "revision": 43,
+          "schema_version": 2,
+          "skills": {}
+        },
+        "36:default:workflow.todo.success": {
+          "events": {},
+          "revision": 43,
+          "schema_version": 2,
+          "skills": {}
+        },
+        "37:default:workflow.plan.enter": {
+          "events": {
+            "workflow.plan.enter": {
+              "bindings": [
+                {
+                  "enabled": true,
+                  "id": "default-plan",
+                  "inputs": {},
+                  "mode": "blocking",
+                  "order": 0,
+                  "overrides": null,
+                  "scope": {
+                    "node_id": null
+                  },
+                  "skill_id": "default-plan"
+                }
+              ],
+              "enabled": true,
+              "id": "workflow.plan.enter",
+              "kind": "system",
+              "name": "Workflow Plan Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.plan.enter"
+            }
+          },
+          "revision": 43,
+          "schema_version": 2,
+          "skills": {
+            "default-plan": {
+              "enabled": true,
+              "id": "default-plan",
+              "name": "Plan",
+              "parameters": [],
+              "prompt": "## Plan\n\nProduce a complete, concise implementation plan for the current Goal Round. Choose the planning method appropriate to the work. For behavior changes, identify the underlying cause, governing concept or invariant, and existing owner before listing edits. Prefer strengthening an existing concept; introduce one only when it clarifies the behavior and reduces special cases. Do not change repository files. \n\n### Guidance\n\n- Thrashing is a real danger with AI agents. To mitigate this, consider if the Goal is merely a symptom of a missing or misused concept in the target app architecture. Feel free to explore other Goals to determine if they have additional insights into this question.\n- Over- or under-specificity can also cause undesirable implementation outcomes. Ensure that the plan has the information it needs for effective implementation, but not unnecessary details.\n- Always use plain language.\n\n### Format\n\nReturn an actionable plan with stable checklist IDs and meaningful verification.\n\nExample:\nTask #1 - short description of the work (what) and the rationale (why)\nTask #2 - short description of the work (what) and the rationale (why)\n(etc.)\n\n### Intent and architecture\n\nReview Refine's relevant documentation files under Refine's runtime at `<refine-runtime>/docs/intent/***/*.*` as the durable product specification.",
+              "provenance": "refine-default-v1",
+              "role": "task",
+              "scope": {
+                "node_id": null
+              }
+            }
+          }
         }
       },
       "governance_rule_actions": [],
@@ -1586,12 +1704,12 @@
         }
       ],
       "reporter": "Buddy Williams",
-      "updated": "2026-09-12T16:18:08Z",
+      "updated": "2026-09-12T19:29:52Z",
       "workflow_attempt_authority": {
-        "claimed_at": "2026-09-12T16:12:02Z",
-        "generation": 32,
+        "claimed_at": "2026-09-12T19:29:50Z",
+        "generation": 36,
         "round_idx": 0,
-        "workflow_revision": 111
+        "workflow_revision": 125
       },
       "workflow_claim_history": [
         {
@@ -1605,6 +1723,12 @@
           "generation": 27,
           "round_idx": 0,
           "workflow_revision": 85
+        },
+        {
+          "claimed_at": "2026-09-12T16:12:02Z",
+          "generation": 32,
+          "round_idx": 0,
+          "workflow_revision": 111
         }
       ],
       "workflow_failure_occurrence": {
@@ -1615,9 +1739,9 @@
       "workflow_recovery": null
     }
   ],
-  "status": "todo",
+  "status": "plan",
   "target_branch": "main",
-  "updated": "2026-09-12T18:10:07Z",
+  "updated": "2026-09-12T19:29:52Z",
   "workflow_context": "",
   "workflow_controls": [
     {
@@ -2037,7 +2161,17 @@
       "round_idx": 0,
       "to": "todo",
       "workflow_revision": 125
+    },
+    {
+      "at": "2026-09-12T19:29:51.529451614+00:00",
+      "forced": false,
+      "from": "todo",
+      "generation": 37,
+      "node_id": "default",
+      "round_idx": 0,
+      "to": "plan",
+      "workflow_revision": 129
     }
   ],
-  "workflow_revision": 125
+  "workflow_revision": 131
 }

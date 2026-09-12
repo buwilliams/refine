@@ -54,7 +54,12 @@
         "workspace": "/home/buddy/projects/refine-next"
       }
     },
-    "metadata": {}
+    "metadata": {
+      "event_operation_id": "1a09718f16d2a5380",
+      "started_bindings": {
+        "trigger-2124c51c-8d1f-44b7-8a07-7a989a68227f": "2026-09-12T19:29:49.440734829+00:00"
+      }
+    }
   },
   "bindings": [
     {
@@ -96,11 +101,47 @@
       }
     }
   ],
-  "state": "pending",
-  "results": {},
-  "attempts": [],
+  "state": "failed",
+  "results": {
+    "trigger-2124c51c-8d1f-44b7-8a07-7a989a68227f": {
+      "invocation_id": "1ba5d1db9c21a0502ee101527e95df7cd5bbf7060089642b9b6e9561b42c1168",
+      "binding_id": "trigger-2124c51c-8d1f-44b7-8a07-7a989a68227f",
+      "role": "task",
+      "outcome": "failure",
+      "summary": "Could not queue fetch-goals-from-email: the supplied completion contract contains no invocation_id, so the required startup-email-<invocation_id> request ID cannot be constructed exactly. No command was run or configuration changed.",
+      "evidence": [],
+      "artifacts": null
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "trigger-2124c51c-8d1f-44b7-8a07-7a989a68227f",
+      "checkout": {
+        "observation": {
+          "branch": "main",
+          "head_commit": "4e7f1245a3170ee5ff1ba2e90dbc7c654dfff0b5",
+          "status_porcelain": []
+        },
+        "tree": "487c8b2774ea5bfeee702bef938d26fb3a11d891"
+      },
+      "checkout_recorded": true,
+      "diagnostic": null,
+      "host_bound_result": true,
+      "observational_violation": false,
+      "operation_id": null,
+      "process_id": "proc-1789241389512-173368-2",
+      "prompt_bytes": 2098,
+      "provider_session_id": null,
+      "purpose": "work",
+      "raw_output": "{\"outcome\":\"failure\",\"summary\":\"Could not queue fetch-goals-from-email: the supplied completion contract contains no invocation_id, so the required startup-email-<invocation_id> request ID cannot be constructed exactly. No command was run or configuration changed.\"}",
+      "received_at": "2026-09-12T19:29:57.207352974+00:00",
+      "started_at": "2026-09-12T19:29:49.460187425+00:00",
+      "workflow_revision": null
+    }
+  ],
   "created_at": "2026-09-12T18:09:56.206567116+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-12T19:29:57.257452426+00:00",
   "error": null,
   "action_applied": false
 }
