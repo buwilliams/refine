@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "revision": 41,
+  "revision": 42,
   "skills": {
     "default-governance": {
       "id": "default-governance",
@@ -41,7 +41,7 @@
     "default-quality": {
       "id": "default-quality",
       "name": "Quality",
-      "prompt": "## Quality review\n\nAssess and correct the implementation. Run meaningful tests, fix blocking failures, and rerun until they pass, including blockers outside the Goal’s scope. Preserve meaningful tests; remove deprecated or meaningless tests. Use the best available tools.\n\nFinding failures is part of Quality’s work, not a final failure outcome. Report success once corrections are verified. Stop unsuccessfully only when a blocker cannot be resolved within your authority or available environment, and explain it. Governance reviews how the overall Goal came together.\n",
+      "prompt": "## Quality review\n\nAssess and correct the implementation. Run meaningful tests, fix blocking failures including those outside the Goal’s scope, and rerun until they pass. Preserve meaningful tests; remove deprecated or meaningless tests. Use the best available tools.\n\nReport success after verified corrections. Only stop unsuccessfully for a blocker you cannot resolve within your authority or environment, and explain it. Governance reviews how the overall Goal came together.\n",
       "role": "task",
       "enabled": true,
       "scope": {
