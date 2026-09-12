@@ -3,7 +3,7 @@
   "branch_name": "refine/DR16616E32E978A0FD32BDC482/round-1",
   "candidate_commit": null,
   "created": "2026-09-12T10:48:19Z",
-  "event_generation": 4,
+  "event_generation": 5,
   "feature_id": null,
   "feature_order": null,
   "id": "DR16616E32E978A0FD32BDC482",
@@ -109,9 +109,9 @@
           "state": "succeeded"
         }
       },
-      "failure_at": "",
-      "failure_category": "",
-      "failure_message": "",
+      "failure_at": "2026-09-12T11:00:15Z",
+      "failure_category": "interrupted",
+      "failure_message": "workflow runner restarted; nonterminal work remains schedulable from its synchronized state",
       "gate_configurations": {
         "1:default:workflow.backlog.enter": {
           "events": {
@@ -296,6 +296,26 @@
               }
             }
           }
+        },
+        "5:default:workflow.failed.enter": {
+          "events": {
+            "workflow.failed.enter": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.failed.enter",
+              "kind": "system",
+              "name": "Workflow Failed Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.failed.enter"
+            }
+          },
+          "revision": 40,
+          "schema_version": 2,
+          "skills": {}
         }
       },
       "governance_candidate_commit": "",
@@ -326,9 +346,9 @@
       "workflow_recovery": null
     }
   ],
-  "status": "implement",
+  "status": "failed",
   "target_branch": "main",
-  "updated": "2026-09-12T10:49:30Z",
+  "updated": "2026-09-12T11:00:15Z",
   "workflow_events": [
     {
       "at": "2026-09-12T10:48:19.606429117+00:00",
@@ -369,7 +389,17 @@
       "round_idx": 0,
       "to": "implement",
       "workflow_revision": 13
+    },
+    {
+      "at": "2026-09-12T11:00:15.964646572+00:00",
+      "forced": true,
+      "from": "implement",
+      "generation": 5,
+      "node_id": "default",
+      "round_idx": 0,
+      "to": "failed",
+      "workflow_revision": 15
     }
   ],
-  "workflow_revision": 14
+  "workflow_revision": 15
 }
