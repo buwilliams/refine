@@ -90,11 +90,46 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "succeeded",
+  "results": {
+    "trigger-2748a40c-20f1-4533-851a-d3d752e56013": {
+      "invocation_id": "815150a2022204b8d58f41f8c758323e5982c38f9a514420256416e0470186b2",
+      "binding_id": "trigger-2748a40c-20f1-4533-851a-d3d752e56013",
+      "role": "task",
+      "outcome": "success",
+      "summary": "Fetch completed successfully: fetched_count=0, batch_limit=25, goal_ids=[], errors=[]. No Goals imported or recovered. No further batch needed; no remaining mail indicated.\n\n",
+      "evidence": [],
+      "artifacts": null
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "trigger-2748a40c-20f1-4533-851a-d3d752e56013",
+      "checkout": {
+        "observation": {
+          "branch": "main",
+          "head_commit": "52e1d08a4e8bfdfa5d589e1f6287e77e8d61c9a6",
+          "status_porcelain": []
+        },
+        "tree": "a7f7f31e791d20b0959e64425ab3a86cee9a6fa2"
+      },
+      "checkout_recorded": true,
+      "diagnostic": null,
+      "observational_violation": false,
+      "operation_id": null,
+      "process_id": "proc-1789214374694-638024-38",
+      "prompt_bytes": 2421,
+      "provider_session_id": null,
+      "purpose": "work",
+      "raw_output": "{\"binding_id\":\"trigger-2748a40c-20f1-4533-851a-d3d752e56013\",\"invocation_id\":\"815150a2022204b8d58f41f8c758323e5982c38f9a514420256416e0470186b2\",\"outcome\":\"success\",\"role\":\"task\",\"summary\":\"Fetch completed successfully: fetched_count=0, batch_limit=25, goal_ids=[], errors=[]. No Goals imported or recovered. No further batch needed; no remaining mail indicated.\\n\\n\"}",
+      "received_at": "2026-09-12T12:00:03.774064515+00:00",
+      "started_at": "2026-09-12T11:59:34.688220059+00:00",
+      "workflow_revision": null
+    }
+  ],
   "created_at": "2026-09-12T11:59:26.094907262+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-12T12:00:03.822481010+00:00",
   "error": null,
   "action_applied": false
 }
