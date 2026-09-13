@@ -780,15 +780,16 @@ mod tests {
         )
         .unwrap();
         fs::set_permissions(&provider, fs::Permissions::from_mode(0o755)).unwrap();
-        let mut environment = (0..23)
-            .map(|index| (format!("REFINE_LARGE_{index}"), "e".repeat(65_800)))
-            .collect::<Vec<_>>();
-        environment.extend([
-            ("TERM".to_string(), "xterm-256color".to_string()),
-            ("COLORTERM".to_string(), "truecolor".to_string()),
-            ("REFINE_TERMINAL".to_string(), "1".to_string()),
-            ("REFINE_SESSION_ROLE".to_string(), "agent".to_string()),
-        ]);
+        let environment =
+            crate::infrastructure::process::launch_environment::padded_agent_environment_for_test(
+                vec![
+                    ("TERM".to_string(), "xterm-256color".to_string()),
+                    ("COLORTERM".to_string(), "truecolor".to_string()),
+                    ("REFINE_TERMINAL".to_string(), "1".to_string()),
+                    ("REFINE_SESSION_ROLE".to_string(), "agent".to_string()),
+                ],
+                16 * 1024,
+            );
         let prompt = format!(
             "INTERACTIVE_FINAL_ENV_SECRET{}",
             "x".repeat(60_000 - "INTERACTIVE_FINAL_ENV_SECRET".len())

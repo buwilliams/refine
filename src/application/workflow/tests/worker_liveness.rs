@@ -114,6 +114,10 @@ fn superseded_failure_preserves_new_intent_and_admits_followup_within_poll() {
                     "Reopened occurrence held for inspection".into(),
                 ));
             }
+            if goal == "GOAL2" && stage == "claimed" {
+                // Measure durable admission before repository preparation.
+                *next_clock.lock().unwrap() = Some(Instant::now());
+            }
             if stage == "executing" {
                 assert_eq!(
                     records.show_goal_summary(goal)?.goal.status,
@@ -165,7 +169,6 @@ fn superseded_failure_preserves_new_intent_and_admits_followup_within_poll() {
                     records.undo_goal_summary(goal)?;
                     Err::<(), _>(error)?;
                 }
-                *next_clock.lock().unwrap() = Some(Instant::now());
                 return Err(RefineError::Conflict("follow-up entered Plan".into()));
             }
             if goal == "GOAL1" && stage == "settlement" {
@@ -221,9 +224,11 @@ fn preparation_execution_and_settlement_panics_cannot_strand_active_entries() {
                 if goal == "GOAL1" && stage == panic_stage {
                     panic!("injected {panic_stage}");
                 }
+                if goal == "GOAL2" && stage == "claimed" {
+                    assert!(ended.lock().unwrap().unwrap().elapsed() < Duration::from_secs(1));
+                }
                 if stage == "executing" {
                     if goal == "GOAL2" {
-                        assert!(ended.lock().unwrap().unwrap().elapsed() < Duration::from_secs(1));
                         seen.fetch_add(1, Ordering::SeqCst);
                     }
                     return Err(RefineError::Conflict("behavior error".into()));
@@ -270,16 +275,18 @@ fn transient_settlement_rechecks_authority_and_exhausted_writes_release_capacity
         let records = items.clone();
         let completion = Arc::new(Mutex::new(None::<Instant>));
         let ended = completion.clone();
+        let admitted = Arc::new(Mutex::new(None::<Instant>));
+        let admission_clock = admitted.clone();
         test_hooks::install(
             &workflow.runtime_root,
             Arc::new(move |_, goal, stage, _| {
                 if goal == "GOAL1" && stage == "delivery" {
                     *ended.lock().unwrap() = Some(Instant::now());
                 }
+                if goal == "GOAL2" && stage == "claimed" {
+                    *admission_clock.lock().unwrap() = Some(Instant::now());
+                }
                 if stage == "executing" {
-                    if goal == "GOAL2" {
-                        assert!(ended.lock().unwrap().unwrap().elapsed() < Duration::from_secs(1));
-                    }
                     return Err(RefineError::Conflict("integration failure".into()));
                 }
                 if goal == "GOAL1" && stage == "settlement" {
@@ -295,6 +302,14 @@ fn transient_settlement_rechecks_authority_and_exhausted_writes_release_capacity
             }),
         );
         assert!(workflow.execute_work().is_err());
+        assert!(
+            admitted
+                .lock()
+                .unwrap()
+                .unwrap()
+                .duration_since(completion.lock().unwrap().unwrap())
+                < Duration::from_secs(1)
+        );
         assert_eq!(
             writes.load(Ordering::SeqCst),
             if mode == "exhaust" { 3 } else { 2 }
@@ -344,8 +359,10 @@ fn preparation_fault_before_claim_preserves_goal_intent_and_releases_its_slot() 
                     }
                     return Err(RefineError::Io("preclaim preparation fault".into()));
                 }
-                if goal == "GOAL2" && stage == "executing" {
+                if goal == "GOAL2" && stage == "claimed" {
                     assert!(clock.lock().unwrap().unwrap().elapsed() < Duration::from_secs(1));
+                }
+                if goal == "GOAL2" && stage == "executing" {
                     seen.fetch_add(1, Ordering::SeqCst);
                     return Err(RefineError::Conflict("followup reached Plan".into()));
                 }

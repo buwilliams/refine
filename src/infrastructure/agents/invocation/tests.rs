@@ -1,4 +1,6 @@
 use super::*;
+#[cfg(unix)]
+use crate::infrastructure::process::launch_environment::padded_agent_environment_for_test;
 use std::fs;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -309,20 +311,20 @@ fn supervised_launch_uses_final_environment_for_file_fallback_and_child_parity()
         std::env::set_var("REFINE_INHERITED_KEY", "inherited");
         std::env::set_var("OPENAI_API_KEY", "must-be-removed");
     }
-    let mut environment = (0..23)
-        .map(|index| (format!("REFINE_LARGE_{index}"), "e".repeat(65_800)))
-        .collect::<Vec<_>>();
-    environment.extend([
-        ("REFINE_INHERITED_KEY".to_string(), "override".to_string()),
-        ("REFINE_DUPLICATE_KEY".to_string(), "first".to_string()),
-        ("REFINE_DUPLICATE_KEY".to_string(), "final".to_string()),
-        ("REFINE_SESSION_ROLE".to_string(), "supervised".to_string()),
-        ("REFINE_MULTIBYTE".to_string(), "🙂é".to_string()),
-        (
-            "OPENAI_API_KEY".to_string(),
-            "still-must-be-removed".to_string(),
-        ),
-    ]);
+    let environment = padded_agent_environment_for_test(
+        vec![
+            ("REFINE_INHERITED_KEY".to_string(), "override".to_string()),
+            ("REFINE_DUPLICATE_KEY".to_string(), "first".to_string()),
+            ("REFINE_DUPLICATE_KEY".to_string(), "final".to_string()),
+            ("REFINE_SESSION_ROLE".to_string(), "supervised".to_string()),
+            ("REFINE_MULTIBYTE".to_string(), "🙂é".to_string()),
+            (
+                "OPENAI_API_KEY".to_string(),
+                "still-must-be-removed".to_string(),
+            ),
+        ],
+        16 * 1024,
+    );
     let service = HostAgentProviderService {
         path_override: Some(bin_dir.display().to_string()),
         runtime_root: Some(runtime_root.clone()),
@@ -378,9 +380,7 @@ fn effective_environment_rejects_before_supervised_spawn_without_prompt_disclosu
     )
     .unwrap();
     make_executable(&smoke);
-    let environment = (0..24)
-        .map(|index| (format!("REFINE_TOO_LARGE_{index}"), "e".repeat(65_800)))
-        .collect::<Vec<_>>();
+    let environment = padded_agent_environment_for_test(Vec::new(), 0);
     let service = HostAgentProviderService {
         path_override: Some(bin_dir.display().to_string()),
         runtime_root: Some(temp_root.join("run/8080")),

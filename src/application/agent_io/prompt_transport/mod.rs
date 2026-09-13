@@ -561,9 +561,10 @@ mod tests {
         );
         let large_environment = EffectiveLaunchEnvironment::assemble(
             &ProcessOwner::Agent,
-            &(0..32)
-                .map(|index| (format!("REFINE_LARGE_{index}"), "x".repeat(64 * 1024)))
-                .collect::<Vec<_>>(),
+            &crate::infrastructure::process::launch_environment::padded_agent_environment_for_test(
+                Vec::new(),
+                0,
+            ),
         )
         .unwrap();
         assert!(!large_environment.launch_fits("provider", &[]).unwrap());

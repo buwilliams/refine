@@ -276,6 +276,46 @@ fn platform_arg_max() -> usize {
     FALLBACK_ARG_MAX
 }
 
+/// Pad test overrides to the real launch budget, leaving room for a bootstrap
+/// but not a full inline prompt when requested. Linux ARG_MAX varies with the
+/// process stack limit, so a fixed number of environment entries is not portable.
+#[cfg(test)]
+pub(crate) fn padded_agent_environment_for_test(
+    mut overrides: Vec<(String, String)>,
+    argv_headroom: usize,
+) -> Vec<(String, String)> {
+    let environment = EffectiveLaunchEnvironment::assemble(&ProcessOwner::Agent, &overrides)
+        .expect("assemble fixture environment");
+    let arg_max = platform_arg_max();
+    let target = arg_max
+        .saturating_sub((arg_max / 4).max(ARG_MAX_MARGIN_MIN))
+        .checked_sub(argv_headroom)
+        .expect("fixture headroom must fit the platform budget");
+    let mut bytes = environment.byte_len();
+    assert!(
+        bytes <= target,
+        "inherited fixture environment exceeds its budget"
+    );
+    let mut index = 0;
+    while bytes < target {
+        let key = format!("REFINE_ARG_BUDGET_FIXTURE_{index}");
+        index += 1;
+        if environment.get(&key).is_some() {
+            continue;
+        }
+        let overhead = key.len() + 2;
+        // Every padding entry remains valid individually: these fixtures test
+        // the aggregate environment limit, not a per-string rejection.
+        let size = target
+            .saturating_sub(bytes + overhead)
+            .min(platform_per_string_limit() - overhead - 1)
+            .min(64 * 1024);
+        bytes += overhead + size;
+        overrides.push((key, "e".repeat(size)));
+    }
+    overrides
+}
+
 #[cfg(unix)]
 fn os_bytes(value: &OsStr) -> &[u8] {
     value.as_bytes()

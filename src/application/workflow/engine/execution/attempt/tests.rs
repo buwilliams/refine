@@ -89,10 +89,16 @@ fn result_construction_fault_and_panic_settle_without_overwriting_newer_intent()
             .unwrap();
         let followed = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
         let seen = followed.clone();
+        let admitted = std::sync::Arc::new(std::sync::Mutex::new(None::<Instant>));
+        let admission_clock = admitted.clone();
         let records = items.clone();
         test_hooks::install(
             &runtime,
             std::sync::Arc::new(move |_, goal, stage, _| {
+                if goal == "GOAL2" && stage == "claimed" {
+                    // Admission precedes repository preparation and execution.
+                    *admission_clock.lock().unwrap() = Some(Instant::now());
+                }
                 if goal == "GOAL2" && stage == "executing" {
                     assert_eq!(
                         records.show_goal_summary(goal)?.goal.status,
@@ -104,10 +110,10 @@ fn result_construction_fault_and_panic_settle_without_overwriting_newer_intent()
                 Ok(())
             }),
         );
-        let ended = Instant::now();
+        let started = Instant::now();
         assert!(engine.execute_work().is_err());
         assert!(followed.load(std::sync::atomic::Ordering::SeqCst));
-        assert!(ended.elapsed() < Duration::from_secs(1));
+        assert!(admitted.lock().unwrap().unwrap().duration_since(started) < Duration::from_secs(1));
         test_hooks::remove(&runtime);
         std::fs::remove_dir_all(root).unwrap();
     }

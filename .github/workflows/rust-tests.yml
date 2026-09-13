@@ -37,4 +37,5 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Run in-crate tests
-        run: cargo test --lib
+        # Match the repository test-unit and release-check commands.
+        run: cargo test --lib --bins -- --test-threads=1
