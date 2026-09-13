@@ -1,9 +1,9 @@
 {
   "base_commit": "139e2dd39781896779b18ae7ecb004f068c71daa",
   "branch_name": "refine/00000T146Y4H01X1WVV8STE000/round-1-execution-9de1f61f-c5fe-49b7-9885-957fa54e0b11",
-  "candidate_commit": "c0ee33c46a6bcd00ed6a869c7f3f552160840538",
+  "candidate_commit": "9e8ec93e34e73645476994cd718625c09bb61016",
   "created": "2026-09-11T14:27:52Z",
-  "event_generation": 45,
+  "event_generation": 46,
   "feature_id": null,
   "feature_order": null,
   "id": "00000T146Y4H01X1WVV8STE000",
@@ -47,11 +47,11 @@
       "created": "2026-09-12T11:40:50Z",
       "event_configuration": {
         "events": {
-          "workflow.quality.enter": {
+          "workflow.governance.enter": {
             "bindings": [
               {
                 "enabled": true,
-                "id": "default-quality",
+                "id": "default-governance",
                 "inputs": {},
                 "mode": "blocking",
                 "order": 0,
@@ -59,30 +59,30 @@
                 "scope": {
                   "node_id": null
                 },
-                "skill_id": "default-quality"
+                "skill_id": "default-governance"
               }
             ],
             "enabled": true,
-            "id": "workflow.quality.enter",
+            "id": "workflow.governance.enter",
             "kind": "system",
-            "name": "Workflow Quality Enter",
+            "name": "Workflow Governance Enter",
             "on_success": null,
             "parameters": [],
             "scope": {
               "node_id": null
             },
-            "source": "workflow.quality.enter"
+            "source": "workflow.governance.enter"
           }
         },
         "revision": 43,
         "schema_version": 2,
         "skills": {
-          "default-quality": {
+          "default-governance": {
             "enabled": true,
-            "id": "default-quality",
-            "name": "Quality",
+            "id": "default-governance",
+            "name": "Governance",
             "parameters": [],
-            "prompt": "## Quality review\n\nRun tests to ensure the Goal's implementation passes meaningful tests. Do not remove meaningful tests. Remove deprecated or meaningless tests. Use the best available tools for the testing the Goal. The quality gate passes when the system is operational and meaningful tests have passed.\n\nIf issues outside the Goal’s scope block progress, investigate and fix them or use an evidence-backed workaround, preserving required checks and documenting what you changed.\n",
+            "prompt": "## Governance\n\nReview the Goal against the Governance intent below. Do not edit files, merge, push, or change Goal state. A finding must identify the violated intent or invariant, its concrete consequence, and an actionable recovery request. Group related symptoms by their underlying cause.\n\n### Intent and architecture\n\nReview Refine's relevant documentation files under Refine's runtime at `<refine-runtime>/docs/intent/***/*.*` as the durable product specification.\n\n### Semantic code organization\n\nKeep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.\n\nIf issues outside the Goal’s scope block progress, investigate and fix them or use an evidence-backed workaround, preserving required checks and documenting what you changed.\n",
             "provenance": "refine-default-v1",
             "role": "task",
             "scope": {
@@ -120,6 +120,31 @@
           },
           "round_idx": 0,
           "source": "workflow.implement.enter",
+          "state": "succeeded"
+        },
+        "8e2ce1993c3b54f760f272928d47e9e8edbe32f73d6a58d44e3fbf869a90937b": {
+          "candidate_commit": "c0ee33c46a6bcd00ed6a869c7f3f552160840538",
+          "generation": 45,
+          "results": {
+            "default-quality": {
+              "artifacts": {
+                "report": "/home/buddy/projects/refine-next/.git/refine-audits/navigation-quality-c0ee33c-20260913/report.md"
+              },
+              "binding_id": "default-quality",
+              "evidence": [
+                "1,361 Rust tests passed; zero failures; seven pre-existing exclusions.",
+                "353 JavaScript/Chromium tests passed with zero skips.",
+                "Compilation, executable smoke tests, static assets, and whitespace checks passed.",
+                "All 17 initial failures resolved; owned-process cleanup passed 30 repetitions."
+              ],
+              "invocation_id": "8e2ce1993c3b54f760f272928d47e9e8edbe32f73d6a58d44e3fbf869a90937b",
+              "outcome": "success",
+              "role": "quality",
+              "summary": "Quality passed. Fixed launch/cleanup defects, a migration-test fixture, and whitespace. Corrections remain uncommitted for Refine to record. Goal state was preserved; no meaningful tests were removed or weakened."
+            }
+          },
+          "round_idx": 0,
+          "source": "workflow.quality.enter",
           "state": "succeeded"
         },
         "fea5e6fff5fb9c584b9bb09fd6569619fdf9658711ec66c562a694ab77960932": {
@@ -331,6 +356,78 @@
               "name": "Quality",
               "parameters": [],
               "prompt": "## Quality review\n\nRun tests to ensure the Goal's implementation passes meaningful tests. Do not remove meaningful tests. Remove deprecated or meaningless tests. Use the best available tools for the testing the Goal. The quality gate passes when the system is operational and meaningful tests have passed.\n\nIf issues outside the Goal’s scope block progress, investigate and fix them or use an evidence-backed workaround, preserving required checks and documenting what you changed.\n",
+              "provenance": "refine-default-v1",
+              "role": "task",
+              "scope": {
+                "node_id": null
+              }
+            }
+          }
+        },
+        "45:default:workflow.quality.exit": {
+          "events": {
+            "workflow.quality.exit": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.quality.exit",
+              "kind": "system",
+              "name": "Workflow Quality Exit",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.quality.exit"
+            }
+          },
+          "revision": 43,
+          "schema_version": 2,
+          "skills": {}
+        },
+        "45:default:workflow.quality.success": {
+          "events": {},
+          "revision": 43,
+          "schema_version": 2,
+          "skills": {}
+        },
+        "46:default:workflow.governance.enter": {
+          "events": {
+            "workflow.governance.enter": {
+              "bindings": [
+                {
+                  "enabled": true,
+                  "id": "default-governance",
+                  "inputs": {},
+                  "mode": "blocking",
+                  "order": 0,
+                  "overrides": null,
+                  "scope": {
+                    "node_id": null
+                  },
+                  "skill_id": "default-governance"
+                }
+              ],
+              "enabled": true,
+              "id": "workflow.governance.enter",
+              "kind": "system",
+              "name": "Workflow Governance Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.governance.enter"
+            }
+          },
+          "revision": 43,
+          "schema_version": 2,
+          "skills": {
+            "default-governance": {
+              "enabled": true,
+              "id": "default-governance",
+              "name": "Governance",
+              "parameters": [],
+              "prompt": "## Governance\n\nReview the Goal against the Governance intent below. Do not edit files, merge, push, or change Goal state. A finding must identify the violated intent or invariant, its concrete consequence, and an actionable recovery request. Group related symptoms by their underlying cause.\n\n### Intent and architecture\n\nReview Refine's relevant documentation files under Refine's runtime at `<refine-runtime>/docs/intent/***/*.*` as the durable product specification.\n\n### Semantic code organization\n\nKeep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.\n\nIf issues outside the Goal’s scope block progress, investigate and fix them or use an evidence-backed workaround, preserving required checks and documenting what you changed.\n",
               "provenance": "refine-default-v1",
               "role": "task",
               "scope": {
@@ -2518,8 +2615,120 @@
         }
       ],
       "prompt": "For the web UI surface, create two new main nav right-aligned dropdown buttons, one for Skills and one for Sites. The right-aligned button order should be Skills, Sites, Settings, and New Goal. Yes, that is a rename of Controls to Settings. Move the menus from Settings (formerly Controls) to the appropriate new menu for Sites and Skills. Add a separator to the new menus for New Skill, New Site, Manage Skills, and Manage Sites. Ensure you use the standardized styles and layout we already have in the app.",
+      "quality_agent_report": "workflow.quality.enter:default-quality: Quality passed. Fixed launch/cleanup defects, a migration-test fixture, and whitespace. Corrections remain uncommitted for Refine to record. Goal state was preserved; no meaningful tests were removed or weakened.",
+      "quality_candidate_commit": "9e8ec93e34e73645476994cd718625c09bb61016",
+      "quality_checked_at": "2026-09-13T11:01:47Z",
+      "quality_details": {
+        "candidate_commit": "9e8ec93e34e73645476994cd718625c09bb61016",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T146Y4H01X1WVV8STE000-round-1-execution-9de1f61f-c5fe-49b7-9885-957fa54e0b11",
+        "diagnostics": [
+          "Reused Skill review workflow.quality.enter:default-quality for final candidate content: automation/invocations/8e2ce1993c3b54f760f272928d47e9e8edbe32f73d6a58d44e3fbf869a90937b.json"
+        ],
+        "evaluation_scope": "isolated_candidate",
+        "operation_id": "1a09a6e24661415465",
+        "provider_attempts": [],
+        "quality_proof": {
+          "checked_at": "2026-09-13T11:01:47Z",
+          "checked_candidate_commit": "9e8ec93e34e73645476994cd718625c09bb61016",
+          "evaluation_scope": "isolated_candidate",
+          "goal_id": "00000T146Y4H01X1WVV8STE000",
+          "operation_id": "1a09a6e24661415465",
+          "results": [
+            {
+              "command": "",
+              "evidence": "Quality passed. Fixed launch/cleanup defects, a migration-test fixture, and whitespace. Corrections remain uncommitted for Refine to record. Goal state was preserved; no meaningful tests were removed or weakened.",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality"
+            }
+          ],
+          "round_idx": 0,
+          "schema_version": 1,
+          "skills": {
+            "invocations": {
+              "workflow.quality.enter:default-quality": "8e2ce1993c3b54f760f272928d47e9e8edbe32f73d6a58d44e3fbf869a90937b"
+            },
+            "required_bindings": [
+              "workflow.quality.enter:default-quality"
+            ],
+            "requirements_id": "bd53563cfd4962c90715b5ef4d1c08277f3f076f80a21692eac07da607b7774c"
+          },
+          "source_candidate_commit": "9e8ec93e34e73645476994cd718625c09bb61016",
+          "state": "passed"
+        },
+        "results": [
+          {
+            "command": "",
+            "evidence": "Quality passed. Fixed launch/cleanup defects, a migration-test fixture, and whitespace. Corrections remain uncommitted for Refine to record. Goal state was preserved; no meaningful tests were removed or weakened.",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality"
+          }
+        ],
+        "source_candidate_commit": "9e8ec93e34e73645476994cd718625c09bb61016"
+      },
+      "quality_message": "Quality Skills reported success.",
+      "quality_requirements": {
+        "candidate_commit": "9e8ec93e34e73645476994cd718625c09bb61016",
+        "id": "bd53563cfd4962c90715b5ef4d1c08277f3f076f80a21692eac07da607b7774c",
+        "node_id": "default",
+        "required_bindings": [
+          "workflow.quality.enter:default-quality"
+        ],
+        "selected": [
+          {
+            "attachments": [],
+            "binding": {
+              "binding": {
+                "enabled": true,
+                "id": "default-quality",
+                "inputs": {},
+                "mode": "blocking",
+                "order": 0,
+                "overrides": null,
+                "scope": {
+                  "node_id": null
+                },
+                "skill_id": "default-quality"
+              },
+              "parameters": {},
+              "skill": {
+                "enabled": true,
+                "id": "default-quality",
+                "name": "Quality",
+                "parameters": [],
+                "prompt": "## Quality review\n\nRun tests to ensure the Goal's implementation passes meaningful tests. Do not remove meaningful tests. Remove deprecated or meaningless tests. Use the best available tools for the testing the Goal. The quality gate passes when the system is operational and meaningful tests have passed.\n\nIf issues outside the Goal’s scope block progress, investigate and fix them or use an evidence-backed workaround, preserving required checks and documenting what you changed.\n",
+                "provenance": "refine-default-v1",
+                "role": "quality",
+                "scope": {
+                  "node_id": null
+                }
+              }
+            },
+            "contract_version": 1,
+            "key": "workflow.quality.enter:default-quality"
+          }
+        ]
+      },
+      "quality_skill_results": [
+        {
+          "artifacts": {
+            "report": "/home/buddy/projects/refine-next/.git/refine-audits/navigation-quality-c0ee33c-20260913/report.md"
+          },
+          "binding_id": "workflow.quality.enter:default-quality",
+          "evidence": [
+            "1,361 Rust tests passed; zero failures; seven pre-existing exclusions.",
+            "353 JavaScript/Chromium tests passed with zero skips.",
+            "Compilation, executable smoke tests, static assets, and whitespace checks passed.",
+            "All 17 initial failures resolved; owned-process cleanup passed 30 repetitions."
+          ],
+          "invocation_id": "8e2ce1993c3b54f760f272928d47e9e8edbe32f73d6a58d44e3fbf869a90937b",
+          "outcome": "success",
+          "role": "quality",
+          "summary": "Quality passed. Fixed launch/cleanup defects, a migration-test fixture, and whitespace. Corrections remain uncommitted for Refine to record. Goal state was preserved; no meaningful tests were removed or weakened."
+        }
+      ],
+      "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "updated": "2026-09-13T10:35:39Z",
+      "updated": "2026-09-13T11:01:49Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-13T10:18:25Z",
         "generation": 42,
@@ -2568,9 +2777,9 @@
       ]
     }
   ],
-  "status": "quality",
+  "status": "governance",
   "target_branch": "main",
-  "updated": "2026-09-13T10:35:39Z",
+  "updated": "2026-09-13T11:01:49Z",
   "workflow_context": "Reproduce the existing authored Round using the new workflow stability implementation. Preserve earlier work and reports as history; run the configured workflow checks on the replacement candidate.",
   "workflow_controls": [
     {
@@ -3133,7 +3342,17 @@
       "round_idx": 0,
       "to": "quality",
       "workflow_revision": 175
+    },
+    {
+      "at": "2026-09-13T11:01:49.262070399+00:00",
+      "forced": false,
+      "from": "quality",
+      "generation": 46,
+      "node_id": "default",
+      "round_idx": 0,
+      "to": "governance",
+      "workflow_revision": 185
     }
   ],
-  "workflow_revision": 176
+  "workflow_revision": 186
 }

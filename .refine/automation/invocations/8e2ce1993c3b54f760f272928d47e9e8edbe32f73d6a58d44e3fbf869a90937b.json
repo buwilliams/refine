@@ -197,11 +197,62 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "succeeded",
+  "results": {
+    "default-quality": {
+      "invocation_id": "8e2ce1993c3b54f760f272928d47e9e8edbe32f73d6a58d44e3fbf869a90937b",
+      "binding_id": "default-quality",
+      "role": "quality",
+      "outcome": "success",
+      "summary": "Quality passed. Fixed launch/cleanup defects, a migration-test fixture, and whitespace. Corrections remain uncommitted for Refine to record. Goal state was preserved; no meaningful tests were removed or weakened.",
+      "evidence": [
+        "1,361 Rust tests passed; zero failures; seven pre-existing exclusions.",
+        "353 JavaScript/Chromium tests passed with zero skips.",
+        "Compilation, executable smoke tests, static assets, and whitespace checks passed.",
+        "All 17 initial failures resolved; owned-process cleanup passed 30 repetitions."
+      ],
+      "artifacts": {
+        "report": "/home/buddy/projects/refine-next/.git/refine-audits/navigation-quality-c0ee33c-20260913/report.md"
+      }
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "default-quality",
+      "checkout": {
+        "observation": {
+          "branch": "refine/00000T146Y4H01X1WVV8STE000/round-1-execution-9de1f61f-c5fe-49b7-9885-957fa54e0b11",
+          "head_commit": "c0ee33c46a6bcd00ed6a869c7f3f552160840538",
+          "status_porcelain": [
+            " M src/application/agents/sessions/pty_lifecycle.rs",
+            " M src/application/persistence_sync/state/tests/synchronization.rs",
+            " M src/infrastructure/process/subprocess/owned_groups/launch_scope.rs",
+            " M src/infrastructure/process/subprocess/owned_groups/launch_tests.rs",
+            " M src/infrastructure/process/subprocess/owned_groups/scope_guardian.rs",
+            " M src/infrastructure/process/subprocess/supervision.rs",
+            " M src/surfaces/web/static/js/topbar.js"
+          ]
+        },
+        "tree": "9f24e8c8dca7c851f9be73fde41d5a8c92d5ef87"
+      },
+      "checkout_recorded": true,
+      "diagnostic": null,
+      "host_bound_result": true,
+      "observational_violation": false,
+      "operation_id": null,
+      "process_id": "proc-1789295741070-1316166-3122",
+      "prompt_bytes": 9026,
+      "provider_session_id": null,
+      "purpose": "work",
+      "raw_output": "{\n  \"outcome\": \"success\",\n  \"summary\": \"Quality passed. Fixed launch/cleanup defects, a migration-test fixture, and whitespace. Corrections remain uncommitted for Refine to record. Goal state was preserved; no meaningful tests were removed or weakened.\",\n  \"evidence\": [\n    \"1,361 Rust tests passed; zero failures; seven pre-existing exclusions.\",\n    \"353 JavaScript/Chromium tests passed with zero skips.\",\n    \"Compilation, executable smoke tests, static assets, and whitespace checks passed.\",\n    \"All 17 initial failures resolved; owned-process cleanup passed 30 repetitions.\"\n  ],\n  \"artifacts\": {\n    \"report\": \"/home/buddy/projects/refine-next/.git/refine-audits/navigation-quality-c0ee33c-20260913/report.md\"\n  }\n}\n",
+      "received_at": "2026-09-13T11:01:41.071337920+00:00",
+      "started_at": "2026-09-13T10:35:41.042429339+00:00",
+      "workflow_revision": 160
+    }
+  ],
   "created_at": "2026-09-13T10:35:39.878606249+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-13T11:01:42.688198633+00:00",
   "error": null,
   "action_applied": false
 }
