@@ -1,22 +1,23 @@
 {
-  "base_commit": "4e7f1245a3170ee5ff1ba2e90dbc7c654dfff0b5",
-  "branch_name": "refine/00000T146Y4H01X1WVV8STE000/round-1",
-  "candidate_commit": "0a85e69cd47b940e7f0e644d3b0a1290f90a0ebf",
+  "base_commit": "139e2dd39781896779b18ae7ecb004f068c71daa",
+  "branch_name": "refine/00000T146Y4H01X1WVV8STE000/round-1-execution-9de1f61f-c5fe-49b7-9885-957fa54e0b11",
+  "candidate_commit": null,
   "created": "2026-09-11T14:27:52Z",
-  "event_generation": 41,
+  "event_generation": 43,
   "feature_id": null,
   "feature_order": null,
   "id": "00000T146Y4H01X1WVV8STE000",
   "name": "For the web UI surface, create two new main nav right-aligned dropdown buttons",
   "node_id": "default",
   "notes": [],
+  "pending_event_dispatches": {},
   "priority": "low",
   "reporter": "Buddy Williams",
   "round_edit_revision": 59,
   "rounds": [
     {
       "agent_context": {
-        "assembled_at": "2026-09-12T11:49:57Z",
+        "assembled_at": "2026-09-13T10:18:26Z",
         "current_round": {
           "assignee": "Buddy Williams",
           "prompt": "For the web UI surface, create two new main nav right-aligned dropdown buttons, one for Skills and one for Sites. The right-aligned button order should be Skills, Sites, Settings, and New Goal. Yes, that is a rename of Controls to Settings. Move the menus from Settings (formerly Controls) to the appropriate new menu for Sites and Skills. Add a separator to the new menus for New Skill, New Site, Manage Skills, and Manage Sites. Ensure you use the standardized styles and layout we already have in the app.",
@@ -46,169 +47,55 @@
       "created": "2026-09-12T11:40:50Z",
       "event_configuration": {
         "events": {
-          "workflow.governance.exit": {
-            "bindings": [],
+          "workflow.plan.enter": {
+            "bindings": [
+              {
+                "enabled": true,
+                "id": "default-plan",
+                "inputs": {},
+                "mode": "blocking",
+                "order": 0,
+                "overrides": null,
+                "scope": {
+                  "node_id": null
+                },
+                "skill_id": "default-plan"
+              }
+            ],
             "enabled": true,
-            "id": "workflow.governance.exit",
+            "id": "workflow.plan.enter",
             "kind": "system",
-            "name": "Workflow Governance Exit",
+            "name": "Workflow Plan Enter",
             "on_success": null,
             "parameters": [],
             "scope": {
               "node_id": null
             },
-            "source": "workflow.governance.exit"
+            "source": "workflow.plan.enter"
           }
         },
         "revision": 43,
         "schema_version": 2,
-        "skills": {}
-      },
-      "event_results": {
-        "4155db45c43236fa41cfdbb0c5505e47586ead298e53c4819d0f1bbe9ea33a5f": {
-          "candidate_commit": "0a85e69cd47b940e7f0e644d3b0a1290f90a0ebf",
-          "generation": 39,
-          "results": {
-            "default-quality": {
-              "artifacts": {
-                "report": "/home/buddy/projects/refine-next/.git/refine-audits/navigation-00000T146Y4H01X1WVV8STE000-20260912-quality/report.json"
-              },
-              "binding_id": "default-quality",
-              "evidence": [],
-              "invocation_id": "4155db45c43236fa41cfdbb0c5505e47586ead298e53c4819d0f1bbe9ea33a5f",
-              "outcome": "success",
-              "role": "quality",
-              "summary": "Goal-scoped Quality passes at 0a85e69c. Navigation is operational; 343 JavaScript tests and eight Rust navigation checks passed. Full Rust suite: 1,288 passed, eight failed, seven ignored. Parent comparison and isolated reruns support treating these as unrelated baseline/timing failures. No tests weakened or disabled; worktree clean."
+        "skills": {
+          "default-plan": {
+            "enabled": true,
+            "id": "default-plan",
+            "name": "Plan",
+            "parameters": [],
+            "prompt": "## Plan\n\nProduce a complete, concise implementation plan for the current Goal Round. Choose the planning method appropriate to the work. For behavior changes, identify the underlying cause, governing concept or invariant, and existing owner before listing edits. Prefer strengthening an existing concept; introduce one only when it clarifies the behavior and reduces special cases. Do not change repository files. \n\n### Guidance\n\n- Thrashing is a real danger with AI agents. To mitigate this, consider if the Goal is merely a symptom of a missing or misused concept in the target app architecture. Feel free to explore other Goals to determine if they have additional insights into this question.\n- Over- or under-specificity can also cause undesirable implementation outcomes. Ensure that the plan has the information it needs for effective implementation, but not unnecessary details.\n- Always use plain language.\n\n### Format\n\nReturn an actionable plan with stable checklist IDs and meaningful verification.\n\nExample:\nTask #1 - short description of the work (what) and the rationale (why)\nTask #2 - short description of the work (what) and the rationale (why)\n(etc.)\n\n### Intent and architecture\n\nReview Refine's relevant documentation files under Refine's runtime at `<refine-runtime>/docs/intent/***/*.*` as the durable product specification.",
+            "provenance": "refine-default-v1",
+            "role": "task",
+            "scope": {
+              "node_id": null
             }
-          },
-          "round_idx": 0,
-          "source": "workflow.quality.enter",
-          "state": "succeeded"
-        },
-        "43faaa6ada2ddfcabf7e63a620fb18c15bd7d3616d1e7534b05b2a083f84b2c8": {
-          "candidate_commit": "0a85e69cd47b940e7f0e644d3b0a1290f90a0ebf",
-          "generation": 40,
-          "results": {
-            "default-governance": {
-              "artifacts": null,
-              "binding_id": "default-governance",
-              "evidence": [
-                "Reviewed runtime navigation, Skills, and Knowledge Hub intent under /home/buddy/projects/refine/docs/intent and isolated the Goal changes from ancestor 9c1be94c.",
-                "Retained Quality browser.log records 341 passing tests, zero failures and zero skips, including navigation, keyboard dismissal, stale-context handling, and responsive menus. navigation-rust.log records eight passing checks.",
-                "Full Rust suite remains non-green: 1,288 passed, eight failed, seven ignored. Retained parent comparisons and isolated reruns support unrelated baseline/timing failures.",
-                "Verified pinned HEAD, clean worktree, and passing git diff --check."
-              ],
-              "invocation_id": "43faaa6ada2ddfcabf7e63a620fb18c15bd7d3616d1e7534b05b2a083f84b2c8",
-              "outcome": "success",
-              "role": "governance",
-              "summary": "Governance passes for candidate 0a85e69cd47b940e7f0e644d3b0a1290f90a0ebf. No blocking Goal-scoped findings. The navigation implements Skills, Sites, Settings, and New Goal in order, with separated creation/management actions and shared styling. Existing context selectors and capability boundaries are preserved. Changes stay within existing responsibilities; no structural split is warranted by this patch. No files or Goal state changed; no merge or push performed."
-            }
-          },
-          "round_idx": 0,
-          "source": "workflow.governance.enter",
-          "state": "succeeded"
-        },
-        "497e1a074e6df75deb563fa78767eda334db2c83fdfd2de6872f26de34ef6ec5": {
-          "candidate_commit": null,
-          "generation": 37,
-          "results": {
-            "default-plan": {
-              "artifacts": null,
-              "binding_id": "default-plan",
-              "evidence": [
-                "Reviewed project-root intent documentation for navigation, shared components, Skills, and Knowledge Hub, plus the retained worktree’s updated navigation specification.",
-                "Implementation commit f3945f54 already contains the requested navigation changes and regression tests.",
-                "Quality commit 0a85e69c contains the terminal browser helper correction. The current worktree is clean.",
-                "Inspected existing menu interaction handlers, Skill rendering and launch behavior, and navigation tests. No files changed or tests run during planning."
-              ],
-              "invocation_id": "497e1a074e6df75deb563fa78767eda334db2c83fdfd2de6872f26de34ef6ec5",
-              "outcome": "success",
-              "role": "plan",
-              "summary": "Cause and governing concept: Controls combined application settings with operational Skill and Site entry points. The existing browser shell owns navigation placement, shared styling, and dropdown interaction; Skills and Knowledge Hub already own their lists, creation, execution, and management. Strengthen that separation without introducing a new domain concept or duplicating those capabilities.\n\nTask #1 - Preserve and assess the retained implementation. Start from f3945f54 and 0a85e69c, checking the requirements below against current code. Keep completed work and make only necessary corrections; the older report’s description of an uncommitted helper fix is superseded by Git evidence.\n\nTask #2 - Confirm shell structure and wording. In static/index.html and shared navigation styles, ensure right-aligned actions appear as Skills, Sites, Settings, and + New Goal. Move Skill and Site lists out of Settings. Retain Settings’ context selectors, status, configuration, appearance, update, and utility actions. Preserve New Goal’s related actions and existing routes. Update remaining user-facing Controls references and relevant intent documentation consistently.\n\nTask #3 - Confirm each menu uses its existing feature owner. In settings_skills.js, show enabled Custom Skills for the active node, followed by a separator and New Skill / Manage Skills. Reuse the existing editor, typed input preflight, and agent-tab launch; management goes to #/settings/skills. In knowledge-hub.js, show Sites, followed by a separator and New Site / Manage Sites. Reuse site creation and existing draft/published opening behavior; management goes to #/settings/knowledge-hub. Keep creation and management available when lists are empty or fail. Preserve refresh on opening, definition changes, and context changes, rejecting stale responses.\n\nTask #4 - Verify shared interaction and layout. Keep menu dismissal and mutual exclusion in common.js and reuse existing summary, row, icon, separator, panel, and spacing styles. Verify keyboard opening, Escape with focus restoration, outside-click and action dismissal, and scrollable panels within the viewport at desktop and narrow widths in both themes. Correct any gaps through these existing owners.\n\nTask #5 - Validate the retained candidate and resolve the Quality evidence. Run tests/web_topbar_navigation.test.js with Chromium available, plus affected Knowledge Hub, screen-render, Skill-launch, and Node-context tests and the Rust static navigation contract. Confirm order, exclusive placement, separators, creation, management destinations, Skill inputs, draft and published links, empty/error lists, refresh races, and preserved Settings controls. Skipped browser tests do not establish success. Recover the exact identities and output of the 12 reported broader Rust failures, reproduce them, and compare against the implementation parent where necessary. Fix candidate-caused regressions; document unrelated baseline failures separately without weakening tests or claiming a full pass. Hand off the exact tested candidate and remaining limitations to Quality.\n\n"
-            }
-          },
-          "round_idx": 0,
-          "source": "workflow.plan.enter",
-          "state": "succeeded"
-        },
-        "bcf2a05e206d74741558403e5821c320d98a691d77d09eb02f5a05c97913532a": {
-          "candidate_commit": null,
-          "generation": 38,
-          "results": {
-            "default-implement": {
-              "artifacts": {
-                "report": "/home/buddy/projects/refine-next/.git/refine-audits/navigation-00000T146Y4H01X1WVV8STE000-20260912-implementation/implementation-report.json"
-              },
-              "binding_id": "default-implement",
-              "evidence": [
-                "Verified Skills, Sites, Settings, and + New Goal order, shared styling, separators, creation actions, and management destinations.",
-                "Verified existing feature ownership, typed Skill launches, draft/published Site links, refresh races, and preserved Settings controls.",
-                "81 selected JavaScript tests passed with zero skips; eight Rust navigation tests passed.",
-                "Recovered all 12 historical failure identities. Broad candidate run: 1287 passed, nine failed, seven ignored. All nine failures also occurred on the Git parent; one executable-location failure subsequently passed on both revisions.",
-                "Remaining baseline failures, verification deviations, exact commands, and checklist evidence are preserved in the report. Full-suite success is not claimed."
-              ],
-              "invocation_id": "bcf2a05e206d74741558403e5821c320d98a691d77d09eb02f5a05c97913532a",
-              "outcome": "success",
-              "role": "implement",
-              "summary": "Retained candidate 0a85e69c implements the accepted navigation plan and is ready for Quality. No additional source changes were needed; worktree remains clean."
-            }
-          },
-          "round_idx": 0,
-          "source": "workflow.implement.enter",
-          "state": "succeeded"
+          }
         }
       },
-      "failure_at": "2026-09-12T19:53:28Z",
-      "failure_category": "governance_candidate_lineage",
-      "failure_message": "Candidate 0a85e69cd47b940e7f0e644d3b0a1290f90a0ebf is stale: recorded base 4e7f1245a3170ee5ff1ba2e90dbc7c654dfff0b5 is not its ancestor",
+      "failure_at": "",
+      "failure_category": "",
+      "failure_message": "",
       "gate_configurations": {
-        "36:default:workflow.todo.enter": {
-          "events": {
-            "workflow.todo.enter": {
-              "bindings": [],
-              "enabled": true,
-              "id": "workflow.todo.enter",
-              "kind": "system",
-              "name": "Workflow Todo Enter",
-              "on_success": null,
-              "parameters": [],
-              "scope": {
-                "node_id": null
-              },
-              "source": "workflow.todo.enter"
-            }
-          },
-          "revision": 43,
-          "schema_version": 2,
-          "skills": {}
-        },
-        "36:default:workflow.todo.exit": {
-          "events": {
-            "workflow.todo.exit": {
-              "bindings": [],
-              "enabled": true,
-              "id": "workflow.todo.exit",
-              "kind": "system",
-              "name": "Workflow Todo Exit",
-              "on_success": null,
-              "parameters": [],
-              "scope": {
-                "node_id": null
-              },
-              "source": "workflow.todo.exit"
-            }
-          },
-          "revision": 43,
-          "schema_version": 2,
-          "skills": {}
-        },
-        "36:default:workflow.todo.success": {
-          "events": {},
-          "revision": 43,
-          "schema_version": 2,
-          "skills": {}
-        },
-        "37:default:workflow.plan.enter": {
+        "43:default:workflow.plan.enter": {
           "events": {
             "workflow.plan.enter": {
               "bindings": [
@@ -253,303 +140,8 @@
               }
             }
           }
-        },
-        "37:default:workflow.plan.exit": {
-          "events": {
-            "workflow.plan.exit": {
-              "bindings": [],
-              "enabled": true,
-              "id": "workflow.plan.exit",
-              "kind": "system",
-              "name": "Workflow Plan Exit",
-              "on_success": null,
-              "parameters": [],
-              "scope": {
-                "node_id": null
-              },
-              "source": "workflow.plan.exit"
-            }
-          },
-          "revision": 43,
-          "schema_version": 2,
-          "skills": {}
-        },
-        "37:default:workflow.plan.success": {
-          "events": {},
-          "revision": 43,
-          "schema_version": 2,
-          "skills": {}
-        },
-        "38:default:workflow.implement.enter": {
-          "events": {
-            "workflow.implement.enter": {
-              "bindings": [
-                {
-                  "enabled": true,
-                  "id": "default-implement",
-                  "inputs": {},
-                  "mode": "blocking",
-                  "order": 0,
-                  "overrides": null,
-                  "scope": {
-                    "node_id": null
-                  },
-                  "skill_id": "default-implement"
-                }
-              ],
-              "enabled": true,
-              "id": "workflow.implement.enter",
-              "kind": "system",
-              "name": "Workflow Implement Enter",
-              "on_success": null,
-              "parameters": [],
-              "scope": {
-                "node_id": null
-              },
-              "source": "workflow.implement.enter"
-            }
-          },
-          "revision": 43,
-          "schema_version": 2,
-          "skills": {
-            "default-implement": {
-              "enabled": true,
-              "id": "default-implement",
-              "name": "Implement",
-              "parameters": [],
-              "prompt": "## Implementation\n\nImplement the current Goal Round using all accepted plans and attached Skills. Inspect existing code, make the complete change, run appropriate verification, and report evidence for each checklist item. Check the plan's assumptions against the code and keep policy in its shared owner. Prefer one correction that explains the affected behavior over separate fixes at each failing call site. Report evidence-backed plan deviations within the Goal's scope and existing authority. Preserve unrelated changes and historical evidence.\n\n### Intent and architecture\n\nReview Refine's relevant documentation files under Refine's runtime at `<refine-runtime>/docs/intent/***/*.*` as the durable product specification.\n\n### Semantic code organization\n\nKeep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.\n\nIf issues outside the Goal’s scope block progress, investigate and fix them or use an evidence-backed workaround, preserving required checks and documenting what you changed.\n",
-              "provenance": "refine-default-v1",
-              "role": "task",
-              "scope": {
-                "node_id": null
-              }
-            }
-          }
-        },
-        "38:default:workflow.implement.exit": {
-          "events": {
-            "workflow.implement.exit": {
-              "bindings": [],
-              "enabled": true,
-              "id": "workflow.implement.exit",
-              "kind": "system",
-              "name": "Workflow Implement Exit",
-              "on_success": null,
-              "parameters": [],
-              "scope": {
-                "node_id": null
-              },
-              "source": "workflow.implement.exit"
-            }
-          },
-          "revision": 43,
-          "schema_version": 2,
-          "skills": {}
-        },
-        "38:default:workflow.implement.success": {
-          "events": {},
-          "revision": 43,
-          "schema_version": 2,
-          "skills": {}
-        },
-        "39:default:workflow.quality.enter": {
-          "events": {
-            "workflow.quality.enter": {
-              "bindings": [
-                {
-                  "enabled": true,
-                  "id": "default-quality",
-                  "inputs": {},
-                  "mode": "blocking",
-                  "order": 0,
-                  "overrides": null,
-                  "scope": {
-                    "node_id": null
-                  },
-                  "skill_id": "default-quality"
-                }
-              ],
-              "enabled": true,
-              "id": "workflow.quality.enter",
-              "kind": "system",
-              "name": "Workflow Quality Enter",
-              "on_success": null,
-              "parameters": [],
-              "scope": {
-                "node_id": null
-              },
-              "source": "workflow.quality.enter"
-            }
-          },
-          "revision": 43,
-          "schema_version": 2,
-          "skills": {
-            "default-quality": {
-              "enabled": true,
-              "id": "default-quality",
-              "name": "Quality",
-              "parameters": [],
-              "prompt": "## Quality review\n\nRun tests to ensure the Goal's implementation passes meaningful tests. Do not remove meaningful tests. Remove deprecated or meaningless tests. Use the best available tools for the testing the Goal. The quality gate passes when the system is operational and meaningful tests have passed.\n\nIf issues outside the Goal’s scope block progress, investigate and fix them or use an evidence-backed workaround, preserving required checks and documenting what you changed.\n",
-              "provenance": "refine-default-v1",
-              "role": "task",
-              "scope": {
-                "node_id": null
-              }
-            }
-          }
-        },
-        "39:default:workflow.quality.exit": {
-          "events": {
-            "workflow.quality.exit": {
-              "bindings": [],
-              "enabled": true,
-              "id": "workflow.quality.exit",
-              "kind": "system",
-              "name": "Workflow Quality Exit",
-              "on_success": null,
-              "parameters": [],
-              "scope": {
-                "node_id": null
-              },
-              "source": "workflow.quality.exit"
-            }
-          },
-          "revision": 43,
-          "schema_version": 2,
-          "skills": {}
-        },
-        "39:default:workflow.quality.success": {
-          "events": {},
-          "revision": 43,
-          "schema_version": 2,
-          "skills": {}
-        },
-        "40:default:workflow.governance.enter": {
-          "events": {
-            "workflow.governance.enter": {
-              "bindings": [
-                {
-                  "enabled": true,
-                  "id": "default-governance",
-                  "inputs": {},
-                  "mode": "blocking",
-                  "order": 0,
-                  "overrides": null,
-                  "scope": {
-                    "node_id": null
-                  },
-                  "skill_id": "default-governance"
-                }
-              ],
-              "enabled": true,
-              "id": "workflow.governance.enter",
-              "kind": "system",
-              "name": "Workflow Governance Enter",
-              "on_success": null,
-              "parameters": [],
-              "scope": {
-                "node_id": null
-              },
-              "source": "workflow.governance.enter"
-            }
-          },
-          "revision": 43,
-          "schema_version": 2,
-          "skills": {
-            "default-governance": {
-              "enabled": true,
-              "id": "default-governance",
-              "name": "Governance",
-              "parameters": [],
-              "prompt": "## Governance\n\nReview the Goal against the Governance intent below. Do not edit files, merge, push, or change Goal state. A finding must identify the violated intent or invariant, its concrete consequence, and an actionable recovery request. Group related symptoms by their underlying cause.\n\n### Intent and architecture\n\nReview Refine's relevant documentation files under Refine's runtime at `<refine-runtime>/docs/intent/***/*.*` as the durable product specification.\n\n### Semantic code organization\n\nKeep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.\n\nIf issues outside the Goal’s scope block progress, investigate and fix them or use an evidence-backed workaround, preserving required checks and documenting what you changed.\n",
-              "provenance": "refine-default-v1",
-              "role": "task",
-              "scope": {
-                "node_id": null
-              }
-            }
-          }
-        },
-        "40:default:workflow.governance.exit": {
-          "events": {
-            "workflow.governance.exit": {
-              "bindings": [],
-              "enabled": true,
-              "id": "workflow.governance.exit",
-              "kind": "system",
-              "name": "Workflow Governance Exit",
-              "on_success": null,
-              "parameters": [],
-              "scope": {
-                "node_id": null
-              },
-              "source": "workflow.governance.exit"
-            }
-          },
-          "revision": 43,
-          "schema_version": 2,
-          "skills": {}
-        },
-        "40:default:workflow.governance.success": {
-          "events": {},
-          "revision": 43,
-          "schema_version": 2,
-          "skills": {}
-        },
-        "41:default:workflow.failed.enter": {
-          "events": {
-            "workflow.failed.enter": {
-              "bindings": [],
-              "enabled": true,
-              "id": "workflow.failed.enter",
-              "kind": "system",
-              "name": "Workflow Failed Enter",
-              "on_success": null,
-              "parameters": [],
-              "scope": {
-                "node_id": null
-              },
-              "source": "workflow.failed.enter"
-            }
-          },
-          "revision": 43,
-          "schema_version": 2,
-          "skills": {}
         }
       },
-      "governance_candidate_commit": "0a85e69cd47b940e7f0e644d3b0a1290f90a0ebf",
-      "governance_checked_at": "2026-09-12T19:53:24Z",
-      "governance_details": {
-        "candidate_commit": "0a85e69cd47b940e7f0e644d3b0a1290f90a0ebf",
-        "configured": true,
-        "failed_actions": [],
-        "phase": "post_implementation",
-        "skill_results": [
-          {
-            "artifacts": null,
-            "binding_id": "workflow.governance.enter:default-governance",
-            "evidence": [
-              "Reviewed runtime navigation, Skills, and Knowledge Hub intent under /home/buddy/projects/refine/docs/intent and isolated the Goal changes from ancestor 9c1be94c.",
-              "Retained Quality browser.log records 341 passing tests, zero failures and zero skips, including navigation, keyboard dismissal, stale-context handling, and responsive menus. navigation-rust.log records eight passing checks.",
-              "Full Rust suite remains non-green: 1,288 passed, eight failed, seven ignored. Retained parent comparisons and isolated reruns support unrelated baseline/timing failures.",
-              "Verified pinned HEAD, clean worktree, and passing git diff --check."
-            ],
-            "invocation_id": "43faaa6ada2ddfcabf7e63a620fb18c15bd7d3616d1e7534b05b2a083f84b2c8",
-            "outcome": "success",
-            "role": "governance",
-            "summary": "Governance passes for candidate 0a85e69cd47b940e7f0e644d3b0a1290f90a0ebf. No blocking Goal-scoped findings. The navigation implements Skills, Sites, Settings, and New Goal in order, with separated creation/management actions and shared styling. Existing context selectors and capability boundaries are preserved. Changes stay within existing responsibilities; no structural split is warranted by this patch. No files or Goal state changed; no merge or push performed."
-          }
-        ],
-        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T146Y4H01X1WVV8STE000-round-1"
-      },
-      "governance_message": "Governance checks passed.",
-      "governance_recovery_analysis": null,
-      "governance_recovery_round_prompt": null,
-      "governance_rule_actions": [],
-      "guidance_decision": null,
-      "implementation_plan": null,
-      "implementation_report": "workflow.implement.enter:default-implement: Retained candidate 0a85e69c implements the accepted navigation plan and is ready for Quality. No additional source changes were needed; worktree remains clean.",
-      "implementation_reported_at": "2026-09-12T19:41:04Z",
       "logs": [],
       "prior_attempts": [
         {
@@ -1997,124 +1589,742 @@
           },
           "workflow_reconciliation": null,
           "workflow_recovery": null
-        }
-      ],
-      "prompt": "For the web UI surface, create two new main nav right-aligned dropdown buttons, one for Skills and one for Sites. The right-aligned button order should be Skills, Sites, Settings, and New Goal. Yes, that is a rename of Controls to Settings. Move the menus from Settings (formerly Controls) to the appropriate new menu for Sites and Skills. Add a separator to the new menus for New Skill, New Site, Manage Skills, and Manage Sites. Ensure you use the standardized styles and layout we already have in the app.",
-      "quality_agent_report": "workflow.quality.enter:default-quality: Goal-scoped Quality passes at 0a85e69c. Navigation is operational; 343 JavaScript tests and eight Rust navigation checks passed. Full Rust suite: 1,288 passed, eight failed, seven ignored. Parent comparison and isolated reruns support treating these as unrelated baseline/timing failures. No tests weakened or disabled; worktree clean.",
-      "quality_candidate_commit": "0a85e69cd47b940e7f0e644d3b0a1290f90a0ebf",
-      "quality_checked_at": "2026-09-12T19:52:01Z",
-      "quality_details": {
-        "candidate_commit": "0a85e69cd47b940e7f0e644d3b0a1290f90a0ebf",
-        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T146Y4H01X1WVV8STE000-round-1",
-        "diagnostics": [
-          "Reused Skill review workflow.quality.enter:default-quality for final candidate content: automation/invocations/4155db45c43236fa41cfdbb0c5505e47586ead298e53c4819d0f1bbe9ea33a5f.json"
-        ],
-        "evaluation_scope": "isolated_candidate",
-        "operation_id": "1a0972d3d902a5388",
-        "provider_attempts": [],
-        "quality_proof": {
-          "checked_at": "2026-09-12T19:52:01Z",
-          "checked_candidate_commit": "0a85e69cd47b940e7f0e644d3b0a1290f90a0ebf",
-          "evaluation_scope": "isolated_candidate",
-          "goal_id": "00000T146Y4H01X1WVV8STE000",
-          "operation_id": "1a0972d3d902a5388",
-          "results": [
-            {
-              "command": "",
-              "evidence": "Goal-scoped Quality passes at 0a85e69c. Navigation is operational; 343 JavaScript tests and eight Rust navigation checks passed. Full Rust suite: 1,288 passed, eight failed, seven ignored. Parent comparison and isolated reruns support treating these as unrelated baseline/timing failures. No tests weakened or disabled; worktree clean.",
-              "status": "passed",
-              "test": "workflow.quality.enter:default-quality"
-            }
-          ],
-          "round_idx": 0,
-          "schema_version": 1,
-          "skills": {
-            "invocations": {
-              "workflow.quality.enter:default-quality": "4155db45c43236fa41cfdbb0c5505e47586ead298e53c4819d0f1bbe9ea33a5f"
-            },
-            "required_bindings": [
-              "workflow.quality.enter:default-quality"
-            ],
-            "requirements_id": "bd53563cfd4962c90715b5ef4d1c08277f3f076f80a21692eac07da607b7774c"
-          },
-          "source_candidate_commit": "0a85e69cd47b940e7f0e644d3b0a1290f90a0ebf",
-          "state": "passed"
         },
-        "results": [
-          {
-            "command": "",
-            "evidence": "Goal-scoped Quality passes at 0a85e69c. Navigation is operational; 343 JavaScript tests and eight Rust navigation checks passed. Full Rust suite: 1,288 passed, eight failed, seven ignored. Parent comparison and isolated reruns support treating these as unrelated baseline/timing failures. No tests weakened or disabled; worktree clean.",
-            "status": "passed",
-            "test": "workflow.quality.enter:default-quality"
-          }
-        ],
-        "source_candidate_commit": "0a85e69cd47b940e7f0e644d3b0a1290f90a0ebf"
-      },
-      "quality_message": "Quality Skills reported success.",
-      "quality_requirements": {
-        "candidate_commit": "0a85e69cd47b940e7f0e644d3b0a1290f90a0ebf",
-        "id": "bd53563cfd4962c90715b5ef4d1c08277f3f076f80a21692eac07da607b7774c",
-        "node_id": "default",
-        "required_bindings": [
-          "workflow.quality.enter:default-quality"
-        ],
-        "selected": [
-          {
-            "attachments": [],
-            "binding": {
-              "binding": {
+        {
+          "agent_context": {
+            "assembled_at": "2026-09-12T11:49:57Z",
+            "current_round": {
+              "assignee": "Buddy Williams",
+              "prompt": "For the web UI surface, create two new main nav right-aligned dropdown buttons, one for Skills and one for Sites. The right-aligned button order should be Skills, Sites, Settings, and New Goal. Yes, that is a rename of Controls to Settings. Move the menus from Settings (formerly Controls) to the appropriate new menu for Sites and Skills. Add a separator to the new menus for New Skill, New Site, Manage Skills, and Manage Sites. Ensure you use the standardized styles and layout we already have in the app.",
+              "reporter": "Buddy Williams",
+              "round": 1
+            },
+            "goal": {
+              "assignee": "Buddy Williams",
+              "id": "00000T146Y4H01X1WVV8STE000",
+              "name": "For the web UI surface, create two new main nav right-aligned dropdown buttons",
+              "node_id": "default",
+              "priority": "low",
+              "reporter": "Buddy Williams"
+            },
+            "governance": {
+              "configured": false,
+              "constitution": "",
+              "product": "",
+              "rules": []
+            },
+            "guidance_candidates": [],
+            "previous_rounds": [],
+            "version": 1,
+            "workflow_summary": "Refine gives this Goal Agent an isolated worktree, the current Round, and available planning context. Follow the Goal and applicable Skill instructions and use your judgment to decide when to stop. Quality and Governance agents make their own decisions using their Skills before integration and human Review. Refine coordinates workflow transitions and Git actions. Do not directly advance Goal state, approve, merge, or push."
+          },
+          "assignee": "Buddy Williams",
+          "created": "2026-09-12T11:40:50Z",
+          "event_configuration": {
+            "events": {
+              "workflow.governance.exit": {
+                "bindings": [],
                 "enabled": true,
-                "id": "default-quality",
-                "inputs": {},
-                "mode": "blocking",
-                "order": 0,
-                "overrides": null,
+                "id": "workflow.governance.exit",
+                "kind": "system",
+                "name": "Workflow Governance Exit",
+                "on_success": null,
+                "parameters": [],
                 "scope": {
                   "node_id": null
                 },
-                "skill_id": "default-quality"
+                "source": "workflow.governance.exit"
+              }
+            },
+            "revision": 43,
+            "schema_version": 2,
+            "skills": {}
+          },
+          "event_results": {
+            "4155db45c43236fa41cfdbb0c5505e47586ead298e53c4819d0f1bbe9ea33a5f": {
+              "candidate_commit": "0a85e69cd47b940e7f0e644d3b0a1290f90a0ebf",
+              "generation": 39,
+              "results": {
+                "default-quality": {
+                  "artifacts": {
+                    "report": "/home/buddy/projects/refine-next/.git/refine-audits/navigation-00000T146Y4H01X1WVV8STE000-20260912-quality/report.json"
+                  },
+                  "binding_id": "default-quality",
+                  "evidence": [],
+                  "invocation_id": "4155db45c43236fa41cfdbb0c5505e47586ead298e53c4819d0f1bbe9ea33a5f",
+                  "outcome": "success",
+                  "role": "quality",
+                  "summary": "Goal-scoped Quality passes at 0a85e69c. Navigation is operational; 343 JavaScript tests and eight Rust navigation checks passed. Full Rust suite: 1,288 passed, eight failed, seven ignored. Parent comparison and isolated reruns support treating these as unrelated baseline/timing failures. No tests weakened or disabled; worktree clean."
+                }
               },
-              "parameters": {},
-              "skill": {
-                "enabled": true,
-                "id": "default-quality",
-                "name": "Quality",
-                "parameters": [],
-                "prompt": "## Quality review\n\nRun tests to ensure the Goal's implementation passes meaningful tests. Do not remove meaningful tests. Remove deprecated or meaningless tests. Use the best available tools for the testing the Goal. The quality gate passes when the system is operational and meaningful tests have passed.\n\nIf issues outside the Goal’s scope block progress, investigate and fix them or use an evidence-backed workaround, preserving required checks and documenting what you changed.\n",
-                "provenance": "refine-default-v1",
-                "role": "quality",
-                "scope": {
-                  "node_id": null
+              "round_idx": 0,
+              "source": "workflow.quality.enter",
+              "state": "succeeded"
+            },
+            "43faaa6ada2ddfcabf7e63a620fb18c15bd7d3616d1e7534b05b2a083f84b2c8": {
+              "candidate_commit": "0a85e69cd47b940e7f0e644d3b0a1290f90a0ebf",
+              "generation": 40,
+              "results": {
+                "default-governance": {
+                  "artifacts": null,
+                  "binding_id": "default-governance",
+                  "evidence": [
+                    "Reviewed runtime navigation, Skills, and Knowledge Hub intent under /home/buddy/projects/refine/docs/intent and isolated the Goal changes from ancestor 9c1be94c.",
+                    "Retained Quality browser.log records 341 passing tests, zero failures and zero skips, including navigation, keyboard dismissal, stale-context handling, and responsive menus. navigation-rust.log records eight passing checks.",
+                    "Full Rust suite remains non-green: 1,288 passed, eight failed, seven ignored. Retained parent comparisons and isolated reruns support unrelated baseline/timing failures.",
+                    "Verified pinned HEAD, clean worktree, and passing git diff --check."
+                  ],
+                  "invocation_id": "43faaa6ada2ddfcabf7e63a620fb18c15bd7d3616d1e7534b05b2a083f84b2c8",
+                  "outcome": "success",
+                  "role": "governance",
+                  "summary": "Governance passes for candidate 0a85e69cd47b940e7f0e644d3b0a1290f90a0ebf. No blocking Goal-scoped findings. The navigation implements Skills, Sites, Settings, and New Goal in order, with separated creation/management actions and shared styling. Existing context selectors and capability boundaries are preserved. Changes stay within existing responsibilities; no structural split is warranted by this patch. No files or Goal state changed; no merge or push performed."
+                }
+              },
+              "round_idx": 0,
+              "source": "workflow.governance.enter",
+              "state": "succeeded"
+            },
+            "497e1a074e6df75deb563fa78767eda334db2c83fdfd2de6872f26de34ef6ec5": {
+              "candidate_commit": null,
+              "generation": 37,
+              "results": {
+                "default-plan": {
+                  "artifacts": null,
+                  "binding_id": "default-plan",
+                  "evidence": [
+                    "Reviewed project-root intent documentation for navigation, shared components, Skills, and Knowledge Hub, plus the retained worktree’s updated navigation specification.",
+                    "Implementation commit f3945f54 already contains the requested navigation changes and regression tests.",
+                    "Quality commit 0a85e69c contains the terminal browser helper correction. The current worktree is clean.",
+                    "Inspected existing menu interaction handlers, Skill rendering and launch behavior, and navigation tests. No files changed or tests run during planning."
+                  ],
+                  "invocation_id": "497e1a074e6df75deb563fa78767eda334db2c83fdfd2de6872f26de34ef6ec5",
+                  "outcome": "success",
+                  "role": "plan",
+                  "summary": "Cause and governing concept: Controls combined application settings with operational Skill and Site entry points. The existing browser shell owns navigation placement, shared styling, and dropdown interaction; Skills and Knowledge Hub already own their lists, creation, execution, and management. Strengthen that separation without introducing a new domain concept or duplicating those capabilities.\n\nTask #1 - Preserve and assess the retained implementation. Start from f3945f54 and 0a85e69c, checking the requirements below against current code. Keep completed work and make only necessary corrections; the older report’s description of an uncommitted helper fix is superseded by Git evidence.\n\nTask #2 - Confirm shell structure and wording. In static/index.html and shared navigation styles, ensure right-aligned actions appear as Skills, Sites, Settings, and + New Goal. Move Skill and Site lists out of Settings. Retain Settings’ context selectors, status, configuration, appearance, update, and utility actions. Preserve New Goal’s related actions and existing routes. Update remaining user-facing Controls references and relevant intent documentation consistently.\n\nTask #3 - Confirm each menu uses its existing feature owner. In settings_skills.js, show enabled Custom Skills for the active node, followed by a separator and New Skill / Manage Skills. Reuse the existing editor, typed input preflight, and agent-tab launch; management goes to #/settings/skills. In knowledge-hub.js, show Sites, followed by a separator and New Site / Manage Sites. Reuse site creation and existing draft/published opening behavior; management goes to #/settings/knowledge-hub. Keep creation and management available when lists are empty or fail. Preserve refresh on opening, definition changes, and context changes, rejecting stale responses.\n\nTask #4 - Verify shared interaction and layout. Keep menu dismissal and mutual exclusion in common.js and reuse existing summary, row, icon, separator, panel, and spacing styles. Verify keyboard opening, Escape with focus restoration, outside-click and action dismissal, and scrollable panels within the viewport at desktop and narrow widths in both themes. Correct any gaps through these existing owners.\n\nTask #5 - Validate the retained candidate and resolve the Quality evidence. Run tests/web_topbar_navigation.test.js with Chromium available, plus affected Knowledge Hub, screen-render, Skill-launch, and Node-context tests and the Rust static navigation contract. Confirm order, exclusive placement, separators, creation, management destinations, Skill inputs, draft and published links, empty/error lists, refresh races, and preserved Settings controls. Skipped browser tests do not establish success. Recover the exact identities and output of the 12 reported broader Rust failures, reproduce them, and compare against the implementation parent where necessary. Fix candidate-caused regressions; document unrelated baseline failures separately without weakening tests or claiming a full pass. Hand off the exact tested candidate and remaining limitations to Quality.\n\n"
+                }
+              },
+              "round_idx": 0,
+              "source": "workflow.plan.enter",
+              "state": "succeeded"
+            },
+            "bcf2a05e206d74741558403e5821c320d98a691d77d09eb02f5a05c97913532a": {
+              "candidate_commit": null,
+              "generation": 38,
+              "results": {
+                "default-implement": {
+                  "artifacts": {
+                    "report": "/home/buddy/projects/refine-next/.git/refine-audits/navigation-00000T146Y4H01X1WVV8STE000-20260912-implementation/implementation-report.json"
+                  },
+                  "binding_id": "default-implement",
+                  "evidence": [
+                    "Verified Skills, Sites, Settings, and + New Goal order, shared styling, separators, creation actions, and management destinations.",
+                    "Verified existing feature ownership, typed Skill launches, draft/published Site links, refresh races, and preserved Settings controls.",
+                    "81 selected JavaScript tests passed with zero skips; eight Rust navigation tests passed.",
+                    "Recovered all 12 historical failure identities. Broad candidate run: 1287 passed, nine failed, seven ignored. All nine failures also occurred on the Git parent; one executable-location failure subsequently passed on both revisions.",
+                    "Remaining baseline failures, verification deviations, exact commands, and checklist evidence are preserved in the report. Full-suite success is not claimed."
+                  ],
+                  "invocation_id": "bcf2a05e206d74741558403e5821c320d98a691d77d09eb02f5a05c97913532a",
+                  "outcome": "success",
+                  "role": "implement",
+                  "summary": "Retained candidate 0a85e69c implements the accepted navigation plan and is ready for Quality. No additional source changes were needed; worktree remains clean."
+                }
+              },
+              "round_idx": 0,
+              "source": "workflow.implement.enter",
+              "state": "succeeded"
+            }
+          },
+          "failure_at": "2026-09-12T19:53:28Z",
+          "failure_category": "governance_candidate_lineage",
+          "failure_message": "Candidate 0a85e69cd47b940e7f0e644d3b0a1290f90a0ebf is stale: recorded base 4e7f1245a3170ee5ff1ba2e90dbc7c654dfff0b5 is not its ancestor",
+          "gate_configurations": {
+            "36:default:workflow.todo.enter": {
+              "events": {
+                "workflow.todo.enter": {
+                  "bindings": [],
+                  "enabled": true,
+                  "id": "workflow.todo.enter",
+                  "kind": "system",
+                  "name": "Workflow Todo Enter",
+                  "on_success": null,
+                  "parameters": [],
+                  "scope": {
+                    "node_id": null
+                  },
+                  "source": "workflow.todo.enter"
+                }
+              },
+              "revision": 43,
+              "schema_version": 2,
+              "skills": {}
+            },
+            "36:default:workflow.todo.exit": {
+              "events": {
+                "workflow.todo.exit": {
+                  "bindings": [],
+                  "enabled": true,
+                  "id": "workflow.todo.exit",
+                  "kind": "system",
+                  "name": "Workflow Todo Exit",
+                  "on_success": null,
+                  "parameters": [],
+                  "scope": {
+                    "node_id": null
+                  },
+                  "source": "workflow.todo.exit"
+                }
+              },
+              "revision": 43,
+              "schema_version": 2,
+              "skills": {}
+            },
+            "36:default:workflow.todo.success": {
+              "events": {},
+              "revision": 43,
+              "schema_version": 2,
+              "skills": {}
+            },
+            "37:default:workflow.plan.enter": {
+              "events": {
+                "workflow.plan.enter": {
+                  "bindings": [
+                    {
+                      "enabled": true,
+                      "id": "default-plan",
+                      "inputs": {},
+                      "mode": "blocking",
+                      "order": 0,
+                      "overrides": null,
+                      "scope": {
+                        "node_id": null
+                      },
+                      "skill_id": "default-plan"
+                    }
+                  ],
+                  "enabled": true,
+                  "id": "workflow.plan.enter",
+                  "kind": "system",
+                  "name": "Workflow Plan Enter",
+                  "on_success": null,
+                  "parameters": [],
+                  "scope": {
+                    "node_id": null
+                  },
+                  "source": "workflow.plan.enter"
+                }
+              },
+              "revision": 43,
+              "schema_version": 2,
+              "skills": {
+                "default-plan": {
+                  "enabled": true,
+                  "id": "default-plan",
+                  "name": "Plan",
+                  "parameters": [],
+                  "prompt": "## Plan\n\nProduce a complete, concise implementation plan for the current Goal Round. Choose the planning method appropriate to the work. For behavior changes, identify the underlying cause, governing concept or invariant, and existing owner before listing edits. Prefer strengthening an existing concept; introduce one only when it clarifies the behavior and reduces special cases. Do not change repository files. \n\n### Guidance\n\n- Thrashing is a real danger with AI agents. To mitigate this, consider if the Goal is merely a symptom of a missing or misused concept in the target app architecture. Feel free to explore other Goals to determine if they have additional insights into this question.\n- Over- or under-specificity can also cause undesirable implementation outcomes. Ensure that the plan has the information it needs for effective implementation, but not unnecessary details.\n- Always use plain language.\n\n### Format\n\nReturn an actionable plan with stable checklist IDs and meaningful verification.\n\nExample:\nTask #1 - short description of the work (what) and the rationale (why)\nTask #2 - short description of the work (what) and the rationale (why)\n(etc.)\n\n### Intent and architecture\n\nReview Refine's relevant documentation files under Refine's runtime at `<refine-runtime>/docs/intent/***/*.*` as the durable product specification.",
+                  "provenance": "refine-default-v1",
+                  "role": "task",
+                  "scope": {
+                    "node_id": null
+                  }
                 }
               }
             },
-            "contract_version": 1,
-            "key": "workflow.quality.enter:default-quality"
-          }
-        ]
-      },
-      "quality_skill_results": [
-        {
-          "artifacts": {
-            "report": "/home/buddy/projects/refine-next/.git/refine-audits/navigation-00000T146Y4H01X1WVV8STE000-20260912-quality/report.json"
+            "37:default:workflow.plan.exit": {
+              "events": {
+                "workflow.plan.exit": {
+                  "bindings": [],
+                  "enabled": true,
+                  "id": "workflow.plan.exit",
+                  "kind": "system",
+                  "name": "Workflow Plan Exit",
+                  "on_success": null,
+                  "parameters": [],
+                  "scope": {
+                    "node_id": null
+                  },
+                  "source": "workflow.plan.exit"
+                }
+              },
+              "revision": 43,
+              "schema_version": 2,
+              "skills": {}
+            },
+            "37:default:workflow.plan.success": {
+              "events": {},
+              "revision": 43,
+              "schema_version": 2,
+              "skills": {}
+            },
+            "38:default:workflow.implement.enter": {
+              "events": {
+                "workflow.implement.enter": {
+                  "bindings": [
+                    {
+                      "enabled": true,
+                      "id": "default-implement",
+                      "inputs": {},
+                      "mode": "blocking",
+                      "order": 0,
+                      "overrides": null,
+                      "scope": {
+                        "node_id": null
+                      },
+                      "skill_id": "default-implement"
+                    }
+                  ],
+                  "enabled": true,
+                  "id": "workflow.implement.enter",
+                  "kind": "system",
+                  "name": "Workflow Implement Enter",
+                  "on_success": null,
+                  "parameters": [],
+                  "scope": {
+                    "node_id": null
+                  },
+                  "source": "workflow.implement.enter"
+                }
+              },
+              "revision": 43,
+              "schema_version": 2,
+              "skills": {
+                "default-implement": {
+                  "enabled": true,
+                  "id": "default-implement",
+                  "name": "Implement",
+                  "parameters": [],
+                  "prompt": "## Implementation\n\nImplement the current Goal Round using all accepted plans and attached Skills. Inspect existing code, make the complete change, run appropriate verification, and report evidence for each checklist item. Check the plan's assumptions against the code and keep policy in its shared owner. Prefer one correction that explains the affected behavior over separate fixes at each failing call site. Report evidence-backed plan deviations within the Goal's scope and existing authority. Preserve unrelated changes and historical evidence.\n\n### Intent and architecture\n\nReview Refine's relevant documentation files under Refine's runtime at `<refine-runtime>/docs/intent/***/*.*` as the durable product specification.\n\n### Semantic code organization\n\nKeep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.\n\nIf issues outside the Goal’s scope block progress, investigate and fix them or use an evidence-backed workaround, preserving required checks and documenting what you changed.\n",
+                  "provenance": "refine-default-v1",
+                  "role": "task",
+                  "scope": {
+                    "node_id": null
+                  }
+                }
+              }
+            },
+            "38:default:workflow.implement.exit": {
+              "events": {
+                "workflow.implement.exit": {
+                  "bindings": [],
+                  "enabled": true,
+                  "id": "workflow.implement.exit",
+                  "kind": "system",
+                  "name": "Workflow Implement Exit",
+                  "on_success": null,
+                  "parameters": [],
+                  "scope": {
+                    "node_id": null
+                  },
+                  "source": "workflow.implement.exit"
+                }
+              },
+              "revision": 43,
+              "schema_version": 2,
+              "skills": {}
+            },
+            "38:default:workflow.implement.success": {
+              "events": {},
+              "revision": 43,
+              "schema_version": 2,
+              "skills": {}
+            },
+            "39:default:workflow.quality.enter": {
+              "events": {
+                "workflow.quality.enter": {
+                  "bindings": [
+                    {
+                      "enabled": true,
+                      "id": "default-quality",
+                      "inputs": {},
+                      "mode": "blocking",
+                      "order": 0,
+                      "overrides": null,
+                      "scope": {
+                        "node_id": null
+                      },
+                      "skill_id": "default-quality"
+                    }
+                  ],
+                  "enabled": true,
+                  "id": "workflow.quality.enter",
+                  "kind": "system",
+                  "name": "Workflow Quality Enter",
+                  "on_success": null,
+                  "parameters": [],
+                  "scope": {
+                    "node_id": null
+                  },
+                  "source": "workflow.quality.enter"
+                }
+              },
+              "revision": 43,
+              "schema_version": 2,
+              "skills": {
+                "default-quality": {
+                  "enabled": true,
+                  "id": "default-quality",
+                  "name": "Quality",
+                  "parameters": [],
+                  "prompt": "## Quality review\n\nRun tests to ensure the Goal's implementation passes meaningful tests. Do not remove meaningful tests. Remove deprecated or meaningless tests. Use the best available tools for the testing the Goal. The quality gate passes when the system is operational and meaningful tests have passed.\n\nIf issues outside the Goal’s scope block progress, investigate and fix them or use an evidence-backed workaround, preserving required checks and documenting what you changed.\n",
+                  "provenance": "refine-default-v1",
+                  "role": "task",
+                  "scope": {
+                    "node_id": null
+                  }
+                }
+              }
+            },
+            "39:default:workflow.quality.exit": {
+              "events": {
+                "workflow.quality.exit": {
+                  "bindings": [],
+                  "enabled": true,
+                  "id": "workflow.quality.exit",
+                  "kind": "system",
+                  "name": "Workflow Quality Exit",
+                  "on_success": null,
+                  "parameters": [],
+                  "scope": {
+                    "node_id": null
+                  },
+                  "source": "workflow.quality.exit"
+                }
+              },
+              "revision": 43,
+              "schema_version": 2,
+              "skills": {}
+            },
+            "39:default:workflow.quality.success": {
+              "events": {},
+              "revision": 43,
+              "schema_version": 2,
+              "skills": {}
+            },
+            "40:default:workflow.governance.enter": {
+              "events": {
+                "workflow.governance.enter": {
+                  "bindings": [
+                    {
+                      "enabled": true,
+                      "id": "default-governance",
+                      "inputs": {},
+                      "mode": "blocking",
+                      "order": 0,
+                      "overrides": null,
+                      "scope": {
+                        "node_id": null
+                      },
+                      "skill_id": "default-governance"
+                    }
+                  ],
+                  "enabled": true,
+                  "id": "workflow.governance.enter",
+                  "kind": "system",
+                  "name": "Workflow Governance Enter",
+                  "on_success": null,
+                  "parameters": [],
+                  "scope": {
+                    "node_id": null
+                  },
+                  "source": "workflow.governance.enter"
+                }
+              },
+              "revision": 43,
+              "schema_version": 2,
+              "skills": {
+                "default-governance": {
+                  "enabled": true,
+                  "id": "default-governance",
+                  "name": "Governance",
+                  "parameters": [],
+                  "prompt": "## Governance\n\nReview the Goal against the Governance intent below. Do not edit files, merge, push, or change Goal state. A finding must identify the violated intent or invariant, its concrete consequence, and an actionable recovery request. Group related symptoms by their underlying cause.\n\n### Intent and architecture\n\nReview Refine's relevant documentation files under Refine's runtime at `<refine-runtime>/docs/intent/***/*.*` as the durable product specification.\n\n### Semantic code organization\n\nKeep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.\n\nIf issues outside the Goal’s scope block progress, investigate and fix them or use an evidence-backed workaround, preserving required checks and documenting what you changed.\n",
+                  "provenance": "refine-default-v1",
+                  "role": "task",
+                  "scope": {
+                    "node_id": null
+                  }
+                }
+              }
+            },
+            "40:default:workflow.governance.exit": {
+              "events": {
+                "workflow.governance.exit": {
+                  "bindings": [],
+                  "enabled": true,
+                  "id": "workflow.governance.exit",
+                  "kind": "system",
+                  "name": "Workflow Governance Exit",
+                  "on_success": null,
+                  "parameters": [],
+                  "scope": {
+                    "node_id": null
+                  },
+                  "source": "workflow.governance.exit"
+                }
+              },
+              "revision": 43,
+              "schema_version": 2,
+              "skills": {}
+            },
+            "40:default:workflow.governance.success": {
+              "events": {},
+              "revision": 43,
+              "schema_version": 2,
+              "skills": {}
+            },
+            "41:default:workflow.failed.enter": {
+              "events": {
+                "workflow.failed.enter": {
+                  "bindings": [],
+                  "enabled": true,
+                  "id": "workflow.failed.enter",
+                  "kind": "system",
+                  "name": "Workflow Failed Enter",
+                  "on_success": null,
+                  "parameters": [],
+                  "scope": {
+                    "node_id": null
+                  },
+                  "source": "workflow.failed.enter"
+                }
+              },
+              "revision": 43,
+              "schema_version": 2,
+              "skills": {}
+            }
           },
-          "binding_id": "workflow.quality.enter:default-quality",
-          "evidence": [],
-          "invocation_id": "4155db45c43236fa41cfdbb0c5505e47586ead298e53c4819d0f1bbe9ea33a5f",
-          "outcome": "success",
-          "role": "quality",
-          "summary": "Goal-scoped Quality passes at 0a85e69c. Navigation is operational; 343 JavaScript tests and eight Rust navigation checks passed. Full Rust suite: 1,288 passed, eight failed, seven ignored. Parent comparison and isolated reruns support treating these as unrelated baseline/timing failures. No tests weakened or disabled; worktree clean."
+          "governance_candidate_commit": "0a85e69cd47b940e7f0e644d3b0a1290f90a0ebf",
+          "governance_checked_at": "2026-09-12T19:53:24Z",
+          "governance_details": {
+            "candidate_commit": "0a85e69cd47b940e7f0e644d3b0a1290f90a0ebf",
+            "configured": true,
+            "failed_actions": [],
+            "phase": "post_implementation",
+            "skill_results": [
+              {
+                "artifacts": null,
+                "binding_id": "workflow.governance.enter:default-governance",
+                "evidence": [
+                  "Reviewed runtime navigation, Skills, and Knowledge Hub intent under /home/buddy/projects/refine/docs/intent and isolated the Goal changes from ancestor 9c1be94c.",
+                  "Retained Quality browser.log records 341 passing tests, zero failures and zero skips, including navigation, keyboard dismissal, stale-context handling, and responsive menus. navigation-rust.log records eight passing checks.",
+                  "Full Rust suite remains non-green: 1,288 passed, eight failed, seven ignored. Retained parent comparisons and isolated reruns support unrelated baseline/timing failures.",
+                  "Verified pinned HEAD, clean worktree, and passing git diff --check."
+                ],
+                "invocation_id": "43faaa6ada2ddfcabf7e63a620fb18c15bd7d3616d1e7534b05b2a083f84b2c8",
+                "outcome": "success",
+                "role": "governance",
+                "summary": "Governance passes for candidate 0a85e69cd47b940e7f0e644d3b0a1290f90a0ebf. No blocking Goal-scoped findings. The navigation implements Skills, Sites, Settings, and New Goal in order, with separated creation/management actions and shared styling. Existing context selectors and capability boundaries are preserved. Changes stay within existing responsibilities; no structural split is warranted by this patch. No files or Goal state changed; no merge or push performed."
+              }
+            ],
+            "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T146Y4H01X1WVV8STE000-round-1"
+          },
+          "governance_message": "Governance checks passed.",
+          "governance_recovery_analysis": null,
+          "governance_recovery_round_prompt": null,
+          "governance_rule_actions": [],
+          "guidance_decision": null,
+          "implementation_plan": null,
+          "implementation_report": "workflow.implement.enter:default-implement: Retained candidate 0a85e69c implements the accepted navigation plan and is ready for Quality. No additional source changes were needed; worktree remains clean.",
+          "implementation_reported_at": "2026-09-12T19:41:04Z",
+          "logs": [],
+          "prompt": "For the web UI surface, create two new main nav right-aligned dropdown buttons, one for Skills and one for Sites. The right-aligned button order should be Skills, Sites, Settings, and New Goal. Yes, that is a rename of Controls to Settings. Move the menus from Settings (formerly Controls) to the appropriate new menu for Sites and Skills. Add a separator to the new menus for New Skill, New Site, Manage Skills, and Manage Sites. Ensure you use the standardized styles and layout we already have in the app.",
+          "quality_agent_report": "workflow.quality.enter:default-quality: Goal-scoped Quality passes at 0a85e69c. Navigation is operational; 343 JavaScript tests and eight Rust navigation checks passed. Full Rust suite: 1,288 passed, eight failed, seven ignored. Parent comparison and isolated reruns support treating these as unrelated baseline/timing failures. No tests weakened or disabled; worktree clean.",
+          "quality_candidate_commit": "0a85e69cd47b940e7f0e644d3b0a1290f90a0ebf",
+          "quality_checked_at": "2026-09-12T19:52:01Z",
+          "quality_details": {
+            "candidate_commit": "0a85e69cd47b940e7f0e644d3b0a1290f90a0ebf",
+            "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T146Y4H01X1WVV8STE000-round-1",
+            "diagnostics": [
+              "Reused Skill review workflow.quality.enter:default-quality for final candidate content: automation/invocations/4155db45c43236fa41cfdbb0c5505e47586ead298e53c4819d0f1bbe9ea33a5f.json"
+            ],
+            "evaluation_scope": "isolated_candidate",
+            "operation_id": "1a0972d3d902a5388",
+            "provider_attempts": [],
+            "quality_proof": {
+              "checked_at": "2026-09-12T19:52:01Z",
+              "checked_candidate_commit": "0a85e69cd47b940e7f0e644d3b0a1290f90a0ebf",
+              "evaluation_scope": "isolated_candidate",
+              "goal_id": "00000T146Y4H01X1WVV8STE000",
+              "operation_id": "1a0972d3d902a5388",
+              "results": [
+                {
+                  "command": "",
+                  "evidence": "Goal-scoped Quality passes at 0a85e69c. Navigation is operational; 343 JavaScript tests and eight Rust navigation checks passed. Full Rust suite: 1,288 passed, eight failed, seven ignored. Parent comparison and isolated reruns support treating these as unrelated baseline/timing failures. No tests weakened or disabled; worktree clean.",
+                  "status": "passed",
+                  "test": "workflow.quality.enter:default-quality"
+                }
+              ],
+              "round_idx": 0,
+              "schema_version": 1,
+              "skills": {
+                "invocations": {
+                  "workflow.quality.enter:default-quality": "4155db45c43236fa41cfdbb0c5505e47586ead298e53c4819d0f1bbe9ea33a5f"
+                },
+                "required_bindings": [
+                  "workflow.quality.enter:default-quality"
+                ],
+                "requirements_id": "bd53563cfd4962c90715b5ef4d1c08277f3f076f80a21692eac07da607b7774c"
+              },
+              "source_candidate_commit": "0a85e69cd47b940e7f0e644d3b0a1290f90a0ebf",
+              "state": "passed"
+            },
+            "results": [
+              {
+                "command": "",
+                "evidence": "Goal-scoped Quality passes at 0a85e69c. Navigation is operational; 343 JavaScript tests and eight Rust navigation checks passed. Full Rust suite: 1,288 passed, eight failed, seven ignored. Parent comparison and isolated reruns support treating these as unrelated baseline/timing failures. No tests weakened or disabled; worktree clean.",
+                "status": "passed",
+                "test": "workflow.quality.enter:default-quality"
+              }
+            ],
+            "source_candidate_commit": "0a85e69cd47b940e7f0e644d3b0a1290f90a0ebf"
+          },
+          "quality_message": "Quality Skills reported success.",
+          "quality_requirements": {
+            "candidate_commit": "0a85e69cd47b940e7f0e644d3b0a1290f90a0ebf",
+            "id": "bd53563cfd4962c90715b5ef4d1c08277f3f076f80a21692eac07da607b7774c",
+            "node_id": "default",
+            "required_bindings": [
+              "workflow.quality.enter:default-quality"
+            ],
+            "selected": [
+              {
+                "attachments": [],
+                "binding": {
+                  "binding": {
+                    "enabled": true,
+                    "id": "default-quality",
+                    "inputs": {},
+                    "mode": "blocking",
+                    "order": 0,
+                    "overrides": null,
+                    "scope": {
+                      "node_id": null
+                    },
+                    "skill_id": "default-quality"
+                  },
+                  "parameters": {},
+                  "skill": {
+                    "enabled": true,
+                    "id": "default-quality",
+                    "name": "Quality",
+                    "parameters": [],
+                    "prompt": "## Quality review\n\nRun tests to ensure the Goal's implementation passes meaningful tests. Do not remove meaningful tests. Remove deprecated or meaningless tests. Use the best available tools for the testing the Goal. The quality gate passes when the system is operational and meaningful tests have passed.\n\nIf issues outside the Goal’s scope block progress, investigate and fix them or use an evidence-backed workaround, preserving required checks and documenting what you changed.\n",
+                    "provenance": "refine-default-v1",
+                    "role": "quality",
+                    "scope": {
+                      "node_id": null
+                    }
+                  }
+                },
+                "contract_version": 1,
+                "key": "workflow.quality.enter:default-quality"
+              }
+            ]
+          },
+          "quality_skill_results": [
+            {
+              "artifacts": {
+                "report": "/home/buddy/projects/refine-next/.git/refine-audits/navigation-00000T146Y4H01X1WVV8STE000-20260912-quality/report.json"
+              },
+              "binding_id": "workflow.quality.enter:default-quality",
+              "evidence": [],
+              "invocation_id": "4155db45c43236fa41cfdbb0c5505e47586ead298e53c4819d0f1bbe9ea33a5f",
+              "outcome": "success",
+              "role": "quality",
+              "summary": "Goal-scoped Quality passes at 0a85e69c. Navigation is operational; 343 JavaScript tests and eight Rust navigation checks passed. Full Rust suite: 1,288 passed, eight failed, seven ignored. Parent comparison and isolated reruns support treating these as unrelated baseline/timing failures. No tests weakened or disabled; worktree clean."
+            }
+          ],
+          "quality_state": "passed",
+          "reporter": "Buddy Williams",
+          "rule_state": "passed",
+          "updated": "2026-09-12T19:53:28Z",
+          "workflow_attempt_authority": {
+            "claimed_at": "2026-09-12T19:29:50Z",
+            "generation": 36,
+            "round_idx": 0,
+            "workflow_revision": 125
+          },
+          "workflow_claim_history": [
+            {
+              "claimed_at": "2026-09-12T11:49:55Z",
+              "generation": 22,
+              "round_idx": 0,
+              "workflow_revision": 63
+            },
+            {
+              "claimed_at": "2026-09-12T13:42:20Z",
+              "generation": 27,
+              "round_idx": 0,
+              "workflow_revision": 85
+            },
+            {
+              "claimed_at": "2026-09-12T16:12:02Z",
+              "generation": 32,
+              "round_idx": 0,
+              "workflow_revision": 111
+            }
+          ],
+          "workflow_failure_occurrence": {
+            "generation": 40,
+            "round_idx": 0
+          },
+          "workflow_git_remote": "origin",
+          "workflow_reconciliation": null,
+          "workflow_recovery": null
+        },
+        {
+          "assignee": "Buddy Williams",
+          "created": "2026-09-12T11:40:50Z",
+          "failure_at": "",
+          "failure_category": "",
+          "failure_message": "",
+          "logs": [],
+          "prompt": "For the web UI surface, create two new main nav right-aligned dropdown buttons, one for Skills and one for Sites. The right-aligned button order should be Skills, Sites, Settings, and New Goal. Yes, that is a rename of Controls to Settings. Move the menus from Settings (formerly Controls) to the appropriate new menu for Sites and Skills. Add a separator to the new menus for New Skill, New Site, Manage Skills, and Manage Sites. Ensure you use the standardized styles and layout we already have in the app.",
+          "reporter": "Buddy Williams",
+          "updated": "2026-09-13T10:18:25Z",
+          "workflow_attempt_authority": {
+            "claimed_at": "2026-09-13T10:18:25Z",
+            "generation": 42,
+            "round_idx": 0,
+            "workflow_revision": 160
+          },
+          "workflow_claim_history": [
+            {
+              "claimed_at": "2026-09-12T11:49:55Z",
+              "generation": 22,
+              "round_idx": 0,
+              "workflow_revision": 63
+            },
+            {
+              "claimed_at": "2026-09-12T13:42:20Z",
+              "generation": 27,
+              "round_idx": 0,
+              "workflow_revision": 85
+            },
+            {
+              "claimed_at": "2026-09-12T16:12:02Z",
+              "generation": 32,
+              "round_idx": 0,
+              "workflow_revision": 111
+            },
+            {
+              "claimed_at": "2026-09-12T19:29:50Z",
+              "generation": 36,
+              "round_idx": 0,
+              "workflow_revision": 125
+            }
+          ],
+          "workflow_git_remote": "origin"
         }
       ],
-      "quality_state": "passed",
+      "prompt": "For the web UI surface, create two new main nav right-aligned dropdown buttons, one for Skills and one for Sites. The right-aligned button order should be Skills, Sites, Settings, and New Goal. Yes, that is a rename of Controls to Settings. Move the menus from Settings (formerly Controls) to the appropriate new menu for Sites and Skills. Add a separator to the new menus for New Skill, New Site, Manage Skills, and Manage Sites. Ensure you use the standardized styles and layout we already have in the app.",
       "reporter": "Buddy Williams",
-      "rule_state": "passed",
-      "updated": "2026-09-12T19:53:28Z",
+      "updated": "2026-09-13T10:18:27Z",
       "workflow_attempt_authority": {
-        "claimed_at": "2026-09-12T19:29:50Z",
-        "generation": 36,
+        "claimed_at": "2026-09-13T10:18:25Z",
+        "generation": 42,
         "round_idx": 0,
-        "workflow_revision": 125
+        "workflow_revision": 160
       },
       "workflow_claim_history": [
         {
@@ -2134,21 +2344,34 @@
           "generation": 32,
           "round_idx": 0,
           "workflow_revision": 111
+        },
+        {
+          "claimed_at": "2026-09-12T19:29:50Z",
+          "generation": 36,
+          "round_idx": 0,
+          "workflow_revision": 125
         }
       ],
-      "workflow_failure_occurrence": {
-        "generation": 40,
-        "round_idx": 0
-      },
       "workflow_git_remote": "origin",
-      "workflow_reconciliation": null,
-      "workflow_recovery": null
+      "workspace_branch": "refine/00000T146Y4H01X1WVV8STE000/round-1-execution-9de1f61f-c5fe-49b7-9885-957fa54e0b11",
+      "workspace_recoveries": [
+        {
+          "at": "2026-09-13T10:18:26Z",
+          "base": "4e7f1245a3170ee5ff1ba2e90dbc7c654dfff0b5",
+          "branch": "refine/00000T146Y4H01X1WVV8STE000/round-1",
+          "candidate": "0a85e69cd47b940e7f0e644d3b0a1290f90a0ebf",
+          "generation": 42,
+          "reason": "Generated workspace inputs are missing or inconsistent; reproduce the authored Round in a clean execution",
+          "step": "plan",
+          "target": "main"
+        }
+      ]
     }
   ],
-  "status": "failed",
+  "status": "plan",
   "target_branch": "main",
-  "updated": "2026-09-12T19:53:28Z",
-  "workflow_context": "",
+  "updated": "2026-09-13T10:18:27Z",
+  "workflow_context": "Reproduce the existing authored Round using the new workflow stability implementation. Preserve earlier work and reports as history; run the configured workflow checks on the replacement candidate.",
   "workflow_controls": [
     {
       "at": "2026-09-12T11:32:11Z",
@@ -2326,6 +2549,58 @@
       "source_round": 1,
       "stopped_processes": [],
       "to": "todo"
+    },
+    {
+      "at": "2026-09-13T10:18:24Z",
+      "decision": true,
+      "forced": false,
+      "from": "failed",
+      "generation": 42,
+      "integration_performed": false,
+      "integration_requested": false,
+      "overridden_requirements": [],
+      "previous_attempt": {
+        "claimed_at": "2026-09-12T19:29:50Z",
+        "generation": 36,
+        "round_idx": 0,
+        "workflow_revision": 125
+      },
+      "request": {
+        "actor": "codex",
+        "context": "Reproduce the existing authored Round using the new workflow stability implementation. Preserve earlier work and reports as history; run the configured workflow checks on the replacement candidate.",
+        "expected_revision": 159,
+        "force": false,
+        "invocation_id": null,
+        "reason": "Recover the reported stale lineage through shared workspace preparation",
+        "request_id": "workflow-stability-recovery-6c43b6b0-c041-41ec-b867-ec454050687e",
+        "to": "plan"
+      },
+      "request_id": "workflow-stability-recovery-6c43b6b0-c041-41ec-b867-ec454050687e",
+      "retained_candidate": "0a85e69cd47b940e7f0e644d3b0a1290f90a0ebf",
+      "source_round": 1,
+      "to": "plan"
+    },
+    {
+      "actor": "refine",
+      "at": "2026-09-13T10:18:26Z",
+      "decision": true,
+      "forced": false,
+      "from": "plan",
+      "reason": "Generated workspace inputs are missing or inconsistent; reproduce the authored Round in a clean execution",
+      "recovery": true,
+      "request": {
+        "actor": "refine",
+        "context": "",
+        "expected_revision": 161,
+        "force": false,
+        "invocation_id": null,
+        "reason": "Generated workspace inputs are missing or inconsistent; reproduce the authored Round in a clean execution",
+        "request_id": "5b243819-dd05-4a90-b29e-db5a8f2e5499",
+        "to": "plan"
+      },
+      "request_id": "5b243819-dd05-4a90-b29e-db5a8f2e5499",
+      "source_round": 1,
+      "to": "plan"
     }
   ],
   "workflow_events": [
@@ -2617,7 +2892,28 @@
       "round_idx": 0,
       "to": "failed",
       "workflow_revision": 159
+    },
+    {
+      "at": "2026-09-13T10:18:24.954085658+00:00",
+      "forced": false,
+      "from": "failed",
+      "generation": 42,
+      "node_id": "default",
+      "round_idx": 0,
+      "supersedes_execution": true,
+      "to": "plan",
+      "workflow_revision": 160
+    },
+    {
+      "at": "2026-09-13T10:18:26.398874363+00:00",
+      "from": "plan",
+      "generation": 43,
+      "node_id": "default",
+      "round_idx": 0,
+      "supersedes_execution": true,
+      "to": "plan",
+      "workflow_revision": 162
     }
   ],
-  "workflow_revision": 159
+  "workflow_revision": 164
 }
