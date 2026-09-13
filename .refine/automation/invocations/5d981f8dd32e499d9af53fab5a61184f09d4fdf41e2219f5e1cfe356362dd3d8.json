@@ -1,5 +1,5 @@
 {
-  "id": "875ba1836670e8871457f4bf6e7ddd2b2fcf8c446322bf885b2e36c01bf2125d",
+  "id": "5d981f8dd32e499d9af53fab5a61184f09d4fdf41e2219f5e1cfe356362dd3d8",
   "event": {
     "id": "node.startup.ready",
     "name": "Node Startup Ready",
@@ -55,9 +55,9 @@
       }
     },
     "metadata": {
-      "event_operation_id": "1a09a9618bf2137ff2",
+      "event_operation_id": "1a09a95d9782137ff0",
       "started_bindings": {
-        "trigger-2124c51c-8d1f-44b7-8a07-7a989a68227f": "2026-09-13T11:45:23.162274128+00:00"
+        "trigger-2124c51c-8d1f-44b7-8a07-7a989a68227f": "2026-09-13T11:45:06.964380197+00:00"
       }
     }
   },
@@ -101,11 +101,47 @@
       }
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
-  "created_at": "2026-09-13T11:02:23.667071100+00:00",
-  "completed_at": null,
+  "state": "error",
+  "results": {
+    "trigger-2124c51c-8d1f-44b7-8a07-7a989a68227f": {
+      "invocation_id": "5d981f8dd32e499d9af53fab5a61184f09d4fdf41e2219f5e1cfe356362dd3d8",
+      "binding_id": "trigger-2124c51c-8d1f-44b7-8a07-7a989a68227f",
+      "role": "task",
+      "outcome": "error",
+      "summary": "The supplied completion contract contains no invocation_id, so I could not construct the required request ID exactly. No child Skill was queued or configuration changed.",
+      "evidence": [],
+      "artifacts": null
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "trigger-2124c51c-8d1f-44b7-8a07-7a989a68227f",
+      "checkout": {
+        "observation": {
+          "branch": "main",
+          "head_commit": "45abde2177ce55c244aea26636ea13368af0f21c",
+          "status_porcelain": []
+        },
+        "tree": "bce3b102b36a52a78c3c1f81087b106cdaec825c"
+      },
+      "checkout_recorded": true,
+      "diagnostic": null,
+      "host_bound_result": true,
+      "observational_violation": false,
+      "operation_id": null,
+      "process_id": "proc-1789299907070-2177023-3",
+      "prompt_bytes": 2098,
+      "provider_session_id": null,
+      "purpose": "work",
+      "raw_output": "{\"outcome\":\"error\",\"summary\":\"The supplied completion contract contains no invocation_id, so I could not construct the required request ID exactly. No child Skill was queued or configuration changed.\"}",
+      "received_at": "2026-09-13T11:45:22.608980506+00:00",
+      "started_at": "2026-09-13T11:45:06.993103029+00:00",
+      "workflow_revision": null
+    }
+  ],
+  "created_at": "2026-09-13T11:45:06.089715725+00:00",
+  "completed_at": "2026-09-13T11:45:22.673362648+00:00",
   "error": null,
   "action_applied": false
 }

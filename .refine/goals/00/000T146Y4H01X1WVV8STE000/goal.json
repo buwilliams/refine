@@ -2728,12 +2728,12 @@
       ],
       "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "updated": "2026-09-13T11:01:49Z",
+      "updated": "2026-09-13T11:45:34Z",
       "workflow_attempt_authority": {
-        "claimed_at": "2026-09-13T10:18:25Z",
-        "generation": 42,
+        "claimed_at": "2026-09-13T11:45:34Z",
+        "generation": 46,
         "round_idx": 0,
-        "workflow_revision": 160
+        "workflow_revision": 193
       },
       "workflow_claim_history": [
         {
@@ -2759,6 +2759,54 @@
           "generation": 36,
           "round_idx": 0,
           "workflow_revision": 125
+        },
+        {
+          "claimed_at": "2026-09-13T10:18:25Z",
+          "generation": 42,
+          "round_idx": 0,
+          "workflow_revision": 160
+        },
+        {
+          "claimed_at": "2026-09-13T11:45:07Z",
+          "generation": 46,
+          "round_idx": 0,
+          "workflow_revision": 186
+        },
+        {
+          "claimed_at": "2026-09-13T11:45:10Z",
+          "generation": 46,
+          "round_idx": 0,
+          "workflow_revision": 187
+        },
+        {
+          "claimed_at": "2026-09-13T11:45:14Z",
+          "generation": 46,
+          "round_idx": 0,
+          "workflow_revision": 188
+        },
+        {
+          "claimed_at": "2026-09-13T11:45:18Z",
+          "generation": 46,
+          "round_idx": 0,
+          "workflow_revision": 189
+        },
+        {
+          "claimed_at": "2026-09-13T11:45:23Z",
+          "generation": 46,
+          "round_idx": 0,
+          "workflow_revision": 190
+        },
+        {
+          "claimed_at": "2026-09-13T11:45:27Z",
+          "generation": 46,
+          "round_idx": 0,
+          "workflow_revision": 191
+        },
+        {
+          "claimed_at": "2026-09-13T11:45:31Z",
+          "generation": 46,
+          "round_idx": 0,
+          "workflow_revision": 192
         }
       ],
       "workflow_git_remote": "origin",
@@ -2779,7 +2827,7 @@
   ],
   "status": "governance",
   "target_branch": "main",
-  "updated": "2026-09-13T11:01:49Z",
+  "updated": "2026-09-13T11:45:34Z",
   "workflow_context": "Reproduce the existing authored Round using the new workflow stability implementation. Preserve earlier work and reports as history; run the configured workflow checks on the replacement candidate.",
   "workflow_controls": [
     {
@@ -3354,5 +3402,5 @@
       "workflow_revision": 185
     }
   ],
-  "workflow_revision": 186
+  "workflow_revision": 194
 }
