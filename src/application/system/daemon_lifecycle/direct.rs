@@ -2,6 +2,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use crate::error::{RefineError, RefineResult};
+#[cfg(test)]
 use crate::infrastructure::process::subprocess::{
     FileProcessSupervisor, ProcessOwner, ProcessSupervisor,
 };
@@ -9,6 +10,10 @@ use crate::infrastructure::process::supervisor::lifecycle::{
     DaemonLifecycleEvidence, DaemonReachability, DaemonRuntimeService, DaemonStatus,
     FileDaemonLifecycleService, http_reachability_probe,
 };
+
+#[cfg(all(test, target_os = "linux"))]
+#[path = "direct_scope_tests.rs"]
+mod scope_tests;
 
 pub(super) fn stop_direct_daemon(
     lifecycle: &FileDaemonLifecycleService,
@@ -23,95 +28,7 @@ pub(super) fn stop_direct_daemon(
 }
 
 fn stop_direct_runtime(lifecycle: &FileDaemonLifecycleService, port: u16) -> RefineResult<()> {
-    let supervisor = FileProcessSupervisor::new(lifecycle.runtime_root.port_root(port));
-    let mut processes = supervisor.list()?;
-    processes.sort_by_key(|process| process.owner == ProcessOwner::Daemon);
-    let mut failures = Vec::new();
-    for process in processes {
-        let observed = match supervisor.wait(&process.id) {
-            Ok(observed) => observed,
-            Err(error) => {
-                failures.push(format!("failed to inspect process {}: {error}", process.id));
-                continue;
-            }
-        };
-        if observed.state != "running" {
-            continue;
-        }
-        if let Err(error) = supervisor.signal(&process.id, "terminate") {
-            failures.push(format!(
-                "failed to terminate process {}: {error}",
-                process.id
-            ));
-            continue;
-        }
-        // Poll until the process is actually gone: a fixed sleep per process
-        // made every stop pay its worst case regardless of how quickly the
-        // process died.
-        let still_running =
-            match wait_until_stopped(&supervisor, &process.id, DIRECT_STOP_TERMINATE_WAIT) {
-                Ok(still_running) => still_running,
-                Err(error) => {
-                    failures.push(format!(
-                        "failed to confirm process {} after terminate: {error}",
-                        process.id
-                    ));
-                    continue;
-                }
-            };
-        if !still_running {
-            continue;
-        }
-        if let Err(error) = supervisor.signal(&process.id, "kill") {
-            failures.push(format!("failed to kill process {}: {error}", process.id));
-            continue;
-        }
-        match wait_until_stopped(&supervisor, &process.id, DIRECT_STOP_KILL_WAIT) {
-            Ok(true) => failures.push(format!(
-                "process {} remained running after terminate and kill",
-                process.id
-            )),
-            Ok(false) => {}
-            Err(error) => failures.push(format!(
-                "failed to confirm process {} after kill: {error}",
-                process.id
-            )),
-        }
-    }
-    if failures.is_empty() {
-        Ok(())
-    } else {
-        Err(RefineError::Degraded(format!(
-            "direct daemon shutdown failed: {}",
-            failures.join("; ")
-        )))
-    }
-}
-
-const DIRECT_STOP_TERMINATE_WAIT: Duration = Duration::from_secs(2);
-const DIRECT_STOP_KILL_WAIT: Duration = Duration::from_secs(1);
-const DIRECT_STOP_POLL: Duration = Duration::from_millis(10);
-
-/// Returns whether the process is still running once the deadline passes;
-/// exits as soon as it stops.
-fn wait_until_stopped(
-    supervisor: &FileProcessSupervisor,
-    process_id: &str,
-    deadline: Duration,
-) -> RefineResult<bool> {
-    let started = Instant::now();
-    loop {
-        match supervisor.wait(process_id) {
-            Ok(observed) if observed.state == "running" => {}
-            Ok(_) => return Ok(false),
-            Err(RefineError::NotFound(_)) => return Ok(false),
-            Err(error) => return Err(error),
-        }
-        if started.elapsed() >= deadline {
-            return Ok(true);
-        }
-        thread::sleep(DIRECT_STOP_POLL);
-    }
+    lifecycle.stop_runtime_processes(port)
 }
 
 /// How long the post-stop probe may retry an ambiguous observation. A freshly

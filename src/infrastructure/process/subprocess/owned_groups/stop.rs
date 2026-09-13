@@ -61,25 +61,10 @@ impl FileProcessSupervisor {
         {
             group = quiesced.group.clone();
         }
-        // An escaped descendant can outlive the original group. Its identity does not
-        // authorize signalling a now-reused group number: require a witness in that group.
-        #[cfg(unix)]
-        if let Some(pgid) = group.pgid {
-            let mut witnessed_group = false;
-            for (pid, token) in &group.witnesses {
-                if os_process_identity(*pid)?.as_ref() == Some(token)
-                    && unsafe { libc::getpgid(*pid as i32) } == pgid as i32
-                {
-                    witnessed_group = true;
-                    break;
-                }
-            }
-            if witnessed_group && let Some(error) = signal_os_process(pgid, "kill", true)? {
-                return Err(RefineError::Degraded(error));
-            }
-        }
-        // A child may have created a new session. Witnessed descendants are still owned;
-        // recheck each OS identity before signalling outside the original group.
+        // Quiescence includes every workload descendant, even in a new session.
+        // Signal only those exact identities: nested scope guardians can share
+        // their launcher's process group and must survive to write exit proof.
+        // A group-wide signal would also kill the guardians excluded by observation.
         for (child, token) in &group.witnesses {
             if os_process_identity(*child)?.as_ref() == Some(token)
                 && let Some(error) = signal_os_process(*child, "kill", false)?

@@ -204,7 +204,7 @@ pub(super) fn io_error(error: std::io::Error) -> RefineError {
     RefineError::Io(format!("ownership launch handshake: {error}"))
 }
 impl LaunchScope {
-    fn read_proof(&self, group: &OwnedGroup) -> RefineResult<Vec<u8>> {
+    pub(super) fn read_proof(&self, group: &OwnedGroup) -> RefineResult<Vec<u8>> {
         if self.guardian_identity.is_none()
             || self.proof_path.parent() != Some(group.runtime_root.join("owned-scopes").as_path())
             || !self
@@ -302,6 +302,7 @@ impl LaunchScope {
             confirmed_exit: false,
             ownership_gap: None,
             launch_scope: Some(self.clone()),
+            enclosing_scope_exit: None,
         };
         let bytes = self.read_proof(&group)?;
         Ok((bytes.len() >= 8).then(|| {

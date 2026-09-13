@@ -16,6 +16,8 @@ use crate::infrastructure::process::supervisor::operations::{
 };
 use crate::infrastructure::process::supervisor::runtime::RuntimeRoot;
 
+mod runtime_stop;
+
 pub const DAEMON_STATUS_FILE: &str = "daemon-status.json";
 pub const DAEMON_STARTUP_PROGRESS_FILE: &str = "daemon-startup-progress";
 /// How long startup may go without observable progress before it is called a
@@ -612,30 +614,7 @@ fn relay_daemon_startup_output(path: Option<&str>, offset: &mut usize) -> bool {
 
 impl DaemonRuntimeService for FileDaemonLifecycleService {
     fn stop_runtime(&self, port: u16) -> RefineResult<DaemonStatus> {
-        let port_root = self.runtime_root.port_root(port);
-        for process_root in [port_root.join("agents"), port_root.clone()] {
-            let supervisor = FileProcessSupervisor::new(process_root);
-            for process in supervisor
-                .list()?
-                .into_iter()
-                .filter(|process| process.owner != ProcessOwner::Daemon)
-            {
-                let process = supervisor.wait(&process.id)?;
-                if process.state == "running" {
-                    let _ = supervisor.signal(&process.id, "kill");
-                }
-            }
-        }
-        let supervisor = FileProcessSupervisor::new(&port_root);
-        let processes = supervisor.list()?;
-        for process in processes {
-            if process.owner == ProcessOwner::Daemon {
-                let process = supervisor.wait(&process.id)?;
-                if process.state == "running" {
-                    let _ = supervisor.signal(&process.id, "kill");
-                }
-            }
-        }
+        self.stop_runtime_processes(port)?;
         let mut status = self
             .read_status(port)
             .unwrap_or_else(|_| stopped_status(port, vec!["daemon-status-missing".to_string()]));

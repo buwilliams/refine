@@ -33,10 +33,54 @@ fn wait_tick(root: &Path, process: &ManagedProcess) -> SchedulerObservation {
 fn stop_all(root: &Path) {
     let supervisor = FileProcessSupervisor::new(root);
     for group in supervisor.owned_groups().unwrap() {
-        supervisor
-            .stop_owned_group(&group, Duration::from_secs(2))
-            .unwrap();
+        assert!(
+            supervisor
+                .stop_owned_group(&group, Duration::from_secs(2))
+                .unwrap()
+                .confirmed_exit
+        );
+        wait_for_fixture_retirement(&supervisor, &group.process);
     }
+}
+
+fn wait_for_fixture_retirement(
+    supervisor: &FileProcessSupervisor,
+    process: &ManagedProcess,
+) -> ManagedProcess {
+    // Scope exit precedes asynchronous archival. Registration removal follows
+    // the reaper's writes, so observe it before removing the fixture directory.
+    let registration = supervisor
+        .processes_dir()
+        .join(format!("{}.json", process.id));
+    let deadline = Instant::now() + Duration::from_secs(2);
+    loop {
+        match std::fs::metadata(&registration) {
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => break,
+            Err(error) => panic!("could not observe fixture retirement: {error}"),
+            Ok(_) => {}
+        }
+        assert!(
+            Instant::now() < deadline,
+            "fixture reaper did not retire registration {}",
+            process.id
+        );
+        thread::sleep(Duration::from_millis(5));
+    }
+    let terminal: ManagedProcess = serde_json::from_slice(
+        &std::fs::read(
+            supervisor
+                .process_history_dir()
+                .join(format!("{}.json", process.id)),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(terminal.id, process.id);
+    assert_eq!(terminal.pid, process.pid);
+    assert_eq!(terminal.started_at, process.started_at);
+    assert_eq!(terminal.owner, process.owner);
+    assert_ne!(terminal.state, "running");
+    terminal
 }
 fn launch(root: &Path, token: &str, command: &str, args: &[&str], worker: bool) -> ManagedProcess {
     FileProcessSupervisor::new(root).launch(ManagedProcessSpec { owner: if worker { ProcessOwner::Runner } else { ProcessOwner::Maintenance },
@@ -362,35 +406,7 @@ fn termination_failure_and_launch_contention_preserve_worker_and_evidence() {
             .unwrap()
             .confirmed_exit
     );
-    // Scope exit precedes the launcher's asynchronous terminal archive. Its
-    // active registration is removed after those writes, so wait for retirement
-    // before deleting a directory that the reaper still owns.
-    let registration = supervisor
-        .processes_dir()
-        .join(format!("{}.json", worker.id));
-    let deadline = Instant::now() + Duration::from_secs(2);
-    loop {
-        match std::fs::metadata(&registration) {
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => break,
-            Err(error) => panic!("could not observe fixture retirement: {error}"),
-            Ok(_) => {}
-        }
-        assert!(
-            Instant::now() < deadline,
-            "fixture reaper did not retire its registration"
-        );
-        thread::sleep(Duration::from_millis(5));
-    }
-    let terminal: ManagedProcess = serde_json::from_slice(
-        &std::fs::read(
-            supervisor
-                .process_history_dir()
-                .join(format!("{}.json", worker.id)),
-        )
-        .unwrap(),
-    )
-    .unwrap();
-    assert_eq!(terminal.id, worker.id);
+    let terminal = wait_for_fixture_retirement(&supervisor, &worker);
     assert_eq!(terminal.state, "failed");
     std::fs::remove_dir_all(root.parent().unwrap().parent().unwrap()).unwrap();
 }
@@ -497,6 +513,7 @@ fn recovery_checks_unobserved_descendants_after_parent_reaping_and_registration_
                 assert_eq!(operations.status(&operation.id).unwrap(), operation);
             }
             drop(fixture);
+            wait_for_fixture_retirement(&supervisor, &worker);
             std::fs::remove_dir_all(root.parent().unwrap().parent().unwrap()).unwrap();
         }
     }
@@ -556,6 +573,7 @@ fn ticking_worker_with_stalled_admission_cycle_enters_bounded_recovery() {
     assert_eq!(record["stopped"], true);
     assert_eq!(record["pending"], true);
     assert!(!FileProcessSupervisor::process_is_alive(&worker).unwrap());
+    stop_all(&root);
     std::fs::remove_dir_all(root).unwrap();
 }
 

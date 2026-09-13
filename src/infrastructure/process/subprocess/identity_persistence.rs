@@ -89,6 +89,18 @@ pub(super) fn new_process_id() -> String {
     )
 }
 
+/// The launcher's PID is part of the original registration ID, not a later observation.
+pub(super) fn registered_launcher_pid(id: &str) -> Option<u32> {
+    let mut parts = id.split('-');
+    if parts.next()? != "proc" {
+        return None;
+    }
+    parts.next()?.parse::<u128>().ok()?;
+    let launcher = parts.next()?.parse::<u32>().ok()?;
+    parts.next()?.parse::<u64>().ok()?;
+    (parts.next().is_none() && launcher > 1).then_some(launcher)
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) enum OwnedProcessState {
     Alive,

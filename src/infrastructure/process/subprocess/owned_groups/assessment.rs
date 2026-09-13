@@ -35,7 +35,7 @@ impl FileProcessSupervisor {
 
     pub(super) fn assess_group_members(
         &self,
-        group: &OwnedGroup,
+        group: &mut OwnedGroup,
     ) -> RefineResult<(OwnershipAssessment, BTreeMap<u32, String>)> {
         if self.runtime_root.canonicalize().ok().as_ref() != Some(&group.runtime_root) {
             return Err(RefineError::Conflict("owned group runtime changed".into()));
@@ -53,6 +53,9 @@ impl FileProcessSupervisor {
                 } else if scope.proof(group)? {
                     // The guardian can publish its receipt between probes.
                     return Ok((OwnershipAssessment::Exited, BTreeMap::new()));
+                } else if let Some(evidence) = self.enclosing_scope_exit_evidence(group)? {
+                    group.enclosing_scope_exit = Some(evidence);
+                    return Ok((OwnershipAssessment::Exited, BTreeMap::new()));
                 } else {
                     Some("launch ownership guardian disappeared without complete exit proof".into())
                 }
@@ -61,6 +64,10 @@ impl FileProcessSupervisor {
         };
         #[cfg(not(target_os = "linux"))]
         let gap = Some("complete ownership inspection is unavailable on this platform".into());
+        #[cfg(target_os = "linux")]
+        {
+            group.enclosing_scope_exit = None;
+        }
         let members = if group.pgid.is_none() && gap.is_some() {
             BTreeMap::new()
         } else {

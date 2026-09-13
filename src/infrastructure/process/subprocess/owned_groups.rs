@@ -13,6 +13,8 @@ mod scope_guardian;
 pub use scope_guardian::run_if_requested as run_scope_guardian_if_requested;
 mod assessment;
 mod recovery;
+#[cfg(target_os = "linux")]
+pub use recovery::EnclosingScopeExit;
 mod stop;
 pub use assessment::OwnershipAssessment;
 #[cfg(all(test, target_os = "linux"))]
@@ -36,6 +38,10 @@ pub struct OwnedGroup {
     #[cfg(target_os = "linux")]
     #[serde(default)]
     pub launch_scope: Option<launch_scope::LaunchScope>,
+    /// Diagnostic provenance only; assessment revalidates the original enclosing receipt.
+    #[cfg(target_os = "linux")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub enclosing_scope_exit: Option<EnclosingScopeExit>,
 }
 
 impl FileProcessSupervisor {
@@ -91,6 +97,8 @@ impl FileProcessSupervisor {
                 .map(serde_json::from_value)
                 .transpose()
                 .map_err(|e| RefineError::Serialization(e.to_string()))?,
+            #[cfg(target_os = "linux")]
+            enclosing_scope_exit: None,
         };
         self.write_owned_group(&group)
     }
@@ -261,6 +269,10 @@ impl FileProcessSupervisor {
         expected.witnesses.extend(latest.witnesses.clone());
         expected.ownership_gap = latest.ownership_gap.clone().or(expected.ownership_gap);
         #[cfg(target_os = "linux")]
+        {
+            expected.enclosing_scope_exit = latest.enclosing_scope_exit.clone();
+        }
+        #[cfg(target_os = "linux")]
         if expected.launch_scope != latest.launch_scope {
             return Err(RefineError::Conflict(
                 "owned group launch scope changed".into(),
@@ -292,7 +304,7 @@ impl FileProcessSupervisor {
                 "owned group registration was replaced".into(),
             ));
         }
-        let (assessment, members) = self.assess_group_members(&expected)?;
+        let (assessment, members) = self.assess_group_members(&mut expected)?;
         let mut group = expected.clone();
         group.confirmed_exit = matches!(assessment, OwnershipAssessment::Exited);
         group.ownership_gap = match assessment {
@@ -301,7 +313,12 @@ impl FileProcessSupervisor {
         };
         // Retain every identity witness: disappearance cannot erase an earlier coverage gap.
         group.witnesses.extend(members);
-        if group.witnesses != latest.witnesses
+        #[cfg(target_os = "linux")]
+        let recovery_changed = group.enclosing_scope_exit != latest.enclosing_scope_exit;
+        #[cfg(not(target_os = "linux"))]
+        let recovery_changed = false;
+        if recovery_changed
+            || group.witnesses != latest.witnesses
             || group.ownership_gap != latest.ownership_gap
             || group.confirmed_exit != latest.confirmed_exit
         {
@@ -321,6 +338,12 @@ fn group_members(group: &OwnedGroup) -> RefineResult<BTreeMap<u32, String>> {
                 "isolated process group evidence unavailable; exit cannot be proved".into(),
             )
         })?;
+    // Snapshot registered guardian identities before observing the process tree.
+    // Guardians can outlive a killed parent in its old process group while the
+    // kernel reparents them. They remain ancestry links, not workload evidence
+    // that the old group ID has been reused by an unrelated process.
+    let registered_guardians = registered_scope_guardians(group)?;
+    let mut guardians = BTreeSet::new();
     let mut tree = BTreeMap::new();
     for entry in fs::read_dir("/proc").map_err(|e| RefineError::Io(e.to_string()))? {
         let entry = entry.map_err(|e| RefineError::Io(e.to_string()))?;
@@ -364,10 +387,17 @@ fn group_members(group: &OwnedGroup) -> RefineResult<BTreeMap<u32, String>> {
     let mut group_present = false;
     let mut group_witnessed = false;
     for (pid, (_, process_group)) in &tree {
-        let witnessed = match group.witnesses.get(pid) {
-            Some(token) => os_process_identity(*pid)?.as_ref() == Some(token),
-            None => false,
+        if *process_group != pgid && !group.witnesses.contains_key(pid) {
+            continue;
+        }
+        let Some(token) = os_process_identity(*pid)? else {
+            continue;
         };
+        if scope_guardian_for_identity(*pid, &token, &registered_guardians)? {
+            guardians.insert(*pid);
+            continue;
+        }
+        let witnessed = group.witnesses.get(pid) == Some(&token);
         if *process_group == pgid {
             group_present = true;
             group_witnessed |= witnessed;
@@ -383,7 +413,7 @@ fn group_members(group: &OwnedGroup) -> RefineResult<BTreeMap<u32, String>> {
         if scope.alive()? {
             group_witnessed = tree
                 .iter()
-                .filter(|(_, (_, pg))| *pg == pgid)
+                .filter(|(pid, (_, pg))| *pg == pgid && !guardians.contains(pid))
                 .all(|(pid, _)| {
                     let mut cursor = *pid;
                     let mut seen = BTreeSet::new();
@@ -422,11 +452,13 @@ fn group_members(group: &OwnedGroup) -> RefineResult<BTreeMap<u32, String>> {
             .launch_scope
             .as_ref()
             .is_some_and(|s| s.guardian_pid == pid)
-            || is_scope_guardian(group, pid)
+            || guardians.contains(&pid)
         {
             continue;
         }
-        if let Some(token) = os_process_identity(pid)? {
+        if let Some(token) = os_process_identity(pid)?
+            && !scope_guardian_for_identity(pid, &token, &registered_guardians)?
+        {
             members.insert(pid, token);
         }
     }
@@ -447,7 +479,7 @@ fn requires_ownership(details: &str) -> bool {
         })
 }
 #[cfg(target_os = "linux")]
-fn is_scope_guardian(group: &OwnedGroup, pid: u32) -> bool {
+fn registered_scope_guardians(group: &OwnedGroup) -> RefineResult<BTreeMap<u32, BTreeSet<String>>> {
     let root = if group
         .runtime_root
         .file_name()
@@ -457,18 +489,79 @@ fn is_scope_guardian(group: &OwnedGroup, pid: u32) -> bool {
     } else {
         &group.runtime_root
     };
-    [root.to_path_buf(), root.join("agents")]
-        .into_iter()
-        .any(|root| {
-            FileProcessSupervisor::new(root)
-                .owned_groups()
-                .is_ok_and(|groups| {
-                    groups.into_iter().any(|g| {
-                        g.launch_scope
-                            .is_some_and(|s| s.guardian_pid == pid && s.alive().unwrap_or(false))
-                    })
-                })
-        })
+    let mut guardians: BTreeMap<u32, BTreeSet<String>> = BTreeMap::new();
+    for root in [root.to_path_buf(), root.join("agents")] {
+        // Maintenance reports damaged records independently. A corrupt sibling
+        // must not prevent this valid scope's deadline from being enforced.
+        for registered in FileProcessSupervisor::new(root)
+            .owned_group_observations()?
+            .into_iter()
+            .flatten()
+        {
+            if let Some(scope) = registered.launch_scope
+                && let Some(identity) = scope.guardian_identity
+            {
+                guardians
+                    .entry(scope.guardian_pid)
+                    .or_default()
+                    .insert(identity);
+            }
+        }
+    }
+    Ok(guardians)
+}
+
+#[cfg(target_os = "linux")]
+fn scope_guardian_for_identity(
+    pid: u32,
+    identity: &str,
+    registered: &BTreeMap<u32, BTreeSet<String>>,
+) -> RefineResult<bool> {
+    if registered
+        .get(&pid)
+        .is_some_and(|identities| identities.contains(identity))
+    {
+        return Ok(true);
+    }
+    // An unregistered or damaged-record guardian still has its kernel argv.
+    // This bounded probe only prevents signalling a helper; it can never prove
+    // exit, release capacity, or establish ownership of another process.
+    let path = PathBuf::from(format!("/proc/{pid}/cmdline"));
+    let mut bytes = Vec::new();
+    match fs::File::open(&path) {
+        Ok(file) => file.take(4096).read_to_end(&mut bytes).map_err(|e| {
+            RefineError::Io(format!("cannot inspect candidate guardian {pid}: {e}"))
+        })?,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+        Err(e) => {
+            return Err(RefineError::Io(format!(
+                "cannot inspect candidate guardian {pid}: {e}"
+            )));
+        }
+    };
+    match os_process_identity(pid)? {
+        None => return Ok(false),
+        Some(current) if current == identity => {}
+        Some(_) => {
+            return Err(RefineError::Conflict(format!(
+                "candidate guardian {pid} identity changed during inspection"
+            )));
+        }
+    }
+    let mut args = bytes.split(|byte| *byte == 0);
+    let _program = args.next();
+    let Some(role_flag) = args.next() else {
+        return Err(RefineError::Degraded(format!(
+            "candidate guardian {pid} command line is unavailable"
+        )));
+    };
+    if role_flag != b"--refine-owned-scope" {
+        return Ok(false);
+    }
+    Ok(matches!(
+        args.next(),
+        Some(b"guardian" | b"guardian-socket")
+    ))
 }
 
 fn ownership_incarnation(process: &ManagedProcess) -> Option<String> {

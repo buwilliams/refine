@@ -39,7 +39,12 @@ pub(crate) fn run_service_managed_daemon_with(
     if !matches!(probe(port), DaemonReachability::Reachable) {
         lifecycle.begin_start(port)?;
     }
-    if let Err(error) = control() {
+    let control_result = if action == InstalledServiceAction::Restart {
+        lifecycle.with_runtime_workers_stopped(port, &mut control)
+    } else {
+        control()
+    };
+    if let Err(error) = control_result {
         let observation = probe(port);
         persist_managed_command_failure(
             lifecycle,
@@ -142,7 +147,9 @@ pub(crate) fn stop_service_managed_daemon_with(
     mut control: impl FnMut() -> RefineResult<()>,
     mut probe: impl FnMut(u16) -> DaemonReachability,
 ) -> RefineResult<DaemonStatus> {
-    if let Err(error) = control() {
+    // The lease drops before post-control probes and stop_runtime cleanup, which
+    // acquire the same shared shutdown owner independently.
+    if let Err(error) = lifecycle.with_runtime_workers_stopped(port, &mut control) {
         let observation = probe(port);
         let (outcome, readiness_error, observed_reachable, recovery) = match observation {
             DaemonReachability::Reachable => (
