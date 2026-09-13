@@ -449,3 +449,7 @@
 }
 .round-failure-reason { font-size: 1.05rem; font-weight: 600; line-height: 1.6; }
 .round-recorded-error { font-size: .875rem; line-height: 1.6; }
+
+.round-step-activity { margin-top: 24px; }
+.round-step-artifact + .round-step-artifact, .round-step-result + .round-step-result { margin-top: 24px; }
+.round-step-result > h4 { margin-top: 16px; }

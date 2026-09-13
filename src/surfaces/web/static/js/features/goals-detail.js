@@ -13,6 +13,7 @@ async function renderGoalDetail(r) {
 let _goalModalRoot = null;
 let _goalRoundFormDraft = null;
 const _goalRoundTabs = new Map();
+const GOAL_AUTOMATED_STEPS = ["plan", "implement", "quality", "governance"];
 // The goal and workflow most recently drawn. The detail controls are bound once
 // and outlive the render that bound them, so they resolve the goal and its
 // available transitions through here instead of closing over one render's values
@@ -439,12 +440,12 @@ function bindGoalDetailControls() {
     const select = (target, focus = false) => {
       const body = target.closest(".round-body");
       _goalRoundTabs.set(body.dataset.roundTabKey, target.dataset.roundTab);
-      body.querySelectorAll("[role=tab]").forEach(button => {
+      body.querySelectorAll(".round-tabs > [role=tab]").forEach(button => {
         const active = button === target;
         button.setAttribute("aria-selected", String(active));
         button.tabIndex = active ? 0 : -1;
       });
-      body.querySelectorAll("[role=tabpanel]").forEach(panel => {
+      body.querySelectorAll("[data-round-panel]").forEach(panel => {
         panel.hidden = panel.dataset.roundPanel !== target.dataset.roundTab;
       });
       if (focus) target.focus();
@@ -873,7 +874,7 @@ function renderImplementationChecklist(items, implementation) {
 
 function renderImplementationPlan(rnd, idx, prevPlanHistoryOpen = {}) {
   const plan = rnd?.implementation_plan;
-  const recordedPlans = Object.values(rnd?.event_results || {})
+  const recordedPlans = roundStepEvents(rnd, "plan").map(record => record.event)
     .sort((a, b) => (b.generation || 0) - (a.generation || 0))
     .map(event => Object.values(event.results || {}).filter(result =>
       result.role === "plan" && result.outcome === "success" && result.summary))
@@ -917,15 +918,12 @@ function renderRound(rnd, idx, isLatest, prevRoundOpen = {}, prevPlanHistoryOpen
   const roundOpen = key in prevRoundOpen ? prevRoundOpen[key] : isLatest;
   const plan = renderImplementationPlan(rnd, idx, prevPlanHistoryOpen);
   const tabKey = JSON.stringify([goal.id || "", goal.round_edit_revision || 0, rnd.created || "", idx]);
-  const selected = _goalRoundTabs.get(tabKey) || (plan ? "plan" : "request");
+  const savedTab = _goalRoundTabs.get(tabKey);
+  const selected = savedTab === "report" ? "implement" : savedTab || (plan ? "plan" : "request");
   const panels = {
     request: `<div class="round-request" data-testid="goal-round-detail-prompt">${htmlEscape(rnd.prompt || "")}</div>`,
-    plan: plan || `<p class="muted">No plan has been recorded for this Round yet.</p>`,
-    report: rnd.implementation_report ? `<section class="implementation-report" data-testid="goal-implementation-report">
-      <h4>Implementation report</h4>
-      ${rnd.implementation_reported_at ? `<p class="muted small" data-testid="goal-implementation-reported-at">${fmtTime(rnd.implementation_reported_at)}</p>` : ""}
-      <div class="round-report-text" data-testid="goal-implementation-report-body">${htmlEscape(rnd.implementation_report)}</div>
-    </section>` : `<p class="muted">No implementation report has been recorded for this Round yet.</p>`,
+    ...Object.fromEntries(GOAL_AUTOMATED_STEPS.map(step => [step,
+      renderRoundStep(rnd, idx, step, goal, prevPlanHistoryOpen)])),
     activity: renderRoundHistory(goal, rnd, idx, isLatest),
   };
   return `
@@ -953,6 +951,131 @@ function renderRound(rnd, idx, isLatest, prevRoundOpen = {}, prevPlanHistoryOpen
   `;
 }
 
+// The recorded Event source identifies the workflow step, independently of the
+// Skill role (for example, Quality can run while Governance refreshes a candidate).
+function goalWorkflowStep(value) {
+  const text = String(value || "").toLowerCase();
+  const step = text.match(/^workflow\.([a-z]+)\./)?.[1] || text;
+  return GOAL_AUTOMATED_STEPS.includes(step) ? step : null;
+}
+
+function roundEvidenceSources(round) {
+  const sources = [];
+  const visit = (record, history = "") => {
+    if (!record || typeof record !== "object") return;
+    sources.push({ record, history });
+    if (record.workflow_candidate_refresh?.previous_gate_evidence) {
+      sources.push({ record: record.workflow_candidate_refresh.previous_gate_evidence,
+        history: "Before candidate refresh" });
+    }
+    // Retry snapshots belong to this authored Round. They remain historical
+    // artifacts, never a substitute for the current candidate's verdict.
+    (record.prior_attempts || []).slice().reverse().forEach(previous => visit(previous, "Previous execution"));
+  };
+  visit(round);
+  return sources;
+}
+
+function roundStepEvents(round, step) {
+  const seen = new Set();
+  const records = [];
+  for (const { record, history } of roundEvidenceSources(round)) {
+    for (const [id, event] of Object.entries(record.event_results || {})) {
+      const key = JSON.stringify([id, event.generation]);
+      if (seen.has(key)) continue;
+      // Older receipts recorded only Skill roles. Use those only when the
+      // workflow source is absent; an explicit source always takes precedence.
+      const results = Object.fromEntries(Object.entries(event.results || {})
+        .filter(([, result]) => result.role === step));
+      if (event.source ? goalWorkflowStep(event.source) !== step : !Object.keys(results).length) continue;
+      seen.add(key);
+      records.push({ id, event: event.source ? event : { ...event, results }, history });
+    }
+  }
+  return records.sort((a, b) => (b.event.generation || 0) - (a.event.generation || 0));
+}
+
+function renderRoundStepArtifacts(round, idx, step, prevPlanHistoryOpen = {}) {
+  const label = step[0].toUpperCase() + step.slice(1);
+  const events = roundStepEvents(round, step);
+  const legacy = roundEvidenceSources(round).find(({ record }) =>
+    step === "plan" ? record.implementation_plan
+      : step === "implement" ? record.implementation_report
+      : step === "quality" ? record.quality_state && record.quality_state !== "unclassified"
+      : renderGovernanceSummary(record));
+  let output = events.map(({ event, history }) => `<section class="round-step-artifact" data-testid="goal-step-artifact">
+    <h4>${htmlEscape(label)} results${history ? ` · ${htmlEscape(history)}` : ""}</h4>
+    <p class="muted small">${htmlEscape(event.source || "Legacy Skill results")} · ${htmlEscape(event.state || "recorded")}${event.candidate_commit ? ` · candidate <code>${htmlEscape(event.candidate_commit)}</code>` : ""}</p>
+    ${Object.values(event.results || {}).map(result => `<div class="round-step-result">
+      <p class="muted small">${htmlEscape(result.binding_id || result.role || "Skill")} · ${htmlEscape(result.outcome || "recorded")}</p>
+      ${result.summary ? `<div class="round-report-text"${step === "plan" ? ' data-testid="goal-implementation-plan-summary"' : ""}>${htmlEscape(result.summary)}</div>` : ""}
+      ${result.evidence?.length ? `<h4>Evidence</h4><ul>${result.evidence.map(item => `<li>${htmlEscape(diagnosticDetailsText(item))}</li>`).join("")}</ul>` : ""}
+      ${result.artifacts && Object.keys(result.artifacts).length ? `<h4>Artifacts</h4><pre class="round-evidence">${htmlEscape(diagnosticDetailsText(result.artifacts))}</pre>` : ""}
+    </div>`).join("")}
+  </section>`).join("");
+  // Legacy reports are still useful for rounds predating Skill result records.
+  if (legacy && (!events.length || !legacy.history)) {
+    const { record, history } = legacy;
+    output = `${history ? `<p class="muted small">${htmlEscape(history)}</p>` : ""}` + (
+      step === "plan" ? renderImplementationPlan({ implementation_plan: record.implementation_plan }, idx, prevPlanHistoryOpen)
+        : step === "implement" ? `<section class="implementation-report" data-testid="goal-implementation-report"><h4>Implementation report</h4>
+          ${record.implementation_reported_at ? `<p class="muted small" data-testid="goal-implementation-reported-at">${fmtTime(record.implementation_reported_at)}</p>` : ""}
+          <div class="round-report-text" data-testid="goal-implementation-report-body">${htmlEscape(record.implementation_report)}</div></section>`
+        : step === "quality" ? renderQualitySummary(record) : renderGovernanceSummary(record)) + output;
+  }
+  return output || `<p class="muted">No ${label} artifacts have been recorded for this Round yet.</p>`;
+}
+
+function roundStepLogs(round, step, controls = []) {
+  let current = null;
+  let intervalKnown = false;
+  const selected = [];
+  const timeline = [
+    ...controls.filter(control => control.at && control.to).map(control => ({ at: control.at, control })),
+    ...(round.logs || []).map(log => ({ at: log.datetime || "", log })),
+  ].sort((a, b) => (Date.parse(a.at) || 0) - (Date.parse(b.at) || 0));
+  for (const entry of timeline) {
+    if (entry.control) {
+      current = goalWorkflowStep(entry.control.to);
+      intervalKnown = true;
+      continue;
+    }
+    const log = entry.log;
+    const details = log.details && typeof log.details === "object" ? log.details : {};
+    const transition = log.category === "state"
+      ? String(log.message || "").match(/^Workflow status changed: ([a-z-]+) -> ([a-z-]+)$/) : null;
+    if (transition) {
+      current = goalWorkflowStep(transition[2]);
+      intervalKnown = true;
+      if (goalWorkflowStep(transition[1]) === step || current === step) selected.push(log);
+      continue;
+    }
+    const explicit = goalWorkflowStep(details.workflow_state) || goalWorkflowStep(details.workflow_step)
+      || goalWorkflowStep(details.source) || goalWorkflowStep(details.status);
+    if (log.category === "workflow" && details.status) {
+      current = goalWorkflowStep(details.status);
+      intervalKnown = true;
+    }
+    const category = goalWorkflowStep(log.category) || (String(log.category || "").startsWith("governance_") ? "governance" : null);
+    if ((explicit || (intervalKnown ? current : category)) === step) selected.push(log);
+  }
+  return selected;
+}
+
+function renderRoundLogEntries(logs, empty = "No log entries recorded for this Round.") {
+  return logs.length ? `<section class="round-log" data-testid="goal-round-log"><h3>Event history</h3>${logs.map(log => `<div class="round-log-entry"><div class="muted small">${htmlEscape(log.datetime || "")} · ${htmlEscape(log.severity || "info")}${log.category ? ` · ${htmlEscape(log.category)}` : ""}</div><div>${htmlEscape(log.message || "")}</div>${log.details ? `<pre class="round-evidence">${htmlEscape(diagnosticDetailsText(log.details))}</pre>` : ""}</div>`).join("")}</section>` : `<p class="muted small">${htmlEscape(empty)}</p>`;
+}
+
+function renderRoundStep(round, idx, step, goal = {}, prevPlanHistoryOpen = {}) {
+  const label = step[0].toUpperCase() + step.slice(1);
+  return `<div class="round-step" data-workflow-step="${step}">
+    <section class="round-step-artifacts" aria-label="${label} artifacts">${renderRoundStepArtifacts(round, idx, step, prevPlanHistoryOpen)}</section>
+    <section class="round-step-activity" aria-label="${label} activity"><h3>Activity</h3>
+      ${renderRoundLogEntries(roundStepLogs(round, step, (goal.workflow_controls || []).filter(control => control.source_round === idx + 1)), `No ${label} activity has been recorded for this Round yet.`)}
+    </section>
+  </div>`;
+}
+
 function renderRoundHistory(goal, round, idx, isLatest) {
   const logs = round.logs || [];
   const errors = logs.filter(log => log.severity === "error");
@@ -967,7 +1090,7 @@ function renderRoundHistory(goal, round, idx, isLatest) {
     ${renderQualitySummary(round)}
     ${renderGovernanceSummary(round)}
     ${typeof renderWorkflowOutcome === "function" ? renderWorkflowOutcome(roundGoal) : ""}
-    ${logs.length ? `<section class="round-log" data-testid="goal-round-log"><h3>Event history</h3>${logs.map(log => `<div class="round-log-entry"><div class="muted small">${htmlEscape(log.datetime || "")} · ${htmlEscape(log.severity || "info")}${log.category ? ` · ${htmlEscape(log.category)}` : ""}</div><div>${htmlEscape(log.message || "")}</div>${log.details ? `<pre class="round-evidence">${htmlEscape(diagnosticDetailsText(log.details))}</pre>` : ""}</div>`).join("")}</section>` : `<p class="muted small">No log entries recorded for this Round.</p>`}
+    ${renderRoundLogEntries(logs)}
   </div>`;
 }
 
