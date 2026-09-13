@@ -356,9 +356,42 @@ fn termination_failure_and_launch_contention_preserve_worker_and_evidence() {
         serde_json::from_str(group.process.details.as_deref().unwrap()).unwrap();
     details["test_termination_failure"] = json!(false);
     group.process.details = Some(details.to_string());
-    supervisor
-        .stop_owned_group(&group, Duration::from_secs(2))
-        .unwrap();
+    assert!(
+        supervisor
+            .stop_owned_group(&group, Duration::from_secs(2))
+            .unwrap()
+            .confirmed_exit
+    );
+    // Scope exit precedes the launcher's asynchronous terminal archive. Its
+    // active registration is removed after those writes, so wait for retirement
+    // before deleting a directory that the reaper still owns.
+    let registration = supervisor
+        .processes_dir()
+        .join(format!("{}.json", worker.id));
+    let deadline = Instant::now() + Duration::from_secs(2);
+    loop {
+        match std::fs::metadata(&registration) {
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => break,
+            Err(error) => panic!("could not observe fixture retirement: {error}"),
+            Ok(_) => {}
+        }
+        assert!(
+            Instant::now() < deadline,
+            "fixture reaper did not retire its registration"
+        );
+        thread::sleep(Duration::from_millis(5));
+    }
+    let terminal: ManagedProcess = serde_json::from_slice(
+        &std::fs::read(
+            supervisor
+                .process_history_dir()
+                .join(format!("{}.json", worker.id)),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(terminal.id, worker.id);
+    assert_eq!(terminal.state, "failed");
     std::fs::remove_dir_all(root.parent().unwrap().parent().unwrap()).unwrap();
 }
 
