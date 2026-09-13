@@ -1,8 +1,7 @@
-//! Interrupted workflow attempts preserve durable claims, branches, candidates,
-//! logs and partial evidence. Restart settles the attempt through Error handling
-//! without relaunching the worker. A later attempt requires an explicit decision.
-//! Each regression seeds a distinct interruption point and checks that repeated
-//! startup does not rerun work or manufacture completion evidence.
+//! Interrupted execution preserves the current step and reusable work. The
+//! daemon restores continuation through ordinary admission; interruption alone
+//! is not a failed Skill verdict. Each fixture verifies that repeated recovery
+//! retains its authored request, candidate, and partially completed evidence.
 
 #![cfg(unix)]
 
@@ -248,47 +247,33 @@ impl DisruptionFixture {
             .unwrap();
     }
 
-    fn assert_restart_preserves_evidence_without_relaunch(&self) {
+    fn assert_restart_preserves_evidence_and_continuation(&self) {
         let before = self.work_items.show_goal_detail(GOAL).unwrap();
         let main = git_output(&self.target_root, &["rev-parse", "main"]);
+        let head = git_output(&self.worktree, &["rev-parse", "HEAD"]);
+        let work = fs::read(self.worktree.join("app.txt")).unwrap();
         let engine = WorkflowEngine::with_target_root(&self.runtime_root, &self.target_root);
-        assert_eq!(
-            engine
-                .recover_interrupted_goals("operator force-stopped production")
-                .unwrap(),
-            1
-        );
-        let pass = engine.evaluate_workflow().unwrap();
-        assert!(
-            pass.steps.is_empty(),
-            "Interrupted work was relaunched: {pass:?}"
-        );
-        let after = self.work_items.show_goal_detail(GOAL).unwrap();
-        assert_eq!(after["status"], "failed");
-        assert_eq!(
-            after["rounds"].as_array().unwrap().len(),
-            before["rounds"].as_array().unwrap().len()
-        );
-        assert_eq!(after["candidate_commit"], before["candidate_commit"]);
-        assert_eq!(after["branch_name"], before["branch_name"]);
-        for field in [
-            "implementation_plan",
-            "event_results",
-            "implementation_report",
-            "quality_details",
-            "workflow_integration",
+        for reason in [
+            "operator force-stopped production",
+            "replacement daemon restarted",
         ] {
+            engine.recover_interrupted_goals(reason).unwrap();
             assert_eq!(
-                after["rounds"][0][field], before["rounds"][0][field],
-                "{field}"
+                self.detail(),
+                before,
+                "recovery changed the current request or evidence"
+            );
+            assert_eq!(git_output(&self.target_root, &["rev-parse", "main"]), main);
+            assert_eq!(git_output(&self.worktree, &["rev-parse", "HEAD"]), head);
+            assert_eq!(fs::read(self.worktree.join("app.txt")).unwrap(), work);
+            assert_eq!(
+                engine
+                    .launchable_goals(&std::collections::BTreeSet::new())
+                    .unwrap(),
+                vec![GOAL],
+                "preserved work must remain available to ordinary workflow admission",
             );
         }
-        assert_eq!(git_output(&self.target_root, &["rev-parse", "main"]), main);
-        assert_eq!(
-            engine.recover_interrupted_goals("second restart").unwrap(),
-            0
-        );
-        assert!(engine.evaluate_workflow().unwrap().steps.is_empty());
     }
     fn detail(&self) -> Value {
         self.work_items.show_goal_detail(GOAL).unwrap()
@@ -303,8 +288,7 @@ impl Drop for DisruptionFixture {
 
 /// Disruption point: after the workflow attempt claim, before the Todo → Plan
 /// transition. The claim is durable on the Round; nothing else happened.
-/// REDO: the restarted engine supersedes the stale claim and runs the whole
-/// pipeline.
+/// Recovery leaves this unstarted occurrence available to normal admission.
 #[test]
 fn force_stop_after_claim_in_todo_preserves_the_unstarted_attempt() {
     let fixture = DisruptionFixture::new("disruption-todo-claim");
@@ -329,7 +313,7 @@ fn force_stop_after_claim_in_todo_preserves_the_unstarted_attempt() {
 
 /// Disruption point: after the Todo → Plan transition and worktree
 /// materialization, before any planning artifact was persisted.
-/// REDO: planning is entirely done over.
+/// Recovery preserves the selection; ordinary admission prepares the Plan work.
 #[test]
 fn force_stop_after_entering_plan_preserves_plan_entry() {
     let fixture = DisruptionFixture::new("disruption-plan-entry");
@@ -341,14 +325,41 @@ fn force_stop_after_entering_plan_preserves_plan_entry() {
     fixture.enter_plan_with_worktree();
     drop(fixture.claim(GoalStatus::Plan));
 
-    fixture.assert_restart_preserves_evidence_without_relaunch();
+    fixture.assert_restart_preserves_evidence_and_continuation();
+    let engine = WorkflowEngine::with_target_root(&fixture.runtime_root, &fixture.target_root);
+    let continued = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let observed = continued.clone();
+    crate::application::workflow::engine::test_hooks::install(
+        &fixture.runtime_root,
+        std::sync::Arc::new(move |_, id, stage, _| {
+            if stage == "executing" {
+                assert_eq!(id, GOAL);
+                observed.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                return Err(RefineError::Conflict(
+                    "fixture observed resumed Plan execution".into(),
+                ));
+            }
+            Ok(())
+        }),
+    );
+    let resumed = engine.evaluate_workflow();
+    crate::application::workflow::engine::test_hooks::remove(&fixture.runtime_root);
+    assert!(
+        resumed
+            .unwrap_err()
+            .to_string()
+            .contains("fixture observed resumed Plan execution")
+    );
+    assert_eq!(continued.load(std::sync::atomic::Ordering::SeqCst), 1);
+    assert_eq!(fixture.detail()["rounds"].as_array().unwrap().len(), 1);
+    assert_eq!(fixture.detail()["rounds"][0]["prompt"], PROMPT);
 }
 
 /// Disruption point: mid-planning — the proposal artifact is persisted, the
-/// criticize phase never ran. RECOVER: the persisted proposal is reused and
-/// only the remaining phases run.
+/// criticize phase never ran. Recovery preserves the proposal while ordinary
+/// continuation determines which compatible evidence can be reused.
 #[test]
-fn force_stop_mid_planning_reuses_the_persisted_proposal() {
+fn force_stop_mid_planning_preserves_the_proposal_for_continuation() {
     let fixture = DisruptionFixture::new("disruption-plan-partial");
     let _env = smoke_ai_env_lock()
         .lock()
@@ -414,14 +425,14 @@ fn force_stop_mid_planning_reuses_the_persisted_proposal() {
         .unwrap();
     drop(fixture.claim(GoalStatus::Plan));
 
-    fixture.assert_restart_preserves_evidence_without_relaunch();
+    fixture.assert_restart_preserves_evidence_and_continuation();
 }
 
 /// Disruption point: planning finished and the Plan → Implement transition
-/// landed, but the implementation agent never launched. RECOVER the plan
-/// (reused verbatim), REDO the implementation.
+/// landed, but the implementation agent never launched. Recovery preserves the
+/// final plan and keeps implementation available to normal admission.
 #[test]
-fn force_stop_after_plan_before_implement_reuses_the_final_plan() {
+fn force_stop_after_plan_before_implement_preserves_the_final_plan() {
     let fixture = DisruptionFixture::new("disruption-implement-entry");
     let _env = smoke_ai_env_lock()
         .lock()
@@ -435,12 +446,12 @@ fn force_stop_after_plan_before_implement_reuses_the_final_plan() {
     let planned = fixture.detail()["rounds"][0]["event_results"].clone();
     assert!(!planned.is_null());
 
-    fixture.assert_restart_preserves_evidence_without_relaunch();
+    fixture.assert_restart_preserves_evidence_and_continuation();
 }
 
 /// Disruption point: mid-implement — the durable phase is `implement`, the
 /// worktree is present with the dead agent's uncommitted half-done edit.
-/// Recovery retains the worktree and enters Failed; another attempt requires a decision.
+/// Recovery retains the worktree and leaves implementation eligible to continue.
 #[test]
 fn force_stop_mid_implement_with_worktree_preserves_partial_implementation() {
     let fixture = DisruptionFixture::new("disruption-implement-mid");
@@ -461,7 +472,7 @@ fn force_stop_mid_implement_with_worktree_preserves_partial_implementation() {
     content.push_str("# half-finished agent edit\n");
     fs::write(&app, content).unwrap();
 
-    fixture.assert_restart_preserves_evidence_without_relaunch();
+    fixture.assert_restart_preserves_evidence_and_continuation();
 }
 
 /// Disruption point: the implementation committed its candidate and recorded
@@ -494,14 +505,14 @@ fn force_stop_after_implement_commit_before_quality_preserves_the_candidate() {
         .update_goal_candidate_commit(GOAL, &seeded_candidate)
         .unwrap();
 
-    fixture.assert_restart_preserves_evidence_without_relaunch();
+    fixture.assert_restart_preserves_evidence_and_continuation();
 }
 
 /// Disruption point: the Quality correction agent finished and its report was
-/// persisted, but the gate never ran. RECOVER: the persisted agent evidence is
-/// reused verbatim and only the gate runs.
+/// persisted, but the gate never ran. Recovery preserves the report and leaves
+/// Quality eligible without manufacturing a gate verdict.
 #[test]
-fn force_stop_after_quality_agent_evidence_preserves_it_without_running_the_gate() {
+fn force_stop_after_quality_agent_evidence_preserves_it_for_continuation() {
     let fixture = DisruptionFixture::new("disruption-quality-agent");
     let _env = smoke_ai_env_lock()
         .lock()
@@ -529,16 +540,15 @@ fn force_stop_after_quality_agent_evidence_preserves_it_without_running_the_gate
         .unwrap();
     drop(fixture.claim(GoalStatus::Quality));
 
-    fixture.assert_restart_preserves_evidence_without_relaunch();
+    fixture.assert_restart_preserves_evidence_and_continuation();
 }
 
 /// Disruption point: a durable passed Quality proof exists and the
 /// Quality → Governance transition landed, but Governance never started.
-/// RECOVER: the proof is evidence — nothing regenerates it — and Governance
-/// runs to integration. (The narrower window where the transition itself was
-/// lost is covered by `worktree_resume::resume_reuses_a_durable_quality_proof…`.)
+/// Recovery preserves the proof and leaves Governance available to normal
+/// admission, where evidence applicability is rechecked before integration.
 #[test]
-fn force_stop_after_quality_proof_before_governance_reuses_the_proof() {
+fn force_stop_after_quality_proof_before_governance_preserves_the_proof() {
     let fixture = DisruptionFixture::new("disruption-governance-entry");
     let _env = smoke_ai_env_lock()
         .lock()
@@ -557,16 +567,15 @@ fn force_stop_after_quality_proof_before_governance_reuses_the_proof() {
     fixture.advance(GoalStatus::Governance);
     drop(fixture.claim(GoalStatus::Governance));
 
-    fixture.assert_restart_preserves_evidence_without_relaunch();
+    fixture.assert_restart_preserves_evidence_and_continuation();
 }
 
 /// Disruption point: mid-Governance with the integrated-target transaction
 /// marker written and integration-worktree residue left behind — integration
-/// itself was interrupted. RECOVER: the restarted lane recovers the
-/// transaction (marker removed, residue worktree recreated, recovery event
-/// journaled), reuses the durable Quality proof, and integrates.
+/// itself was interrupted. Recovery retains transaction facts and leaves the
+/// current occurrence available to ordinary reconciliation before integration.
 #[test]
-fn force_stop_mid_governance_with_transaction_marker_preserves_the_transaction_without_relaunch() {
+fn force_stop_mid_governance_with_transaction_marker_preserves_the_transaction_for_continuation() {
     let fixture = DisruptionFixture::new("disruption-governance-marker");
     let _env = smoke_ai_env_lock()
         .lock()
@@ -613,5 +622,5 @@ fn force_stop_mid_governance_with_transaction_marker_preserves_the_transaction_w
     )
     .unwrap();
 
-    fixture.assert_restart_preserves_evidence_without_relaunch();
+    fixture.assert_restart_preserves_evidence_and_continuation();
 }

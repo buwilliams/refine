@@ -167,32 +167,6 @@ pub(crate) fn state_change_status(
         .collect()
 }
 
-pub(crate) fn replace_live_durable_state(
-    source_root: &std::path::Path,
-    destination_root: &std::path::Path,
-) -> RefineResult<()> {
-    let existing = durable_state_map(destination_root)?;
-    for relative in existing.keys() {
-        let path = destination_root.join(relative);
-        if path.exists() {
-            fs::remove_file(&path).map_err(|error| {
-                RefineError::Io(format!(
-                    "failed to replace Refine state {}: {error}",
-                    path.display()
-                ))
-            })?;
-        }
-    }
-    let source = durable_state_map(source_root)?;
-    for relative in source.keys() {
-        copy_state_file(
-            &source_root.join(relative),
-            &destination_root.join(relative),
-        )?;
-    }
-    Ok(())
-}
-
 /// Keep the scheduler's view current for Goals arriving from another Node.
 ///
 /// Local mutations update that view as they write, but synchronization copies
@@ -207,7 +181,7 @@ pub(crate) fn record_synchronized_goal(
     if !is_goal_record(relative) {
         return;
     }
-    if let Err(error) = ActiveGoalIndex::record_goal(live_root, destination) {
+    if let Err(error) = ActiveGoalIndex::complete_goal_write(live_root, destination) {
         eprintln!(
             "refine: active Goal index was not updated for synchronized {}: {error}",
             relative.display()
@@ -219,35 +193,16 @@ pub(crate) fn forget_synchronized_goal(live_root: &std::path::Path, relative: &s
     if !is_goal_record(relative) {
         return;
     }
-    // The record is already gone, so identity comes from its sharded path
-    // rather than from the file.
-    let Some(goal_id) = goal_id_from_record_path(relative) else {
-        return;
-    };
-    if let Err(error) = ActiveGoalIndex::forget_goal(live_root, &goal_id) {
+    if let Err(error) = ActiveGoalIndex::complete_goal_write(live_root, &live_root.join(relative)) {
         eprintln!(
-            "refine: active Goal index still lists synchronized-away Goal {goal_id}: {error}"
+            "refine: active Goal index still lists synchronized-away Goal {}: {error}",
+            relative.display()
         );
     }
 }
 
 pub(crate) fn is_goal_record(relative: &std::path::Path) -> bool {
     relative.file_name().and_then(|name| name.to_str()) == Some("goal.json")
-}
-
-/// `goals/<shard>/<rest>/goal.json` identifies Goal `<shard><rest>`.
-fn goal_id_from_record_path(relative: &std::path::Path) -> Option<String> {
-    let mut components = relative
-        .components()
-        .map(|component| component.as_os_str().to_string_lossy().into_owned())
-        .collect::<Vec<_>>();
-    components.pop()?;
-    let rest = components.pop()?;
-    let shard = components.pop()?;
-    if components.last().map(String::as_str) != Some("goals") {
-        return None;
-    }
-    Some(format!("{shard}{rest}"))
 }
 
 pub(crate) fn copy_state_file(
@@ -278,13 +233,30 @@ pub(crate) fn copy_state_file(
             temp.display()
         )));
     }
+    File::open(&temp)
+        .and_then(|file| file.sync_all())
+        .map_err(|error| {
+            let _ = fs::remove_file(&temp);
+            RefineError::Io(format!(
+                "failed to flush synchronized Refine state {}: {error}",
+                destination.display()
+            ))
+        })?;
     fs::rename(&temp, destination).map_err(|error| {
         let _ = fs::remove_file(&temp);
         RefineError::Io(format!(
             "failed to commit synchronized Refine state {}: {error}",
             destination.display()
         ))
-    })
+    })?;
+    File::open(parent)
+        .and_then(|directory| directory.sync_all())
+        .map_err(|error| {
+            RefineError::Io(format!(
+                "failed to durably commit synchronized Refine state {}: {error}",
+                destination.display()
+            ))
+        })
 }
 
 pub(crate) fn state_commit_summary(status: &str) -> String {

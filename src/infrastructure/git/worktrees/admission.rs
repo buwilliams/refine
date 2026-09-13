@@ -134,6 +134,112 @@ pub fn validate_workspace_launch(
 }
 
 impl FileGitWorktreeService {
+    /// Decide whether a generated checkout must be replaced, without adopting,
+    /// repairing, or deleting it. A missing directory can be rematerialized at
+    /// the same binding; malformed metadata in an existing directory cannot.
+    /// Filesystem failures remain errors rather than evidence of absence.
+    pub fn worktree_requires_reconstruction(
+        &self,
+        branch: &str,
+        allow_rebase: bool,
+    ) -> RefineResult<bool> {
+        let path = self.managed_worktree_path(branch)?;
+        if let Some(registered) = self.existing_worktree_for_branch(branch)?
+            && registered != path
+        {
+            return Ok(true);
+        }
+        let metadata = match fs::symlink_metadata(&path) {
+            Ok(metadata) => metadata,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+            Err(error) => {
+                return Err(RefineError::Io(format!(
+                    "failed to inspect generated checkout {}: {error}",
+                    path.display()
+                )));
+            }
+        };
+        if !metadata.is_dir() || metadata.file_type().is_symlink() {
+            return Ok(true);
+        }
+        let read_metadata = |file: &Path| -> RefineResult<Option<String>> {
+            match fs::read_to_string(file) {
+                Ok(value) => Ok(Some(value)),
+                Err(error)
+                    if matches!(
+                        error.kind(),
+                        std::io::ErrorKind::NotFound | std::io::ErrorKind::InvalidData
+                    ) =>
+                {
+                    Ok(None)
+                }
+                Err(error) => Err(RefineError::Io(format!(
+                    "failed to inspect generated checkout metadata {}: {error}",
+                    file.display()
+                ))),
+            }
+        };
+        let pointer_metadata = match fs::symlink_metadata(path.join(".git")) {
+            Ok(metadata) => metadata,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(true),
+            Err(error) => {
+                return Err(RefineError::Io(format!(
+                    "failed to inspect generated checkout metadata {}: {error}",
+                    path.display()
+                )));
+            }
+        };
+        if !pointer_metadata.is_file() || pointer_metadata.file_type().is_symlink() {
+            return Ok(true);
+        }
+        let Some(pointer) = read_metadata(&path.join(".git"))? else {
+            return Ok(true);
+        };
+        let Some(pointer) = pointer
+            .trim()
+            .strip_prefix("gitdir: ")
+            .filter(|pointer| !pointer.is_empty())
+        else {
+            return Ok(true);
+        };
+        let git_dir = path.join(pointer);
+        let git_dir = match fs::canonicalize(&git_dir) {
+            Ok(path) => path,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(true),
+            Err(error) => {
+                return Err(RefineError::Io(format!(
+                    "failed to inspect generated checkout registration {}: {error}",
+                    git_dir.display()
+                )));
+            }
+        };
+        if !git_dir.starts_with(self.common_git_dir()?.join("worktrees")) {
+            return Ok(true);
+        }
+        let Some(backlink) = read_metadata(&git_dir.join("gitdir"))? else {
+            return Ok(true);
+        };
+        if Path::new(backlink.trim()) != path.join(".git") {
+            return Ok(true);
+        }
+        let Some(head) = read_metadata(&git_dir.join("HEAD"))? else {
+            return Ok(true);
+        };
+        if head.trim() == format!("ref: refs/heads/{branch}") {
+            return Ok(false);
+        }
+        if allow_rebase {
+            for kind in ["rebase-merge", "rebase-apply"] {
+                if read_metadata(&git_dir.join(kind).join("head-name"))?
+                    .is_some_and(|name| name.trim() == format!("refs/heads/{branch}"))
+                {
+                    return Ok(false);
+                }
+            }
+        }
+        Ok(true)
+    }
+
     pub fn with_managed_worktree(mut self, workspace: ManagedWorktree) -> RefineResult<Self> {
         workspace.validate_cwd(&self.root)?;
         self.root = canonical(&self.root)?;

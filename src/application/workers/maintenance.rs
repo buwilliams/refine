@@ -3,11 +3,14 @@
 use super::*;
 use crate::infrastructure::process::subprocess::owned_groups::OwnedGroup;
 
+mod workflow;
+
 #[derive(Clone, Debug, Serialize)]
 pub struct MaintenanceHealth {
     pub checked_at_ms: i64,
     pub checked_groups: usize,
     pub expired_groups: usize,
+    pub superseded_groups: usize,
     pub failures: Vec<String>,
 }
 
@@ -16,10 +19,25 @@ pub fn maintain_daemon(runtime: &Path) -> MaintenanceHealth {
         checked_at_ms: chrono::Utc::now().timestamp_millis(),
         checked_groups: 0,
         expired_groups: 0,
+        superseded_groups: 0,
         failures: Vec::new(),
     };
     for root in [runtime.to_path_buf(), runtime.join("agents")] {
         let supervisor = FileProcessSupervisor::new(&root);
+        match supervisor.list() {
+            Ok(processes) => {
+                for process in processes
+                    .into_iter()
+                    .filter(|p| !FileProcessSupervisor::requires_group_ownership(p))
+                {
+                    match workflow::maintain_ungrouped_execution(&supervisor, &process) {
+                        Ok(stopped) => health.superseded_groups += usize::from(stopped),
+                        Err(error) => health.failures.push(format!("{}: {error}", process.id)),
+                    }
+                }
+            }
+            Err(error) => health.failures.push(error.to_string()),
+        }
         let groups = match supervisor.owned_group_observations() {
             Ok(groups) => groups,
             Err(error) => {
@@ -47,16 +65,31 @@ pub fn maintain_daemon(runtime: &Path) -> MaintenanceHealth {
             }
             health.checked_groups += 1;
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                crate::infrastructure::process::supervisor::coordination::with_lock_timeout(
-                    Duration::from_millis(200),
-                    || maintain_group(runtime, &supervisor, &group, health.checked_at_ms),
-                )
+                // Read workflow decisions before acquiring process coordination:
+                // Goal writers can themselves register managed subprocesses.
+                let superseded = workflow::maintain_execution(&supervisor, &group);
+                // A damaged Goal must not disable its independent process deadline.
+                let expired =
+                    crate::infrastructure::process::supervisor::coordination::with_lock_timeout(
+                        Duration::from_millis(200),
+                        || maintain_group(runtime, &supervisor, &group, health.checked_at_ms),
+                    );
+                (superseded, expired)
             }));
             match result {
-                Ok(Ok(expired)) => health.expired_groups += usize::from(expired),
-                Ok(Err(error)) => health
-                    .failures
-                    .push(format!("{}: {error}", group.process.id)),
+                Ok((superseded, expired)) => {
+                    for (result, count) in [
+                        (superseded, &mut health.superseded_groups),
+                        (expired, &mut health.expired_groups),
+                    ] {
+                        match result {
+                            Ok(stopped) => *count += usize::from(stopped),
+                            Err(error) => health
+                                .failures
+                                .push(format!("{}: {error}", group.process.id)),
+                        }
+                    }
+                }
                 Err(_) => health.failures.push(format!(
                     "{}: process maintenance panicked",
                     group.process.id

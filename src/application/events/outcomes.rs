@@ -2,7 +2,7 @@
 use super::*;
 use crate::application::work_items::FileWorkItemService;
 use crate::error::{RefineError, RefineResult};
-use crate::infrastructure::storage::automation::{read_json, write_json};
+use crate::infrastructure::storage::automation::read_json;
 use crate::model::automation::AutomationConfig;
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
@@ -15,6 +15,7 @@ impl FileEventService {
             self.runtime()?,
         )
         .active_node_id()?;
+        self.repair_pending_goal_dispatches(&node)?;
         let directory = self.refine_dir.join("automation/outcomes").join(&node);
         if !directory.exists() {
             return Ok(());
@@ -24,101 +25,110 @@ impl FileEventService {
             self.runtime()?,
             self.runtime()?.join("cache"),
         );
-        for entry in std::fs::read_dir(&directory)
-            .map_err(|e| RefineError::Io(e.to_string()))?
-            .take(128)
+        for path in super::transitions::pending_dispatch_paths(&directory)? {
+            if let Err(error) = self.dispatch_outcome(target, &node, &work, &path) {
+                eprintln!(
+                    "refine workflow outcome dispatch: {}: {error}",
+                    path.display()
+                );
+            }
+        }
+        Ok(())
+    }
+
+    fn dispatch_outcome(
+        &self,
+        target: &Path,
+        node: &str,
+        work: &FileWorkItemService,
+        path: &Path,
+    ) -> RefineResult<()> {
+        let marker: Value = read_json(&path)?;
+        let Some(id) = marker["goal_id"].as_str() else {
+            return Ok(());
+        };
+        let goal = work.show_goal_detail(id)?;
+        let pending = &goal["pending_workflow_outcome"];
+        if pending["id"] != marker["id"]
+            || pending["state"] != "pending"
+            || goal["node_id"].as_str().unwrap_or("default") != node
         {
-            let path = entry.map_err(|e| RefineError::Io(e.to_string()))?.path();
-            if path.extension().and_then(|x| x.to_str()) != Some("json") {
-                continue;
-            }
-            let marker: Value = read_json(&path)?;
-            let Some(id) = marker["goal_id"].as_str() else {
-                continue;
-            };
-            let goal = work.show_goal_detail(id)?;
-            let pending = &goal["pending_workflow_outcome"];
-            if pending["id"] != marker["id"]
-                || pending["state"] != "pending"
-                || goal["node_id"].as_str().unwrap_or("default") != node
-            {
-                std::fs::remove_file(&path).map_err(|e| RefineError::Io(e.to_string()))?;
-                continue;
-            }
-            let occurrence_id = pending["id"].as_str().unwrap_or_default();
-            let expired = chrono::Utc::now().timestamp_millis()
-                >= pending["deadline_ms"].as_i64().unwrap_or(0);
-            let config: AutomationConfig = serde_json::from_value(pending["config"].clone())
-                .map_err(|e| RefineError::Serialization(e.to_string()))?;
-            let source = pending["source"].as_str().unwrap_or_default();
-            let mut complete = true;
-            let mut failure = None;
-            for event in config.events.values().filter(|e| {
-                e.enabled
-                    && e.scope.applies(&node)
-                    && e.source.as_deref() == Some(source)
-                    && config.bindings(e, &node).iter().any(|(binding, _)| {
-                        binding.mode != crate::model::automation::BindingMode::Context
-                    })
-            }) {
-                let mut context = self.manual_context(target, &json!({"goal_id":id}))?;
-                context.data["occurrence"] = pending["occurrence"].clone();
-                context.data["outcome"] = json!({
-                    "id":pending["id"], "source":pending["source"],
-                    "category":pending["category"], "message":pending["message"],
-                    "deadline_ms":pending["deadline_ms"], "candidate_commit":pending["candidate_commit"]
-                });
-                context
-                    .metadata
-                    .insert("outcome_deadline_ms".into(), pending["deadline_ms"].clone());
-                let invocation =
-                    self.prepare_pinned(&config, event, context, BTreeMap::new(), occurrence_id);
-                let invocation = match invocation {
-                    Ok(v) => v,
-                    Err(e) => {
-                        failure = Some(e.to_string());
-                        break;
-                    }
-                };
-                if expired {
-                    if !invocation.state.terminal() {
-                        self.cancel_invocation(&invocation.id)?;
-                    }
-                    failure = Some("Error handling deadline expired".into());
+            std::fs::remove_file(&path).map_err(|e| RefineError::Io(e.to_string()))?;
+            return Ok(());
+        }
+        let occurrence_id = pending["id"].as_str().unwrap_or_default();
+        let expired =
+            chrono::Utc::now().timestamp_millis() >= pending["deadline_ms"].as_i64().unwrap_or(0);
+        let config: AutomationConfig = serde_json::from_value(pending["config"].clone())
+            .map_err(|e| RefineError::Serialization(e.to_string()))?;
+        let source = pending["source"].as_str().unwrap_or_default();
+        let mut complete = true;
+        let mut failure = None;
+        for event in config.events.values().filter(|e| {
+            e.enabled
+                && e.scope.applies(&node)
+                && e.source.as_deref() == Some(source)
+                && config.bindings(e, &node).iter().any(|(binding, _)| {
+                    binding.mode != crate::model::automation::BindingMode::Context
+                })
+        }) {
+            let mut context = self.manual_context(target, &json!({"goal_id":id}))?;
+            context.data["occurrence"] = pending["occurrence"].clone();
+            context.data["outcome"] = json!({
+                "id":pending["id"], "source":pending["source"],
+                "category":pending["category"], "message":pending["message"],
+                "deadline_ms":pending["deadline_ms"], "candidate_commit":pending["candidate_commit"]
+            });
+            context
+                .metadata
+                .insert("outcome_deadline_ms".into(), pending["deadline_ms"].clone());
+            let invocation =
+                self.prepare_pinned(&config, event, context, BTreeMap::new(), occurrence_id);
+            let invocation = match invocation {
+                Ok(v) => v,
+                Err(e) => {
+                    failure = Some(e.to_string());
                     break;
                 }
-                match invocation.state {
-                    InvocationState::Succeeded => {}
-                    InvocationState::Pending | InvocationState::Running => {
-                        complete = false;
-                        break;
-                    }
-                    _ => {
-                        failure = Some(
-                            invocation
-                                .error
-                                .unwrap_or_else(|| "Error handler did not succeed".into()),
-                        );
-                        break;
-                    }
+            };
+            if expired {
+                if !invocation.state.terminal() {
+                    self.cancel_invocation(&invocation.id)?;
+                }
+                failure = Some("Error handling deadline expired".into());
+                break;
+            }
+            match invocation.state {
+                InvocationState::Succeeded => {}
+                InvocationState::Pending | InvocationState::Running => {
+                    complete = false;
+                    break;
+                }
+                _ => {
+                    failure = Some(
+                        invocation
+                            .error
+                            .unwrap_or_else(|| "Error handler did not succeed".into()),
+                    );
+                    break;
                 }
             }
-            if complete || failure.is_some() {
-                work.finish_pending_outcome(
-                    id,
-                    occurrence_id,
-                    failure
-                        .as_deref()
-                        .unwrap_or("No explicit workflow redirect was requested"),
-                )?;
-            }
+        }
+        if complete || failure.is_some() {
+            work.finish_pending_outcome(
+                id,
+                occurrence_id,
+                failure
+                    .as_deref()
+                    .unwrap_or("No explicit workflow redirect was requested"),
+            )?;
         }
         Ok(())
     }
 }
 
-/// Called while the Goal is locked. The marker is harmless until the Goal write
-/// makes the matching occurrence durable; dispatch always verifies both.
+/// Called while the Goal is locked. The pending outcome retains its exact inputs;
+/// shared Goal persistence publishes its delivery index after the durable write.
 pub(crate) fn prepare_error(
     root: &Path,
     goal: &mut Value,
@@ -193,12 +203,5 @@ pub(crate) fn prepare_error(
         .unwrap_or(600)
         .clamp(1, 86400);
     goal["pending_workflow_outcome"] = json!({"id":id,"source":source,"state":"pending","category":category,"message":message,"candidate_commit":goal["candidate_commit"],"occurrence":occurrence,"config":config,"deadline_ms":chrono::Utc::now().timestamp_millis()+seconds*1000});
-    write_json(
-        &root
-            .join("automation/outcomes")
-            .join(&node)
-            .join(format!("{id}.json")),
-        &json!({"id":id,"goal_id":goal["id"]}),
-    )?;
     Ok(true)
 }

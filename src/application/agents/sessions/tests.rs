@@ -730,12 +730,24 @@ fn workflow_goal_agent_handoff_survives_dead_process_recovery() {
             .join(format!("{}.json", result.process_id))
             .exists()
     );
+    let retained: ManagedProcess = serde_json::from_slice(
+        &fs::read(
+            supervisor
+                .process_history_dir()
+                .join(format!("{}.json", result.process_id)),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(retained.state, "exited");
+    assert!(retained.stdin_path.is_none());
+    let transcript = Path::new(retained.stdout_path.as_deref().unwrap());
     assert!(
-        !supervisor
-            .processes_dir()
-            .join(format!("{}.stdout.log", result.process_id))
-            .exists()
+        fs::read_to_string(transcript)
+            .unwrap()
+            .contains("transcript survives recovery")
     );
+    assert!(supervisor.list().unwrap().is_empty());
     // The inode remains stable so a waiting consumer cannot lock an unlinked lease.
     let lease = supervisor
         .begin_artifact_handoff(&result.process_id)

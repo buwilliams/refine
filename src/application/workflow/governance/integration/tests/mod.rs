@@ -1,6 +1,7 @@
 mod detached_integration;
 mod integration;
 mod integration_worktree;
+mod pending_controls;
 mod reconciliation;
 mod recovery;
 mod review;

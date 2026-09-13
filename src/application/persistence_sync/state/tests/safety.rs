@@ -242,3 +242,39 @@ fn synchronized_goals_reach_the_scheduler_index() {
         "a Goal completed on another node must leave the scheduler index"
     );
 }
+
+#[test]
+fn interrupted_synchronized_replace_and_delete_reconcile_without_revision_assumptions() {
+    let root = unique_temp_dir("sync-index-interruption");
+    let relative = PathBuf::from("goals/GO/ALA/goal.json");
+    let path = root.join(&relative);
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    fs::write(
+        &path,
+        br#"{"id":"GOALA","status":"done","workflow_revision":20}"#,
+    )
+    .unwrap();
+    assert!(ActiveGoalIndex::load_or_rebuild(&root).unwrap().is_empty());
+
+    // Synchronization can select bytes with a lower local revision. Compare
+    // the intended source bytes, so a reader before replacement cannot consume
+    // the marker merely because the old revision is numerically greater.
+    let selected = br#"{"id":"GOALA","status":"todo","workflow_revision":4}"#;
+    ActiveGoalIndex::prepare_goal_write(&root, &path, Some(selected)).unwrap();
+    assert!(ActiveGoalIndex::load_or_rebuild(&root).unwrap().is_empty());
+    replace_file_durably(&path, selected).unwrap();
+    // Simulate the synchronizer exiting before reconcile_hydrated_index.
+    assert_eq!(ActiveGoalIndex::load_or_rebuild(&root).unwrap().len(), 1);
+
+    ActiveGoalIndex::prepare_goal_write(&root, &path, None).unwrap();
+    assert_eq!(ActiveGoalIndex::load_or_rebuild(&root).unwrap().len(), 1);
+    fs::remove_file(&path).unwrap();
+    assert!(ActiveGoalIndex::load_or_rebuild(&root).unwrap().is_empty());
+    assert_eq!(
+        fs::read_dir(root.join("runtime/active-goals-pending"))
+            .unwrap()
+            .count(),
+        0
+    );
+    fs::remove_dir_all(root).unwrap();
+}

@@ -111,16 +111,6 @@ impl WorkflowEngine {
         let mut goals = index
             .goals()
             .filter(|goal| {
-                matches!(
-                    goal.status,
-                    GoalStatus::Todo
-                        | GoalStatus::Plan
-                        | GoalStatus::Implement
-                        | GoalStatus::Governance
-                        | GoalStatus::Quality
-                )
-            })
-            .filter(|goal| {
                 crate::application::fleet::nodes::node_ids_match(
                     goal.node_id.as_deref().unwrap_or("default"),
                     &policy.active_node_id,
@@ -128,8 +118,6 @@ impl WorkflowEngine {
             })
             .filter(|goal| goal.round_count > 0)
             .filter(|goal| !active.contains(&goal.id) && !observed.contains(&goal.id))
-            .filter(|goal| eligibility.feature_eligible(&goal.id))
-            .filter(|goal| eligibility.priority_eligible(goal))
             .cloned()
             .collect::<Vec<_>>();
         goals.sort_by(|a, b| {
@@ -142,12 +130,16 @@ impl WorkflowEngine {
         let mut load = self.observed_execution_load()?;
         let mut result = Vec::new();
         for goal in goals {
-            let detail = items.show_goal_detail(&goal.id)?;
-            if self
-                .workflow_blocking_reason(&goal, &detail, &eligibility, &policy.active_node_id)?
-                .is_some()
-            {
-                continue;
+            let assessment = items.show_goal_detail(&goal.id).and_then(|detail| {
+                self.workflow_blocking_reason(&goal, &detail, &eligibility, &policy.active_node_id)
+            });
+            match assessment {
+                Ok(None) => {}
+                Ok(Some(_)) => continue,
+                Err(error) => {
+                    eprintln!("refine Goal admission: {} needs recovery: {error}", goal.id);
+                    continue;
+                }
             }
             if !load.available(
                 &policy,

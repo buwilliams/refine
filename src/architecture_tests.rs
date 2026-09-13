@@ -130,7 +130,6 @@ fn planned_capability_directories_exist() {
         "application/workflow/recovery/candidate_handoff",
         "application/workflow/recovery/candidate_refresh",
         "application/workflow/recovery/failure_settlement",
-        "application/workflow/recovery/quality",
         "application/workflow/recovery/reconciliation",
         "infrastructure/agents/discovery",
         "infrastructure/agents/invocation",
@@ -236,6 +235,29 @@ fn retired_and_generic_root_namespaces_are_absent() {
                 !source.contains(&format!("pub mod {generic};")),
                 "{} reintroduces generic namespace {generic}",
                 catalog.display()
+            );
+        }
+    }
+}
+
+#[test]
+fn workflow_behaviors_delegate_workspace_preparation() {
+    let root = source_root().join("application/workflow/engine/behaviors");
+    for path in rust_files(&root) {
+        if path.components().any(|part| part.as_os_str() == "tests") {
+            continue;
+        }
+        let source = fs::read_to_string(&path).unwrap();
+        for operation in [
+            ".update_goal_git_refs(",
+            ".ensure_worktree(",
+            ".ensure_worktree_at_commit(",
+            ".ensure_worktree_from_base(",
+        ] {
+            assert!(
+                !source.contains(operation),
+                "{} selects workspace inputs outside shared preparation: {operation}",
+                path.display()
             );
         }
     }

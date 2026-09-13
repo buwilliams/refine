@@ -1353,6 +1353,13 @@ impl FileGitSyncService {
                     concurrent_change = true;
                     return Ok(());
                 }
+                if is_goal_record(&relative) {
+                    ActiveGoalIndex::prepare_goal_write(
+                        live_root,
+                        &destination,
+                        target_bytes.as_deref(),
+                    )?;
+                }
                 if let Some(bytes) = &target_bytes {
                     replace_file_durably(&destination, bytes)?;
                 } else if destination.exists() {

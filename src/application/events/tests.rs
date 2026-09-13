@@ -1191,6 +1191,7 @@ fn single_trigger_save_rejects_multiple_and_derives_the_workflow_result_contract
     );
 }
 
+mod recovery;
 mod repairs;
 
 #[test]

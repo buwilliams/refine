@@ -15,6 +15,7 @@ mod rounds_and_metadata;
 mod validation;
 mod workflow;
 mod workflow_attempts;
+mod workspace_preparation;
 use std::collections::BTreeSet;
 use std::fs::{self};
 use std::path::PathBuf;

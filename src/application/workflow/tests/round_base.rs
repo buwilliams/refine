@@ -360,7 +360,7 @@ impl Drop for StaleLocalTargetFixture {
     }
 }
 
-/// The Todo fast-forward runs outside the integrated-target transaction, so its
+/// The preparation fast-forward runs outside the integrated-target transaction, so its
 /// only durable trace of an unfinished checkout sync is the pending record.
 #[test]
 fn a_dirty_checkout_advances_the_ref_and_leaves_the_sync_pending_for_repair() {
@@ -464,7 +464,7 @@ fn a_diverged_local_target_is_left_for_integration_to_merge() {
     assert_eq!(
         git_output(&fixture.target_root, &["rev-parse", "main"]).trim(),
         diverged_tip,
-        "Todo must not merge; integration owns that with its own evidence"
+        "Preparation must not merge; integration owns that with its own evidence"
     );
 }
 
@@ -490,7 +490,7 @@ fn an_unreachable_remote_leaves_the_round_to_start_from_the_local_ref() {
 }
 
 #[test]
-fn a_stale_candidate_against_an_advanced_target_queues_a_recovery_round() {
+fn integration_target_advancement_retains_failure_in_the_original_round() {
     let fixture = CheckoutElsewhereFixture::new("stale-candidate-race");
     fixture
         .work_items
@@ -511,8 +511,8 @@ fn a_stale_candidate_against_an_advanced_target_queues_a_recovery_round() {
     let authority = fixture.authority(GoalStatus::Governance);
     let mut ctx = fixture.context(authority);
 
-    // The target moved while the Round was in flight: the candidate is
-    // genuinely obsolete, and a fresh Round from a fresh base is the cure.
+    // The integration guard retains its actual failure. A later workflow
+    // decision uses shared preparation without inventing another authored Round.
     let outcome = settle_stale_candidate(
         &mut ctx,
         RefineError::StaleCandidate {
@@ -541,7 +541,7 @@ fn a_stale_candidate_against_an_advanced_target_queues_a_recovery_round() {
 }
 
 #[test]
-fn a_stale_candidate_whose_target_never_moved_fails_without_spending_the_budget() {
+fn integration_ancestry_guard_preserves_the_original_diagnosis() {
     let fixture = CheckoutElsewhereFixture::new("stale-candidate-lineage");
     fixture
         .work_items
@@ -562,8 +562,8 @@ fn a_stale_candidate_whose_target_never_moved_fails_without_spending_the_budget(
     let authority = fixture.authority(GoalStatus::Governance);
     let mut ctx = fixture.context(authority);
 
-    // The target still names the recorded base: nothing raced, so the candidate
-    // simply never descended from the base, and every retry would reproduce it.
+    // The direct integration boundary must reject contradictory provenance.
+    // Workspace preparation, exercised below, owns regeneration before a new attempt.
     let error = settle_stale_candidate(
         &mut ctx,
         RefineError::StaleCandidate {
@@ -589,5 +589,208 @@ fn a_stale_candidate_whose_target_never_moved_fails_without_spending_the_budget(
     assert_eq!(
         detail["rounds"][0]["failure_category"],
         "governance_candidate_lineage"
+    );
+}
+
+#[test]
+fn todo_reassignment_preserves_the_base_of_retained_work_after_main_advances() {
+    let fixture = CheckoutElsewhereFixture::new("retained-base-after-target-advance");
+    let mut ctx = fixture.context(fixture.authority(GoalStatus::Todo));
+    WorkflowTodo.advance(&mut ctx).unwrap();
+    let branch = ctx.branch.clone().unwrap();
+    let workspace = PathBuf::from(ctx.worktree_path.clone().unwrap());
+    fs::write(workspace.join("feature.txt"), "retained implementation\n").unwrap();
+    git(&workspace, &["add", "feature.txt"]).unwrap();
+    git(&workspace, &["commit", "-qm", "implementation"]).unwrap();
+    let candidate = git_output(&workspace, &["rev-parse", "HEAD"])
+        .trim()
+        .to_string();
+    fixture
+        .work_items
+        .update_goal_candidate_commit("GOAL1", &candidate)
+        .unwrap();
+    git(&fixture.target_root, &["checkout", "-q", "main"]).unwrap();
+    fs::write(fixture.target_root.join("other.txt"), "published work\n").unwrap();
+    git(&fixture.target_root, &["add", "other.txt"]).unwrap();
+    git(
+        &fixture.target_root,
+        &["commit", "-qm", "target advancement"],
+    )
+    .unwrap();
+    fixture
+        .work_items
+        .override_goal_status("GOAL1", GoalStatus::Todo)
+        .unwrap();
+    let mut resumed = fixture.context(fixture.authority(GoalStatus::Todo));
+    WorkflowTodo.advance(&mut resumed).unwrap();
+    let goal = fixture.work_items.show_goal_detail("GOAL1").unwrap();
+    assert_eq!(goal["base_commit"], fixture.main_tip);
+    assert_eq!(goal["branch_name"], branch);
+    assert_eq!(goal["candidate_commit"], candidate);
+    assert!(fixture.is_ancestor(goal["base_commit"].as_str().unwrap(), &candidate));
+}
+
+#[test]
+fn corrupt_generated_lineage_restarts_same_authored_round_without_resetting_old_work() {
+    let fixture = CheckoutElsewhereFixture::new("regenerate-corrupt-lineage");
+    let mut ctx = fixture.context(fixture.authority(GoalStatus::Todo));
+    WorkflowTodo.advance(&mut ctx).unwrap();
+    let old_branch = ctx.branch.clone().unwrap();
+    let workspace = PathBuf::from(ctx.worktree_path.clone().unwrap());
+    fs::write(workspace.join("feature.txt"), "retained work\n").unwrap();
+    git(&workspace, &["add", "feature.txt"]).unwrap();
+    git(&workspace, &["commit", "-qm", "implementation"]).unwrap();
+    let candidate = git_output(&workspace, &["rev-parse", "HEAD"])
+        .trim()
+        .to_string();
+    // The reported incident: a newer unrelated base is attached to the old branch.
+    fixture
+        .work_items
+        .update_goal_git_refs(
+            "GOAL1",
+            &old_branch,
+            "main",
+            &fixture.develop_tip,
+            Some(&candidate),
+        )
+        .unwrap();
+    fixture
+        .work_items
+        .override_goal_status("GOAL1", GoalStatus::Todo)
+        .unwrap();
+    let mut resumed = fixture.context(fixture.authority(GoalStatus::Todo));
+    WorkflowTodo.advance(&mut resumed).unwrap();
+    let goal = fixture.work_items.show_goal_detail("GOAL1").unwrap();
+    assert_ne!(goal["branch_name"], old_branch);
+    assert_eq!(goal["base_commit"], fixture.main_tip);
+    assert!(goal["candidate_commit"].is_null());
+    assert_eq!(goal["rounds"].as_array().unwrap().len(), 1);
+    assert_eq!(goal["rounds"][0]["prompt"], "Prompt");
+    assert_eq!(
+        goal["rounds"][0]["workspace_recoveries"][0]["candidate"],
+        candidate
+    );
+    assert_eq!(
+        git_output(&workspace, &["rev-parse", "HEAD"]).trim(),
+        candidate
+    );
+    // A replacement daemon reuses the already recorded clean binding.
+    let branch = goal["branch_name"].clone();
+    let mut replacement = fixture.context(fixture.authority(GoalStatus::Plan));
+    hydrate_plan_or_implement_context(&mut replacement, "refine/{goal_id}", "main").unwrap();
+    assert_eq!(
+        fixture.work_items.show_goal_detail("GOAL1").unwrap()["branch_name"],
+        branch
+    );
+}
+
+#[test]
+fn selecting_quality_without_generated_inputs_recovers_through_plan_in_the_same_round() {
+    let fixture = CheckoutElsewhereFixture::new("direct-quality-regeneration");
+    fixture
+        .work_items
+        .override_goal_status("GOAL1", GoalStatus::Quality)
+        .unwrap();
+    let mut ctx = fixture.context(fixture.authority(GoalStatus::Quality));
+    crate::application::workflow::engine::context::execution::hydrate_retry_context(
+        &mut ctx,
+        GoalStatus::Quality,
+    )
+    .unwrap();
+    let goal = fixture.work_items.show_goal_detail("GOAL1").unwrap();
+    assert_eq!(goal["status"], "plan");
+    assert_eq!(ctx.start_status, GoalStatus::Plan);
+    assert_eq!(goal["rounds"].as_array().unwrap().len(), 1);
+    assert_eq!(goal["rounds"][0]["prompt"], "Prompt");
+    assert_eq!(goal["base_commit"], fixture.main_tip);
+    assert!(PathBuf::from(ctx.worktree_path.unwrap()).exists());
+}
+
+#[test]
+fn sibling_candidate_and_branch_require_regeneration_even_with_a_shared_base() {
+    let fixture = CheckoutElsewhereFixture::new("divergent-candidate-branch");
+    let mut ctx = fixture.context(fixture.authority(GoalStatus::Todo));
+    WorkflowTodo.advance(&mut ctx).unwrap();
+    let branch = ctx.branch.clone().unwrap();
+    let workspace = PathBuf::from(ctx.worktree_path.clone().unwrap());
+    fs::write(workspace.join("feature.txt"), "branch-only work\n").unwrap();
+    git(&workspace, &["add", "feature.txt"]).unwrap();
+    git(&workspace, &["commit", "-qm", "branch work"]).unwrap();
+    let old_tip = git_output(&workspace, &["rev-parse", "HEAD"])
+        .trim()
+        .to_string();
+    assert!(fixture.is_ancestor(&fixture.main_tip, &old_tip));
+    assert!(fixture.is_ancestor(&fixture.main_tip, &fixture.develop_tip));
+    assert!(!fixture.is_ancestor(&fixture.develop_tip, &old_tip));
+    fixture
+        .work_items
+        .update_goal_candidate_commit("GOAL1", &fixture.develop_tip)
+        .unwrap();
+    fixture
+        .work_items
+        .override_goal_status("GOAL1", GoalStatus::Quality)
+        .unwrap();
+    let mut resumed = fixture.context(fixture.authority(GoalStatus::Quality));
+    crate::application::workflow::engine::context::execution::hydrate_retry_context(
+        &mut resumed,
+        GoalStatus::Quality,
+    )
+    .unwrap();
+    let goal = fixture.work_items.show_goal_detail("GOAL1").unwrap();
+    assert_eq!(goal["status"], "plan");
+    assert_ne!(goal["branch_name"], branch);
+    assert!(goal["candidate_commit"].is_null());
+    assert_eq!(goal["rounds"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        git_output(&workspace, &["rev-parse", "HEAD"]).trim(),
+        old_tip
+    );
+}
+
+#[test]
+fn retained_legacy_seed_uses_common_preparation_with_its_actual_base() {
+    let fixture = CheckoutElsewhereFixture::new("legacy-retained-seed");
+    fixture
+        .work_items
+        .update_goal_git_refs(
+            "GOAL1",
+            "refine/GOAL1/round-1",
+            "main",
+            &fixture.main_tip,
+            Some(&fixture.develop_tip),
+        )
+        .unwrap();
+    fixture
+        .work_items
+        .override_goal_status("GOAL1", GoalStatus::Failed)
+        .unwrap();
+    fixture
+        .work_items
+        .append_goal_round_summary("GOAL1", "Reporter", "Continue retained work")
+        .unwrap();
+    // Seed the retired persisted schema directly; the current evaluation API
+    // intentionally cannot manufacture automatic retry records.
+    let summary = fixture.work_items.show_goal_summary("GOAL1").unwrap();
+    let path = fixture.work_items.refine_dir.join(&summary.goal.json_path);
+    let mut historical: serde_json::Value =
+        serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    historical["rounds"][1]["automatic_retry"] = json!({"kind":"quality","source_round":1});
+    historical["rounds"][1]["retained_candidate"] = json!(fixture.develop_tip);
+    fs::write(&path, serde_json::to_vec_pretty(&historical).unwrap()).unwrap();
+    let mut ctx = fixture.context(fixture.authority(GoalStatus::Todo));
+    WorkflowTodo.advance(&mut ctx).unwrap();
+    let goal = fixture.work_items.show_goal_detail("GOAL1").unwrap();
+    assert_eq!(goal["rounds"].as_array().unwrap().len(), 2);
+    assert_eq!(goal["branch_name"], "refine/GOAL1/round-2");
+    assert_eq!(goal["base_commit"], fixture.main_tip);
+    assert_eq!(goal["candidate_commit"], fixture.develop_tip);
+    assert!(goal["rounds"][1]["workspace_recoveries"].is_null());
+    assert_eq!(
+        git_output(
+            &PathBuf::from(ctx.worktree_path.unwrap()),
+            &["rev-parse", "HEAD"]
+        )
+        .trim(),
+        fixture.develop_tip
     );
 }

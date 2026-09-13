@@ -585,15 +585,26 @@ impl FileWorkItemService {
         self.ensure_goal_owned(&current)?;
         validate_goal_operation(&current.goal.status, &GoalOperation::Delete)?;
         let goal_path = self.refine_dir.join(&current.goal.json_path);
+        ActiveGoalIndex::prepare_goal_write(&self.refine_dir, &goal_path, None)?;
         fs::remove_file(&goal_path).map_err(|error| {
             RefineError::Io(format!(
                 "failed to delete Goal {}: {error}",
                 goal_path.display()
             ))
         })?;
-        // A deleted record cannot be re-projected, so the removal is recorded
-        // explicitly rather than derived from the file that no longer exists.
-        if let Err(error) = ActiveGoalIndex::forget_goal(&self.refine_dir, &current.goal.id) {
+        if let Some(parent) = goal_path.parent() {
+            fs::File::open(parent)
+                .and_then(|directory| directory.sync_all())
+                .map_err(|error| {
+                    RefineError::Io(format!(
+                        "failed to commit Goal deletion {}: {error}",
+                        goal_path.display()
+                    ))
+                })?;
+        }
+        // The absence is a committed source change too. If indexing is
+        // interrupted, its preceding marker lets the daemon finish discovery.
+        if let Err(error) = ActiveGoalIndex::complete_goal_write(&self.refine_dir, &goal_path) {
             eprintln!(
                 "refine: active Goal index still lists deleted Goal {}: {error}",
                 current.goal.id

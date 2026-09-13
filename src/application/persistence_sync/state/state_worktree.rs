@@ -1,3 +1,4 @@
+use super::service::snapshot_live_state;
 use super::*;
 
 impl FileGitSyncService {
@@ -179,7 +180,16 @@ impl FileGitSyncService {
         ])?;
         self.git_at_checked(&path, &["switch", "--orphan", REFINE_STATE_BRANCH])?;
         self.git_at_checked(&path, &["rm", "-rf", "--ignore-unmatch", "."])?;
-        replace_live_durable_state(live_refine, &path.join(".refine"))?;
+        // This is a synchronized snapshot, not a live-source restoration.
+        // Rebuilding live discovery here would add runtime indexes to the
+        // initial commit before the next pass removes excluded records.
+        snapshot_live_state(
+            live_refine,
+            &path.join(".refine"),
+            &durable_state_map(live_refine)?,
+            &BTreeMap::new(),
+            true,
+        )?;
         if path.join(".refine").exists() {
             self.git_at_checked(&path, &["add", "-f", "-A", "--", ".refine"])?;
         }

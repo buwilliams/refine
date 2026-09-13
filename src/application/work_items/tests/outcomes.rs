@@ -21,18 +21,18 @@ fn workflow_control_is_surface_independent_idempotent_and_revision_fenced() {
     service
         .create_goal_summary("Controlled", Some("GOAL1"))
         .unwrap();
+    service
+        .append_goal_round_summary("GOAL1", "Reporter", "Authored request")
+        .unwrap();
     let plan = decision(&service, GoalStatus::Plan, "plan-1");
     let receipt = service.control_workflow("GOAL1", &plan).unwrap();
     assert_eq!(service.control_workflow("GOAL1", &plan).unwrap(), receipt);
     let goal = service.show_goal_detail("GOAL1").unwrap();
     assert_eq!(goal["rounds"].as_array().unwrap().len(), 1);
     assert_eq!(goal["workflow_controls"].as_array().unwrap().len(), 1);
-    assert!(
-        goal["rounds"][0]["prompt"]
-            .as_str()
-            .unwrap()
-            .contains(&plan.context)
-    );
+    assert_eq!(goal["rounds"][0]["prompt"], "Authored request");
+    assert_eq!(goal["workflow_context"], plan.context);
+    assert_eq!(goal["status"], "plan");
     let mut stale = plan.clone();
     stale.request_id = "stale-redirect".into();
     stale.to = GoalStatus::Failed;
@@ -58,6 +58,14 @@ fn workflow_control_forced_done_is_audited_and_does_not_invent_integration() {
         .unwrap();
     let mut request = decision(&service, GoalStatus::Done, "force-done");
     assert!(service.control_workflow("GOAL1", &request).is_err());
+    let before = service.show_goal_detail("GOAL1").unwrap();
+    let prior_edge_approval = service
+        .refine_dir
+        .join("automation/approvals")
+        .join(format!(
+            "{}.json",
+            crate::application::events::transitions::edge_key(&before, "done")
+        ));
     request.force = true;
     let receipt = service.control_workflow("GOAL1", &request).unwrap();
     assert_eq!(receipt["forced"], true);
@@ -72,40 +80,37 @@ fn workflow_control_forced_done_is_audited_and_does_not_invent_integration() {
     assert_eq!(goal["status"], "done");
     assert!(goal["candidate_commit"].is_null());
     assert!(goal["integration"].is_null());
+    // The atomic decision receipt itself bypasses the previous gates. An
+    // approval written before that receipt could survive a failed Goal write
+    // and let an ordinary transition bypass gates on the unchanged occurrence.
+    assert!(!prior_edge_approval.exists());
     fs::remove_dir_all(root).unwrap();
 }
 
 #[test]
-fn workflow_control_repeated_attempts_have_flat_history_and_fresh_event_identity() {
-    let root = unique_temp_dir("workflow-control-attempts");
+fn workflow_control_repeated_assignments_are_noops() {
+    let root = unique_temp_dir("workflow-control-noop");
     let service = FileWorkItemService::new(root.join(".refine"));
     service
         .create_goal_summary("Controlled", Some("GOAL1"))
         .unwrap();
     service
-        .control_workflow("GOAL1", &decision(&service, GoalStatus::Plan, "plan"))
+        .append_goal_round_summary("GOAL1", "Reporter", "Authored request")
+        .unwrap();
+    service
+        .control_workflow("GOAL1", &decision(&service, GoalStatus::Todo, "select"))
         .unwrap();
     let before = service.show_goal_detail("GOAL1").unwrap();
     for number in 0..3 {
-        service
+        let result = service
             .control_workflow(
                 "GOAL1",
-                &decision(&service, GoalStatus::Todo, &format!("retry-{number}")),
+                &decision(&service, GoalStatus::Todo, &format!("noop-{number}")),
             )
             .unwrap();
+        assert_eq!(result["noop"], true);
+        assert_eq!(service.show_goal_detail("GOAL1").unwrap(), before);
     }
-    let after = service.show_goal_detail("GOAL1").unwrap();
-    assert_eq!(
-        after["event_generation"].as_u64().unwrap(),
-        before["event_generation"].as_u64().unwrap_or(0) + 3
-    );
-    let attempts = after["rounds"][0]["prior_attempts"].as_array().unwrap();
-    assert_eq!(attempts.len(), 3);
-    assert!(
-        attempts
-            .iter()
-            .all(|attempt| attempt.get("prior_attempts").is_none())
-    );
     fs::remove_dir_all(root).unwrap();
 }
 
@@ -155,7 +160,7 @@ fn interrupted_integration_releases_reservation_without_repeating_git_work() {
             .as_array()
             .unwrap()
             .len(),
-        2
+        1
     );
     fs::remove_dir_all(root).unwrap();
 }
@@ -184,11 +189,14 @@ fn unresolved_step_outcome_is_superseded_by_explicit_retry_with_evidence_retaine
         .create_goal_summary("Controlled", Some("GOAL1"))
         .unwrap();
     service
+        .append_goal_round_summary("GOAL1", "Reporter", "Authored request")
+        .unwrap();
+    service
         .control_workflow("GOAL1", &decision(&service, GoalStatus::Plan, "plan"))
         .unwrap();
     let (round, revision, prompt) = service.authored_goal_commitment("GOAL1").unwrap();
     let authority = service
-        .claim_workflow_attempt("GOAL1", GoalStatus::Todo, round, revision, &prompt)
+        .claim_workflow_attempt("GOAL1", GoalStatus::Plan, round, revision, &prompt)
         .unwrap();
     let engine =
         crate::application::workflow::WorkflowEngine::with_target_root(root.join("runtime"), &root);
@@ -230,7 +238,7 @@ fn unresolved_step_outcome_is_superseded_by_explicit_retry_with_evidence_retaine
             .as_array()
             .unwrap()
             .len(),
-        1
+        2
     );
     fs::remove_dir_all(root).unwrap();
 }
@@ -300,7 +308,10 @@ fn human_assignment_stops_owned_agent_and_supersedes_its_claim() {
     service
         .override_goal_status("GOAL1", GoalStatus::Todo)
         .unwrap();
-    assert!(!supervisor.group_pending(&process).unwrap());
+    assert!(
+        supervisor.group_pending(&process).unwrap(),
+        "selection commits before downstream cleanup"
+    );
     assert!(
         service
             .verify_workflow_attempt("GOAL1", authority, GoalStatus::Implement, "default")
@@ -336,5 +347,45 @@ fn human_assignment_stops_owned_agent_and_supersedes_its_claim() {
     {
         assert!(!std::path::Path::new(&path).exists());
     }
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn superseded_integration_records_actual_effect_without_advancing_reentered_governance() {
+    let root = unique_temp_dir("superseded-integration-result");
+    let service = FileWorkItemService::new(root.join(".refine"));
+    service
+        .create_goal_summary("Controlled", Some("GOAL1"))
+        .unwrap();
+    service
+        .append_goal_round_summary("GOAL1", "Reporter", "Request")
+        .unwrap();
+    let mut integrate = decision(&service, GoalStatus::Governance, "integrate-old");
+    integrate.force = true;
+    service
+        .control_workflow_operation("GOAL1", &integrate, true)
+        .unwrap();
+    service
+        .override_goal_status("GOAL1", GoalStatus::Implement)
+        .unwrap();
+    service
+        .override_goal_status("GOAL1", GoalStatus::Governance)
+        .unwrap();
+    let generation = service.show_goal_detail("GOAL1").unwrap()["event_generation"].clone();
+    let result = Ok(json!({"candidate_commit":"actual-published-commit"}));
+    let receipt = service
+        .finish_controlled_integration("GOAL1", "integrate-old", &result)
+        .unwrap();
+    assert_eq!(receipt["integration_performed"], true);
+    let goal = service.show_goal_detail("GOAL1").unwrap();
+    assert_eq!(goal["status"], "governance");
+    assert_eq!(goal["event_generation"], generation);
+    assert_eq!(goal["workflow_integration_control"]["state"], "redirected");
+    assert_eq!(
+        service
+            .finish_controlled_integration("GOAL1", "integrate-old", &result)
+            .unwrap(),
+        receipt
+    );
     fs::remove_dir_all(root).unwrap();
 }

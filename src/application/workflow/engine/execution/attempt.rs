@@ -66,6 +66,29 @@ impl WorkflowEngine {
         {
             return Err(unclaimed(RefineError::Conflict(reason)));
         }
+        if detail["workflow_integration_control"]["state"] == "pending" {
+            let integration = crate::application::workflow::governance::integration::FileGovernanceIntegrationService::with_target_root(
+                &self.runtime_root, &refine_dir, target_root,
+            ).resume_pending_control(goal_id).map_err(unclaimed)?;
+            let current = work_items.show_goal_detail(goal_id).map_err(unclaimed)?;
+            return Ok(PreparedGoal::Completed(Box::new(WorkflowStepResult {
+                goal_id: goal_id.to_string(),
+                provider: policy.provider,
+                branch: detail["branch_name"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .to_string(),
+                commit: detail["candidate_commit"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .to_string(),
+                merge: integration.as_ref().and_then(|result| {
+                    serde_json::from_value(result["integration"]["merge"].clone()).ok()
+                }),
+                final_status: current["status"].as_str().unwrap_or_default().to_string(),
+                provider_output: "Reconciled the pending explicit integration decision".into(),
+            })));
+        }
         let node_id = summary
             .goal
             .node_id
@@ -154,16 +177,16 @@ impl WorkflowEngine {
                 outcome => Err(claimed(RefineError::Conflict(outcome_reason(outcome)))),
             },
             GoalStatus::Plan | GoalStatus::Implement => {
-                let start_status = summary.goal.status.clone();
                 let pattern =
                     setting_string(&ctx.settings, "branch_name_pattern", "refine/{goal_id}");
                 let target = setting_string(&ctx.settings, "merge_target_branch", "main");
                 hydrate_plan_or_implement_context(&mut ctx, &pattern, &target).map_err(claimed)?;
-                ctx.start_status = start_status;
+                *claimed_authority = Some(ctx.attempt_authority);
                 Ok(PreparedGoal::Execute(Box::new(ctx)))
             }
             current => {
                 hydrate_retry_context(&mut ctx, current).map_err(claimed)?;
+                *claimed_authority = Some(ctx.attempt_authority);
                 Ok(PreparedGoal::Execute(Box::new(ctx)))
             }
         }

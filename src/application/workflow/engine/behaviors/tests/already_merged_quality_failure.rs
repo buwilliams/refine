@@ -105,6 +105,190 @@ fn superseded_authority_cannot_settle_a_persisted_failed_quality_result() {
     );
 }
 
+#[test]
+fn todo_reconciliation_detection_is_written_only_after_its_quality_transition_is_accepted() {
+    for reject_gate in [false, true] {
+        let fixture = AlreadyMergedQualityFixture::new("todo-gate-order");
+        fixture
+            .work_items
+            .set_goal_status_unchecked("GOAL1", &GoalStatus::Todo)
+            .unwrap();
+        let recorded = json!({
+            "state": "completed",
+            "candidate_commit": fixture.candidate,
+            "target_branch": "main"
+        });
+        let detail = fixture.work_items.show_goal_detail("GOAL1").unwrap();
+        let mut evaluation = json!({"workflow_reconciliation": recorded});
+        if reject_gate {
+            // An unreadable pinned gate must block the transition without
+            // replacing the integration's previous reconciliation evidence.
+            let key = format!(
+                "{}:default:workflow.todo.enter",
+                detail["event_generation"].as_u64().unwrap()
+            );
+            let mut configurations = detail["rounds"][0]["gate_configurations"].clone();
+            configurations[&key] = json!({"invalid": "pinned gate"});
+            evaluation["gate_configurations"] = configurations;
+        }
+        fixture
+            .work_items
+            .update_goal_round_evaluation_summary("GOAL1", 0, &evaluation)
+            .unwrap();
+        let (round_idx, revision, request) = fixture
+            .work_items
+            .authored_goal_commitment("GOAL1")
+            .unwrap();
+        let authority = fixture
+            .work_items
+            .claim_workflow_attempt("GOAL1", GoalStatus::Todo, round_idx, revision, &request)
+            .unwrap();
+        let mut context = WorkflowContext::new(
+            &fixture.runtime_root,
+            &fixture.target_root,
+            "GOAL1".into(),
+            "default".into(),
+            "smoke-ai".into(),
+            round_idx,
+            authority,
+            Default::default(),
+            fixture.work_items.clone(),
+        );
+        let target_before = behavior_test_git(&fixture.target_root, &["rev-parse", "main"]);
+        let result = WorkflowTodo.advance(&mut context);
+        let detail = fixture.work_items.show_goal_detail("GOAL1").unwrap();
+        if reject_gate {
+            assert!(matches!(result, Err(RefineError::Serialization(_))));
+            assert_eq!(detail["status"], "todo");
+            assert_eq!(detail["rounds"][0]["workflow_reconciliation"], recorded);
+        } else {
+            assert!(matches!(
+                result.unwrap(),
+                WorkflowAdvanceOutcome::Transition {
+                    to: GoalStatus::Quality,
+                    ..
+                }
+            ));
+            assert_eq!(detail["status"], "quality");
+            assert_eq!(
+                detail["rounds"][0]["workflow_reconciliation"]["state"],
+                "detected"
+            );
+            assert_eq!(
+                detail["rounds"][0]["workflow_reconciliation"]["recorded_reconciliation_state"],
+                "completed"
+            );
+        }
+        assert_eq!(
+            detail["rounds"][0]["workflow_integration"],
+            fixture.integration
+        );
+        assert_eq!(
+            behavior_test_git(&fixture.target_root, &["rev-parse", "main"]),
+            target_before
+        );
+    }
+}
+
+#[test]
+fn todo_reproduces_after_a_recorded_revert_without_reapplying_the_integrated_effect() {
+    let fixture = AlreadyMergedQualityFixture::new("todo-recorded-revert");
+    let integrated = fixture.integration["target_commit"].as_str().unwrap();
+    behavior_test_git(
+        &fixture.target_root,
+        &["revert", "--no-edit", "-m", "1", integrated],
+    );
+    behavior_test_git(&fixture.target_root, &["push", "origin", "main"]);
+    let reverted = behavior_test_git(&fixture.target_root, &["rev-parse", "main"]);
+    assert!(!fixture.target_root.join("candidate.txt").exists());
+    assert!(
+        FileGitWorktreeService::new(&fixture.target_root)
+            .commit_is_ancestor(&fixture.candidate, &reverted)
+            .unwrap()
+    );
+    let reconciliation = json!({
+        "state": "reverted",
+        "candidate_commit": fixture.candidate,
+        "target_branch": "main",
+        "revert_commit": reverted
+    });
+    fixture
+        .work_items
+        .set_goal_status_unchecked("GOAL1", &GoalStatus::Todo)
+        .unwrap();
+    fixture
+        .work_items
+        .update_goal_round_evaluation_summary(
+            "GOAL1",
+            0,
+            &json!({"workflow_reconciliation": reconciliation}),
+        )
+        .unwrap();
+    let (round_idx, revision, request) = fixture
+        .work_items
+        .authored_goal_commitment("GOAL1")
+        .unwrap();
+    let authority = fixture
+        .work_items
+        .claim_workflow_attempt("GOAL1", GoalStatus::Todo, round_idx, revision, &request)
+        .unwrap();
+    let mut context = WorkflowContext::new(
+        &fixture.runtime_root,
+        &fixture.target_root,
+        "GOAL1".into(),
+        "default".into(),
+        "smoke-ai".into(),
+        round_idx,
+        authority,
+        Default::default(),
+        fixture.work_items.clone(),
+    );
+    assert!(matches!(
+        WorkflowTodo.advance(&mut context).unwrap(),
+        WorkflowAdvanceOutcome::Transition {
+            to: GoalStatus::Plan,
+            ..
+        }
+    ));
+    let detail = fixture.work_items.show_goal_detail("GOAL1").unwrap();
+    assert_eq!(detail["status"], "plan");
+    assert_eq!(detail["base_commit"], reverted);
+    assert!(detail["candidate_commit"].is_null());
+    assert_ne!(detail["branch_name"], fixture.branch);
+    assert_eq!(detail["rounds"].as_array().unwrap().len(), 1);
+    assert_eq!(detail["rounds"][0]["prompt"], request);
+    assert!(detail["rounds"][0]["workflow_integration"].is_null());
+    assert!(
+        detail["rounds"][0]["prior_attempts"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|prior| {
+                prior["workflow_integration"] == fixture.integration
+                    && prior["workflow_reconciliation"] == reconciliation
+            })
+    );
+    assert_eq!(
+        behavior_test_git(&fixture.target_root, &["rev-parse", "main"]),
+        reverted
+    );
+    assert_eq!(
+        behavior_test_git(&fixture.target_root, &["rev-parse", "origin/main"]),
+        reverted
+    );
+    assert_eq!(
+        behavior_test_git(&fixture.target_root, &["rev-parse", &fixture.branch]),
+        fixture.candidate
+    );
+    let workspace = Path::new(context.worktree_path.as_deref().unwrap());
+    assert_eq!(
+        behavior_test_git(workspace, &["rev-parse", "HEAD"]),
+        reverted
+    );
+    assert!(!workspace.join("candidate.txt").exists());
+    assert!(!fixture.target_root.join("candidate.txt").exists());
+}
+
 struct AlreadyMergedQualityFixture {
     temp_root: PathBuf,
     target_root: PathBuf,

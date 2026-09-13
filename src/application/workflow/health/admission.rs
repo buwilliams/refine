@@ -143,7 +143,10 @@ fn sample_admission(
         String::new()
     };
     let mut ids = Vec::new();
-    let mut blocked_goals = BTreeMap::new();
+    let mut blocked_goals = index
+        .recovery_errors()
+        .map(|(id, error)| (id.to_string(), error.to_string()))
+        .collect::<BTreeMap<_, _>>();
     if cause.is_empty() {
         for goal in index.goals().filter(|g| {
             matches!(
@@ -158,16 +161,28 @@ fn sample_admission(
                 &policy.active_node_id,
             )
         }) {
-            let detail = items.show_goal_detail(&goal.id)?;
+            let detail = match items.show_goal_detail(&goal.id) {
+                Ok(detail) => detail,
+                Err(error) => {
+                    blocked_goals.insert(
+                        goal.id.clone(),
+                        format!("Goal source needs recovery: {error}"),
+                    );
+                    continue;
+                }
+            };
             let reason = if active.contains(&goal.id) {
                 Some("Live execution already occupies this Goal".into())
             } else {
-                workflow.workflow_blocking_reason(
+                match workflow.workflow_blocking_reason(
                     goal,
                     &detail,
                     &eligibility,
                     &policy.active_node_id,
-                )?
+                ) {
+                    Ok(reason) => reason,
+                    Err(error) => Some(format!("Goal assessment needs recovery: {error}")),
+                }
             }
             .or_else(|| delayed.contains(&goal.id).then(|| "retry delay".into()));
             if let Some(reason) = reason {
@@ -202,6 +217,8 @@ fn sample_admission(
         cause = "capacity is occupied".into();
     } else if !eligible_since_ms.is_empty() {
         cause = "eligible workflow work awaiting admission".into();
+    } else if cause.is_empty() && !blocked_goals.is_empty() {
+        cause = format!("{} Goal records need recovery", blocked_goals.len());
     } else if cause.is_empty() {
         cause = "no eligible workflow work".into();
     }

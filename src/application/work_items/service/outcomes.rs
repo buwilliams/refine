@@ -67,12 +67,6 @@ impl FileWorkItemService {
             }
             return Ok(receipt.clone());
         }
-        if goal["workflow_integration_control"]["state"] == "pending"
-            && request.to != GoalStatus::Cancelled
-            && !request.force
-        {
-            return Err(RefineError::Conflict("An explicit integration is pending; reconcile its retained operation before another decision".into()));
-        }
         if workflow_revision(&goal) != request.expected_revision {
             return Err(RefineError::Conflict(
                 "Goal changed; refresh its workflow revision before deciding".into(),
@@ -95,11 +89,18 @@ impl FileWorkItemService {
                             <= chrono::Utc::now().timestamp_millis()))
             {
                 return Err(RefineError::Conflict(
-                    "Invocation no longer authorizes this Goal decision".into(),
+                    "Invocation belongs to superseded Goal work".into(),
                 ));
             }
         }
         let from = current.goal.status;
+        // Assignment does not imply retry. In particular a harmless repeated
+        // selection must not stop an agent or invalidate accepted evidence.
+        if !integrate && request.to == from {
+            return Ok(json!({"request_id": request.request_id, "request": encoded,
+                "from": from, "to": request.to, "noop": true,
+                "integration_requested": false, "integration_performed": false}));
+        }
         let recovery = matches!(
             request.to,
             GoalStatus::Plan
@@ -115,68 +116,48 @@ impl FileWorkItemService {
             return Err(RefineError::InvalidInput("Use Goal approval to accept a reviewed candidate, or explicitly force status-only Done".into()));
         }
         let now = now_timestamp();
-        let mut receipt = json!({"request_id":request.request_id,"request":encoded,"from":from,"to":request.to,
+        let receipt = json!({"decision":true,"generation":goal["event_generation"].as_u64().unwrap_or(0).saturating_add(1),"request_id":request.request_id,"request":encoded,"from":from,"to":request.to,
             "at":now,"forced":request.force,"integration_performed":false,"integration_requested":integrate,
             "source_round":goal["rounds"].as_array().map(Vec::len),
             "overridden_requirements":if request.force { json!(["transition_policy","workflow_evidence_gates"]) } else {json!([])},
             "retained_candidate":goal["candidate_commit"],"previous_attempt":goal["rounds"].as_array().and_then(|a|a.last()).and_then(|r|r.get("workflow_attempt_authority"))});
-        let old_round = goal["rounds"].as_array().and_then(|a| a.last()).cloned();
-        if request.to == GoalStatus::Plan && !request.force {
-            let prompt = if request.context.trim().is_empty() {
-                request.reason.clone()
-            } else {
-                format!("{}\n\n{}", request.reason, request.context)
-            };
-            let mut round = new_round_value(&request.actor, "Refine", &prompt);
-            round["workflow_control"] = receipt.clone();
-            round["retained_candidate"] = goal["candidate_commit"].clone();
-            goal["rounds"]
+        if let Some(round) = goal["rounds"].as_array_mut().and_then(|a| a.last_mut()) {
+            if is_automated_status(&request.to) || request.to == GoalStatus::Todo {
+                archive_round_for_retry(round, &request.to)?;
+            }
+        }
+        goal["status"] = json!(request.to);
+        // A durable decision is sufficient for daemon maintenance to discover
+        // superseded execution. Process termination never gates this write.
+        goal.as_object_mut()
+            .unwrap()
+            .remove("workflow_requested_step");
+        if let Some(pending) = goal
+            .as_object_mut()
+            .unwrap()
+            .remove("pending_event_transition")
+        {
+            goal.as_object_mut()
+                .unwrap()
+                .entry("event_transition_history")
+                .or_insert(json!([]))
                 .as_array_mut()
-                .ok_or_else(|| RefineError::Conflict("Goal has no Rounds".into()))?
-                .push(round);
-            // Plan admission materializes the new Round through the existing Todo boundary.
-            goal["workflow_requested_step"] = json!("plan");
-            goal["status"] = json!("todo");
-        } else {
-            if (is_automated_status(&request.to) || request.to == GoalStatus::Todo)
-                && old_round.is_none()
-                && !request.force
-            {
-                return Err(RefineError::Conflict(
-                    "An executable step requires an authored Round".into(),
-                ));
-            }
-            if matches!(request.to, GoalStatus::Quality | GoalStatus::Governance)
-                && !goal["candidate_commit"].is_string()
-                && !request.force
-            {
-                return Err(RefineError::Conflict(
-                    "This step requires a retained candidate".into(),
-                ));
-            }
-            if let Some(round) = goal["rounds"].as_array_mut().and_then(|a| a.last_mut()) {
-                if is_automated_status(&request.to) || request.to == GoalStatus::Todo {
-                    archive_round_for_retry(round, &request.to)?;
-                }
-            }
-            goal["status"] = json!(request.to);
+                .ok_or_else(|| RefineError::Serialization("Invalid transition history".into()))?
+                .push(
+                    json!({"id":pending["id"],"from":pending["from"],"to":pending["to"],
+                    "state":"superseded","at":now}),
+                );
         }
         if integrate {
-            goal["workflow_integration_control"] =
-                json!({"request_id":request.request_id,"state":"pending"});
-        }
-        receipt["stopped_processes"] =
-            json!(self.stop_goal_execution(id, request.invocation_id.as_deref())?);
-        if request.force {
-            goal.as_object_mut()
-                .unwrap()
-                .remove("workflow_requested_step");
-            goal.as_object_mut()
-                .unwrap()
-                .remove("pending_event_transition");
-            if !integrate && goal["workflow_integration_control"]["state"] == "pending" {
-                goal["workflow_integration_control"]["state"] = json!("redirected");
-            }
+            goal["workflow_integration_control"] = json!({"request_id":request.request_id,
+                "state":"pending", "generation":receipt["generation"],
+                "inputs": {"round_idx": goal["rounds"].as_array().map(Vec::len).unwrap_or(0).checked_sub(1),
+                    "node_id": goal["node_id"], "branch": goal["branch_name"],
+                    "base_commit": goal["base_commit"], "candidate_commit": goal["candidate_commit"],
+                    "target_branch": goal["target_branch"],
+                    "remote": goal["rounds"].as_array().and_then(|rounds| rounds.last()).and_then(|round| round.get("workflow_git_remote"))}});
+        } else if goal["workflow_integration_control"]["state"] == "pending" {
+            goal["workflow_integration_control"]["state"] = json!("redirected");
         }
         goal.as_object_mut()
             .unwrap()
@@ -194,13 +175,6 @@ impl FileWorkItemService {
             goal["event_generation"] = json!(goal["event_generation"].as_u64().unwrap_or(0) + 1);
         }
         goal["updated"] = json!(now);
-        if request.force {
-            crate::application::events::transitions::approve_exit(
-                &self.refine_dir,
-                &self.show_goal_detail(id)?,
-                goal["status"].as_str().unwrap(),
-            )?;
-        }
         write_json_atomically(&path, &goal)?;
         Ok(receipt)
     }
@@ -368,20 +342,46 @@ impl FileWorkItemService {
                 .as_array_mut()
                 .unwrap()
                 .push(occurrence.clone());
-            let node = goal["node_id"].as_str().unwrap_or("default");
-            crate::infrastructure::storage::automation::write_json(
-                &self
-                    .refine_dir
-                    .join("automation/occurrences")
-                    .join(node)
-                    .join(format!("{}.json", uuid::Uuid::new_v4())),
-                &json!({"goal_path":current.goal.json_path,"source":format!("workflow.{status}.success"),
-                    "node_id":node,"generation":goal["event_generation"],"previous_generation":goal["event_generation"],
-                    "previous_round":occurrence["round_idx"],"occurrence":occurrence,"config":queued["config"],
-                    "goal_context":crate::application::events::execution::goal_context(&goal),"candidate_commit":goal["candidate_commit"]}),
-            )?;
+            let key = crate::application::events::execution::stable_id(&format!(
+                "{}:{}:terminal-success",
+                goal["id"], goal["event_generation"]
+            ));
+            let dispatch = json!({"goal_path":current.goal.json_path,"source":format!("workflow.{status}.success"),
+                "node_id":goal["node_id"].as_str().unwrap_or("default"),"generation":goal["event_generation"],
+                "previous_generation":goal["event_generation"],"previous_round":occurrence["round_idx"],
+                "occurrence":occurrence,"config":queued["config"],
+                "goal_context":crate::application::events::execution::goal_context(&goal),"candidate_commit":goal["candidate_commit"]});
+            crate::application::events::transitions::retain_occurrence_dispatch(
+                &mut goal, &key, dispatch,
+            );
         }
         goal["updated"] = json!(now_timestamp());
+        write_json_atomically(&path, &goal)
+    }
+
+    /// Acknowledge delivery in the Goal before removing its derived queue entry.
+    /// Retrying after either write is harmless and never recreates finished work.
+    pub(crate) fn finish_event_dispatch(&self, id: &str, queued: &Value) -> RefineResult<()> {
+        let Some(key) = queued["dispatch_key"].as_str() else {
+            return Ok(());
+        };
+        let _lock = self.acquire_goal_mutation_lock(id)?;
+        let current = self.show_goal_summary(id)?;
+        self.ensure_goal_owned(&current)?;
+        let (path, mut goal) = self.read_goal_value_unchecked_locked(&current)?;
+        if goal["pending_event_dispatches"][key] != *queued {
+            return Ok(());
+        }
+        // Required transition invocations pin the exact pending record. Let its
+        // settlement retire this descriptor with the occurrence instead of
+        // invalidating that record for delivery-only bookkeeping.
+        if goal["pending_event_transition"]["state"] == "pending" {
+            return Ok(());
+        }
+        goal["pending_event_dispatches"]
+            .as_object_mut()
+            .expect("pending dispatch map")
+            .remove(key);
         write_json_atomically(&path, &goal)
     }
 
@@ -432,19 +432,37 @@ impl FileWorkItemService {
     ) -> RefineResult<Value> {
         let _lock = self.acquire_goal_mutation_lock(id)?;
         let current = self.show_goal_summary(id)?;
-        self.ensure_goal_owned(&current)?;
         let (path, mut goal) = self.read_goal_value_unchecked_locked(&current)?;
-        if goal["workflow_integration_control"]["request_id"] != request_id {
-            return Err(RefineError::Conflict(
-                "Integration decision was superseded".into(),
-            ));
+        let current_decision = goal["workflow_integration_control"]["request_id"] == request_id
+            && goal["workflow_integration_control"]["state"] == "pending"
+            && (goal["workflow_integration_control"]["generation"] == goal["event_generation"]
+                || (goal["workflow_integration_control"]["generation"].is_null()
+                    && goal["workflow_controls"]
+                        .as_array()
+                        .and_then(|receipts| receipts.last())
+                        .is_some_and(|receipt| receipt["request_id"] == request_id)));
+        if current_decision {
+            self.ensure_goal_owned(&current)?;
+        }
+        let existing = goal["workflow_controls"]
+            .as_array()
+            .and_then(|receipts| {
+                receipts
+                    .iter()
+                    .find(|receipt| receipt["request_id"] == request_id)
+            })
+            .ok_or_else(|| RefineError::Conflict("Integration decision is missing".into()))?;
+        if existing["integration_result"].is_object() && existing["integration_performed"] == true {
+            return Ok(existing.clone());
         }
         let outcome = match result {
             Ok(value) => json!({"state":"succeeded","integration":value}),
             Err(error) => json!({"state":"failed","diagnostic":error.to_string()}),
         };
-        goal["workflow_integration_control"]["state"] = outcome["state"].clone();
-        goal["workflow_integration_control"]["result"] = outcome.clone();
+        if current_decision {
+            goal["workflow_integration_control"]["state"] = outcome["state"].clone();
+            goal["workflow_integration_control"]["result"] = outcome.clone();
+        }
         let receipt = goal["workflow_controls"]
             .as_array_mut()
             .unwrap()
@@ -454,7 +472,7 @@ impl FileWorkItemService {
         receipt["integration_performed"] = json!(result.is_ok());
         receipt["integration_result"] = outcome;
         let receipt = receipt.clone();
-        if current.goal.status == GoalStatus::Governance {
+        if current_decision && current.goal.status == GoalStatus::Governance {
             if result.is_ok() {
                 goal["status"] = json!("review");
             } else if !crate::application::events::outcomes::prepare_error(

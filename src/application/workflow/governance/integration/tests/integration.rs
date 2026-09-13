@@ -122,12 +122,32 @@ fn governance_push_failure_retries_without_duplicate_merge() {
         work_items.show_goal_detail("GOAL1").unwrap()["rounds"][0]["workflow_integration"]
             .is_null()
     );
+    let partial = work_items.show_goal_detail("GOAL1").unwrap();
+    assert_eq!(partial["integration_history"][0]["complete"], false);
+    assert_eq!(
+        partial["integration_history"][0]["integration"]["pushed"],
+        false
+    );
+    assert_eq!(
+        partial["integration_history"][0]["integration"]["target_commit"],
+        integrated_head
+    );
 
     fs::remove_file(&hook).unwrap();
     let retried = integration_service
         .integrate_workflow_candidate("GOAL1", 0, "default", branch, &candidate_commit, "origin")
         .unwrap();
     assert_eq!(retried.target_commit, integrated_head);
+    let completed = work_items.show_goal_detail("GOAL1").unwrap();
+    assert_eq!(
+        completed["integration_history"].as_array().unwrap().len(),
+        1
+    );
+    assert_eq!(completed["integration_history"][0]["complete"], true);
+    assert_eq!(
+        completed["integration_history"][0]["integration"]["pushed"],
+        true
+    );
     assert!(retried.pushed);
     assert_eq!(git_stdout(&repo, &["rev-parse", "HEAD"]), integrated_head);
     assert!(git_succeeds(

@@ -32,11 +32,18 @@ fn pty_failure_admits_followup_within_poll_only_after_scope_release() {
         test_hooks::install(
             &workflow.runtime_root,
             Arc::new(move |engine, goal, stage, _| {
+                // Admission is durable before workspace preparation and execution.
+                if goal == "GOAL3" && stage == "claimed" {
+                    let elapsed = clock.lock().unwrap().unwrap().elapsed();
+                    assert!(
+                        elapsed < Duration::from_secs(1),
+                        "Followup admission took {elapsed:?} after scope release"
+                    );
+                }
                 if stage != "executing" {
                     return Ok(());
                 }
                 if goal == "GOAL3" {
-                    assert!(clock.lock().unwrap().unwrap().elapsed() < Duration::from_secs(1));
                     next.fetch_add(1, Ordering::SeqCst);
                     return Err(RefineError::Conflict("followup admitted".into()));
                 }

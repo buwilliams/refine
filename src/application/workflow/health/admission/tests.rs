@@ -18,6 +18,54 @@ fn fixture() -> (PathBuf, PathBuf, FileWorkItemService) {
         .unwrap();
     (root, target, items)
 }
+
+#[test]
+fn damaged_goal_does_not_stop_admission_health_or_restart_of_valid_siblings() {
+    let (root, target, items) = fixture();
+    items
+        .create_goal_summary("Damaged Goal", Some("GOAL2"))
+        .unwrap();
+    items
+        .append_goal_round_summary("GOAL2", "Reporter", "Retain authored request")
+        .unwrap();
+    items
+        .transition_goal_status("GOAL2", GoalStatus::Todo)
+        .unwrap();
+    let damaged = items
+        .refine_dir
+        .join(items.show_goal_summary("GOAL2").unwrap().goal.json_path);
+    let original = std::fs::read(&damaged).unwrap();
+    std::fs::write(&damaged, "{damaged source").unwrap();
+    let engine = WorkflowEngine::with_target_root(&root, &target);
+
+    // A previously valid index can still name a source damaged afterward.
+    assert_eq!(
+        engine.launchable_goals(&BTreeSet::new()).unwrap(),
+        vec!["GOAL1"]
+    );
+    assert_eq!(
+        engine
+            .recover_interrupted_goals("storage recovered")
+            .unwrap(),
+        0
+    );
+    let now = chrono::Utc::now().timestamp_millis();
+    let snapshot = sample_admission(&root, &target, None, now).unwrap();
+    assert!(snapshot.eligible_since_ms.contains_key("GOAL1"));
+    assert!(snapshot.blocked_goals["GOAL2"].contains("needs recovery"));
+
+    // Rebuilding must retain the same diagnostic even after dropping the
+    // malformed projection; repairing the source restores discovery next pass.
+    std::fs::write(ActiveGoalIndex::path(&items.refine_dir), "{bad index").unwrap();
+    let snapshot = sample_admission(&root, &target, None, now + 1000).unwrap();
+    assert!(snapshot.eligible_since_ms.contains_key("GOAL1"));
+    assert!(snapshot.blocked_goals["GOAL2"].contains("needs recovery"));
+    std::fs::write(&damaged, original).unwrap();
+    let snapshot = sample_admission(&root, &target, None, now + 2000).unwrap();
+    assert!(snapshot.eligible_since_ms.contains_key("GOAL2"));
+    assert!(!snapshot.blocked_goals.contains_key("GOAL2"));
+    std::fs::remove_dir_all(root).unwrap();
+}
 #[test]
 fn continuous_eligibility_requires_fresh_observation_and_resets_for_pause_and_missing_skills() {
     let (root, target, items) = fixture();
@@ -252,7 +300,7 @@ fn health_and_admission_expose_the_same_unpersisted_outcome_until_superseded() {
 }
 
 #[test]
-fn restoring_a_legacy_marker_after_same_round_retry_cannot_resurrect_its_restriction() {
+fn restoring_a_legacy_marker_after_same_round_reassignment_cannot_resurrect_its_restriction() {
     let (root, target, items) = fixture();
     let engine = WorkflowEngine::with_target_root(&root, &target);
     let (round, revision, prompt) = items.authored_goal_commitment("GOAL1").unwrap();
@@ -280,11 +328,11 @@ fn restoring_a_legacy_marker_after_same_round_retry_cannot_resurrect_its_restric
         .control_workflow(
             "GOAL1",
             &crate::application::work_items::WorkflowControl {
-                to: GoalStatus::Todo,
-                reason: "Explicit retry".into(),
+                to: GoalStatus::Plan,
+                reason: "Explicit different-step reassignment".into(),
                 context: String::new(),
                 expected_revision: before["workflow_revision"].as_u64().unwrap(),
-                request_id: "retry-once".into(),
+                request_id: "reassign-once".into(),
                 actor: "Operator".into(),
                 force: false,
                 invocation_id: None,

@@ -33,6 +33,8 @@ When a Goal is failed:
 
 Structured-output failures retain the original invalid response and diagnostic. Integration races, merge conflicts, refresh failures, and failed checks retain their candidate, branch, worktree, handoff, gates, and target observations. They emit the source step's Error event without generating a recovery Round or rerunning work. Configured Error handlers receive a bounded handling window; an explicit revision-fenced workflow decision may redirect the Goal with context. Without that decision, the Goal settles in Failed. A successful handler response alone does not change this outcome.
 
+After an executable step is selected, shared preparation restores coherent inputs or records recovery to Plan on a fresh execution branch under the existing authored Round. A user need not invent another Round to repair generated lineage. This does not reopen a completed failed verdict merely because the daemon restarted. Superseded agents are stopped downstream even when the selected Goal is parked or terminal. The [shared consistency contract](11-consistency-contract.md) defines these recovery rules and their limits.
+
 ## Future Direction
 
 Future failed behavior should support automated diagnosis, recovery planning, dependency-aware rerouting, and agent handoff. The goal is not to avoid all failure; it is to make failure a productive workflow state.

@@ -129,10 +129,7 @@ fn required_success_failure_opens_error_handling_and_only_an_explicit_decision_r
         }
         f.service.dispatch_outcomes(&f.primary).unwrap();
         let settled = f.work().show_goal_detail("FRESH").unwrap();
-        assert_eq!(settled["status"], if redirect { "todo" } else { "failed" });
-        assert_eq!(
-            settled["rounds"].as_array().unwrap().len(),
-            if redirect { 2 } else { 1 }
-        );
+        assert_eq!(settled["status"], if redirect { "plan" } else { "failed" });
+        assert_eq!(settled["rounds"].as_array().unwrap().len(), 1);
     }
 }

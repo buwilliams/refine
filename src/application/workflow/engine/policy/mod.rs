@@ -219,73 +219,83 @@ impl WorkflowEngine {
         };
         let mut recovered = 0;
         for goal in &active_goals {
-            let Some(round_idx) = goal.round_count.checked_sub(1) else {
-                eprintln!(
-                    "refine workflow recovery: Goal {} is {} with no authored Round; preserving the Goal and creating no worker or worktree",
-                    goal.id,
-                    goal.status.as_str()
-                );
-                continue;
-            };
-            let current = work_items.show_goal_detail(&goal.id)?;
-            let authority =
-                crate::application::work_items::WorkflowStepAuthority::from_goal(&current)?;
-            let unresolved = self.unresolved_workflow_outcome(&goal.id, &current)?;
-            let receipts = restart::step_receipts(
-                &crate::application::events::FileEventService::new(&refine_dir),
-                &current,
-                authority,
-            )?;
-            if receipts.completed && unresolved.is_none() {
-                // The replacement consumes this step's accepted receipts through the
-                // ordinary exact-candidate path. It does not invoke failed work again.
-                continue;
-            }
-            if unresolved.is_none() {
-                // Loss of an execution owner is not a Skill verdict. The admitted
-                // occurrence will reconcile its old launch and resume in-place.
-                if !receipts.started {
-                    continue;
+            let assessment = (|| -> RefineResult<usize> {
+                let Some(round_idx) = goal.round_count.checked_sub(1) else {
+                    eprintln!(
+                        "refine workflow recovery: Goal {} is {} with no authored Round; preserving the Goal and creating no worker or worktree",
+                        goal.id,
+                        goal.status.as_str()
+                    );
+                    return Ok(0);
+                };
+                let current = work_items.show_goal_detail(&goal.id)?;
+                let authority =
+                    crate::application::work_items::WorkflowStepAuthority::from_goal(&current)?;
+                let unresolved = self.unresolved_workflow_outcome(&goal.id, &current)?;
+                let receipts = restart::step_receipts(
+                    &crate::application::events::FileEventService::new(&refine_dir),
+                    &current,
+                    authority,
+                )?;
+                if receipts.completed && unresolved.is_none() {
+                    // The replacement consumes this step's accepted receipts through the
+                    // ordinary exact-candidate path. It does not invoke failed work again.
+                    return Ok(0);
                 }
-                logs.append_round_log(&goal.id, round_idx, LogEntry {
+                if unresolved.is_none() {
+                    // Loss of an execution owner is not a Skill verdict. The admitted
+                    // occurrence will reconcile its old launch and resume in-place.
+                    if !receipts.started {
+                        return Ok(0);
+                    }
+                    logs.append_round_log(&goal.id, round_idx, LogEntry {
                     datetime: now_timestamp(), severity: "info".into(), category: "workflow".into(),
                     message: format!("Execution ownership released; {} remains scheduled for continuation", goal.status.as_str()),
                     details: Some(json_object(json!({"reason":detail,"checkpoint":goal.status.as_str(),"automatic_restart":true}))),
                     actions: Vec::new(), actor: Some("refine".into()), goal_id: Some(goal.id.clone()),
                 })?;
-                recovered += 1;
-                continue;
+                    return Ok(1);
+                }
+                match work_items.interrupt_workflow_if_current(
+                    &goal.id,
+                    authority,
+                    unresolved.as_deref().unwrap_or(detail),
+                ) {
+                    Err(RefineError::Conflict(_)) => return Ok(0),
+                    result => result?,
+                }
+                logs.append_round_log(
+                    &goal.id,
+                    round_idx,
+                    LogEntry {
+                        datetime: now_timestamp(),
+                        severity: "warning".to_string(),
+                        category: "workflow".to_string(),
+                        message: format!(
+                            "Workflow execution was interrupted in {} state: {detail}",
+                            goal.status.as_str()
+                        ),
+                        details: Some(json_object(json!({
+                            "reason": detail,
+                            "checkpoint": goal.status.as_str(),
+                            "automatic_restart": false
+                        }))),
+                        actions: Vec::new(),
+                        actor: Some("refine".to_string()),
+                        goal_id: Some(goal.id.clone()),
+                    },
+                )?;
+                Ok(1)
+            })();
+            match assessment {
+                Ok(count) => recovered += count,
+                Err(error) => {
+                    eprintln!(
+                        "refine workflow recovery: Goal {} needs recovery: {error}",
+                        goal.id
+                    );
+                }
             }
-            match work_items.interrupt_workflow_if_current(
-                &goal.id,
-                authority,
-                unresolved.as_deref().unwrap_or(detail),
-            ) {
-                Err(RefineError::Conflict(_)) => continue,
-                result => result?,
-            }
-            logs.append_round_log(
-                &goal.id,
-                round_idx,
-                LogEntry {
-                    datetime: now_timestamp(),
-                    severity: "warning".to_string(),
-                    category: "workflow".to_string(),
-                    message: format!(
-                        "Workflow execution was interrupted in {} state: {detail}",
-                        goal.status.as_str()
-                    ),
-                    details: Some(json_object(json!({
-                        "reason": detail,
-                        "checkpoint": goal.status.as_str(),
-                        "automatic_restart": false
-                    }))),
-                    actions: Vec::new(),
-                    actor: Some("refine".to_string()),
-                    goal_id: Some(goal.id.clone()),
-                },
-            )?;
-            recovered += 1;
         }
         Ok(recovered)
     }

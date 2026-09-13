@@ -114,6 +114,7 @@ impl FileWorkItemService {
     }
 
     pub fn undo_goal_summary(&self, goal_id: &str) -> RefineResult<GoalSummaryProjection> {
+        let _goal_lock = self.acquire_goal_mutation_lock(goal_id)?;
         let current = self.show_goal_summary(goal_id)?;
         if current.goal.status == GoalStatus::Review {
             return Err(RefineError::InvalidInput(
@@ -132,7 +133,7 @@ impl FileWorkItemService {
                 ));
             }
         };
-        self.set_goal_status_unchecked(goal_id, &target)?;
+        self.assign_goal_status_locked(goal_id, &target, "Explicit undo")?;
         self.show_goal_summary(goal_id)
     }
 
@@ -254,7 +255,6 @@ impl FileWorkItemService {
         target: GoalStatus,
     ) -> RefineResult<()> {
         self.ensure_goal_index_owned(current)?;
-        validate_manual_goal_transition(&current.status, &target)?;
 
         let goal_path = self.refine_dir.join(&current.json_path);
         let bytes = fs::read(&goal_path).map_err(|error| {
@@ -304,6 +304,11 @@ impl FileWorkItemService {
                 current.id
             )));
         }
+        if durable_status == target {
+            return Ok(());
+        }
+        validate_manual_goal_transition(&durable_status, &target)?;
+        record_step_assignment(object, &durable_status, &target, "Explicit step assignment")?;
         object.insert(
             "status".to_string(),
             Value::String(target.as_str().to_string()),
@@ -328,8 +333,28 @@ impl FileWorkItemService {
                 "done Goals cannot be cancelled".to_string(),
             ));
         }
-        self.set_goal_status_unchecked_locked(goal_id, &GoalStatus::Cancelled)?;
+        self.assign_goal_status_locked(goal_id, &GoalStatus::Cancelled, "Explicit cancellation")?;
         self.show_goal_summary(goal_id)
+    }
+
+    fn assign_goal_status_locked(
+        &self,
+        goal_id: &str,
+        target: &GoalStatus,
+        reason: &str,
+    ) -> RefineResult<()> {
+        let current = self.show_goal_summary(goal_id)?;
+        self.ensure_goal_owned(&current)?;
+        let (path, mut value) = self.read_goal_value_unchecked_locked(&current)?;
+        let object = value.as_object_mut().ok_or_else(|| {
+            RefineError::Serialization(format!("Goal {goal_id} is not a JSON object"))
+        })?;
+        let from = workflow_attempts::goal_status(object);
+        if from == *target {
+            return Ok(());
+        }
+        record_step_assignment(object, &from, target, reason)?;
+        self.write_goal_status_value(&path, &mut value, target)
     }
 
     pub(crate) fn fail_goal_after_process_stop_if_current(
@@ -360,4 +385,36 @@ impl FileWorkItemService {
         self.set_goal_status_unchecked_locked(goal_id, &GoalStatus::Failed)?;
         self.show_goal_summary(goal_id)
     }
+}
+
+fn record_step_assignment(
+    goal: &mut Map<String, Value>,
+    from: &GoalStatus,
+    to: &GoalStatus,
+    reason: &str,
+) -> RefineResult<()> {
+    let source_round = goal.get("rounds").and_then(Value::as_array).map(Vec::len);
+    if matches!(
+        to,
+        GoalStatus::Todo
+            | GoalStatus::Plan
+            | GoalStatus::Implement
+            | GoalStatus::Quality
+            | GoalStatus::Governance
+    ) && let Some(round) = goal
+        .get_mut("rounds")
+        .and_then(Value::as_array_mut)
+        .and_then(|rounds| rounds.last_mut())
+    {
+        archive_round_for_retry(round, to)?;
+    }
+    goal.entry("workflow_controls")
+        .or_insert(json!([]))
+        .as_array_mut()
+        .ok_or_else(|| RefineError::Serialization("Invalid workflow controls".into()))?
+        .push(
+            json!({"request_id":uuid::Uuid::new_v4().to_string(), "from":from, "to":to, "source_round":source_round,
+            "actor":"operator", "reason":reason, "at":now_timestamp(), "forced":false}),
+        );
+    Ok(())
 }

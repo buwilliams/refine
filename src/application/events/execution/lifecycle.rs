@@ -214,11 +214,7 @@ impl LifecycleWorkspace {
                     edge
                 );
                 if self.source != expected
-                    || occurrence["generation"].as_u64().unwrap_or(0)
-                        != goal["event_generation"].as_u64().unwrap_or(0)
-                    || !goal["workflow_events"]
-                        .as_array()
-                        .is_some_and(|items| items.contains(occurrence))
+                    || !super::super::transitions::occurrence_is_current(&goal, occurrence)
                 {
                     return Err(unavailable(
                         "durable lifecycle occurrence is missing or changed",

@@ -72,6 +72,9 @@ function browserRuntime() {
   vm.runInContext(fs.readFileSync(path.join(staticRoot, "features/terminal-keyboard.js"), "utf8"), context);
   vm.runInContext(fs.readFileSync(path.join(staticRoot, "features/toolbar.js"), "utf8"), context);
   vm.runInContext(`
+    // Sync health has its own Toolbar harness. Isolate its dashboard request
+    // from the Goal-log and background-operation transport under test here.
+    refreshToolbarSyncHealth = async () => {};
     globalThis.goalLogTest = {
       chatState,
       goalLogTabId,
@@ -90,6 +93,7 @@ function browserRuntime() {
       },
       setLiveHooks(hooks) {
         toast = hooks.toast || toast;
+        recordSystemOperation = hooks.recordSystemOperation || recordSystemOperation;
         refreshDashboard = hooks.refreshDashboard || (() => {});
         refreshGoalsTable = hooks.refreshGoalsTable || (() => {});
         loadGoalDetail = hooks.loadGoalDetail || (() => {});
@@ -171,7 +175,7 @@ test("main SSE transport reconnects in place and reconciles durable visible stat
   let detailRefreshes = 0;
   let nodeReconciliations = 0;
   runtime.setLiveHooks({
-    toast(message) { notices.push(message); },
+    recordSystemOperation(operation) { notices.push(operation.message); },
     reconcileNodeContext(options) {
       assert.equal(JSON.stringify(options), JSON.stringify({ external: true }));
       nodeReconciliations += 1;

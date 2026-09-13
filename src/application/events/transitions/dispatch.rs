@@ -1,330 +1,357 @@
 //! Lifecycle dispatch and short-lock gate settlement.
 use super::*;
+
 impl FileEventService {
+    /// Reconcile only Goals retaining live work in the shared index, including
+    /// terminal Goals whose lifecycle delivery has not finished yet.
+    pub(crate) fn repair_pending_goal_dispatches(&self, node: &str) -> RefineResult<()> {
+        let index = crate::application::projects::projection::ActiveGoalIndex::load_or_rebuild(
+            &self.refine_dir,
+        )?;
+        for projected in index
+            .goals()
+            .filter(|goal| goal.node_id.as_deref().unwrap_or("default") == node)
+        {
+            let path = self.refine_dir.join(&projected.json_path);
+            let result = crate::infrastructure::process::supervisor::coordination::with_record_lock(
+                &self.refine_dir,
+                &crate::infrastructure::process::supervisor::coordination::record_lock_key(&path),
+                || repair_goal_dispatches(&self.refine_dir, &path, &read_json::<Value>(&path)?),
+            );
+            if let Err(error) = result {
+                eprintln!("refine Event recovery: Goal {}: {error}", projected.id);
+            }
+        }
+        Ok(())
+    }
+
     pub fn dispatch_goal_events(&self, target: &Path) -> RefineResult<()> {
         let node = crate::application::fleet::nodes::FileNodeRegistryService::with_active_root(
             &self.refine_dir,
             self.runtime()?,
         )
         .active_node_id()?;
+        self.repair_pending_goal_dispatches(&node)?;
         for name in ["transitions", "occurrences"] {
             let directory = self.refine_dir.join("automation").join(name).join(&node);
             if !directory.exists() {
                 continue;
             }
-            for entry in std::fs::read_dir(&directory)
-                .map_err(|e| RefineError::Io(e.to_string()))?
-                .take(128)
-            {
-                let path = entry.map_err(|e| RefineError::Io(e.to_string()))?.path();
-                if path.extension().and_then(|p| p.to_str()) != Some("json") {
-                    continue;
+            for path in pending_dispatch_paths(&directory)? {
+                if let Err(error) = self.dispatch_goal_event(target, &node, name, &path) {
+                    // Queue and per-Goal failures are contained. A damaged derived
+                    // marker is replaced from its Goal on the next reconciliation.
+                    eprintln!("refine Event dispatch: {}: {error}", path.display());
+                    let diagnostic = self
+                        .refine_dir
+                        .join("automation/occurrence-errors")
+                        .join(path.file_name().expect("queued Event filename"));
+                    if let Err(error) =
+                        write_json(&diagnostic, &json!({"path":path,"error":error.to_string()}))
+                    {
+                        eprintln!("refine Event dispatch: unable to retain diagnostic: {error}");
+                    }
                 }
-                let queued: Value = match read_json(&path) {
-                    Ok(record) => record,
-                    Err(_) if !path.exists() => continue,
-                    Err(e) => return Err(e),
-                };
-                if queued["node_id"].as_str() != Some(&node) {
-                    continue;
+            }
+        }
+        Ok(())
+    }
+
+    fn dispatch_goal_event(
+        &self,
+        target: &Path,
+        node: &str,
+        name: &str,
+        path: &Path,
+    ) -> RefineResult<()> {
+        let queued: Value = match read_json(&path) {
+            Ok(record) => record,
+            Err(_) if !path.exists() => return Ok(()),
+            Err(e) => return Err(e),
+        };
+        if queued["node_id"].as_str() != Some(node) {
+            return Ok(());
+        }
+        let relative = Path::new(
+            queued["goal_path"]
+                .as_str()
+                .ok_or_else(|| RefineError::InvalidInput("missing event Goal path".into()))?,
+        );
+        if relative
+            .components()
+            .any(|c| !matches!(c, std::path::Component::Normal(_)))
+        {
+            return Err(RefineError::InvalidInput(
+                "invalid synchronized Event Goal path".into(),
+            ));
+        }
+        let goal_path = self.refine_dir.join(relative);
+        let goal = crate::infrastructure::process::supervisor::coordination::with_record_lock(
+            &self.refine_dir,
+            &crate::infrastructure::process::supervisor::coordination::record_lock_key(&goal_path),
+            || {
+                if !goal_path.exists() {
+                    let _ = std::fs::remove_file(&path);
+                    return Ok(None);
                 }
-                let relative =
-                    Path::new(queued["goal_path"].as_str().ok_or_else(|| {
-                        RefineError::InvalidInput("missing event Goal path".into())
-                    })?);
-                if relative
-                    .components()
-                    .any(|c| !matches!(c, std::path::Component::Normal(_)))
+                let goal: Value = read_json(&goal_path)?;
+                if name == "occurrences"
+                    && (!occurrence_is_current(&goal, &queued["occurrence"])
+                        || queued["dispatch_key"]
+                            .as_str()
+                            .is_some_and(|key| goal["pending_event_dispatches"][key] != queued))
                 {
-                    return Err(RefineError::InvalidInput(
-                        "invalid synchronized Event Goal path".into(),
-                    ));
-                }
-                let goal_path = self.refine_dir.join(relative);
-                let goal =
-                    crate::infrastructure::process::supervisor::coordination::with_record_lock(
-                        &self.refine_dir,
-                        &crate::infrastructure::process::supervisor::coordination::record_lock_key(
-                            &goal_path,
-                        ),
-                        || {
-                            if !goal_path.exists() {
-                                let _ = std::fs::remove_file(&path);
-                                return Ok(None);
-                            }
-                            let goal: Value = read_json(&goal_path)?;
-                            if name == "occurrences"
-                                && !goal
-                                    .get("workflow_events")
-                                    .and_then(Value::as_array)
-                                    .is_some_and(|items| {
-                                        items.iter().any(|item| item == &queued["occurrence"])
-                                    })
-                            {
-                                let _ = std::fs::remove_file(&path);
-                                return Ok(None);
-                            }
-                            Ok(Some(goal))
-                        },
-                    )?;
-                let Some(goal) = goal else {
-                    continue;
-                };
-                let Some(id) = goal["id"].as_str() else {
-                    continue;
-                };
-                if goal["node_id"].as_str().unwrap_or("default") != node {
                     let _ = std::fs::remove_file(&path);
+                    return Ok(None);
+                }
+                Ok(Some(goal))
+            },
+        )?;
+        let Some(goal) = goal else {
+            return Ok(());
+        };
+        let Some(id) = goal["id"].as_str() else {
+            return Ok(());
+        };
+        if goal["node_id"].as_str().unwrap_or("default") != node {
+            let _ = std::fs::remove_file(&path);
+            return Ok(());
+        }
+        let mut context = self.manual_context(target, &json!({"goal_id": id}))?;
+        if name == "occurrences" {
+            context.data["occurrence"] = queued["occurrence"].clone();
+            if let Some(pinned) = queued.get("goal_context") {
+                context.data["goal"] = pinned.clone();
+                context.round_idx = pinned["rounds"]
+                    .as_array()
+                    .and_then(|rounds| rounds.len().checked_sub(1));
+            }
+            let config: AutomationConfig = serde_json::from_value(queued["config"].clone())
+                .map_err(|e| RefineError::Serialization(e.to_string()))?;
+            let mut complete = true;
+            let mut fault = false;
+            for event in config.events.values().filter(|e| {
+                e.source == queued["source"].as_str().map(str::to_string)
+                    && e.enabled
+                    && e.scope.applies(node)
+            }) {
+                if config
+                    .bindings(event, node)
+                    .iter()
+                    .all(|(binding, _)| binding.mode == BindingMode::Context)
+                {
                     continue;
                 }
-                let mut context = self.manual_context(target, &json!({"goal_id": id}))?;
-                if name == "occurrences" {
-                    // The index is written before the Goal replacement. Only a durable
-                    // occurrence authorizes execution; an interrupted write cannot emit it.
-                    if !goal
-                        .get("workflow_events")
-                        .and_then(Value::as_array)
-                        .is_some_and(|items| items.iter().any(|item| item == &queued["occurrence"]))
-                    {
-                        continue;
-                    }
-                    context.data["occurrence"] = queued["occurrence"].clone();
-                    if let Some(pinned) = queued.get("goal_context") {
-                        context.data["goal"] = pinned.clone();
-                        context.round_idx = pinned["rounds"]
-                            .as_array()
-                            .and_then(|rounds| rounds.len().checked_sub(1));
-                    }
-                    let config: AutomationConfig = serde_json::from_value(queued["config"].clone())
-                        .map_err(|e| RefineError::Serialization(e.to_string()))?;
-                    let mut complete = true;
-                    let mut fault = false;
-                    for event in config.events.values().filter(|e| {
-                        e.source == queued["source"].as_str().map(str::to_string)
-                            && e.enabled
-                            && e.scope.applies(&node)
-                    }) {
-                        if config
-                            .bindings(event, &node)
-                            .iter()
-                            .all(|(binding, _)| binding.mode == BindingMode::Context)
-                        {
-                            continue;
-                        }
-                        let source = queued["source"].as_str().unwrap_or_default();
-                        let exit = source.ends_with(".exit");
-                        let departure = exit || source.ends_with(".success");
-                        let generation = if departure {
-                            queued["previous_generation"].as_u64().unwrap_or(0)
-                        } else {
-                            queued["generation"].as_u64().unwrap_or(0)
-                        };
-                        let round = if departure {
-                            queued["previous_round"].as_u64().unwrap_or(0)
-                        } else {
-                            queued["occurrence"]["round_idx"].as_u64().unwrap_or(0)
-                        };
-                        let variant = if exit {
-                            format!(
-                                "to-{}-{}",
-                                queued["occurrence"]["to"].as_str().unwrap_or_default(),
-                                queued["candidate_commit"].as_str().unwrap_or_default()
-                            )
-                        } else {
-                            String::new()
-                        };
-                        let key = format!("{id}:{round}:{generation}:{node}:{source}:{variant}");
-                        match self.prepare_pinned(
-                            &config,
-                            event,
-                            context.clone(),
-                            BTreeMap::new(),
-                            &key,
-                        ) {
-                            Ok(invocation) => {
-                                complete &= invocation.state.terminal();
-                                fault |= matches!(invocation.gate_assessment(), crate::application::workflow::gates::GateAssessment::Finding | crate::application::workflow::gates::GateAssessment::Fault);
-                            }
-                            Err(error) => {
-                                fault |= config
-                                    .bindings(event, &node)
-                                    .iter()
-                                    .any(|(binding, _)| binding.mode == BindingMode::Blocking);
-                                write_json(
-                                    &self
-                                        .refine_dir
-                                        .join("automation/occurrence-errors")
-                                        .join(path.file_name().unwrap()),
-                                    &json!({"event": event.id, "goal_id": id, "error": error.to_string()}),
-                                )?;
-                            }
-                        }
-                    }
-                    let source = queued["source"].as_str().unwrap_or_default();
-                    if source.ends_with(".enter") || source.ends_with(".success") {
-                        if !complete && !fault {
-                            continue;
-                        }
-                        crate::application::work_items::FileWorkItemService::for_node(
-                            &self.refine_dir,
-                            &node,
-                        )
-                        .settle_lifecycle_outcome(id, &queued, fault)?;
-                    }
-                    let _ = std::fs::remove_file(&path);
+                let source = queued["source"].as_str().unwrap_or_default();
+                let exit = source.ends_with(".exit");
+                let departure = exit || source.ends_with(".success");
+                let generation = if departure {
+                    queued["previous_generation"].as_u64().unwrap_or(0)
                 } else {
-                    let Some(pending) = goal
-                        .get("pending_event_transition")
-                        .filter(|p| p["id"] == queued["id"] && p["state"] == "pending")
-                    else {
-                        let _ = std::fs::remove_file(&path);
-                        continue;
-                    };
-                    context.data["lifecycle_transition"] = pending.clone();
-                    let pending_id = pending["id"].as_str().unwrap_or_default().to_string();
-                    let config: AutomationConfig =
-                        serde_json::from_value(pending["config"].clone())
-                            .map_err(|e| RefineError::Serialization(e.to_string()))?;
-                    let from = pending["from"].as_str().unwrap_or_default();
-                    let source = format!("workflow.{from}.exit");
-                    let success_source = format!("workflow.{from}.success");
-                    let entry_source = format!("workflow.{from}.enter");
-                    let mut complete = true;
-                    let mut failed = false;
-                    let mut checked_invocations = Vec::new();
-                    let entry_config: AutomationConfig = if pending["entry_config"].is_object() {
-                        serde_json::from_value(pending["entry_config"].clone())
-                            .map_err(|e| RefineError::Serialization(e.to_string()))?
-                    } else {
-                        super::super::gate_configuration::transition_entry_configuration(
-                            &goal, &config, &node, from,
-                        )?
-                    };
-                    let selected = entry_config
-                        .events
-                        .values()
-                        .filter(|event| {
-                            !["plan", "implement", "quality", "governance"].contains(&from)
-                                && event.source.as_deref() == Some(&entry_source)
-                        })
-                        .map(|event| (&entry_config, event))
-                        .chain(
-                            config
-                                .events
-                                .values()
-                                .filter(|event| event.source.as_deref() == Some(&success_source))
-                                .map(|event| (&config, event)),
-                        )
-                        .chain(
-                            config
-                                .events
-                                .values()
-                                .filter(|event| event.source.as_deref() == Some(&source))
-                                .map(|event| (&config, event)),
+                    queued["generation"].as_u64().unwrap_or(0)
+                };
+                let round = if departure {
+                    queued["previous_round"].as_u64().unwrap_or(0)
+                } else {
+                    queued["occurrence"]["round_idx"].as_u64().unwrap_or(0)
+                };
+                let variant = if exit {
+                    format!(
+                        "to-{}-{}",
+                        queued["occurrence"]["to"].as_str().unwrap_or_default(),
+                        queued["candidate_commit"].as_str().unwrap_or_default()
+                    )
+                } else {
+                    String::new()
+                };
+                let key = format!("{id}:{round}:{generation}:{node}:{source}:{variant}");
+                match self.prepare_pinned(&config, event, context.clone(), BTreeMap::new(), &key) {
+                    Ok(invocation) => {
+                        complete &= invocation.state.terminal();
+                        fault |= matches!(
+                            invocation.gate_assessment(),
+                            crate::application::workflow::gates::GateAssessment::Finding
+                                | crate::application::workflow::gates::GateAssessment::Fault
                         );
-                    for (binding_config, event) in
-                        selected.filter(|(_, e)| e.enabled && e.scope.applies(&node))
-                    {
-                        let effective = binding_config.bindings(event, &node);
-                        if effective.is_empty() {
-                            continue;
-                        }
-                        let blocking = effective
+                    }
+                    Err(error) => {
+                        fault |= config
+                            .bindings(event, node)
                             .iter()
                             .any(|(binding, _)| binding.mode == BindingMode::Blocking);
-                        if !blocking {
-                            continue;
-                        }
-                        let key = if event.source.as_deref() == Some(&entry_source) {
-                            format!(
-                                "{id}:{}:{}:{node}:{entry_source}:",
-                                context.round_idx.unwrap_or(0),
-                                goal["event_generation"].as_u64().unwrap_or(0)
-                            )
-                        } else {
-                            pending_id.clone()
-                        };
-                        let mut binding_context = context.clone();
-                        if event.source.as_deref() == Some(&entry_source)
-                            && let Some(occurrence) =
-                                goal["workflow_events"].as_array().and_then(|items| {
-                                    items.iter().find(|item| {
-                                        item["generation"] == goal["event_generation"]
-                                            && item["to"] == pending["from"]
-                                    })
-                                })
-                        {
-                            binding_context.data["occurrence"] = occurrence.clone();
-                        }
-                        let invocation = match self.prepare_pinned(
-                            binding_config,
-                            event,
-                            binding_context,
-                            BTreeMap::new(),
-                            &key,
-                        ) {
-                            Ok(invocation) => invocation,
-                            Err(error) => {
+                        write_json(
+                            &self
+                                .refine_dir
+                                .join("automation/occurrence-errors")
+                                .join(path.file_name().unwrap()),
+                            &json!({"event": event.id, "goal_id": id, "error": error.to_string()}),
+                        )?;
+                    }
+                }
+            }
+            let source = queued["source"].as_str().unwrap_or_default();
+            if source.ends_with(".enter") || source.ends_with(".success") {
+                if !complete && !fault {
+                    return Ok(());
+                }
+                crate::application::work_items::FileWorkItemService::for_node(
+                    &self.refine_dir,
+                    node,
+                )
+                .settle_lifecycle_outcome(id, &queued, fault)?;
+            }
+            crate::application::work_items::FileWorkItemService::for_node(&self.refine_dir, node)
+                .finish_event_dispatch(id, &queued)?;
+            let _ = std::fs::remove_file(&path);
+        } else {
+            let Some(pending) = goal
+                .get("pending_event_transition")
+                .filter(|p| p["id"] == queued["id"] && p["state"] == "pending")
+            else {
+                let _ = std::fs::remove_file(&path);
+                return Ok(());
+            };
+            context.data["lifecycle_transition"] = pending.clone();
+            let pending_id = pending["id"].as_str().unwrap_or_default().to_string();
+            let config: AutomationConfig = serde_json::from_value(pending["config"].clone())
+                .map_err(|e| RefineError::Serialization(e.to_string()))?;
+            let from = pending["from"].as_str().unwrap_or_default();
+            let source = format!("workflow.{from}.exit");
+            let success_source = format!("workflow.{from}.success");
+            let entry_source = format!("workflow.{from}.enter");
+            let mut complete = true;
+            let mut failed = false;
+            let mut checked_invocations = Vec::new();
+            let entry_config: AutomationConfig = if pending["entry_config"].is_object() {
+                serde_json::from_value(pending["entry_config"].clone())
+                    .map_err(|e| RefineError::Serialization(e.to_string()))?
+            } else {
+                super::super::gate_configuration::transition_entry_configuration(
+                    &goal, &config, node, from,
+                )?
+            };
+            let selected = entry_config
+                .events
+                .values()
+                .filter(|event| {
+                    !["plan", "implement", "quality", "governance"].contains(&from)
+                        && event.source.as_deref() == Some(&entry_source)
+                })
+                .map(|event| (&entry_config, event))
+                .chain(
+                    config
+                        .events
+                        .values()
+                        .filter(|event| event.source.as_deref() == Some(&success_source))
+                        .map(|event| (&config, event)),
+                )
+                .chain(
+                    config
+                        .events
+                        .values()
+                        .filter(|event| event.source.as_deref() == Some(&source))
+                        .map(|event| (&config, event)),
+                );
+            for (binding_config, event) in
+                selected.filter(|(_, e)| e.enabled && e.scope.applies(node))
+            {
+                let effective = binding_config.bindings(event, node);
+                if effective.is_empty() {
+                    continue;
+                }
+                let blocking = effective
+                    .iter()
+                    .any(|(binding, _)| binding.mode == BindingMode::Blocking);
+                if !blocking {
+                    continue;
+                }
+                let key = if event.source.as_deref() == Some(&entry_source) {
+                    format!(
+                        "{id}:{}:{}:{node}:{entry_source}:",
+                        context.round_idx.unwrap_or(0),
+                        goal["event_generation"].as_u64().unwrap_or(0)
+                    )
+                } else {
+                    pending_id.clone()
+                };
+                let mut binding_context = context.clone();
+                if event.source.as_deref() == Some(&entry_source)
+                    && let Some(occurrence) = goal["workflow_events"].as_array().and_then(|items| {
+                        items.iter().find(|item| {
+                            item["generation"] == goal["event_generation"]
+                                && item["to"] == pending["from"]
+                        })
+                    })
+                {
+                    binding_context.data["occurrence"] = occurrence.clone();
+                }
+                let invocation = match self.prepare_pinned(
+                    binding_config,
+                    event,
+                    binding_context,
+                    BTreeMap::new(),
+                    &key,
+                ) {
+                    Ok(invocation) => invocation,
+                    Err(error) => {
+                        write_json(
+                            &self
+                                .refine_dir
+                                .join("automation/occurrence-errors")
+                                .join(format!("{pending_id}.json")),
+                            &json!({"event_id": event.id, "goal_id": id, "error": error.to_string()}),
+                        )?;
+                        failed = true;
+                        break;
+                    }
+                };
+                if let Some(required) =
+                    super::super::execution::BlockingInvocation::pin(&invocation)
+                {
+                    checked_invocations.push(required);
+                }
+                let assessment = invocation.gate_assessment();
+                complete &=
+                    assessment != crate::application::workflow::gates::GateAssessment::Missing;
+                failed |= matches!(
+                    assessment,
+                    crate::application::workflow::gates::GateAssessment::Finding
+                        | crate::application::workflow::gates::GateAssessment::Fault
+                );
+                // Later lifecycle edges may only begin after the preceding
+                // required edge has succeeded.
+                if !complete || failed {
+                    break;
+                }
+            }
+            if complete || failed {
+                crate::infrastructure::process::supervisor::coordination::with_record_lock(
+                    &self.refine_dir,
+                    id,
+                    || {
+                        self.settle_blocking(&checked_invocations, |validation| {
+                            if let Err(error) = validation {
+                                failed = true;
                                 write_json(
                                     &self
                                         .refine_dir
                                         .join("automation/occurrence-errors")
                                         .join(format!("{pending_id}.json")),
-                                    &json!({"event_id": event.id, "goal_id": id, "error": error.to_string()}),
+                                    &json!({"goal_id":id,"error":error.to_string()}),
                                 )?;
-                                failed = true;
-                                break;
                             }
-                        };
-                        if let Some(required) =
-                            super::super::execution::BlockingInvocation::pin(&invocation)
-                        {
-                            checked_invocations.push(required);
-                        }
-                        let assessment = invocation.gate_assessment();
-                        complete &= assessment
-                            != crate::application::workflow::gates::GateAssessment::Missing;
-                        failed |= matches!(
-                            assessment,
-                            crate::application::workflow::gates::GateAssessment::Finding
-                                | crate::application::workflow::gates::GateAssessment::Fault
-                        );
-                        // Later lifecycle edges may only begin after the preceding
-                        // required edge has succeeded.
-                        if !complete || failed {
-                            break;
-                        }
-                    }
-                    if complete || failed {
-                        crate::infrastructure::process::supervisor::coordination::with_record_lock(
-                            &self.refine_dir,
-                            id,
-                            || {
-                                self.settle_blocking(&checked_invocations, |validation| {
-                                    if let Err(error) = validation {
-                                        failed = true;
-                                        write_json(
-                                            &self
-                                                .refine_dir
-                                                .join("automation/occurrence-errors")
-                                                .join(format!("{pending_id}.json")),
-                                            &json!({"goal_id":id,"error":error.to_string()}),
-                                        )?;
-                                    }
-                                    crate::application::work_items::FileWorkItemService::new(
-                                        &self.refine_dir,
-                                    )
-                                    .settle_event_transition(
-                                        id,
-                                        &pending_id,
-                                        failed,
-                                    )
-                                })
-                            },
-                        )?;
-                        let _ = std::fs::remove_file(&path);
-                    }
-                }
+                            crate::application::work_items::FileWorkItemService::new(
+                                &self.refine_dir,
+                            )
+                            .settle_event_transition(
+                                id,
+                                &pending_id,
+                                failed,
+                            )
+                        })
+                    },
+                )?;
+                let _ = std::fs::remove_file(&path);
             }
         }
         Ok(())

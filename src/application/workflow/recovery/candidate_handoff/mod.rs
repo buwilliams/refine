@@ -40,16 +40,46 @@ pub(crate) fn register_candidate_handoff(
         }
     }
     if let Some(operation) = active_handoff(&registry, &owner)? {
-        validate_handoff(
+        match validate_handoff(
             &operation,
             goal_id,
             round_idx,
             branch,
             worktree_path,
             base_commit,
-        )?;
-        settle_superseded_handoffs(&registry, target_root, goal_id, round_idx, &operation.id)?;
-        return Ok(operation);
+        ) {
+            Ok(()) => {
+                settle_superseded_handoffs(
+                    &registry,
+                    target_root,
+                    goal_id,
+                    round_idx,
+                    &operation.id,
+                )?;
+                return Ok(operation);
+            }
+            Err(error) => {
+                // A handoff describes generated work. The current Round may have
+                // selected a replacement workspace or rebased candidate since it
+                // was recorded; the old operation cannot veto that binding.
+                let root = crate::infrastructure::storage::project_layout::prepare_refine_dir(
+                    target_root,
+                )?;
+                let goal = crate::application::work_items::FileWorkItemService::new(root)
+                    .show_goal_detail(goal_id)?;
+                if goal["rounds"].as_array().map(Vec::len) != Some(round_idx + 1)
+                    || goal["node_id"].as_str().unwrap_or("default") != node_id
+                    || goal["branch_name"] != branch
+                    || goal["base_commit"] != base_commit
+                    || goal["rounds"][round_idx]["workspace_branch"] != branch
+                {
+                    return Err(error);
+                }
+                registry.finish_with_result(&operation.id, OperationState::Succeeded,
+                    json!({"disposition":"superseded_by_workspace","evidence":{
+                        "branch":branch,"base_commit":base_commit,"generation":goal["event_generation"]}}))?;
+            }
+        }
     }
     let operation = registry.register_exclusive_with_request(
         &owner,

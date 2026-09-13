@@ -2,7 +2,37 @@ use super::*;
 
 impl FileProjectProjectionStore {
     pub(crate) fn project_goal(&self, path: &Path) -> RefineResult<Option<GoalSummaryProjection>> {
-        let value = Self::read_json(path)?;
+        match Self::read_json(path).and_then(|value| self.project_goal_value(path, &value)) {
+            Ok(Some(projection)) => Ok(Some(projection)),
+            result => {
+                // A project snapshot supports per-Goal reads and mutations too.
+                // One damaged source must not make every sibling unreadable.
+                // The scheduling index retains a durable recovery diagnostic;
+                // source fingerprints make a repaired record rejoin the cache.
+                if let Err(error) = result {
+                    eprintln!("refine Goal projection {}: {error}", path.display());
+                }
+                if let Err(error) =
+                    crate::application::projects::projection::ActiveGoalIndex::record_goal(
+                        &self.refine_dir,
+                        path,
+                    )
+                {
+                    eprintln!(
+                        "refine Goal recovery diagnostic {}: {error}",
+                        path.display()
+                    );
+                }
+                Ok(None)
+            }
+        }
+    }
+
+    pub(crate) fn project_goal_value(
+        &self,
+        path: &Path,
+        value: &Value,
+    ) -> RefineResult<Option<GoalSummaryProjection>> {
         let Some(object) = value.as_object() else {
             return Ok(None);
         };

@@ -368,8 +368,7 @@ pub(super) fn prepare_occurrence(current: Option<&Value>, next: &mut Value) {
         return;
     };
     let round = |v: &Value| v["rounds"].as_array().map_or(0, Vec::len);
-    let changed = current["status"] != next["status"]
-        || current["node_id"] != next["node_id"]
+    let supersedes_execution = current["node_id"] != next["node_id"]
         || round(current) != round(next)
         || current["rounds"]
             .as_array()
@@ -381,6 +380,7 @@ pub(super) fn prepare_occurrence(current: Option<&Value>, next: &mut Value) {
                 .map(|r| &r["prompt"])
         || current["workflow_controls"].as_array().map_or(0, Vec::len)
             != next["workflow_controls"].as_array().map_or(0, Vec::len);
+    let changed = current["status"] != next["status"] || supersedes_execution;
     let generation = current["event_generation"].as_u64().unwrap_or(0);
     if !changed {
         next["event_generation"] = json!(generation);
@@ -391,6 +391,11 @@ pub(super) fn prepare_occurrence(current: Option<&Value>, next: &mut Value) {
     }
     if changed {
         let selected = next["event_generation"].clone();
+        if next["workflow_integration_control"]["state"] == "pending"
+            && next["workflow_integration_control"]["generation"] != selected
+        {
+            next["workflow_integration_control"]["state"] = json!("superseded");
+        }
         if next["pending_workflow_outcome"]["state"] == "pending"
             && next["pending_workflow_outcome"]["occurrence"]["generation"] != selected
         {
@@ -423,6 +428,26 @@ pub(super) fn prepare_occurrence(current: Option<&Value>, next: &mut Value) {
         if let Some(events) = next["workflow_events"].as_array_mut() {
             for event in events.iter_mut().filter(|e| e["generation"] == selected) {
                 event["workflow_revision"] = json!(workflow_revision(current).saturating_add(1));
+                if supersedes_execution {
+                    // The existing occurrence is also the durable cleanup boundary.
+                    // Normal phase progression does not retire its enclosing execution.
+                    event["supersedes_execution"] = json!(true);
+                }
+            }
+        }
+        let occurrence = next["workflow_events"].as_array().and_then(|events| {
+            events
+                .iter()
+                .find(|event| event["generation"] == selected)
+                .cloned()
+        });
+        if let Some(occurrence) = occurrence
+            && let Some(dispatches) = next["pending_event_dispatches"].as_object_mut()
+        {
+            dispatches.retain(|_, queued| queued["occurrence"]["generation"] == selected);
+            for queued in dispatches.values_mut() {
+                // Dispatch is a projection of this finalized durable occurrence.
+                queued["occurrence"] = occurrence.clone();
             }
         }
     }

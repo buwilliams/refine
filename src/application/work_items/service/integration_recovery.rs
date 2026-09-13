@@ -68,25 +68,9 @@ impl FileWorkItemService {
                     "Goal {goal_id} has no authoritative Round for candidate refresh"
                 ))
             })?;
-        let mut prior_gates = Map::new();
-        for key in [
-            "quality_state",
-            "quality_message",
-            "quality_details",
-            "quality_checked_at",
-            "quality_candidate_commit",
-            "rule_state",
-            "governance_message",
-            "governance_details",
-            "governance_checked_at",
-            "governance_candidate_commit",
-        ] {
-            prior_gates.insert(
-                key.to_string(),
-                round.get(key).cloned().unwrap_or(Value::Null),
-            );
-            round.insert(key.to_string(), Value::Null);
-        }
+        let mut round_value = Value::Object(std::mem::take(round));
+        let prior_gates = invalidate_round_evidence(&mut round_value, &GoalStatus::Quality, false)?;
+        *round = round_value.as_object().unwrap().clone();
         // A Round can refresh more than once — the Implement→Quality boundary
         // and then Governance, or Governance across its bounded retries — so
         // the slot it publishes into is not free: whatever it replaces travels
@@ -224,4 +208,82 @@ fn superseded_refresh_history(current: Option<&Value>) -> Vec<Value> {
         history.drain(..history.len() - SUPERSEDED_REFRESH_HISTORY);
     }
     history
+}
+
+impl FileWorkItemService {
+    /// Record an external effect even when its original execution was superseded.
+    /// Only the matching current occurrence receives a current integration projection.
+    pub(crate) fn record_actual_integration(
+        &self,
+        id: &str,
+        round_idx: usize,
+        generation: u64,
+        integration: &crate::model::goal::RoundIntegration,
+    ) -> RefineResult<()> {
+        self.record_integration_effect(id, round_idx, generation, integration, true)
+    }
+
+    pub(crate) fn record_partial_integration(
+        &self,
+        id: &str,
+        round_idx: usize,
+        generation: u64,
+        integration: &crate::model::goal::RoundIntegration,
+    ) -> RefineResult<()> {
+        self.record_integration_effect(id, round_idx, generation, integration, false)
+    }
+
+    fn record_integration_effect(
+        &self,
+        id: &str,
+        round_idx: usize,
+        generation: u64,
+        integration: &crate::model::goal::RoundIntegration,
+        complete: bool,
+    ) -> RefineResult<()> {
+        let _lock = self.acquire_goal_mutation_lock(id)?;
+        let summary = self.show_goal_summary(id)?;
+        // Actual Git effects remain facts after a step or node changes. This
+        // evidence-only write never uses the former execution's current-write gate.
+        let (path, mut goal) = self.read_goal_value_unchecked_locked(&summary)?;
+        let current = complete
+            && goal["event_generation"].as_u64().unwrap_or(0) == generation
+            && goal["rounds"].as_array().map(Vec::len) == Some(round_idx + 1)
+            && goal["candidate_commit"] == integration.candidate_commit;
+        let effect = json!({"round_idx":round_idx,"generation":generation,
+            "integration":integration,"complete":complete});
+        let history = goal
+            .as_object_mut()
+            .unwrap()
+            .entry("integration_history")
+            .or_insert(json!([]))
+            .as_array_mut()
+            .ok_or_else(|| RefineError::Serialization("Invalid integration history".into()))?;
+        // A local advance and its later push are one concrete effect. A retry
+        // can finish publication, but cannot turn completed evidence back into
+        // an incomplete result. Partial effects never populate the projection
+        // that tells a replacement execution it may skip integration.
+        if let Some(existing) = history.iter_mut().find(|entry| {
+            entry["round_idx"] == round_idx
+                && entry["generation"] == generation
+                && [
+                    "candidate_commit",
+                    "target_branch",
+                    "target_commit",
+                    "remote",
+                ]
+                .iter()
+                .all(|key| entry["integration"][key] == effect["integration"][key])
+        }) {
+            if complete || existing["complete"] == false {
+                *existing = effect;
+            }
+        } else {
+            history.push(effect);
+        }
+        if current {
+            goal["rounds"][round_idx]["workflow_integration"] = json!(integration);
+        }
+        write_json_atomically(&path, &goal)
+    }
 }

@@ -20,6 +20,8 @@ use crate::model::goal::RoundIntegration;
 use crate::model::workflow::GoalStatus;
 mod checkout_sync;
 mod integration_worktree;
+#[cfg(test)]
+mod publication_test_hooks;
 mod reconciliation;
 // Crate-visible so the integrated-target workflow lease can delegate the
 // durable transaction lifecycle (recovery, marker, checkout-sync window) here.
@@ -39,6 +41,7 @@ pub struct FileGovernanceIntegrationService {
     pub runtime_root: PathBuf,
     pub refine_dir: PathBuf,
     pub target_root: Option<PathBuf>,
+    expected_generation: Option<u64>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -80,8 +83,8 @@ pub(crate) enum TargetRefresh {
     /// The base resolves from the ref immediately after, so the race is benign.
     Raced { target_commit: String },
     /// The local ref carries commits the remote does not. Merging is
-    /// integration's job, under its own evidence and conflict handling; Todo
-    /// leaves the ref alone.
+    /// integration's job, under its own evidence and conflict handling; shared
+    /// workflow preparation leaves the ref alone.
     Diverged {
         local_commit: String,
         remote_commit: String,
@@ -96,6 +99,7 @@ struct GovernanceAuthority {
     branch: String,
     candidate: String,
     remote: String,
+    generation: u64,
 }
 
 /// Compare-and-swap `refs/heads/<target_branch>` from `from_commit` to
@@ -106,7 +110,7 @@ struct GovernanceAuthority {
 /// publication. A checkout-sync collision leaves the pending marker and is
 /// never an error; only losing the CAS itself aborts the caller.
 ///
-/// This is deliberately not a method: the Todo boundary fast-forwards the same
+/// This is deliberately not a method: shared workflow preparation fast-forwards the same
 /// ref from the same remote, and one ref-motion implementation must serve both
 /// so the checkout-sync window can never be opened by one path and skipped by
 /// the other. It carries no Governance state — the caller supplies everything.
@@ -118,6 +122,24 @@ pub(crate) fn apply_target_advance(
     target_branch: &str,
     from_commit: &str,
     to_commit: &str,
+) -> RefineResult<TargetAdvanceOutcome> {
+    apply_target_advance_guarded(
+        git,
+        target_root,
+        target_branch,
+        from_commit,
+        to_commit,
+        || Ok(git.clone()),
+    )
+}
+
+fn apply_target_advance_guarded(
+    git: &FileGitWorktreeService,
+    target_root: &Path,
+    target_branch: &str,
+    from_commit: &str,
+    to_commit: &str,
+    before_publication: impl FnOnce() -> RefineResult<FileGitWorktreeService>,
 ) -> RefineResult<TargetAdvanceOutcome> {
     if from_commit == to_commit {
         return Ok(TargetAdvanceOutcome::Applied);
@@ -140,7 +162,14 @@ pub(crate) fn apply_target_advance(
             to: to_commit.to_string(),
         },
     )?;
-    match git.update_ref_cas(&reference, to_commit, from_commit) {
+    let publication_git = match before_publication() {
+        Ok(git) => git,
+        Err(error) => {
+            clear_checkout_sync_window(target_root)?;
+            return Err(error);
+        }
+    };
+    match publication_git.update_ref_cas(&reference, to_commit, from_commit) {
         Ok(()) => {}
         Err(RefineError::TargetAdvanced { current, .. }) => {
             clear_checkout_sync_window(target_root)?;
@@ -224,7 +253,7 @@ pub(crate) fn refresh_target_from_remote(
                 remote_commit,
             });
         }
-        // Todo runs outside the integrated-target transaction, so the marker
+        // Shared preparation runs outside the integrated-target transaction, so the marker
         // that would attribute an interrupted CAS-to-sync window has no lane to
         // attach to. The pending-sync record is this path's durable trace
         // instead, written before the ref moves and replayed by the repair
@@ -258,6 +287,7 @@ impl FileGovernanceIntegrationService {
             runtime_root: runtime_root.into(),
             refine_dir: refine_dir.into(),
             target_root: None,
+            expected_generation: None,
         }
     }
 
@@ -270,7 +300,13 @@ impl FileGovernanceIntegrationService {
             runtime_root: runtime_root.into(),
             refine_dir: refine_dir.into(),
             target_root: Some(target_root.into()),
+            expected_generation: None,
         }
+    }
+
+    pub(crate) fn for_occurrence(mut self, generation: u64) -> Self {
+        self.expected_generation = Some(generation);
+        self
     }
 
     /// Integrate the recorded automated workflow candidate during Governance.
@@ -370,6 +406,12 @@ impl FileGovernanceIntegrationService {
             Some(target_root) => target_root.clone(),
             None => target_root(&self.refine_dir)?,
         };
+        let work_items = FileWorkItemService::for_node(&self.refine_dir, node_id);
+        let generation = self.expected_generation.unwrap_or(
+            work_items.show_goal_detail(goal_id)?["event_generation"]
+                .as_u64()
+                .unwrap_or(0),
+        );
         let authority = GovernanceAuthority {
             goal_id: goal_id.to_string(),
             node_id: node_id.to_string(),
@@ -377,6 +419,7 @@ impl FileGovernanceIntegrationService {
             branch: expected_branch.to_string(),
             candidate: expected_candidate.to_string(),
             remote: expected_remote.to_string(),
+            generation,
         };
         let work_items = FileWorkItemService::for_node(&self.refine_dir, node_id);
         self.verify_integration_authority(&work_items, &authority, true)?;
@@ -731,9 +774,8 @@ impl FileGovernanceIntegrationService {
         operation_id: &str,
     ) -> RefineResult<RoundIntegration> {
         let work_items = FileWorkItemService::for_node(&self.refine_dir, &authority.node_id);
-        // This is the last authority check before the first Git side effect. Cancellation or
-        // reassignment before this point prevents integration. Once this succeeds, the repository
-        // operation is allowed to finish and record evidence without a rollback protocol.
+        // Preparation may outlive a decision. Each target publication below
+        // rechecks this occurrence immediately before starting its Git child.
         self.verify_integration_authority(&work_items, authority, true)?;
         let detail = work_items.show_goal_detail(&authority.goal_id)?;
         let rounds = detail
@@ -754,12 +796,18 @@ impl FileGovernanceIntegrationService {
             "WorkflowGovernance",
             Some(authority.round_idx),
         );
-        // Goal cancellation must not kill a Git child after the Governance point of no return.
-        // This is node-local process metadata, not synchronized execution authority.
-        process_metadata.insert("side_effect_committed".to_string(), json!(true));
+        process_metadata.insert("target_app_id".into(), json!(target_root));
+        process_metadata.insert(
+            "workflow_step_generation".into(),
+            json!(authority.generation),
+        );
         let git = FileGitWorktreeService::with_runtime_root(target_root, &self.runtime_root)
             .with_operation_id(operation_id)
-            .with_process_metadata(process_metadata);
+            .with_process_metadata(process_metadata.clone());
+        // Protect only a started CAS or push child, never preparatory fetch or
+        // private merge work. The next publication needs a fresh decision check.
+        process_metadata.insert("side_effect_committed".into(), json!(true));
+        let publication_git = git.clone().with_process_metadata(process_metadata);
         // A collision-skipped checkout sync from an earlier integration
         // self-heals here, under the same repository lock, once the colliding
         // dirt is gone. Best-effort: a still-pending sync must not block an
@@ -786,8 +834,11 @@ impl FileGovernanceIntegrationService {
             if git.commit_is_ancestor(&candidate_commit, &published_target)? {
                 let local_target = git.resolve_commit(&target_branch)?;
                 if git.commit_is_ancestor(&local_target, &published_target)? {
-                    self.advance_target(
+                    self.advance_current_target(
                         &git,
+                        &publication_git,
+                        &work_items,
+                        authority,
                         target_root,
                         &target_branch,
                         &local_target,
@@ -813,6 +864,7 @@ impl FileGovernanceIntegrationService {
                         &work_items,
                         &authority.goal_id,
                         authority.round_idx,
+                        authority.generation,
                         &recovered,
                     )?;
                     return Ok(recovered);
@@ -870,8 +922,11 @@ impl FileGovernanceIntegrationService {
                     ));
                 }
                 let synchronized_commit = worktree.git().resolve_commit("HEAD")?;
-                self.advance_target(
+                self.advance_current_target(
                     &git,
+                    &publication_git,
+                    &work_items,
+                    authority,
                     target_root,
                     &target_branch,
                     &local_target,
@@ -911,34 +966,106 @@ impl FileGovernanceIntegrationService {
             // two-parent commit, which the already-merged revert machinery
             // depends on to identify integrations.
             let merge_commit = worktree.git().resolve_commit("HEAD")?;
-            self.advance_target(
+            if let Err(error) = self.advance_current_target(
                 &git,
+                &publication_git,
+                &work_items,
+                authority,
                 target_root,
                 &target_branch,
                 &current_target,
                 &merge_commit,
-            )?;
+            ) {
+                // Checkout synchronization can fail after the CAS committed.
+                // Preserve the observed ref effect even when that continuation
+                // fails; it does not prove that remote publication completed.
+                if git.resolve_commit(&target_branch).ok().as_deref() == Some(&merge_commit) {
+                    work_items.record_partial_integration(
+                        &authority.goal_id,
+                        authority.round_idx,
+                        authority.generation,
+                        &RoundIntegration {
+                            candidate_commit: candidate_commit.clone(),
+                            target_branch: target_branch.clone(),
+                            target_commit: merge_commit,
+                            remote: remote.clone(),
+                            pushed: false,
+                            integrated_at: Utc::now().to_rfc3339(),
+                            merge,
+                        },
+                    )?;
+                }
+                return Err(error);
+            }
             (merge, merge_commit)
         };
-        if remote_configured {
-            git.push(&remote, &target_branch)?;
-        }
-        let integration = RoundIntegration {
+        let mut integration = RoundIntegration {
             candidate_commit,
             target_branch,
             target_commit,
             remote,
-            pushed: remote_configured,
+            pushed: false,
             integrated_at: Utc::now().to_rfc3339(),
             merge,
         };
+        if remote_configured {
+            // Record the actual local effect before the interruptible gap to
+            // push. It is history only until the remaining publication ends.
+            work_items.record_partial_integration(
+                &authority.goal_id,
+                authority.round_idx,
+                authority.generation,
+                &integration,
+            )?;
+            #[cfg(test)]
+            publication_test_hooks::run(publication_test_hooks::Boundary::Push);
+            self.verify_integration_authority(&work_items, authority, true)?;
+            publication_git.push(&integration.remote, &integration.target_branch)?;
+            integration.pushed = true;
+        }
         self.persist_integration(
             &work_items,
             &authority.goal_id,
             authority.round_idx,
+            authority.generation,
             &integration,
         )?;
         Ok(integration)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn advance_current_target(
+        &self,
+        git: &FileGitWorktreeService,
+        publication_git: &FileGitWorktreeService,
+        work_items: &FileWorkItemService,
+        authority: &GovernanceAuthority,
+        target_root: &Path,
+        target_branch: &str,
+        from_commit: &str,
+        to_commit: &str,
+    ) -> RefineResult<()> {
+        let outcome = apply_target_advance_guarded(
+            git,
+            target_root,
+            target_branch,
+            from_commit,
+            to_commit,
+            || {
+                #[cfg(test)]
+                publication_test_hooks::run(publication_test_hooks::Boundary::TargetCas);
+                self.verify_integration_authority(work_items, authority, true)?;
+                Ok(publication_git.clone())
+            },
+        )?;
+        match outcome {
+            TargetAdvanceOutcome::Applied => Ok(()),
+            TargetAdvanceOutcome::CasLost { current } => Err(RefineError::TargetAdvanced {
+                reference: format!("refs/heads/{target_branch}"),
+                expected: from_commit.to_string(),
+                current,
+            }),
+        }
     }
 
     /// Advance the target ref and surface a lost compare-and-swap as the
@@ -968,6 +1095,11 @@ impl FileGovernanceIntegrationService {
         require_governance: bool,
     ) -> RefineResult<()> {
         let detail = work_items.show_goal_detail(&authority.goal_id)?;
+        if detail["event_generation"].as_u64().unwrap_or(0) != authority.generation {
+            return Err(RefineError::Conflict(
+                "Integration belongs to a superseded workflow occurrence".into(),
+            ));
+        }
         let status = detail.get("status").and_then(Value::as_str);
         if require_governance && status != Some(GoalStatus::Governance.as_str()) {
             return Err(RefineError::Conflict(format!(
@@ -1043,14 +1175,10 @@ impl FileGovernanceIntegrationService {
         work_items: &FileWorkItemService,
         goal_id: &str,
         round_idx: usize,
+        generation: u64,
         integration: &RoundIntegration,
     ) -> RefineResult<()> {
-        work_items.update_goal_round_evaluation_summary(
-            goal_id,
-            round_idx,
-            &json!({"workflow_integration": integration}),
-        )?;
-        Ok(())
+        work_items.record_actual_integration(goal_id, round_idx, generation, integration)
     }
 
     fn verify_existing_integration(
@@ -1077,6 +1205,13 @@ impl FileGovernanceIntegrationService {
     }
 }
 
+/// A revert preserves candidate ancestry while removing its delivered change.
+/// All consumers must retain that recorded effect instead of treating the old
+/// integration receipt as proof the candidate remains delivered.
+pub(crate) fn recorded_integration_is_applicable(round: &Value) -> bool {
+    round["workflow_reconciliation"]["state"] != "reverted"
+}
+
 fn round_integration(round: &Value) -> RefineResult<Option<RoundIntegration>> {
     let Some(value) = round
         .get("workflow_integration")
@@ -1084,6 +1219,11 @@ fn round_integration(round: &Value) -> RefineResult<Option<RoundIntegration>> {
     else {
         return Ok(None);
     };
+    if !recorded_integration_is_applicable(round) {
+        return Err(RefineError::Conflict(
+            "Recorded integration was reverted; candidate ancestry cannot prove delivery".into(),
+        ));
+    }
     serde_json::from_value(value.clone())
         .map(Some)
         .map_err(|error| {
@@ -1152,8 +1292,35 @@ fn setting_string(settings: &JsonObject, key: &str, fallback: &str) -> String {
 mod tests;
 
 impl FileGovernanceIntegrationService {
-    /// Explicit surface operation. Recording a forced decision never manufactures
-    /// Quality or Governance evidence; integration records only the actual Git result.
+    /// Resume only a still-pending explicit decision; ordinary Goal work cannot
+    /// manufacture the pinned request or silently replay a completed verdict.
+    pub(crate) fn resume_pending_control(&self, id: &str) -> RefineResult<Option<Value>> {
+        let work = FileWorkItemService::new(&self.refine_dir);
+        let goal = work.show_goal_detail(id)?;
+        if goal["workflow_integration_control"]["state"] != "pending" {
+            return Ok(None);
+        }
+        let request_id = goal["workflow_integration_control"]["request_id"]
+            .as_str()
+            .ok_or_else(|| {
+                RefineError::Conflict("Pending integration has no request identity".into())
+            })?;
+        let receipt = goal["workflow_controls"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .find(|receipt| receipt["request_id"] == request_id)
+            .ok_or_else(|| {
+                RefineError::Conflict("Pending integration request is unavailable".into())
+            })?;
+        let request = serde_json::from_value(receipt["request"].clone()).map_err(|error| {
+            RefineError::Serialization(format!("Invalid pending integration request: {error}"))
+        })?;
+        self.force_integrate(id, &request).map(Some)
+    }
+
+    /// Explicit surface operation. Its durable request can be resumed by the
+    /// existing Goal scheduler after interruption, under the same request lock.
     pub fn force_integrate(
         &self,
         id: &str,
@@ -1169,18 +1336,17 @@ impl FileGovernanceIntegrationService {
             &self.runtime_root,
             self.runtime_root.join("cache"),
         );
-        // Serialize duplicate callers before recording launch intent. Validate every required
-        // input before changing Goal state; the durable reservation excludes the scheduler.
         crate::infrastructure::process::supervisor::coordination::with_record_lock(
             &self.refine_dir,
             &format!("forced-integration-{id}"),
             || {
                 let goal = work.show_goal_detail(id)?;
-                if let Some(existing) = goal["workflow_controls"].as_array().and_then(|receipts| {
-                    receipts
-                        .iter()
-                        .find(|r| r["request_id"] == request.request_id)
-                }) {
+                let existing = goal["workflow_controls"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .find(|receipt| receipt["request_id"] == request.request_id);
+                let decision = if let Some(existing) = existing {
                     if existing["request"] != serde_json::to_value(request).unwrap()
                         || existing["integration_requested"] != true
                     {
@@ -1188,44 +1354,77 @@ impl FileGovernanceIntegrationService {
                             "request_id identifies another decision".into(),
                         ));
                     }
-                    return Ok(
-                        json!({"decision":existing,"integration":existing["integration_result"]["integration"],"forced":true}),
-                    );
-                }
-                let round = goal["rounds"]
-                    .as_array()
-                    .and_then(|a| a.len().checked_sub(1))
-                    .ok_or_else(|| RefineError::Conflict("No candidate Round".into()))?;
-                let branch = required_string(&goal, "branch_name", id)?;
-                let candidate = required_string(&goal, "candidate_commit", id)?;
-                let remote = required_string(&goal["rounds"][round], "workflow_git_remote", id)?;
-                let target = self
-                    .target_root
-                    .clone()
-                    .map(Ok)
-                    .unwrap_or_else(|| target_root(&self.refine_dir))?;
-                let git = FileGitWorktreeService::with_runtime_root(&target, &self.runtime_root);
-                if git.resolve_commit(&candidate)? != candidate
-                    || git.resolve_commit(&branch)? != candidate
-                    || git.remote_branch_commit(&remote, &branch)?.as_deref()
-                        != Some(candidate.as_str())
-                {
-                    return Err(RefineError::Conflict("Forced integration requires the exact candidate on both the local branch and its configured remote".into()));
-                }
-                work.control_workflow_operation(id, request, true)?;
-                let result = self
-                    .integrate_workflow_candidate(
-                        id,
-                        round,
-                        goal["node_id"].as_str().unwrap_or("default"),
-                        &branch,
-                        &candidate,
-                        &remote,
-                    )
-                    .and_then(|value| {
-                        serde_json::to_value(value)
-                            .map_err(|e| RefineError::Serialization(e.to_string()))
-                    });
+                    if goal["workflow_integration_control"]["request_id"] != request.request_id
+                        || goal["workflow_integration_control"]["state"] != "pending"
+                    {
+                        return Ok(json!({"decision":existing,
+                            "integration":existing["integration_result"]["integration"], "forced":true}));
+                    }
+                    existing.clone()
+                } else {
+                    let round = goal["rounds"]
+                        .as_array()
+                        .and_then(|rounds| rounds.len().checked_sub(1))
+                        .ok_or_else(|| RefineError::Conflict("No candidate Round".into()))?;
+                    let branch = required_string(&goal, "branch_name", id)?;
+                    let candidate = required_string(&goal, "candidate_commit", id)?;
+                    let remote =
+                        required_string(&goal["rounds"][round], "workflow_git_remote", id)?;
+                    let target = self
+                        .target_root
+                        .clone()
+                        .map(Ok)
+                        .unwrap_or_else(|| target_root(&self.refine_dir))?;
+                    let git =
+                        FileGitWorktreeService::with_runtime_root(&target, &self.runtime_root);
+                    if git.resolve_commit(&candidate)? != candidate
+                        || git.resolve_commit(&branch)? != candidate
+                        || git.remote_branch_commit(&remote, &branch)?.as_deref()
+                            != Some(candidate.as_str())
+                    {
+                        return Err(RefineError::Conflict("Forced integration requires the exact candidate on both the local branch and its configured remote".into()));
+                    }
+                    work.control_workflow_operation(id, request, true)?
+                };
+                let result = (|| {
+                    let goal = work.show_goal_detail(id)?;
+                    let pending = &goal["workflow_integration_control"];
+                    if pending["request_id"] != request.request_id
+                        || pending["state"] != "pending"
+                        || pending["generation"] != goal["event_generation"]
+                        || pending["generation"] != decision["generation"]
+                    {
+                        return Err(RefineError::Conflict(
+                            "Integration decision was superseded".into(),
+                        ));
+                    }
+                    let inputs = &pending["inputs"];
+                    let round = inputs["round_idx"].as_u64()
+                        .ok_or_else(|| RefineError::Conflict("Pending integration lacks its original pinned inputs; request a new integration decision".into()))? as usize;
+                    if goal["rounds"].as_array().map(Vec::len) != Some(round + 1)
+                        || inputs["node_id"] != goal["node_id"]
+                        || inputs["branch"] != goal["branch_name"]
+                        || inputs["base_commit"] != goal["base_commit"]
+                        || inputs["candidate_commit"] != goal["candidate_commit"]
+                        || inputs["target_branch"] != goal["target_branch"]
+                        || inputs["remote"] != goal["rounds"][round]["workflow_git_remote"]
+                    {
+                        return Err(RefineError::Conflict("Pending integration inputs changed; the original decision cannot integrate replacement work".into()));
+                    }
+                    let integration = self
+                        .clone()
+                        .for_occurrence(pending["generation"].as_u64().unwrap_or(0))
+                        .integrate_workflow_candidate(
+                            id,
+                            round,
+                            inputs["node_id"].as_str().unwrap_or("default"),
+                            &required_string(inputs, "branch", id)?,
+                            &required_string(inputs, "candidate_commit", id)?,
+                            &required_string(inputs, "remote", id)?,
+                        )?;
+                    serde_json::to_value(integration)
+                        .map_err(|error| RefineError::Serialization(error.to_string()))
+                })();
                 let receipt =
                     work.finish_controlled_integration(id, &request.request_id, &result)?;
                 result.map(|integration| json!({"decision":receipt,"integration":integration,"forced":true}))

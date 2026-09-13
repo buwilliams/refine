@@ -240,20 +240,8 @@ fn web_server_manages_quality_skill_and_checks() {
     assert_eq!(checks.body["operation"]["status"], "running");
     let quality_operation_id = checks.body["operation"]["id"].as_str().unwrap();
     let registry = FileOperationRegistry::new(&runtime_root);
-    let operation = (0..200)
-        .find_map(|_| {
-            let operation = registry.status(quality_operation_id).unwrap();
-            if matches!(
-                operation.state,
-                OperationState::Succeeded | OperationState::Failed
-            ) {
-                Some(operation)
-            } else {
-                std::thread::sleep(std::time::Duration::from_millis(10));
-                None
-            }
-        })
-        .expect("Quality operation did not settle");
+    let operation =
+        wait_for_operation_status(&registry, quality_operation_id, OperationState::Succeeded);
     assert_eq!(operation.state, OperationState::Succeeded);
     assert_eq!(operation.result["owner_id"], "GOAL1");
     assert_eq!(

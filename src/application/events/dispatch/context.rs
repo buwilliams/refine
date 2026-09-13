@@ -109,6 +109,13 @@ impl FileEventService {
                     ));
                 }
             }
+            if let Some(occurrence) = invocation.context.data.get("occurrence") {
+                if !super::super::transitions::occurrence_is_current(&goal, occurrence) {
+                    return Err(RefineError::Conflict(
+                        "Workflow occurrence was superseded or is no longer durable".into(),
+                    ));
+                }
+            }
             let pinned = invocation.context.data.get("goal").unwrap_or(&Value::Null);
             for key in ["status", "node_id", "candidate_commit", "event_generation"] {
                 if invocation.context.data.get("occurrence").is_some()

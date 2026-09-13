@@ -18,10 +18,10 @@ struct RefreshFixture {
 
 impl RefreshFixture {
     fn new(conflict: bool) -> Self {
-        Self::new_with_retry(conflict, None)
+        Self::with_prior_recovery(conflict, None)
     }
 
-    fn new_with_retry(conflict: bool, automatic_retry_attempt: Option<u32>) -> Self {
+    fn with_prior_recovery(conflict: bool, prior_attempt: Option<u32>) -> Self {
         let temp_root = unique_temp_dir("workflow-candidate-refresh");
         let target_root = temp_root.join("repo");
         let runtime_root = temp_root.join("run/8080");
@@ -86,7 +86,7 @@ impl RefreshFixture {
         work_items
             .transition_goal_status("GOAL1", GoalStatus::Todo)
             .unwrap();
-        if let Some(attempt) = automatic_retry_attempt {
+        if let Some(attempt) = prior_attempt {
             work_items
                 .advance_automated_goal_status("GOAL1", GoalStatus::Plan)
                 .unwrap();
@@ -96,7 +96,7 @@ impl RefreshFixture {
             work_items
                 .advance_automated_goal_status("GOAL1", GoalStatus::Quality)
                 .unwrap();
-            // Historical lineage remains readable; new recovery requires an explicit decision.
+            // Exercise an explicit recovery selection within the existing authored Round.
             let goal = work_items.show_goal_detail("GOAL1").unwrap();
             work_items
                 .control_workflow(
@@ -114,25 +114,18 @@ impl RefreshFixture {
                 )
                 .unwrap();
         }
-        let branch = if automatic_retry_attempt.is_some() {
-            "refine/GOAL1/round-2"
-        } else {
-            "refine/GOAL1/round-1"
-        };
-        let worktree = if automatic_retry_attempt.is_some() {
-            let service = FileGitWorktreeService::new(&target_root);
-            let target = service.managed_worktree_path(branch).unwrap();
-            PathBuf::from(
-                service
-                    .ensure_worktree_at_commit(branch, &target, &candidate)
-                    .unwrap(),
-            )
-        } else {
-            worktree
-        };
-        work_items
-            .advance_automated_goal_status("GOAL1", GoalStatus::Plan)
-            .unwrap();
+        // Selecting Plan retains the authored Round and its candidate checkout.
+        // A fresh fixture still enters Plan through ordinary automated progress.
+        let branch = "refine/GOAL1/round-1";
+        if prior_attempt.is_none() {
+            work_items
+                .advance_automated_goal_status("GOAL1", GoalStatus::Plan)
+                .unwrap();
+        }
+        let selected = work_items.show_goal_detail("GOAL1").unwrap();
+        assert_eq!(selected["status"], "plan");
+        assert_eq!(selected["rounds"].as_array().unwrap().len(), 1);
+        assert_eq!(selected["rounds"][0]["prompt"], "Implement");
         work_items
             .update_goal_git_refs("GOAL1", branch, "main", &base, Some(&candidate))
             .unwrap();
@@ -410,7 +403,7 @@ fn refresh_conflict_aborts_and_retains_evidence_without_another_round() {
 
 #[test]
 fn refresh_conflict_after_explicit_recovery_has_no_successor_round() {
-    let fixture = RefreshFixture::new_with_retry(true, Some(5));
+    let fixture = RefreshFixture::with_prior_recovery(true, Some(5));
     let mut context = fixture.context();
     let outcome =
         refresh_candidate_for_target_advancement(&mut context, GoalStatus::Governance).unwrap();
@@ -421,12 +414,12 @@ fn refresh_conflict_after_explicit_recovery_has_no_successor_round() {
     );
     let detail = fixture.work_items.show_goal_detail("GOAL1").unwrap();
     assert_eq!(detail["status"], "failed");
-    assert_eq!(detail["rounds"].as_array().unwrap().len(), 2);
-    assert_eq!(detail["rounds"][1]["workflow_recovery"]["state"], "failed");
-    assert!(detail["rounds"][1]["workflow_recovery"]["successor_round"].is_null());
-    assert_eq!(detail["rounds"][1]["failure_category"], "integration");
+    assert_eq!(detail["rounds"].as_array().unwrap().len(), 1);
+    assert_eq!(detail["rounds"][0]["workflow_recovery"]["state"], "failed");
+    assert!(detail["rounds"][0]["workflow_recovery"]["successor_round"].is_null());
+    assert_eq!(detail["rounds"][0]["failure_category"], "integration");
     assert_eq!(
-        detail["rounds"][1]["workflow_recovery"]["retained_evidence"]["original_candidate_commit"],
+        detail["rounds"][0]["workflow_recovery"]["retained_evidence"]["original_candidate_commit"],
         fixture.candidate
     );
 }
@@ -483,7 +476,7 @@ fn integration_merge_conflict_retains_paths_without_another_round() {
 
 #[test]
 fn integration_merge_conflict_after_explicit_recovery_fails_once() {
-    let fixture = RefreshFixture::new_with_retry(true, Some(5));
+    let fixture = RefreshFixture::with_prior_recovery(true, Some(5));
     let mut context = fixture.context();
     let outcome =
         crate::application::workflow::engine::behaviors::settle_integration_merge_conflict(
@@ -503,11 +496,11 @@ fn integration_merge_conflict_after_explicit_recovery_fails_once() {
     assert_eq!(final_status, GoalStatus::Failed);
     let detail = fixture.work_items.show_goal_detail("GOAL1").unwrap();
     assert_eq!(detail["status"], "failed");
-    assert_eq!(detail["rounds"].as_array().unwrap().len(), 2);
-    assert_eq!(detail["rounds"][1]["workflow_recovery"]["state"], "failed");
-    assert_eq!(detail["rounds"][1]["failure_category"], "integration");
+    assert_eq!(detail["rounds"].as_array().unwrap().len(), 1);
+    assert_eq!(detail["rounds"][0]["workflow_recovery"]["state"], "failed");
+    assert_eq!(detail["rounds"][0]["failure_category"], "integration");
     assert!(
-        detail["rounds"][1]["workflow_recovery"]["retained_evidence"]["merge"]["conflicts"]
+        detail["rounds"][0]["workflow_recovery"]["retained_evidence"]["merge"]["conflicts"]
             .as_array()
             .is_some_and(|conflicts| conflicts.iter().any(|path| path == "app.txt"))
     );
@@ -515,14 +508,14 @@ fn integration_merge_conflict_after_explicit_recovery_fails_once() {
 
 #[test]
 fn an_explicit_recovery_failure_does_not_create_another_round() {
-    let fixture = RefreshFixture::new_with_retry(true, Some(4));
+    let fixture = RefreshFixture::with_prior_recovery(true, Some(4));
     let mut context = fixture.context();
     let outcome =
         refresh_candidate_for_target_advancement(&mut context, GoalStatus::Governance).unwrap();
     assert!(matches!(outcome, CandidateRefreshOutcome::Stopped { .. }));
     let detail = fixture.work_items.show_goal_detail("GOAL1").unwrap();
-    // The explicitly requested Round remains the last Round after failure.
-    assert_eq!(detail["rounds"].as_array().unwrap().len(), 2);
+    // Reassignment and its failed execution retain the original authored Round.
+    assert_eq!(detail["rounds"].as_array().unwrap().len(), 1);
     assert!(
         detail["rounds"]
             .as_array()

@@ -132,16 +132,13 @@ fn claims_are_provenance_and_concurrent_workers_cannot_accept_conflicting_transi
 
 #[test]
 fn workflow_decisions_supersede_old_results_without_erasing_claims() {
-    for action in [
-        "retry", "reenter", "reopen", "round", "redirect", "reassign",
-    ] {
+    for action in ["reenter", "reopen", "round", "redirect", "reassign"] {
         let (root, items) = fixture();
         let old = claim(&items, GoalStatus::Todo);
         let original =
             items.show_goal_detail("GOAL1").unwrap()["rounds"][0]["workflow_attempt_authority"]
                 .clone();
         match action {
-            "retry" => decision(&items, GoalStatus::Todo),
             "reenter" => {
                 decision(&items, GoalStatus::Backlog);
                 items.start_goal_workflow("GOAL1").unwrap();
@@ -202,9 +199,14 @@ fn same_named_quality_retry_creates_new_occurrence_and_preserves_candidate_evide
         .unwrap();
     items.retry_goal_quality_summary("GOAL1").unwrap();
     rejects_late_results(&items, old, GoalStatus::Quality);
+    let detail = items.show_goal_detail("GOAL1").unwrap();
+    let retried_attempt = detail["rounds"][0]["prior_attempts"]
+        .as_array()
+        .unwrap()
+        .last()
+        .unwrap();
     assert_eq!(
-        items.show_goal_detail("GOAL1").unwrap()["rounds"][0]["prior_attempts"][0]["quality_details"]
-            ["candidate_commit"],
+        retried_attempt["quality_details"]["candidate_commit"],
         "exact-candidate"
     );
     fs::remove_dir_all(root).unwrap();

@@ -31,7 +31,8 @@ pub(crate) fn ensure_integration_worktree(
     anchor_commit: &str,
 ) -> RefineResult<IntegrationWorktree> {
     let path = integration_worktree_path(repo_git)?;
-    let git = FileGitWorktreeService::with_runtime_root(&path, runtime_root);
+    let git = FileGitWorktreeService::with_runtime_root(&path, runtime_root)
+        .with_process_context_from(repo_git);
     let valid = path.exists() && git.is_inside_work_tree().unwrap_or(false);
     if valid {
         let pristine = git

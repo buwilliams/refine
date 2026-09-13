@@ -175,6 +175,13 @@ fn sync_skips_noop_commits_and_summarizes_batches() {
     assert!(first.committed && first.pushed, "{first:?}");
     let subject = git_stdout(&fixture.a, &["log", "-1", "--format=%s", "refine/state"]);
     assert_eq!(subject, "Sync Refine state: 2 goals");
+    assert_eq!(
+        git_stdout(
+            &fixture.a,
+            &["ls-tree", "-r", "--name-only", "refine/state"],
+        ),
+        ".refine/goals/GOALA/goal.json\n.refine/goals/GOALB/goal.json"
+    );
 
     let second = fixture.service(&fixture.a).sync().unwrap();
     assert!(!second.committed && !second.pushed, "{second:?}");

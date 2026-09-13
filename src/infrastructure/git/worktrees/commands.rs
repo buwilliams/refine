@@ -31,6 +31,12 @@ impl FileGitWorktreeService {
         self
     }
 
+    pub(crate) fn with_process_context_from(mut self, other: &Self) -> Self {
+        self.operation_id = other.operation_id.clone();
+        self.process_metadata = other.process_metadata.clone();
+        self
+    }
+
     pub(crate) fn git_output(&self, args: &[&str]) -> RefineResult<HostCommandOutput> {
         let output = self.git_raw_with_env(args, &[])?;
         if output.success {

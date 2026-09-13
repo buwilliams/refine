@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use crate::application::persistence_sync::conflict_reports::{
     StateSyncConflictPath, StateSyncConflictReport, conflict_path_summary,
 };
+use crate::application::persistence_sync::state::service::snapshot_live_state;
 use crate::application::persistence_sync::state::*;
 use crate::error::{RefineError, RefineResult};
 use crate::infrastructure::git::locks::with_repository_git_lock;
@@ -75,7 +76,13 @@ impl FileGitSyncService {
         })?;
         let path = checkout.path.display().to_string();
         self.git_checked(&["init", "-q", "--", &path])?;
-        replace_live_durable_state(live_refine, &checkout.path.join(".refine"))?;
+        snapshot_live_state(
+            live_refine,
+            &checkout.path.join(".refine"),
+            &durable_state_map(live_refine)?,
+            &Default::default(),
+            true,
+        )?;
         self.git_at_checked(&checkout.path, &["add", "-f", "-A", "--", ".refine"])?;
         self.git_at_checked(
             &checkout.path,

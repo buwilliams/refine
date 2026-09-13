@@ -13,6 +13,7 @@ use crate::model::log::LogEntry;
 use crate::model::workflow::GoalStatus;
 
 pub(crate) mod execution;
+pub(crate) mod preparation;
 mod workspace;
 use crate::application::workflow::{json_object, now_timestamp};
 pub(crate) use workspace::validate_round_workspace_branch;

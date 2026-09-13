@@ -157,6 +157,27 @@ impl FileGitWorktreeService {
         )
     }
 
+    /// Missing objects are recoverable generated state; inspection failures are not absence.
+    pub(crate) fn find_commit(&self, commitish: &str) -> RefineResult<Option<String>> {
+        validate_commitish(commitish)?;
+        let output = self.git_raw(&[
+            "rev-parse",
+            "--verify",
+            "--quiet",
+            &format!("{commitish}^{{commit}}"),
+        ])?;
+        match output.exit_code {
+            Some(0) => Ok(Some(
+                String::from_utf8_lossy(&output.stdout).trim().to_string(),
+            )),
+            Some(1) => Ok(None),
+            _ => Err(RefineError::Conflict(format!(
+                "Git commit inspection failed: {}",
+                trimmed_command_text(&output)
+            ))),
+        }
+    }
+
     pub fn resolve_commit(&self, commitish: &str) -> RefineResult<String> {
         validate_commitish(commitish)?;
         stdout(self.git_output(&["rev-parse", "--verify", &format!("{commitish}^{{commit}}")])?)

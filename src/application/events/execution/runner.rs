@@ -246,6 +246,18 @@ impl FileEventService {
                 );
                 if let Some(goal_id) = &invocation.context.goal_id {
                     metadata.insert("goal_id".into(), json!(goal_id));
+                    // Lifecycle and standalone Skills need the same durable launch
+                    // occurrence as workflow-owned agents, including the Skill that
+                    // submits a redirect. Keep current recovered launch metadata when
+                    // supplied; otherwise use the invocation's pinned Goal snapshot.
+                    for (key, field) in [
+                        ("workflow_step_generation", "event_generation"),
+                        ("workflow_revision", "workflow_revision"),
+                    ] {
+                        if let Some(value) = invocation.context.data["goal"][field].as_u64() {
+                            metadata.entry(key).or_insert(json!(value));
+                        }
+                    }
                 }
                 metadata.insert("skill_id".into(), json!(pinned.skill.id));
                 metadata.insert("node_id".into(), json!(invocation.context.node_id));

@@ -53,7 +53,7 @@ fn explicit_new_round_is_admitted_in_the_same_pass_after_a_superseded_failure() 
                 records.control_workflow(
                     goal,
                     &crate::application::work_items::WorkflowControl {
-                        to: GoalStatus::Plan,
+                        to: GoalStatus::Todo,
                         reason: "Explicit replacement Round".into(),
                         context: "Preserve prior evidence".into(),
                         expected_revision: current["workflow_revision"].as_u64().unwrap(),
@@ -62,6 +62,11 @@ fn explicit_new_round_is_admitted_in_the_same_pass_after_a_superseded_failure() 
                         force: false,
                         invocation_id: None,
                     },
+                )?;
+                records.append_goal_round_summary(
+                    goal,
+                    "Operator",
+                    "Explicitly authored replacement request",
                 )?;
                 Err(RefineError::Conflict("old attempt returned late".into()))
             } else {
@@ -78,6 +83,10 @@ fn explicit_new_round_is_admitted_in_the_same_pass_after_a_superseded_failure() 
     let goal = items.show_goal_detail("GOAL1").unwrap();
     assert_eq!(goal["rounds"].as_array().unwrap().len(), 2);
     assert!(goal["rounds"][0]["workflow_attempt_authority"].is_object());
+    assert_eq!(
+        goal["rounds"][1]["prompt"],
+        "Explicitly authored replacement request"
+    );
     assert_eq!(
         goal["rounds"][1]["failure_message"],
         "replacement failure is final"

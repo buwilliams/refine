@@ -1,6 +1,4 @@
 mod authoring;
-mod scoped_recovery;
-use scoped_recovery::begin_scoped_recovery_round;
 pub mod contract;
 
 use serde_json::{Value, json};
@@ -24,7 +22,7 @@ use crate::application::workflow::phases::quality::{
 };
 use crate::application::workflow::recovery::candidate_handoff::{
     find_candidate_handoff, record_candidate_handoff_commit, record_candidate_handoff_governance,
-    register_candidate_handoff, retain_candidate_handoff_after_failure, settle_candidate_handoff,
+    retain_candidate_handoff_after_failure, settle_candidate_handoff,
 };
 use crate::application::workflow::{
     CandidateRefreshOutcome, GovernanceEvaluation, agent_worktree_cwd, json_object, now_timestamp,
@@ -103,61 +101,19 @@ impl WorkflowBehavior for WorkflowTodo {
     }
 
     fn advance(&self, ctx: &mut WorkflowContext<'_>) -> RefineResult<WorkflowAdvanceOutcome> {
+        let pattern = setting_string(&ctx.settings, "branch_name_pattern", "refine/{goal_id}");
+        let target = setting_string(&ctx.settings, "merge_target_branch", "main");
         ctx.revalidate_authority(GoalStatus::Todo)?;
         let app_git = FileGitWorktreeService::with_runtime_root(ctx.target_root, ctx.runtime_root);
         if let Some(outcome) = prepare_already_merged_reconciliation(ctx, &app_git)? {
             return Ok(outcome);
         }
-        if let Some(outcome) = begin_scoped_recovery_round(ctx, &app_git)? {
-            return Ok(outcome);
-        }
-        let branch = ctx.round_branch()?;
-        let target_branch = setting_string(&ctx.settings, "merge_target_branch", "main");
-        // The base is pinned from the local ref, so the local ref is brought up to
-        // its remote first. Advisory: the Round starts on whatever the ref holds if
-        // the remote is absent or unreachable. The remote itself is read from the
-        // node setting rather than the Round's pin, because Todo may run before the
-        // Round exists to carry one.
-        refresh_todo_target_from_remote(ctx, &app_git, &target_branch)?;
-        let base_commit = match app_git.resolve_commit(&target_branch) {
-            Ok(commit) => commit,
-            Err(error) => return fail(ctx, "branch", error),
-        };
-        // Todo is a queue, not an execution workspace. The scheduler has already
-        // selected this Goal using observed local capacity, and durable Goal state
-        // must cross into Plan before Git may materialize a repository copy.
+        // Gate rejection must leave generated workspace inputs untouched.
         ctx.request_transition(GoalStatus::Todo, GoalStatus::Plan)?;
-        let (worktree_path, handoff) =
-            match materialize_plan_worktree(ctx, &app_git, &branch, &base_commit) {
-                Ok(materialized) => materialized,
-                Err(error) => return fail(ctx, "branch", error),
-            };
-        // The branch tip travels with the creation log so the Round branch's actual
-        // birth commit is inspectable next to the base the Goal records. A silent
-        // disagreement between the two is what made "stale" unreadable before.
-        let branch_tip = app_git.resolve_commit(&branch).ok();
-        ctx.log(
-            "git",
-            &format!("Created implementation worktree for {branch}"),
-            Some(json_object(json!({
-                "branch": branch,
-                "worktree": worktree_path,
-                "base_commit": base_commit,
-                "branch_commit": branch_tip
-            }))),
+        ctx.start_status = GoalStatus::Plan;
+        crate::application::workflow::engine::context::execution::hydrate_plan_or_implement_context(
+            ctx, &pattern, &target,
         )?;
-        if let Err(error) = ctx.work_items.update_goal_git_refs(
-            &ctx.goal_id,
-            &branch,
-            &target_branch,
-            &base_commit,
-            None,
-        ) {
-            return fail(ctx, "branch", error);
-        }
-        ctx.branch = Some(branch);
-        ctx.worktree_path = Some(worktree_path);
-        ctx.candidate_handoff_operation_id = Some(handoff.id);
         Ok(WorkflowAdvanceOutcome::Transition {
             from: GoalStatus::Todo,
             to: GoalStatus::Plan,
@@ -178,20 +134,18 @@ fn prepare_already_merged_reconciliation(
     else {
         return Ok(None);
     };
-    let Some(integration_value) = round
-        .get("workflow_integration")
-        .filter(|value| !value.is_null())
+    let target = setting_string(&ctx.settings, "merge_target_branch", "main");
+    let Some(integration) =
+        crate::application::workflow::engine::context::preparation::matching_round_integration(
+            &detail,
+            ctx.round_idx,
+            &target,
+        )
     else {
+        // Unusable generated evidence is handled by shared preparation after
+        // the ordinary transition gates pass.
         return Ok(None);
     };
-    let integration =
-        serde_json::from_value::<crate::model::goal::RoundIntegration>(integration_value.clone())
-            .map_err(|error| {
-            RefineError::Serialization(format!(
-                "Goal {} has invalid Governance evidence: {error}",
-                ctx.goal_id
-            ))
-        })?;
     let recorded_reconciliation_state = round
         .get("workflow_reconciliation")
         .and_then(Value::as_object)
@@ -199,23 +153,7 @@ fn prepare_already_merged_reconciliation(
         .and_then(Value::as_str)
         .filter(|state| matches!(*state, "reverted" | "completed"))
         .map(str::to_string);
-    let candidate = detail
-        .get("candidate_commit")
-        .and_then(Value::as_str)
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .ok_or_else(|| {
-            RefineError::Conflict(format!(
-                "Goal {} has integration evidence but no recorded candidate",
-                ctx.goal_id
-            ))
-        })?;
-    if candidate != integration.candidate_commit {
-        return Err(RefineError::Conflict(format!(
-            "Goal {} candidate changed from integrated commit {} to {}; reconciliation was not started",
-            ctx.goal_id, integration.candidate_commit, candidate
-        )));
-    }
+    let candidate = detail["candidate_commit"].as_str().unwrap();
     if recorded_reconciliation_state.is_none() {
         ctx.log(
             "reconcile",
@@ -279,21 +217,17 @@ fn prepare_already_merged_reconciliation(
             }))),
         )?;
     }
-    ctx.work_items.update_goal_round_evaluation_summary(
-        &ctx.goal_id,
-        ctx.round_idx,
-        &json!({
-            "workflow_reconciliation": {
-                "state": "detected",
-                "candidate_commit": candidate,
-                "target_branch": integration.target_branch,
-                "detected_target_commit": target_commit,
-                "published_target_commit": published_commit,
-                "recorded_reconciliation_state": recorded_reconciliation_state,
-                "detected_at": now_timestamp()
-            }
-        }),
-    )?;
+    let reconciliation = json!({
+        "workflow_reconciliation": {
+            "state": "detected",
+            "candidate_commit": candidate,
+            "target_branch": integration.target_branch,
+            "detected_target_commit": target_commit,
+            "published_target_commit": published_commit,
+            "recorded_reconciliation_state": recorded_reconciliation_state,
+            "detected_at": now_timestamp()
+        }
+    });
     ctx.log(
         "reconcile",
         "Detected already-merged candidate; routing round to merged-target Quality",
@@ -304,7 +238,16 @@ fn prepare_already_merged_reconciliation(
             "published_target_commit": published_commit
         }))),
     )?;
-    enter_already_merged_quality(ctx, &detail, round, integration, candidate)
+    let outcome = enter_already_merged_quality(ctx, &detail, round, integration, candidate)?;
+    // Gate rejection preserves the prior reconciliation record. Once the
+    // transition is durable, restart can recover from the integration receipt
+    // even if writing this derived detection evidence is interrupted.
+    ctx.work_items.update_goal_round_evaluation_summary(
+        &ctx.goal_id,
+        ctx.round_idx,
+        &reconciliation,
+    )?;
+    Ok(outcome)
 }
 
 fn enter_already_merged_quality(
@@ -346,7 +289,7 @@ fn enter_already_merged_quality(
 /// unreachable remote, leaves a legible Round log and lets the Round proceed on
 /// the local ref. Only writing that log can fail, and that is a durable-state
 /// failure the caller must not swallow.
-fn refresh_todo_target_from_remote(
+pub(crate) fn refresh_workflow_target_from_remote(
     ctx: &WorkflowContext<'_>,
     app_git: &FileGitWorktreeService,
     target_branch: &str,
@@ -402,53 +345,6 @@ fn refresh_todo_target_from_remote(
         ),
     };
     ctx.log("git", &message, Some(json_object(detail)))
-}
-
-fn materialize_plan_worktree(
-    ctx: &WorkflowContext<'_>,
-    app_git: &FileGitWorktreeService,
-    branch: &str,
-    base_commit: &str,
-) -> RefineResult<(
-    String,
-    crate::infrastructure::process::supervisor::operations::OperationHandle,
-)> {
-    let status = ctx.work_items.show_goal_summary(&ctx.goal_id)?.goal.status;
-    if status != GoalStatus::Plan {
-        return Err(RefineError::Conflict(format!(
-            "refusing to create a workflow worktree for Goal {} while it is {}; worktrees are materialized only after admission to plan",
-            ctx.goal_id,
-            status.as_str()
-        )));
-    }
-    crate::application::workflow::engine::context::validate_round_workspace_branch(
-        &ctx.work_items.show_goal_detail(&ctx.goal_id)?,
-        &ctx.goal_id,
-        ctx.round_idx,
-        branch,
-        &setting_string(&ctx.settings, "branch_name_pattern", "refine/{goal_id}"),
-    )?;
-    let worktree_target = app_git.managed_worktree_path(branch)?;
-    with_repository_git_lock(ctx.target_root, || {
-        ctx.revalidate_authority(GoalStatus::Plan)?;
-        // The branch is born at the recorded base, never at the shared checkout's
-        // HEAD: a human sitting on any branch other than the merge target used to
-        // decide where every Round branch started, which made the recorded base a
-        // non-ancestor of the candidate and failed integration as "stale".
-        let worktree_path =
-            app_git.ensure_worktree_from_base(branch, &worktree_target, base_commit)?;
-        let handoff = register_candidate_handoff(
-            ctx.runtime_root,
-            ctx.target_root,
-            &ctx.goal_id,
-            ctx.round_idx,
-            &ctx.node_id,
-            branch,
-            &worktree_path,
-            base_commit,
-        )?;
-        Ok((worktree_path, handoff))
-    })
 }
 
 impl WorkflowBehavior for WorkflowQuality {
@@ -863,7 +759,8 @@ impl WorkflowBehavior for WorkflowGovernance {
             ctx.runtime_root,
             ctx.refine_dir(),
             ctx.target_root,
-        );
+        )
+        .for_occurrence(ctx.attempt_authority.generation);
         // Only Git work holds the repository lock. Quality and Governance
         // agents run between the refresh and integration holds; a moved target
         // fails this attempt and requires an explicit workflow decision.
@@ -1053,19 +950,17 @@ impl WorkflowBehavior for WorkflowGovernance {
                 {
                     return Err(error);
                 }
-                // A candidate the target branch no longer descends from is the
-                // same fenced-recovery shape as the race above, not a dead end:
-                // when the target genuinely moved, a fresh Round from a fresh
-                // base is exactly the recovery. `settle_stale_candidate` keeps
-                // the one case a fresh Round cannot help terminal.
+                // Preserve the integration boundary's ancestry diagnosis.
+                // Shared preparation owns rebuilding inconsistent generated
+                // work when another workflow decision selects execution.
                 Err(stale @ RefineError::StaleCandidate { .. }) => {
                     return settle_stale_candidate(ctx, stale);
                 }
                 // A conflicted `merge --no-ff` is the rebase conflict's twin:
                 // the candidate no longer applies to the advanced target.
-                // Route it into the same fenced integration recovery instead
-                // of failing the Goal, retaining the conflicted paths the way
-                // the rebase path retains `rebase.conflicts`.
+                // Retain the integration conflict and its paths through the
+                // same failure owner as candidate refresh. A failed Git operation
+                // does not fabricate another authored Round.
                 Err(RefineError::MergeConflict {
                     stage: MergeConflictStage::CandidateIntegration,
                     conflicts,

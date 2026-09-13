@@ -5,7 +5,7 @@
 - **Ready For Work**: todo means a Goal is eligible to advance.
 - **Shared Queue**: assigned nodes select todo work from synchronized Goal state.
 - **Ordering Aware**: selection respects Feature order, priority, pause state, and soft capacity.
-- **Target-Derived Base**: a Round's base and its branch both come from the configured merge target, never from whatever branch the shared checkout happens to have open.
+- **Shared Preparation**: all executable steps retain coherent lineage or regenerate work through the same capability; new work starts from the configured target.
 
 ## Purpose
 
@@ -23,7 +23,7 @@ atomically rechecks Todo status, active-node ownership, exact Round count,
 request, and authored workflow revision while moving to plan. A changed
 authoring commitment remains Todo and produces no execution side effects.
 
-Configured executable Backlog and Todo Enter/Exit Skills may need to run before that admission. Each such invocation owns a separate managed linked checkout pinned from the configured target, with Goal, current Round/request, node and transition authority (a pending user transition or the scheduler's authorized Todo occurrence) or a durable occurrence. Its workspace and output never set the implementation branch, base or candidate. Ordinary queueing and Backlog promotion remain state-only; disabled and context-only bindings create no checkout. Lifecycle process launch still obeys capacity and pause controls, and cancellation supersedes pending transition authority immediately. A cancelled, incomplete or invalid blocking Todo Entry invocation prevents transition approval and implementation materialization, including after dispatch retries or restart. Before settlement, Refine rereads every required Entry and Exit invocation and binding, requiring successful completion under the current authority and the original workspace registration even after later Skills have finished.
+Configured executable Backlog and Todo Enter/Exit Skills may need to run before that admission. Each such invocation owns a separate managed linked checkout pinned from the configured target, with Goal, current Round/request, node and transition authority (a pending user transition or the scheduler's current Todo occurrence) or a durable occurrence. Its workspace and output never set the implementation branch, base or candidate. Ordinary queueing and Backlog promotion remain state-only; disabled and context-only bindings create no checkout. Lifecycle process launch still obeys capacity and pause controls, and cancellation supersedes pending transition authority immediately. A cancelled, incomplete or invalid blocking Todo Entry invocation prevents transition approval and implementation materialization, including after dispatch retries or restart. Before settlement, Refine rereads every required Entry and Exit invocation and binding, requiring successful completion under the current authority and the original workspace registration even after later Skills have finished.
 
 Before the base is pinned, Refine brings the local merge target up to its
 remote, so a Round starts from what the fleet has actually published rather than
@@ -37,16 +37,9 @@ branch the human checkout is on, the checkout is brought along with it, and a
 sync the working tree blocks or an interruption cuts short stays recorded until
 a later pass repairs it.
 
-The Round branch is then created at that pinned base. Whichever branch a human
-left checked out never decides where a Round begins: users should not have to
-park their checkout on the merge target, or pull it, for their Goals to be
-integrable, and a branch born anywhere else would leave the recorded base a
-non-ancestor of the candidate and fail integration as stale through no fault of
-the work. Resumption follows the same rule — a Round branch that has gone
-missing is recreated at the Goal's recorded base, while one still carrying an
-interrupted Round's commits is reused exactly as it stands.
+New work receives a branch at the selected target base. Retained work keeps its verified base, branch and candidate together; observing a newer target never replaces only the base field. The shared preparation capability can reconstruct a missing checkout or branch from verified identities. It applies equally when Todo is reentered or another executable step is selected directly.
 
-An explicit Plan decision with a retained candidate creates a new Round branch and checkout at that exact commit. The source Round, worktree, and evidence remain intact. The new checkout does not depend on a pristine or still-present source worktree. Missing candidate or base identities fail visibly; Refine does not silently choose a fresh base.
+If generated lineage or required inputs cannot be reused, preparation records recovery on the existing authored Round and selects Plan with a fresh branch such as `round-1-execution-UUID`. It leaves old work and reports as history and invalidates their current applicability. Selecting Plan does not itself append a Round. An absent authored request remains a visible blocker. See the [shared consistency contract](11-consistency-contract.md) for the uniform recovery rules and exceptions.
 
 Lifecycle dispatch and scheduler admission consume the same occurrence-pinned Entry configuration, even when Skill definitions change before either worker runs. A completed blocking requirement can permit advancement while a background failure remains visible; cancellation or missing/invalid blocking evidence cannot.
 

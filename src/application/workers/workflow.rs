@@ -55,18 +55,30 @@ pub(super) fn run_workflow_worker(
                 }
             }
             if recovered_root.as_ref() != Some(&root) {
-                match workflow.recover_interrupted_goals(
+                match recover_root(&mut recovered_root, &root, || {
+                    workflow.recover_interrupted_goals(
                     "workflow runner restarted; nonterminal work remains schedulable from its synchronized state",
-                ) {
+                )
+                }) {
                     Ok(count) if count > 0 => {
                         let _ = refresh_projection(runtime_root, &target_root);
                     }
                     Ok(_) => {}
                     Err(error) => {
                         eprintln!("refine workflow recovery: {error}");
+                        crate::application::workflow::health::scheduler_tick(
+                            runtime_root,
+                            Some(&target_root),
+                            &Default::default(),
+                            false,
+                            Some(&error.to_string()),
+                        );
+                        // Do not launch replacement writers until interrupted
+                        // process cleanup succeeds. The same pass is retried.
+                        thread::sleep(WORKFLOW_INTERVAL);
+                        continue;
                     }
                 }
-                recovered_root = Some(root);
             }
             if workflow.workflow_paused().unwrap_or(false) {
                 crate::application::workflow::health::scheduler_tick(
@@ -89,6 +101,49 @@ pub(super) fn run_workflow_worker(
             }
         }
         thread::sleep(WORKFLOW_INTERVAL);
+    }
+}
+
+fn recover_root(
+    recovered_root: &mut Option<PathBuf>,
+    root: &Path,
+    recover: impl FnOnce() -> RefineResult<usize>,
+) -> RefineResult<usize> {
+    let count = recover()?;
+    *recovered_root = Some(root.to_path_buf());
+    Ok(count)
+}
+
+#[cfg(test)]
+mod recovery_tests {
+    use super::*;
+
+    #[test]
+    fn failed_recovery_remains_pending_until_a_successful_pass() {
+        let fixture =
+            std::env::temp_dir().join(format!("refine-recovery-retry-{}", uuid::Uuid::new_v4()));
+        let root = fixture.join("target");
+        let runtime = fixture.join("runtime");
+        std::fs::create_dir_all(&root).unwrap();
+        let failure = runtime.join("workflow-automation-state.json");
+        std::fs::create_dir_all(&failure).unwrap();
+        let engine = WorkflowEngine::with_target_root(&runtime, &root);
+        let mut recovered = None;
+        assert!(
+            recover_root(&mut recovered, &root, || engine
+                .recover_interrupted_goals("retry after storage failure"))
+            .is_err()
+        );
+        assert_eq!(recovered, None);
+        std::fs::remove_dir(failure).unwrap();
+        assert_eq!(
+            recover_root(&mut recovered, &root, || engine
+                .recover_interrupted_goals("retry after storage recovery"))
+            .unwrap(),
+            0
+        );
+        assert_eq!(recovered.as_deref(), Some(root.as_path()));
+        std::fs::remove_dir_all(fixture).unwrap();
     }
 }
 

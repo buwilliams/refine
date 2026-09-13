@@ -27,15 +27,19 @@ fn standard_capture_returns_while_pending_scope_blocks_followup_until_proven_rel
     test_hooks::install(
         &workflow.runtime_root,
         Arc::new(move |engine, goal, stage, _| {
-            if stage != "executing" {
-                return Ok(());
-            }
-            if goal == "GOAL3" {
+            // The durable claim observes admission. Workspace preparation runs
+            // afterward; it must not be counted as scheduler admission latency.
+            if goal == "GOAL3" && stage == "claimed" {
                 let elapsed = clock.lock().unwrap().unwrap().elapsed();
                 assert!(
                     elapsed < Duration::from_secs(1),
                     "Followup admission took {elapsed:?} after scope release"
                 );
+            }
+            if stage != "executing" {
+                return Ok(());
+            }
+            if goal == "GOAL3" {
                 next.fetch_add(1, Ordering::SeqCst);
                 return Err(RefineError::Conflict("followup admitted".into()));
             }

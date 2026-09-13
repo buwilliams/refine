@@ -137,15 +137,58 @@ pub(super) fn archive_round_for_retry(round: &mut Value, target: &GoalStatus) ->
         .as_array_mut()
         .ok_or_else(|| RefineError::Serialization("Invalid prior attempts".into()))?
         .push(prior);
-    if *target != GoalStatus::Governance {
-        for key in [
-            "quality_state",
-            "quality_message",
-            "quality_details",
-            "quality_checked_at",
-            "quality_candidate_commit",
-        ] {
-            object.remove(key);
+    invalidate_round_evidence(round, target, true)?;
+    Ok(())
+}
+
+/// The shared dependency rule for a selected step or replacement candidate.
+/// Returns removed projections so callers retain them with the operation's history.
+pub(super) fn invalidate_round_evidence(
+    round: &mut Value,
+    target: &GoalStatus,
+    new_occurrence: bool,
+) -> RefineResult<Value> {
+    let object = round
+        .as_object_mut()
+        .ok_or_else(|| RefineError::Serialization("Invalid Round".into()))?;
+    let mut removed = Map::new();
+    let planning = matches!(target, GoalStatus::Todo | GoalStatus::Plan);
+    let implementation = planning || *target == GoalStatus::Implement;
+    for key in ["implementation_plan", "agent_context", "guidance_decision"] {
+        if planning && let Some(value) = object.remove(key) {
+            removed.insert(key.into(), value);
+        }
+    }
+    for key in [
+        "implementation_report",
+        "implementation_reported_at",
+        "workflow_integration",
+        "workflow_reconciliation",
+        "workflow_recovery",
+    ] {
+        if implementation && let Some(value) = object.remove(key) {
+            removed.insert(key.into(), value);
+        }
+    }
+    for key in [
+        "quality_state",
+        "quality_message",
+        "quality_details",
+        "quality_checked_at",
+        "quality_candidate_commit",
+        "quality_agent_report",
+        "quality_requirements",
+        "quality_skill_results",
+        "quality_recovery_analysis",
+        "quality_recovery_round_prompt",
+        "quality_recovery_details",
+        "quality_recovery_checked_at",
+        "workflow_quality_timing",
+    ] {
+        if *target != GoalStatus::Governance
+            && let Some(value) = object.remove(key)
+        {
+            removed.insert(key.into(), value);
         }
     }
     for key in [
@@ -154,17 +197,26 @@ pub(super) fn archive_round_for_retry(round: &mut Value, target: &GoalStatus) ->
         "governance_details",
         "governance_checked_at",
         "governance_candidate_commit",
+        "governance_rule_actions",
+        "governance_recovery_analysis",
+        "governance_recovery_round_prompt",
         "failure_category",
         "failure_message",
         "failure_at",
+        "workflow_failure_occurrence",
         "event_results",
         "gate_configurations",
         "event_configuration",
     ] {
-        object.remove(key);
+        if !new_occurrence && matches!(key, "gate_configurations" | "event_configuration") {
+            continue;
+        }
+        if let Some(value) = object.remove(key) {
+            removed.insert(key.into(), value);
+        }
     }
     for key in ["failure_category", "failure_message", "failure_at"] {
         object.insert(key.into(), Value::String(String::new()));
     }
-    Ok(())
+    Ok(Value::Object(removed))
 }

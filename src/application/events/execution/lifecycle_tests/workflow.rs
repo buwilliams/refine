@@ -107,7 +107,7 @@ fn authored_todo_start_runs_lifecycle_skills_before_materializing_the_implementa
 #[test]
 fn todo_lifecycle_rechecks_superseded_occurrences_and_cancellation_on_resume() {
     for completed in [false, true] {
-        for change in ["retry", "cancel"] {
+        for change in ["reassign", "cancel"] {
             let f = Fixture::new();
             let _smoke = SmokeSkill::install(&f.service, &f.temp);
             f.gate("workflow.todo.exit", BindingMode::Blocking);
@@ -154,11 +154,11 @@ fn todo_lifecycle_rechecks_superseded_occurrences_and_cancellation_on_resume() {
                     .control_workflow(
                         "FRESH",
                         &crate::application::work_items::WorkflowControl {
-                            to: GoalStatus::Todo,
-                            reason: "Explicit same-step retry".into(),
+                            to: GoalStatus::Backlog,
+                            reason: "Explicit different-step reassignment".into(),
                             context: String::new(),
                             expected_revision: goal["workflow_revision"].as_u64().unwrap(),
-                            request_id: "retry-todo".into(),
+                            request_id: "reassign-backlog".into(),
                             actor: "Operator".into(),
                             force: false,
                             invocation_id: None,

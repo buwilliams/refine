@@ -98,14 +98,17 @@ fn restart_recovery_preserves_goal_state_and_removes_retired_execution_files() {
     .unwrap();
 
     let workflow = WorkflowEngine::with_target_root(&runtime_root, &target_root);
-    assert_eq!(
-        workflow.recover_interrupted_goals("test restart").unwrap(),
-        1
-    );
-    assert_eq!(
-        work_items.show_goal_summary("GOAL1").unwrap().goal.status,
-        GoalStatus::Failed
-    );
+    let before = work_items.show_goal_detail("GOAL1").unwrap();
+    for reason in ["test restart", "replacement restarted"] {
+        workflow.recover_interrupted_goals(reason).unwrap();
+        assert_eq!(work_items.show_goal_detail("GOAL1").unwrap(), before);
+        assert_eq!(
+            workflow
+                .launchable_goals(&std::collections::BTreeSet::new())
+                .unwrap(),
+            vec!["GOAL1"],
+        );
+    }
     for name in [
         "workflow-automation-state.json",
         ".workflow-automation-state.lock",
@@ -221,7 +224,17 @@ fn restart_recovery_preserves_active_zero_round_goal_and_recovers_valid_sibling(
         .collect::<Vec<_>>();
 
     let workflow = WorkflowEngine::with_target_root(&runtime_root, &target_root);
-    assert_eq!(workflow.recover_interrupted_goals("restart").unwrap(), 1);
+    let valid_before = work_items.show_goal_detail("VALID1").unwrap();
+    for reason in ["restart", "replacement restarted"] {
+        workflow.recover_interrupted_goals(reason).unwrap();
+        assert_eq!(work_items.show_goal_detail("VALID1").unwrap(), valid_before);
+        assert_eq!(
+            workflow
+                .launchable_goals(&std::collections::BTreeSet::new())
+                .unwrap(),
+            vec!["VALID1"],
+        );
+    }
     for (path, before) in zero_records {
         assert_eq!(fs::read(path).unwrap(), before);
     }

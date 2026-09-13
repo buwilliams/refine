@@ -3,6 +3,7 @@ use crate::model::goal::{QUALITY_PROOF_SCHEMA_VERSION, QualityProof, RoundIntegr
 use serde_json::json;
 
 use super::workflow_attempts::{goal_status, require_current_step};
+use crate::application::workflow::governance::integration::recorded_integration_is_applicable;
 
 #[derive(Clone, Debug)]
 pub(crate) struct AlreadyMergedResolutionSnapshot {
@@ -86,6 +87,7 @@ impl FileWorkItemService {
                     round_idx + 1
                 ))
             })?;
+        require_applicable_integration(goal_id, round)?;
         if let Some(evidence) = terminal_reconciliation(round, "resolved")
             && summary.goal.status == GoalStatus::Review
         {
@@ -179,6 +181,7 @@ impl FileWorkItemService {
             .and_then(Value::as_array)
             .and_then(|rounds| rounds.get(snapshot.authority.round_idx))
             .ok_or_else(|| RefineError::Conflict(format!("Goal {goal_id} Round changed")))?;
+        require_applicable_integration(goal_id, current_round)?;
         if resolution_gate_evidence(&Value::Object(object.clone()), current_round)
             != snapshot.gate_evidence
         {
@@ -262,6 +265,7 @@ impl FileWorkItemService {
             .and_then(Value::as_array)
             .and_then(|rounds| rounds.get(snapshot.authority.round_idx))
             .ok_or_else(|| RefineError::Conflict(format!("Goal {goal_id} Round changed")))?;
+        require_applicable_integration(goal_id, current_round)?;
         let current_gate_evidence =
             resolution_gate_evidence(&Value::Object(object.clone()), current_round);
         if current_gate_evidence != snapshot.gate_evidence {
@@ -316,6 +320,15 @@ impl FileWorkItemService {
     }
 }
 
+fn require_applicable_integration(goal_id: &str, round: &Value) -> RefineResult<()> {
+    if !recorded_integration_is_applicable(round) {
+        return Err(RefineError::Conflict(format!(
+            "Goal {goal_id} recorded integration was reverted; candidate ancestry cannot resolve it"
+        )));
+    }
+    Ok(())
+}
+
 fn resolution_gate_evidence(detail: &Value, round: &Value) -> Value {
     let mut evidence = Map::new();
     evidence.insert(
@@ -349,6 +362,9 @@ fn validate_resolution_gates(
     integration: Option<&RoundIntegration>,
     round: &Value,
 ) -> Option<String> {
+    if let Err(error) = require_applicable_integration(goal_id, round) {
+        return Some(error.to_string());
+    }
     if candidate.is_empty() {
         return Some(format!("Goal {goal_id} has no exact candidate commit"));
     }

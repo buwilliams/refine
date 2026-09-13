@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use serde_json::{Value, json};
 
 use crate::application::work_items::FileWorkItemService;
@@ -10,7 +8,6 @@ use crate::application::workflow::recovery::candidate_handoff::{
 use crate::error::{RefineError, RefineResult};
 use crate::infrastructure::git::with_repository_git_lock;
 use crate::infrastructure::git::worktrees::{FileGitWorktreeService, GitWorktreeService};
-use crate::model::goal::RoundIntegration;
 use crate::model::workflow::GoalStatus;
 
 use crate::application::workflow::json_object;
@@ -26,6 +23,17 @@ pub(crate) fn hydrate_retry_context(
     ctx: &mut WorkflowContext<'_>,
     current: GoalStatus,
 ) -> RefineResult<()> {
+    let target =
+        crate::application::workflow::setting_string(&ctx.settings, "merge_target_branch", "main");
+    let prepared = super::preparation::prepare_workspace(ctx, current.clone(), &target)?;
+    if prepared.status == GoalStatus::Plan {
+        let pattern = crate::application::workflow::setting_string(
+            &ctx.settings,
+            "branch_name_pattern",
+            "refine/{goal_id}",
+        );
+        return materialize_prepared_workspace(ctx, &pattern, prepared);
+    }
     ctx.revalidate_authority(current.clone())?;
     ctx.start_status = current.clone();
     let detail = ctx.work_items.show_goal_detail(&ctx.goal_id)?;
@@ -60,18 +68,8 @@ pub(crate) fn hydrate_retry_context(
     )?
     .map(|operation| operation.id);
     ctx.implementation_changed = candidate != base;
-    let integration = round
-        .get("workflow_integration")
-        .filter(|value| !value.is_null())
-        .map(|value| {
-            serde_json::from_value::<RoundIntegration>(value.clone()).map_err(|error| {
-                RefineError::Serialization(format!(
-                    "Goal {} has invalid Governance evidence: {error}",
-                    ctx.goal_id
-                ))
-            })
-        })
-        .transpose()?;
+    let integration =
+        super::preparation::matching_round_integration(&detail, ctx.round_idx, &target);
     ctx.merge = integration
         .as_ref()
         .map(|integration| integration.merge.clone());
@@ -226,37 +224,13 @@ fn ensure_resumed_candidate_worktree(
     base: &str,
 ) -> RefineResult<()> {
     let git = FileGitWorktreeService::with_runtime_root(ctx.target_root, ctx.runtime_root);
-    let prior_handoff = find_candidate_handoff(
-        ctx.runtime_root,
-        ctx.target_root,
-        &ctx.goal_id,
-        ctx.round_idx,
-    )?;
-    // Reuse the active handoff's exact identity so its validation keeps matching the
-    // re-registered operation, even after a candidate refresh moved the Goal's base.
-    let target = match prior_handoff.as_ref().and_then(|operation| {
-        operation
-            .request
-            .get("worktree_path")
-            .and_then(Value::as_str)
-    }) {
-        Some(path) => PathBuf::from(path),
-        None => git.managed_worktree_path(branch)?,
-    };
-    if target != git.managed_worktree_path(branch)? {
-        return Err(RefineError::Degraded(
-            "retained candidate handoff names an unrelated workspace; existing work was preserved"
-                .to_string(),
-        ));
-    }
-    let base = prior_handoff
-        .as_ref()
-        .and_then(|operation| operation.request.get("base_commit").and_then(Value::as_str))
-        .unwrap_or(base);
+    // Goal preparation selected this exact workspace and base. Historical handoff
+    // receipts describe older execution; they cannot select the current inputs.
+    let target = git.managed_worktree_path(branch)?;
     let (worktree, handoff) = with_repository_git_lock(ctx.target_root, || {
         ctx.revalidate_authority(ctx.start_status.clone())?;
-        let worktree = match git.resolve_commit(&format!("refs/heads/{branch}")) {
-            Ok(tip) => {
+        let worktree = match git.find_commit(&format!("refs/heads/{branch}"))? {
+            Some(tip) => {
                 if tip != candidate && !matches!(git.commit_is_ancestor(candidate, &tip), Ok(true))
                 {
                     return Err(RefineError::Conflict(format!(
@@ -285,7 +259,7 @@ fn ensure_resumed_candidate_worktree(
             }
             // The branch ref is gone (external cleanup): pin the exact recorded candidate
             // without moving any other ref.
-            Err(_) => git.ensure_worktree_at_commit(branch, &target, candidate)?,
+            None => git.ensure_worktree_at_commit(branch, &target, candidate)?,
         };
         let handoff = register_candidate_handoff(
             ctx.runtime_root,
@@ -333,16 +307,19 @@ pub(crate) fn hydrate_plan_or_implement_context(
             "Current workflow step does not authorize an implementation workspace".into(),
         ));
     }
-    ctx.revalidate_authority(observed_status.clone())?;
-    ctx.start_status = observed_status;
+    let prepared = super::preparation::prepare_workspace(ctx, observed_status, target_branch)?;
+    materialize_prepared_workspace(ctx, branch_pattern, prepared)
+}
+
+pub(crate) fn materialize_prepared_workspace(
+    ctx: &mut WorkflowContext<'_>,
+    branch_pattern: &str,
+    prepared: super::preparation::PreparedWorkspace,
+) -> RefineResult<()> {
+    let branch = prepared.branch;
+    let base = prepared.base;
+    let git = FileGitWorktreeService::with_runtime_root(ctx.target_root, ctx.runtime_root);
     let detail = ctx.work_items.show_goal_detail(&ctx.goal_id)?;
-    let branch = detail
-        .get("branch_name")
-        .and_then(Value::as_str)
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(ToString::to_string)
-        .unwrap_or(ctx.round_branch()?);
     super::validate_round_workspace_branch(
         &detail,
         &ctx.goal_id,
@@ -350,22 +327,16 @@ pub(crate) fn hydrate_plan_or_implement_context(
         &branch,
         branch_pattern,
     )?;
-    let git = FileGitWorktreeService::with_runtime_root(ctx.target_root, ctx.runtime_root);
-    let base = detail
-        .get("base_commit")
-        .and_then(Value::as_str)
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(ToString::to_string)
-        .unwrap_or(git.resolve_commit(target_branch)?);
     let worktree_target = git.managed_worktree_path(&branch)?;
     let (worktree, handoff) = with_repository_git_lock(ctx.target_root, || {
         ctx.revalidate_authority(ctx.start_status.clone())?;
-        // Resumption recreates the branch only when it is gone, and then at the
-        // Goal's recorded base rather than at the shared checkout's HEAD — the same
-        // birth rule the first materialization follows. An existing branch is reused
-        // exactly as it stands: it may hold the interrupted Round's commits.
-        let worktree = git.ensure_worktree_from_base(&branch, &worktree_target, &base)?;
+        let worktree = if let Some(candidate) = prepared.candidate.as_deref()
+            && git.find_commit(&format!("refs/heads/{branch}"))?.is_none()
+        {
+            git.ensure_worktree_at_commit(&branch, &worktree_target, candidate)?
+        } else {
+            git.ensure_worktree_from_base(&branch, &worktree_target, &base)?
+        };
         let handoff = register_candidate_handoff(
             ctx.runtime_root,
             ctx.target_root,
@@ -378,17 +349,6 @@ pub(crate) fn hydrate_plan_or_implement_context(
         )?;
         Ok((worktree, handoff))
     })?;
-    ctx.work_items.update_goal_git_refs(
-        &ctx.goal_id,
-        &branch,
-        target_branch,
-        &base,
-        detail
-            .get("candidate_commit")
-            .and_then(Value::as_str)
-            .map(str::trim)
-            .filter(|value| !value.is_empty()),
-    )?;
     ctx.branch = Some(branch.clone());
     ctx.worktree_path = Some(worktree.clone());
     ctx.candidate_handoff_operation_id = Some(handoff.id);
@@ -396,12 +356,11 @@ pub(crate) fn hydrate_plan_or_implement_context(
         &worktree,
         &crate::application::workflow::setting_string(&ctx.settings, "agent_subpath", ""),
     )?);
-    ctx.start_status = GoalStatus::Implement;
     ctx.log(
         "workflow",
-        "Restarted interrupted implementation from its retained worktree",
+        "Prepared implementation worktree from coherent Round inputs",
         Some(json_object(json!({
-            "status": GoalStatus::Implement.as_str(),
+            "status": ctx.start_status.as_str(),
             "branch": branch,
             "worktree": worktree,
             "round": ctx.round_idx + 1

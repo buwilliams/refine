@@ -312,6 +312,18 @@ impl crate::application::workflow::WorkflowEngine {
         ordering: &SchedulingEligibility,
         node: &str,
     ) -> crate::error::RefineResult<Option<String>> {
+        if !crate::application::fleet::nodes::node_ids_match(
+            goal.node_id.as_deref().unwrap_or("default"),
+            node,
+        ) {
+            return Ok(Some("Goal is assigned to another node".into()));
+        }
+        if detail["workflow_integration_control"]["state"] == "pending" {
+            // Reconcile the accepted operation even on a parked step. Its
+            // original inputs and occurrence are checked before any Git effect;
+            // settlement cannot reopen or advance superseding work.
+            return Ok(None);
+        }
         if !matches!(
             goal.status,
             GoalStatus::Todo
@@ -325,12 +337,6 @@ impl crate::application::workflow::WorkflowEngine {
                 goal.status.as_str()
             )));
         }
-        if !crate::application::fleet::nodes::node_ids_match(
-            goal.node_id.as_deref().unwrap_or("default"),
-            node,
-        ) {
-            return Ok(Some("Goal is assigned to another node".into()));
-        }
         if goal.round_count == 0
             || detail["rounds"]
                 .as_array()
@@ -341,10 +347,6 @@ impl crate::application::workflow::WorkflowEngine {
             return Ok(Some("No actionable current Round".into()));
         }
         for (key, reason) in [
-            (
-                "workflow_integration_control",
-                "Explicit integration is pending",
-            ),
             (
                 "pending_workflow_outcome",
                 "Current step Error handling is pending",

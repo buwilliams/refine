@@ -250,7 +250,7 @@ fn resume_reuses_a_durable_quality_proof_and_skips_straight_to_governance() {
 }
 
 #[test]
-fn resume_fails_closed_when_the_round_branch_no_longer_contains_the_candidate() {
+fn resume_regenerates_the_same_round_when_its_branch_no_longer_contains_the_candidate() {
     let fixture = QualityResumeFixture::new("workflow-worktree-diverged");
     let _smoke_ai_env_guard = smoke_ai_env_lock()
         .lock()
@@ -272,19 +272,28 @@ fn resume_fails_closed_when_the_round_branch_no_longer_contains_the_candidate() 
     .unwrap();
 
     let workflow = WorkflowEngine::with_target_root(&fixture.runtime_root, &fixture.target_root);
-    let error = workflow.execute_work().unwrap_err();
-    assert!(
-        error.to_string().contains("existing work was preserved"),
-        "{error}"
-    );
+    let results = workflow.execute_work().unwrap();
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].final_status, "review");
+    let detail = fixture.work_items.show_goal_detail("GOAL1").unwrap();
+    assert_eq!(detail["status"], "review");
+    assert_eq!(detail["rounds"].as_array().unwrap().len(), 1);
+    assert_eq!(detail["rounds"][0]["prompt"], "Implement the candidate");
+    assert_ne!(detail["branch_name"], "refine/GOAL1/round-1");
+    let recoveries = detail["rounds"][0]["workspace_recoveries"]
+        .as_array()
+        .unwrap();
+    assert_eq!(recoveries.len(), 1);
+    assert_eq!(recoveries[0]["branch"], "refine/GOAL1/round-1");
+    assert_eq!(recoveries[0]["candidate"], fixture.candidate);
+    assert_eq!(recoveries[0]["step"], "quality");
     assert_eq!(
-        fixture
-            .work_items
-            .show_goal_summary("GOAL1")
-            .unwrap()
-            .goal
-            .status,
-        GoalStatus::Failed
+        git_output(
+            &fixture.target_root,
+            &["cat-file", "-t", &fixture.candidate]
+        )
+        .trim(),
+        "commit"
     );
     assert_eq!(
         git_output(
@@ -293,5 +302,10 @@ fn resume_fails_closed_when_the_round_branch_no_longer_contains_the_candidate() 
         )
         .trim(),
         unrelated
+    );
+    assert!(workflow.execute_work().unwrap().is_empty());
+    assert_eq!(
+        fixture.work_items.show_goal_detail("GOAL1").unwrap(),
+        detail
     );
 }

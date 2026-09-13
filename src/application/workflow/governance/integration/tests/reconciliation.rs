@@ -202,6 +202,136 @@ fn revert(
 }
 
 #[test]
+fn recorded_revert_prevents_direct_resolution_and_stale_settlement_despite_ancestry() {
+    use crate::application::work_items::{
+        AlreadyMergedInspection, AlreadyMergedSettlementDecision,
+    };
+    let fixture = ReconciliationFixture::new();
+    let goal_id = "GOAL-REVERTED-RESOLVE";
+    fixture.create_goal(goal_id, json!({}), true);
+    let work = fixture.work_items();
+    let AlreadyMergedInspection::Eligible(snapshot) =
+        work.inspect_already_merged_resolution(goal_id).unwrap()
+    else {
+        panic!("the original integration must be eligible before it is reverted");
+    };
+    park_target_at_integration(&fixture);
+    let reverted = revert(&fixture, goal_id, &fixture.integration_target).unwrap();
+    work.update_goal_round_evaluation_summary(
+        goal_id,
+        0,
+        &json!({"workflow_reconciliation":{"state":"reverted",
+            "candidate_commit":fixture.candidate_commit,"revert_commit":reverted.revert_commit}}),
+    )
+    .unwrap();
+    let before = work.show_goal_detail(goal_id).unwrap();
+    assert_eq!(before["status"], "quality");
+    assert!(git_succeeds(
+        &fixture.repo,
+        &[
+            "merge-base",
+            "--is-ancestor",
+            &fixture.candidate_commit,
+            "main"
+        ]
+    ));
+    assert!(!fixture.repo.join("candidate.txt").exists());
+
+    let error = fixture
+        .service()
+        .resolve_already_merged_goal(goal_id)
+        .unwrap_err();
+    assert!(error.to_string().contains("was reverted"), "{error}");
+    // A resolver that inspected before the revert must also be rejected under
+    // the Goal lock, before either proof regeneration or final settlement can
+    // replace the recorded revert evidence.
+    let error = work
+        .prepare_already_merged_quality_regeneration(goal_id, &snapshot)
+        .unwrap_err();
+    assert!(error.to_string().contains("was reverted"), "{error}");
+    let error = work
+        .settle_already_merged_resolution(
+            goal_id,
+            &snapshot,
+            AlreadyMergedSettlementDecision::Review(json!({})),
+        )
+        .unwrap_err();
+    assert!(error.to_string().contains("was reverted"), "{error}");
+    assert_eq!(work.show_goal_detail(goal_id).unwrap(), before);
+    assert_eq!(
+        git_stdout(&fixture.repo, &["rev-parse", "main"]),
+        reverted.revert_commit
+    );
+    assert!(
+        git_stdout(&fixture.repo, &["ls-remote", "origin", "refs/heads/main"])
+            .starts_with(&reverted.revert_commit)
+    );
+    assert!(!fixture.repo.join("candidate.txt").exists());
+}
+
+#[test]
+fn forced_integration_records_failed_decision_for_reverted_candidate_without_changing_git() {
+    use crate::application::work_items::WorkflowControl;
+    let fixture = ReconciliationFixture::new();
+    fixture.create_goal("GOAL", json!({"workflow_git_remote":"origin"}), true);
+    git(&fixture.repo, &["push", "origin", "refine/GOAL/round-1"]).unwrap();
+    park_target_at_integration(&fixture);
+    let reverted = revert(&fixture, "GOAL", &fixture.integration_target).unwrap();
+    let work = fixture.work_items();
+    work.update_goal_round_evaluation_summary(
+        "GOAL",
+        0,
+        &json!({"workflow_reconciliation":{"state":"reverted",
+            "candidate_commit":fixture.candidate_commit,"revert_commit":reverted.revert_commit}}),
+    )
+    .unwrap();
+    let before = work.show_goal_detail("GOAL").unwrap();
+    let request = WorkflowControl {
+        to: GoalStatus::Governance,
+        reason: "Explicitly integrate the retained candidate".into(),
+        context: String::new(),
+        expected_revision: before["workflow_revision"].as_u64().unwrap(),
+        request_id: "force-reverted-integration".into(),
+        force: true,
+        actor: "operator".into(),
+        invocation_id: None,
+    };
+    let error = fixture
+        .service()
+        .force_integrate("GOAL", &request)
+        .unwrap_err();
+    assert!(error.to_string().contains("was reverted"), "{error}");
+    let after = work.show_goal_detail("GOAL").unwrap();
+    assert_eq!(after["status"], "failed");
+    assert_eq!(after["workflow_integration_control"]["state"], "failed");
+    let receipt = after["workflow_controls"]
+        .as_array()
+        .unwrap()
+        .last()
+        .unwrap();
+    assert_eq!(receipt["request_id"], request.request_id);
+    assert_eq!(receipt["integration_performed"], false);
+    assert!(
+        receipt["integration_result"]["diagnostic"]
+            .as_str()
+            .unwrap()
+            .contains("was reverted")
+    );
+    for key in ["workflow_integration", "workflow_reconciliation"] {
+        assert_eq!(after["rounds"][0][key], before["rounds"][0][key]);
+    }
+    assert_eq!(
+        git_stdout(&fixture.repo, &["rev-parse", "main"]),
+        reverted.revert_commit
+    );
+    assert!(
+        git_stdout(&fixture.repo, &["ls-remote", "origin", "refs/heads/main"])
+            .starts_with(&reverted.revert_commit)
+    );
+    assert!(!fixture.repo.join("candidate.txt").exists());
+}
+
+#[test]
 fn already_merged_resolution_allows_shared_target_descendants_and_is_concurrently_idempotent() {
     let fixture = ReconciliationFixture::new();
     fixture.create_goal("GOAL-RESOLVE", json!({}), true);
