@@ -156,11 +156,53 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "failed",
+  "results": {
+    "default-quality": {
+      "invocation_id": "cd2cfa3cf7c5b49079626fac35de63ff2fb7b34f5954702c479f9b002fb77c0d",
+      "binding_id": "default-quality",
+      "role": "quality",
+      "outcome": "failure",
+      "summary": "Quality gate does not pass for candidate bd003f501a51c20497a61f6db6942a5eb7e542ea. Navigation checks passed, but Rust verification exposed unresolved teardown races. Source files and Git state remain unchanged.",
+      "evidence": [
+        "Full browser suite passed; 44 focused navigation and related checks passed with zero skips.",
+        "Rust library suite: 1363 passed, 4 failed, 7 ignored.",
+        "Removing inherited REFINE_WORKFLOW_INCARNATION from test children resolved the capture and redaction failures; standalone chat then passed 10/10 repetitions.",
+        "Jira recovery assertions passed with that environment workaround, but cleanup failed with DirectoryNotEmpty at src/surfaces/cli/tests/system/release_workers.rs:296. Chat cleanup also failed intermittently at src/application/chat/tests/standalone.rs:77 under the original environment.",
+        "Changed Rust files passed formatting checks; candidate diff passed whitespace checks. Binary test target passed with zero tests."
+      ],
+      "artifacts": null
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "default-quality",
+      "checkout": {
+        "observation": {
+          "branch": "refine/00000T146Y4H01X1WVV8STE000/round-1-execution-9de1f61f-c5fe-49b7-9885-957fa54e0b11",
+          "head_commit": "bd003f501a51c20497a61f6db6942a5eb7e542ea",
+          "status_porcelain": []
+        },
+        "tree": "8b8d04fbe87f660972c639a038ec2d8ea239c4cc"
+      },
+      "checkout_recorded": true,
+      "diagnostic": null,
+      "host_bound_result": true,
+      "observational_violation": false,
+      "operation_id": "1a09a9660302137ff3",
+      "process_id": "proc-1789299949841-2177023-294",
+      "prompt_bytes": 3742,
+      "provider_session_id": null,
+      "purpose": "work",
+      "raw_output": "{\n  \"outcome\": \"failure\",\n  \"summary\": \"Quality gate does not pass for candidate bd003f501a51c20497a61f6db6942a5eb7e542ea. Navigation checks passed, but Rust verification exposed unresolved teardown races. Source files and Git state remain unchanged.\",\n  \"evidence\": [\n    \"Full browser suite passed; 44 focused navigation and related checks passed with zero skips.\",\n    \"Rust library suite: 1363 passed, 4 failed, 7 ignored.\",\n    \"Removing inherited REFINE_WORKFLOW_INCARNATION from test children resolved the capture and redaction failures; standalone chat then passed 10/10 repetitions.\",\n    \"Jira recovery assertions passed with that environment workaround, but cleanup failed with DirectoryNotEmpty at src/surfaces/cli/tests/system/release_workers.rs:296. Chat cleanup also failed intermittently at src/application/chat/tests/standalone.rs:77 under the original environment.\",\n    \"Changed Rust files passed formatting checks; candidate diff passed whitespace checks. Binary test target passed with zero tests.\"\n  ],\n  \"artifacts\": null\n}\n",
+      "received_at": "2026-09-13T12:01:49.611697703+00:00",
+      "started_at": "2026-09-13T11:45:49.800537785+00:00",
+      "workflow_revision": 194
+    }
+  ],
   "created_at": "2026-09-13T11:45:45.448124176+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-13T12:01:50.203350791+00:00",
   "error": null,
   "action_applied": false
 }
