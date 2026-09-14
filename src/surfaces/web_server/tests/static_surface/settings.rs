@@ -48,14 +48,13 @@ fn static_runtime_settings_expose_state_sync_controls() {
 }
 
 #[test]
-fn static_main_nav_exposes_refine_source_update_affordance() {
+fn static_main_nav_omits_source_update_and_retains_shared_update_support() {
     let static_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surfaces/web/static");
     let index = fs::read_to_string(static_root.join("index.html")).unwrap();
     let releases = fs::read_to_string(static_root.join("js/features/source_update.js")).unwrap();
     let init = fs::read_to_string(static_root.join("js/init.js")).unwrap();
 
-    assert!(index.contains(r#"data-testid="nav-source-update""#));
-    assert!(index.contains("hidden disabled"));
+    assert!(!index.contains(r#"data-testid="nav-source-update""#));
     assert!(releases.contains("const sourceUpdate = result.source_update || {}"));
     assert!(releases.contains("button.disabled = sourceUpdate.enabled !== true"));
     assert!(releases.contains(r#"fetchRemote ? "/api/system/source/check""#));

@@ -208,15 +208,6 @@ pre {
   stroke-linejoin: round;
 }
 @keyframes nav-source-update-spin { to { transform: rotate(360deg); } }
-.nav-bug-icon {
-  width: 18px;
-  height: 18px;
-  flex: 0 0 18px;
-  display: block;
-  background: currentColor;
-  mask: url("/static/images/bug.svg") center / contain no-repeat;
-  -webkit-mask: url("/static/images/bug.svg") center / contain no-repeat;
-}
 
 .nav-menu {
   position: relative;
