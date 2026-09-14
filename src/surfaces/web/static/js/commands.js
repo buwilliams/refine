@@ -113,7 +113,7 @@ function openRefineIssueRequestModal() {
     <div class="modal refine-issue-modal" role="dialog" aria-modal="true"
          aria-labelledby="refine-issue-title"
          data-testid="refine-issue-modal">
-      <div class="modal-title" id="refine-issue-title">Request refine feature/bugfix</div>
+      <div class="modal-title" id="refine-issue-title">Contact Refine Devs</div>
       <div class="modal-body">
         <p class="muted small" style="margin-top:0">
           This opens GitHub in a new tab with your title and description pre-filled.
@@ -260,7 +260,7 @@ registerCommand({
 
 registerCommand({
   id: "refine.issue.request",
-  title: "Request refine feature/bugfix",
+  title: "Contact Refine Devs",
   group: "Support",
   aliases: ["issue", "bug", "bugfix", "feature-request", "request-feature"],
   keywords: ["github", "report", "support", "feedback"],
