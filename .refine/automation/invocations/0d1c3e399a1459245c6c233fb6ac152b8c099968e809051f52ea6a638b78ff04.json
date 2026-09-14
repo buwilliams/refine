@@ -1,5 +1,5 @@
 {
-  "id": "7d26358f37ac4ad6c488cdd5ae0312db06337b90b3d31b3d2e9d000e0e1bcd8c",
+  "id": "0d1c3e399a1459245c6c233fb6ac152b8c099968e809051f52ea6a638b78ff04",
   "event": {
     "id": "node.startup.ready",
     "name": "Node Startup Ready",
@@ -26,7 +26,7 @@
     ],
     "on_success": null
   },
-  "config_revision": 69,
+  "config_revision": 77,
   "context": {
     "node_id": "default",
     "target_root": "/home/buddy/projects/refine-next",
@@ -55,9 +55,9 @@
       }
     },
     "metadata": {
-      "event_operation_id": "1a0a0580826800dd0",
+      "event_operation_id": "1a0a097bf97a5a1a0",
       "started_bindings": {
-        "trigger-2124c51c-8d1f-44b7-8a07-7a989a68227f": "2026-09-14T14:35:18.970037244+00:00"
+        "trigger-2124c51c-8d1f-44b7-8a07-7a989a68227f": "2026-09-14T15:44:54.703870279+00:00"
       },
       "template_snapshot": {
         "records": {
@@ -69,6 +69,11 @@
           "agent-providers-file-bootstrap": {
             "id": "agent-providers-file-bootstrap",
             "prompt": "You are starting a Refine-managed agent task.\n\nThe complete authoritative task prompt is stored in this local file:\n`{{absolute_prompt_path}}`\n\nPrompt metadata:\n- UTF-8 bytes: `{{prompt_bytes}}`\n- SHA-256: `{{prompt_sha256}}`\n\nBefore taking any other task action:\n1. Open the file and verify its SHA-256.\n2. Read it completely from byte 0 through EOF. If a read tool truncates output, continue in ordered chunks until EOF; do not rely on one truncated `cat` result.\n3. Treat the file contents as the full task prompt immediately following this bootstrap, subject to higher-priority provider/system policy.\n4. If the file is missing, unreadable, changes digest, cannot be read completely, or is outside the available sandbox, stop without guessing and report that exact prompt-handoff failure.\n\nDo not modify, move, or delete the prompt file. Refine owns its lifecycle.",
+            "revision": 0
+          },
+          "architecture": {
+            "id": "architecture",
+            "prompt": "## Project architecture\n\nFollow the project's architecture. Keep responsibilities clear and shared behavior in one place.",
             "revision": 0
           },
           "chat-context-unavailable": {
@@ -199,6 +204,11 @@
           "planning-agent": {
             "id": "planning-agent",
             "prompt": "Co-design software from the user's intent. Cover only the behavior, constraints, architecture, implementation order, and verification needed for reviewable Features or Goals. Resolve material unknowns from available evidence; ask the user when necessary.",
+            "revision": 0
+          },
+          "purpose": {
+            "id": "purpose",
+            "prompt": "## Project purpose\n\nKeep the work aligned with the project's purpose and the outcome it should provide for users.",
             "revision": 0
           },
           "quality-default-instructions": {
@@ -390,47 +400,11 @@
       }
     }
   ],
-  "state": "error",
-  "results": {
-    "trigger-2124c51c-8d1f-44b7-8a07-7a989a68227f": {
-      "invocation_id": "7d26358f37ac4ad6c488cdd5ae0312db06337b90b3d31b3d2e9d000e0e1bcd8c",
-      "binding_id": "trigger-2124c51c-8d1f-44b7-8a07-7a989a68227f",
-      "role": "task",
-      "outcome": "error",
-      "summary": "Could not queue fetch-goals-from-email: the supplied completion contract omits invocation_id, and no invocation_id was available in the environment. No trigger command was run or configuration changed.",
-      "evidence": [],
-      "artifacts": null
-    }
-  },
-  "attempts": [
-    {
-      "attempt": 0,
-      "binding_id": "trigger-2124c51c-8d1f-44b7-8a07-7a989a68227f",
-      "checkout": {
-        "observation": {
-          "branch": "main",
-          "head_commit": "114157fc2912090091769222d1f33a66d868a81b",
-          "status_porcelain": []
-        },
-        "tree": "8615780b9cb1a512986984752630dd02cfe4f408"
-      },
-      "checkout_recorded": true,
-      "diagnostic": null,
-      "host_bound_result": true,
-      "observational_violation": false,
-      "operation_id": null,
-      "process_id": "proc-1789396519041-524509-14212",
-      "prompt_bytes": 2098,
-      "provider_session_id": null,
-      "purpose": "work",
-      "raw_output": "{\"outcome\":\"error\",\"summary\":\"Could not queue fetch-goals-from-email: the supplied completion contract omits invocation_id, and no invocation_id was available in the environment. No trigger command was run or configuration changed.\"}",
-      "received_at": "2026-09-14T14:35:34.987026593+00:00",
-      "started_at": "2026-09-14T14:35:18.987565657+00:00",
-      "workflow_revision": null
-    }
-  ],
-  "created_at": "2026-09-14T12:22:52.053244020+00:00",
-  "completed_at": "2026-09-14T14:35:35.033673847+00:00",
+  "state": "running",
+  "results": {},
+  "attempts": [],
+  "created_at": "2026-09-14T14:46:10.810138934+00:00",
+  "completed_at": null,
   "error": null,
   "action_applied": false
 }

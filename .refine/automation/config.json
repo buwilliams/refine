@@ -1,6 +1,6 @@
 {
-  "schema_version": 2,
-  "revision": 77,
+  "schema_version": 3,
+  "revision": 78,
   "skills": {
     "default-governance": {
       "id": "default-governance",
