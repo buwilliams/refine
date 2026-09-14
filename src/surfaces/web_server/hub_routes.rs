@@ -73,6 +73,8 @@ impl InProcessWebServer {
             let rev = body["revision"].as_str().unwrap_or("");
             let method = request.method.as_str();
             match parts.as_slice() {
+                ["hub", "metrics"] if method == "GET" => hub.metrics_snapshot(),
+                ["hub", "metrics", "refresh"] if method == "POST" => hub.refresh_metrics(),
                 ["hub", "hosting"] if method == "GET" => {
                     Ok(json!({"public_prefix":"/hub/sites/", "preview_prefix":"/hub/preview/"}))
                 }
@@ -168,9 +170,7 @@ impl InProcessWebServer {
                         "Unsupported record method".into(),
                     )),
                 },
-                _ => Err(RefineError::NotFound(
-                    "Hub route not found".into(),
-                )),
+                _ => Err(RefineError::NotFound("Hub route not found".into())),
             }
         })();
         match result {

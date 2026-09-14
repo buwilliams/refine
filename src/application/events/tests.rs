@@ -56,7 +56,7 @@ fn migration_preserves_content_is_idempotent_and_stale_writes_cannot_erase_edits
     std::fs::create_dir_all(&service.refine_dir).unwrap();
     std::fs::write(service.refine_dir.join("guidance.json"), r#"[{"id":"context","name":"Accessibility","rule":"For interfaces","instructions":"Support keyboard navigation","enabled":false}]"#).unwrap();
     let config = service.config().unwrap();
-    assert_eq!(config.events.len(), 42);
+    assert_eq!(config.events.len(), 43);
     assert!(!system_catalog().iter().any(|s| s.contains("sync")));
     assert!(
         config.skills["guidance-context"]

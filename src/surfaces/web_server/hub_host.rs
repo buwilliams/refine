@@ -11,9 +11,7 @@ impl LocalHttpDaemon {
             } else if let Some(relative) = path.strip_prefix("/hub/sites/") {
                 (relative, true)
             } else {
-                return Err(RefineError::NotFound(
-                    "Hub site route not found".into(),
-                ));
+                return Err(RefineError::NotFound("Hub site route not found".into()));
             };
             if !path.ends_with('/')
                 && !relative.contains('/')
@@ -57,13 +55,19 @@ impl LocalHttpDaemon {
             } else {
                 name
             };
-            let (bytes, hash) = if site == crate::application::hub::builtin::ID {
-                let bytes = crate::application::hub::builtin::page(&name)?;
-                let hash = format!("{:x}", sha2::Sha256::digest(&bytes));
-                (bytes, hash)
-            } else {
-                self.server.hub_service()?.asset(site, &name, public)?
-            };
+            let (bytes, hash) =
+                if site == crate::application::hub::metrics::ID && name == "data.json" {
+                    let bytes = serde_json::to_vec(&self.server.hub_service()?.metrics_snapshot()?)
+                        .map_err(|e| RefineError::Serialization(e.to_string()))?;
+                    let hash = format!("{:x}", sha2::Sha256::digest(&bytes));
+                    (bytes, hash)
+                } else if site == crate::application::hub::builtin::ID {
+                    let bytes = crate::application::hub::builtin::page(&name)?;
+                    let hash = format!("{:x}", sha2::Sha256::digest(&bytes));
+                    (bytes, hash)
+                } else {
+                    self.server.hub_service()?.asset(site, &name, public)?
+                };
             let mime = match name.rsplit('.').next().unwrap_or("") {
                 "md" if site == crate::application::hub::builtin::ID => "text/html; charset=utf-8",
                 "html" => "text/html; charset=utf-8",

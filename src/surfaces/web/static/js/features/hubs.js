@@ -64,7 +64,7 @@ function renderHubsSettings(data = {}) {
   const sites = data?.sites || [];
   return `<section class="settings-section" data-testid="settings-hubs">
     <div class="actions"><h3>Hubs</h3><span class="spacer"></span><button type="button" data-hub-new-site>Add Hub</button></div>
-    <p class="muted">Refine Hub ships with Refine. Your own sites and saved data synchronize through this app’s state repository.</p>
+    <p class="muted">Refine Hub and Metrics Hub ship with Refine. Your own Hubs and saved data synchronize through this app’s state repository.</p>
     <table class="table"><thead><tr><th>Name</th><th>Publication</th><th>Maintenance</th></tr></thead><tbody>${sites.map(({item}) => `<tr data-hub-site="${htmlEscape(item.id)}" tabindex="0" aria-label="Manage ${htmlEscape(item.name)}"><td>${htmlEscape(item.name)}</td><td>${item.builtin ? "Built-in · Read-only" : item.publication ? "Published" : "Private"}</td><td>${item.skill_id ? `<button type="button" disabled title="Checking Skill availability…" data-hub-run="${htmlEscape(item.skill_id)}" data-hub-id="${htmlEscape(item.id)}">Run Skill</button>` : "No Skill assigned"}</td></tr>`).join("")}</tbody></table>
     ${sites.length ? "" : '<p class="muted">No Hubs yet.</p>'}</section>`;
 }
@@ -89,7 +89,7 @@ async function editHubSite(existing, draft = {}) {
   try { skills = await api("GET", "/api/skills"); } catch (error) { showActionError(error); return; }
   if (!isNodeContextGenerationCurrent(generation)) return;
   const selected = draft.skill_id || existing?.item.skill_id || "";
-  const choices = (skills.items || []).filter(skill => !skill.scope?.node_id && skill.id !== "update-refine-hub");
+  const choices = (skills.items || []).filter(skill => !skill.scope?.node_id && !["update-refine-hub", "update-metrics-hub"].includes(skill.id));
   const root = hubModal(existing ? "Edit Hub" : "Add Hub", `<form data-hub-site-form>
     <div class="form-row"><label for="hub-site-name">Name</label><input type="text" id="hub-site-name" data-name required value="${htmlEscape(draft.name ?? existing?.item.name ?? "")}"></div>
     <div class="form-row"><label for="hub-site-description">Description</label><textarea id="hub-site-description" data-description rows="4">${htmlEscape(draft.description ?? existing?.item.description ?? "")}</textarea></div>
@@ -123,7 +123,7 @@ async function editHubSite(existing, draft = {}) {
   root.querySelector('[data-name]').focus();
 }
 async function openHubSite(site) {
-  if (site === "refine") { window.open("/hub/sites/refine/", "_blank", "noopener"); return; }
+  if (["refine", "refine-metrics"].includes(site)) { window.open(`/hub/sites/${site}/`, "_blank", "noopener"); return; }
   const root = hubModal("Manage Hub", `<div data-detail></div>`);
   await hubAction(root, async () => {
     const [data, collections, assets, status, skills] = await Promise.all([hubApi(root,"GET",hubPath(site)),hubApi(root,"GET",`${hubPath(site)}/collections`),hubApi(root,"GET",`${hubPath(site)}/assets`),hubApi(root,"GET",`${hubPath(site)}/status`),hubApi(root,"GET",`/api/skills?node_id=${encodeURIComponent(nodeContextActiveNodeId())}`)]);

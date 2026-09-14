@@ -31,7 +31,7 @@ struct SkillTrigger {
 fn skill_value(skill: &Skill) -> Value {
     let mut value = json!(skill);
     value.as_object_mut().unwrap().remove("role");
-    value["removable"] = json!(skill.id != super::hub_skill::ID);
+    value["removable"] = json!(!super::hub_skill::protected(&skill.id));
     value
 }
 
@@ -117,7 +117,11 @@ impl FileEventService {
         } else {
             config
         };
-        let config = if !config.skills.contains_key(super::hub_skill::ID) {
+        let config = if !config.skills.contains_key(super::hub_skill::ID)
+            || !config
+                .skills
+                .contains_key(crate::application::hub::metrics::SKILL_ID)
+        {
             match store.update(config.revision, |config| {
                 super::hub_skill::install(config);
                 Ok(())
@@ -414,9 +418,9 @@ impl FileEventService {
     }
     pub fn remove(&self, collection: &str, id: &str, revision: u64) -> RefineResult<Value> {
         if collection == "skills" {
-            if id == super::hub_skill::ID {
+            if super::hub_skill::protected(id) {
                 return Err(RefineError::InvalidInput(
-                    "Update Refine Hub cannot be removed".into(),
+                    "Built-in Hub Skills cannot be removed".into(),
                 ));
             }
             let hub = crate::application::hub::Hub::new(&self.refine_dir, &self.refine_dir);

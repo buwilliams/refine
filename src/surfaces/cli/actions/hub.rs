@@ -1,6 +1,10 @@
 use super::*;
 #[derive(Debug, Subcommand)]
 pub enum HubAction {
+    /// Calculate and save Metrics Hub statistics for the attached target app.
+    RefreshMetrics,
+    /// Read the most recently saved Metrics Hub statistics.
+    Metrics,
     /// List Hub sites.
     List,
     /// Inspect a site and its revision.

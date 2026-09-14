@@ -144,6 +144,25 @@ impl FileWorkItemService {
         Ok(value)
     }
 
+    /// Read authored Goal records once, without loading logs or changing workflow state.
+    pub(crate) fn metrics_goal_records(&self) -> RefineResult<Vec<Value>> {
+        let snapshot = self.projection_snapshot()?;
+        snapshot
+            .goals
+            .values()
+            .map(|goal| {
+                let (_lock, _, record) = self.read_goal_value_unchecked(goal)?;
+                Ok(serde_json::json!({
+                    "status":record["status"], "created":record["created"], "updated":record["updated"],
+                    "node_id":record["node_id"], "reporter":record["reporter"],
+                    "rounds":record["rounds"].as_array().into_iter().flatten().map(|round| serde_json::json!({
+                        "created":round["created"], "workflow_integration":{"integrated_at":round["workflow_integration"]["integrated_at"]}
+                    })).collect::<Vec<_>>()
+                }))
+            })
+            .collect()
+    }
+
     pub fn list_goal_summaries(&self) -> RefineResult<Vec<GoalSummaryProjection>> {
         let snapshot = self.projection_snapshot()?;
         Ok(snapshot.goals.values().cloned().collect())

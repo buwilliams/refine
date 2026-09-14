@@ -803,8 +803,10 @@ fn hub_sites_records_publication_and_tombstones_sync_and_invalidate_warm_indexes
         true,
     )
     .unwrap();
+    let saved_metrics = a.refresh_metrics().unwrap();
     fixture.service(&fixture.a).sync().unwrap();
     fixture.service(&fixture.b).sync().unwrap();
+    assert_eq!(b.metrics_snapshot().unwrap(), saved_metrics);
     assert_eq!(b.show("reports").unwrap()["item"]["skill_id"], "maintain-reports");
     assert_eq!(crate::application::events::FileEventService::new(&b.root).show_skill("maintain-reports").unwrap()["item"]["prompt"], "Build and maintain the report Hub");
     assert_eq!(

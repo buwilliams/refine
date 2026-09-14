@@ -258,6 +258,18 @@ pub fn tool_catalog() -> Vec<McpTool> {
             binding: ToolBinding::RoundDelete,
         },
         McpTool {
+            name: "refine_hub_metrics",
+            description: "Read the saved Metrics Hub snapshot for the target app, including day, week, month, quarter, and year views.",
+            input_schema: empty_schema,
+            binding: ToolBinding::Api { method:"GET", path:"/api/hub/metrics", path_params:&[] },
+        },
+        McpTool {
+            name: "refine_refresh_hub_metrics",
+            description: "Calculate and save Metrics Hub aggregates from retained Goal records. Does not launch an agent or change Goals.",
+            input_schema: empty_schema,
+            binding: ToolBinding::BodyApi { method:"POST", path:"/api/hub/metrics/refresh", required:&[], optional:&[], fixed:&[] },
+        },
+        McpTool {
             name: "refine_hub_sites",
             description: "List Hub sites. Manage assets, collections, records, indexes, queries and publication through /api/hub routes with refine_request.",
             input_schema: empty_schema,

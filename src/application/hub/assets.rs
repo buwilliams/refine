@@ -25,6 +25,9 @@ fn asset_name(name: &str) -> RefineResult<()> {
 }
 impl Hub {
     pub fn assets(&self, site: &str) -> RefineResult<Value> {
+        if site == metrics::ID {
+            return Ok(envelope(metrics::manifest()));
+        }
         if site == builtin::ID {
             return Ok(envelope(builtin::manifest()));
         }
@@ -102,6 +105,10 @@ impl Hub {
     }
     pub fn asset(&self, site: &str, name: &str, public: bool) -> RefineResult<(Vec<u8>, String)> {
         asset_name(name)?;
+        if site == metrics::ID {
+            let bytes = metrics::asset(name)?.to_vec();
+            return Ok((bytes.clone(), digest(&bytes)));
+        }
         if site == builtin::ID {
             let bytes = builtin::raw(name)?.to_vec();
             let hash = digest(&bytes);

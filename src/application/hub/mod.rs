@@ -53,6 +53,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 mod assets;
 pub mod builtin;
+pub mod metrics;
 pub mod query;
 #[cfg(test)]
 mod tests;
@@ -109,8 +110,8 @@ impl Hub {
         self.root.join("hub")
     }
     fn site(&self, site: &str) -> RefineResult<PathBuf> {
-        if site == builtin::ID {
-            return Err(invalid("Refine Hub is built-in and read-only"));
+        if site == builtin::ID || site == metrics::ID {
+            return Err(invalid("Built-in Hub content is read-only"));
         }
         Ok(self.directory().join("sites").join(id(site)?))
     }
@@ -127,6 +128,9 @@ impl Hub {
             .join(format!("{key}.json")))
     }
     fn load_site(&self, site: &str) -> RefineResult<Value> {
+        if site == metrics::ID {
+            return Ok(metrics::site());
+        }
         if site == builtin::ID {
             return Ok(builtin::site());
         }
@@ -157,8 +161,9 @@ impl Hub {
                 }
             }
         }
-        rows.retain(|v| v["item"]["id"] != builtin::ID);
+        rows.retain(|v| v["item"]["id"] != builtin::ID && v["item"]["id"] != metrics::ID);
         rows.sort_by_key(|v| v["item"]["name"].as_str().unwrap_or("").to_lowercase());
+        rows.insert(0, envelope(metrics::site()));
         rows.insert(0, envelope(builtin::site()));
         Ok(json!({"sites":rows}))
     }
@@ -207,8 +212,8 @@ impl Hub {
                             "Choose a project Skill so the Hub can be maintained across nodes",
                         ));
                     }
-                    if skill_id == crate::application::events::hub_skill::ID {
-                        return Err(invalid("Update Refine Hub is reserved for Refine Hub"));
+                    if crate::application::events::hub_skill::protected(skill_id) {
+                        return Err(invalid("This Skill is reserved for its built-in Hub"));
                     }
                 }
                 v["skill_id"] = skill.clone();
@@ -232,6 +237,9 @@ impl Hub {
         })
     }
     pub fn collections(&self, site: &str) -> RefineResult<Value> {
+        if site == metrics::ID {
+            return Ok(json!({"collections":[]}));
+        }
         if site == builtin::ID {
             return Ok(json!({"collections":[]}));
         }
