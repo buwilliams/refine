@@ -1,6 +1,6 @@
 # Contribute to Refine Hub
 
-Refine Hub's source lives in `refine-hub/`. The build bundles its Markdown, images, and other assets into the executable. Both the application and website serve this bundle. User-created hubs continue to live in project state.
+Refine Hub's source lives in `src/surfaces/refine-hub/`. The build bundles its Markdown, images, and other assets into the executable. Both the application and website serve this bundle. User-created hubs continue to live in project state.
 
 ## Write for the reader
 

@@ -148,7 +148,7 @@ test("workflow pause handler delegates the action model to the shared API and re
 
 test("Refine Hub states the complete workflow pause and unpause contract", () => {
   const guide = fs.readFileSync(
-    path.join(__dirname, "../refine-hub/product/reference.md"),
+    path.join(__dirname, "../src/surfaces/refine-hub/product/reference.md"),
     "utf8",
   );
   assert.match(guide, /Pause or unpause workflow/);

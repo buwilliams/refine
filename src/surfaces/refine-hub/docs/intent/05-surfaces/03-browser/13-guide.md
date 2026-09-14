@@ -13,4 +13,4 @@ Users can understand Refine and discover changes through one documentation surfa
 - Keep user-created sites in project state; product updates must not overwrite them.
 - Settings help links open the relevant product reference entry.
 - Keep existing public documentation URLs working as content moves.
-- Store authored documentation and assets under `refine-hub/`. Retain repository entry points, executable prompt templates, and required licenses with their owners.
+- Store authored documentation and assets under `src/surfaces/refine-hub/`. Retain repository entry points, executable prompt templates, and required licenses with their owners.

@@ -9,7 +9,7 @@ use crate::error::{RefineError, RefineResult};
 pub(crate) mod test_fixture;
 
 pub const DEPLOYED_MARKER: &str = ".refine-deployed";
-pub const INSTALL_RUNBOOK: &str = "refine-hub/docs/runbooks/install.md";
+pub const INSTALL_RUNBOOK: &str = "src/surfaces/refine-hub/docs/runbooks/install.md";
 static ACTIVE_CHECKOUT_PATHS: OnceLock<RefineCheckoutPaths> = OnceLock::new();
 
 /// Canonical product paths owned by one Refine checkout or gitless deployment.
@@ -261,7 +261,7 @@ fn find_product_home_from(start: &Path) -> Option<PathBuf> {
 fn validate_product_home_shape(path: &Path) -> RefineResult<()> {
     if !validate_common_release_files(path) {
         return Err(RefineError::NotFound(format!(
-            "{} is not a Refine product home: required current release files Cargo.toml, src/main.rs, refine-hub/docs/runbooks/install.md, and r were not all found",
+            "{} is not a Refine product home: required current release files Cargo.toml, src/main.rs, src/surfaces/refine-hub/docs/runbooks/install.md, and r were not all found",
             path.display()
         )));
     }
@@ -277,7 +277,9 @@ fn validate_product_home_shape(path: &Path) -> RefineResult<()> {
 fn validate_common_release_files(path: &Path) -> bool {
     path.join("Cargo.toml").is_file()
         && path.join("src/main.rs").is_file()
-        && (path.join(INSTALL_RUNBOOK).is_file() || path.join("docs/runbooks/install.md").is_file())
+        && (path.join(INSTALL_RUNBOOK).is_file()
+            || path.join("refine-hub/docs/runbooks/install.md").is_file()
+            || path.join("docs/runbooks/install.md").is_file())
         && path.join("r").is_file()
 }
 
@@ -354,7 +356,7 @@ mod tests {
 
     fn common_shape(root: &Path) {
         fs::create_dir_all(root.join("src")).unwrap();
-        fs::create_dir_all(root.join("refine-hub/docs/runbooks")).unwrap();
+        fs::create_dir_all(root.join("src/surfaces/refine-hub/docs/runbooks")).unwrap();
         fs::create_dir_all(root.join("bin")).unwrap();
         fs::write(root.join("Cargo.toml"), "[package]\nname='refine'\n").unwrap();
         fs::write(root.join("src/main.rs"), "fn main() {}\n").unwrap();

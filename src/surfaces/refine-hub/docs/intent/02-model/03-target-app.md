@@ -56,7 +56,7 @@ The current implementation details that matter to intent are:
   once as a commit, classifies the commit pair, fast-forwards ancestor-related
   heads without merging, and merges genuinely diverged heads from their real
   merge base — the mechanism and its policies live in the persistence-sync
-  capability (`refine-hub/docs/intent/03-application/04-persistence-sync.md`). A
+  capability (`src/surfaces/refine-hub/docs/intent/03-application/04-persistence-sync.md`). A
   contested path fails closed with a node-local conflict report whose id is
   stable across attempts, and `sync --authority live|remote [--path]` settles
   it terminally as one merge commit with both heads as parents, the losing

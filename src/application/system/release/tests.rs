@@ -276,11 +276,15 @@ fn publication_requires_explicit_confirmation_before_identity_lookup() {
 fn release_notes_follow_the_product_hub_when_present() {
     let root = unique_temp_dir("hub-release-notes");
     assert_eq!(release_notes_path(&root, "4.4.0"), "RELEASE_NOTES.md");
-    fs::create_dir_all(root.join("refine-hub")).unwrap();
-    fs::write(root.join("refine-hub/index.md"), "# Refine Hub").unwrap();
+    fs::create_dir_all(root.join("src/surfaces/refine-hub")).unwrap();
+    fs::write(
+        root.join("src/surfaces/refine-hub/index.md"),
+        "# Refine Hub",
+    )
+    .unwrap();
     assert_eq!(
         release_notes_path(&root, "4.4.0"),
-        "refine-hub/releases/4.4.0.md"
+        "src/surfaces/refine-hub/releases/4.4.0.md"
     );
     let _ = fs::remove_dir_all(root);
 }

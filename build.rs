@@ -120,11 +120,11 @@ fn bundle_refine_hub() {
             }
         }
     }
-    println!("cargo:rerun-if-changed=refine-hub");
+    println!("cargo:rerun-if-changed=src/surfaces/refine-hub");
     let mut entries = Vec::new();
     visit(
-        std::path::Path::new("refine-hub"),
-        std::path::Path::new("refine-hub"),
+        std::path::Path::new("src/surfaces/refine-hub"),
+        std::path::Path::new("src/surfaces/refine-hub"),
         &mut entries,
     );
     std::fs::write(

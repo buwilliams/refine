@@ -371,12 +371,12 @@ fn prepare_test_product_home(repo_root: &Path, product_home: &Path) -> PathBuf {
     let binary = product_home.join("bin/refine");
     fs::create_dir_all(binary.parent().unwrap()).unwrap();
     fs::create_dir_all(product_home.join("src")).unwrap();
-    fs::create_dir_all(product_home.join("refine-hub/docs/runbooks")).unwrap();
+    fs::create_dir_all(product_home.join("src/surfaces/refine-hub/docs/runbooks")).unwrap();
     fs::copy(refine_bin(), &binary).unwrap();
     for relative in [
         "Cargo.toml",
         "src/main.rs",
-        "refine-hub/docs/runbooks/install.md",
+        "src/surfaces/refine-hub/docs/runbooks/install.md",
         "r",
     ] {
         fs::copy(repo_root.join(relative), product_home.join(relative)).unwrap();
@@ -392,7 +392,10 @@ fn prepare_test_product_home(repo_root: &Path, product_home: &Path) -> PathBuf {
 fn repo_root() -> PathBuf {
     let mut current = std::env::current_dir().expect("failed to inspect cwd");
     loop {
-        if current.join("refine-hub/docs/intent/README.md").is_file() {
+        if current
+            .join("src/surfaces/refine-hub/docs/intent/README.md")
+            .is_file()
+        {
             return current;
         }
         assert!(current.pop(), "failed to locate repository root");

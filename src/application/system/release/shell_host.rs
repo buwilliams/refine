@@ -91,6 +91,9 @@ impl ReleaseHost for ShellReleaseHost {
         version_files.retain(|path| self.repo_root.join(path).is_file());
         let mut documentation_files = vec![release_notes_path(&self.repo_root, &proposed_version)];
         for path in [
+            "src/surfaces/refine-hub/index.md",
+            "src/surfaces/refine-hub/authoring.md",
+            "src/surfaces/refine-hub/docs/story.md",
             "refine-hub/index.md",
             "refine-hub/authoring.md",
             "refine-hub/docs/story.md",

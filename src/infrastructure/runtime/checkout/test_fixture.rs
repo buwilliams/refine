@@ -17,7 +17,7 @@ impl SyntheticSourceProduct {
         ));
         fs::create_dir_all(root.join(".git")).unwrap();
         fs::create_dir_all(root.join("src")).unwrap();
-        fs::create_dir_all(root.join("refine-hub/docs/runbooks")).unwrap();
+        fs::create_dir_all(root.join("src/surfaces/refine-hub/docs/runbooks")).unwrap();
         fs::create_dir_all(root.join("target/debug")).unwrap();
         fs::create_dir_all(root.join("run")).unwrap();
         fs::write(root.join("Cargo.toml"), "[package]\nname='refine'\n").unwrap();

@@ -124,12 +124,12 @@ fn installed_worker_inherits_the_stable_checkout_binary() {
         uuid::Uuid::new_v4()
     ));
     std::fs::create_dir_all(checkout.join("src")).unwrap();
-    std::fs::create_dir_all(checkout.join("refine-hub/docs/runbooks")).unwrap();
+    std::fs::create_dir_all(checkout.join("src/surfaces/refine-hub/docs/runbooks")).unwrap();
     std::fs::create_dir_all(checkout.join("bin")).unwrap();
     std::fs::write(checkout.join("Cargo.toml"), "[package]\nname='refine'\n").unwrap();
     std::fs::write(checkout.join("src/main.rs"), "fn main() {}\n").unwrap();
     std::fs::write(
-        checkout.join("refine-hub/docs/runbooks/install.md"),
+        checkout.join("src/surfaces/refine-hub/docs/runbooks/install.md"),
         "# Install\n",
     )
     .unwrap();

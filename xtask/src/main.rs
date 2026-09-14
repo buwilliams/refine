@@ -363,7 +363,10 @@ fn repo_root() -> Result<PathBuf, String> {
     let mut current =
         std::env::current_dir().map_err(|error| format!("failed to inspect cwd: {error}"))?;
     loop {
-        if current.join("refine-hub/docs/intent/README.md").is_file() {
+        if current
+            .join("src/surfaces/refine-hub/docs/intent/README.md")
+            .is_file()
+        {
             return Ok(current);
         }
         if !current.pop() {

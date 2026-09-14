@@ -358,7 +358,7 @@ Each is normal to encounter; only the first is safe to delete by hand.
   it; only legacy shared-checkout markers still quarantine residue to a stash.
 
 Worker machine creation is agent-operated rather than part of the Refine
-binary. Follow `refine-hub/docs/runbooks/manage-fleet.md` when a fleet needs another
+binary. Follow `src/surfaces/refine-hub/docs/runbooks/manage-fleet.md` when a fleet needs another
 worker.
 
 ## Operating Refine after install
@@ -373,7 +373,7 @@ reading source code:
 - `./r commands` — machine-readable JSON catalog of supported user-facing
   production-binary commands with descriptions. Load once instead of
   exploring `--help` per subcommand.
-- `refine-hub/docs/runbooks/` — task-oriented guides (manage the fleet, distribute and
+- `src/surfaces/refine-hub/docs/runbooks/` — task-oriented guides (manage the fleet, distribute and
   converge work) with preconditions, user questions, verification, and undo
   steps.
 

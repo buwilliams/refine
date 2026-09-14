@@ -14,7 +14,7 @@ Use this runbook only when Refine reports that an attached project requires the
 `goals-prompt-1-to-2` migration. This is an agent-operated semantic migration,
 not a user workflow and not a deterministic Refine application transform.
 For a complete Refine v2 product upgrade, follow
-`refine-hub/docs/runbooks/v2-to-v4-migration-runbook.md`; this document covers only its
+`src/surfaces/refine-hub/docs/runbooks/v2-to-v4-migration-runbook.md`; this document covers only its
 Gap-to-Goal portion.
 
 ## Outcome

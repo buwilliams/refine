@@ -287,10 +287,16 @@ impl FileReleaseService {
                     ))
                 })
         };
-        let hub_notes = format!("refine-hub/releases/{}.md", plan.proposed_version);
+        let hub_notes = format!(
+            "src/surfaces/refine-hub/releases/{}.md",
+            plan.proposed_version
+        );
+        let legacy_hub_notes = format!("refine-hub/releases/{}.md", plan.proposed_version);
         // Retain the notes path chosen during preparation, including pre-Hub releases.
         let release_notes = if plan.documentation_files.contains(&hub_notes) {
             hub_notes
+        } else if plan.documentation_files.contains(&legacy_hub_notes) {
+            legacy_hub_notes
         } else {
             "RELEASE_NOTES.md".to_string()
         };
