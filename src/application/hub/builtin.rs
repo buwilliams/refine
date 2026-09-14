@@ -21,6 +21,9 @@ fn escape(value: &str) -> String {
         .replace('"', "&quot;")
 }
 fn title(name: &str, bytes: &[u8]) -> String {
+    if name == "index.md" {
+        return "Refine Hub".into();
+    }
     String::from_utf8_lossy(bytes)
         .lines()
         .find_map(|line| line.strip_prefix("# "))
