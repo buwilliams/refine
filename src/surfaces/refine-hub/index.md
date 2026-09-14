@@ -4,7 +4,7 @@ Everything you need to use Refine, understand what changed, and contribute to it
 
 ## What you need to know
 
-[Refine 4.3 — Make agent prompts your own](releases/4.3.0.md): understand how prompts are built, reuse Skills, restore defaults, and inspect what your agents received.
+[Refine 4.3.1 — What you need to know](releases/4.3.1.md): changes since September 2, including Skills and Templates, Goal rounds, logs, workflow recovery, terminals, and Knowledge Hubs.
 
 ## Use Refine
 

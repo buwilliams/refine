@@ -8,7 +8,7 @@ Product guides explain how to accomplish a task. Design intent records the syste
 
 ## Add a release
 
-Create `releases/<version>.md` with the title “Refine <version> — What you need to know.” Add one subsection for each major change. Explain what changed, why the reader cares, where to find it, and whether they need to do anything. Add screenshots of the actual interface and links to the relevant product guides.
+Create `releases/<version>.md` with the title “Refine <version> — What you need to know.” State the release coverage period and review the changes across that whole period. Describe the final shipped behavior, combining related fixes and omitting reverted or superseded designs. Add one subsection for each major change. Explain what changed, why the reader cares, where to find it, and whether they need to do anything. Add screenshots of the actual interface and links to the relevant product guides.
 
 Store screenshots beside release notes in a version-specific image directory. Keep historical screenshots unchanged. Update the home page to link to the newest release.
 
