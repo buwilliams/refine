@@ -401,11 +401,47 @@
       }
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "error",
+  "results": {
+    "trigger-2124c51c-8d1f-44b7-8a07-7a989a68227f": {
+      "invocation_id": "fc136392f7b247de5f351985f20cc863fd5934b8d2fe6816f7b6d33b2465e051",
+      "binding_id": "trigger-2124c51c-8d1f-44b7-8a07-7a989a68227f",
+      "role": "task",
+      "outcome": "error",
+      "summary": "The supplied completion contract does not contain invocation_id, and no invocation ID was available in the environment. The child Skill was not queued because the required request ID startup-email-<invocation_id> could not be constructed exactly. No configuration was changed.",
+      "evidence": [],
+      "artifacts": null
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "trigger-2124c51c-8d1f-44b7-8a07-7a989a68227f",
+      "checkout": {
+        "observation": {
+          "branch": "main",
+          "head_commit": "3f1b6712ca8d128825bd4a35b6482f91c4b950b4",
+          "status_porcelain": []
+        },
+        "tree": "845bed7d561d602056dfdd5b4a275462a948d762"
+      },
+      "checkout_recorded": true,
+      "diagnostic": null,
+      "host_bound_result": true,
+      "observational_violation": false,
+      "operation_id": null,
+      "process_id": "proc-1789409016179-1035199-2",
+      "prompt_bytes": 2114,
+      "provider_session_id": null,
+      "purpose": "work",
+      "raw_output": "{\"outcome\":\"error\",\"summary\":\"The supplied completion contract does not contain invocation_id, and no invocation ID was available in the environment. The child Skill was not queued because the required request ID startup-email-<invocation_id> could not be constructed exactly. No configuration was changed.\"}",
+      "received_at": "2026-09-14T18:03:47.624306332+00:00",
+      "started_at": "2026-09-14T18:03:36.123819642+00:00",
+      "workflow_revision": null
+    }
+  ],
   "created_at": "2026-09-14T18:03:34.561813056+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-14T18:03:47.677415462+00:00",
   "error": null,
   "action_applied": false
 }
