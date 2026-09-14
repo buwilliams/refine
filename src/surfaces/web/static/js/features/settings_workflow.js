@@ -189,9 +189,14 @@ async function openWorkflowAssignment(data, source, row = null) {
     ${choices.length ? "" : '<p class="muted">No unassigned Skills are available for this trigger. Create a Skill instead.</p>'}
     <div class="form-row"><label for="assignment-mode">How it runs</label><select id="assignment-mode">${Object.entries({blocking:"Required",background:"Background",context:"Context only"}).map(([value,label]) => `<option value="${value}" ${value === (row?.binding.mode || "blocking") ? "selected" : ""}>${label}</option>`).join("")}</select></div>
     <div class="form-row"><label for="assignment-order">Order</label><input id="assignment-order" type="number" min="-2147483648" max="2147483647" step="1" required value="${row?.binding.order || 0}"></div>
-    <div class="form-row"><label for="assignment-enabled">Enabled</label><input id="assignment-enabled" type="checkbox" ${row?.binding.enabled !== false ? "checked" : ""}></div>
+    <div class="form-row"><label>Status</label>${automationChoices('id="assignment-enabled"', "Assignment status", [["true", "Enabled"], ["false", "Disabled"]], row?.binding.enabled !== false)}</div>
     <div data-assignment-inputs></div>`);
   automationEditor = root;
+  const status = root.querySelector('#assignment-enabled');
+  status.querySelectorAll('[data-choice]').forEach(button => { button.onclick = () => {
+    status.dataset.value = button.dataset.choice;
+    status.querySelectorAll('[data-choice]').forEach(choice => choice.setAttribute('aria-pressed', String(choice === button)));
+  }; });
   const picker = root.querySelector('#assignment-skill');
   const drawInputs = () => {
     const skill = choices.find(skill => skill.id === picker.value);
@@ -219,7 +224,7 @@ async function openWorkflowAssignment(data, source, row = null) {
         if (!event) throw new Error('This event is no longer available. Refresh the Workflow.');
         const inputs = {...(row?.binding.inputs || {})};
         root.querySelectorAll('[data-assignment-input]').forEach(input => { if (input.value.trim()) inputs[input.dataset.assignmentInput] = input.value.trim(); else delete inputs[input.dataset.assignmentInput]; });
-        assignments.push({event_id:event.id, binding:{...row?.binding, id:row?.binding.id || newSkillId(), skill_id:skill.id, enabled:root.querySelector('#assignment-enabled').checked, mode:root.querySelector('#assignment-mode').value, order:Number(order.value), scope:row?.binding.scope || skill.scope || {node_id:null}, inputs}});
+        assignments.push({event_id:event.id, binding:{...row?.binding, id:row?.binding.id || newSkillId(), skill_id:skill.id, enabled:status.dataset.value === 'true', mode:root.querySelector('#assignment-mode').value, order:Number(order.value), scope:row?.binding.scope || skill.scope || {node_id:null}, inputs}});
       }
       await api('PUT', `/api/skills/${encodeURIComponent(skill.id)}`, {revision:current.revision, item:current.item, event_bindings:assignments});
       root._close(); await refreshSettings({force:true}); await refreshManualSkills();

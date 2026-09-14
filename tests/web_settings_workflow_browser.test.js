@@ -153,12 +153,14 @@ test('Existing Skills can be reused and assignment edits preserve other triggers
     await modal.locator('#assignment-skill').selectOption('review');
     await modal.locator('#assignment-mode').selectOption('background');
     await modal.locator('#assignment-order').fill('7');
+    await modal.getByRole('button', {name:'Disabled', exact:true}).click();
     await modal.locator('[data-save]').click();
     await modal.waitFor({state:'detached'});
     const card = page.locator('[data-workflow-assignment="review"]');
     assert.match(await card.innerText(), /Order 7 · Background/);
     let save = data.requests.at(-1).body;
     assert.equal(save.event_bindings.length, 2);
+    assert.equal(save.event_bindings.find(row => row.event_id === 'event-2').binding.enabled, false);
     assert.deepEqual(save.event_bindings.find(row => row.event_id === 'event-0').binding, {id:'binding-0',skill_id:'review',enabled:true,order:2,mode:'blocking',scope:{}});
     await card.locator('[data-workflow-skill]').click();
     await modal.locator('[data-skill-tab="settings"]').click();
@@ -169,10 +171,13 @@ test('Existing Skills can be reused and assignment edits preserve other triggers
     assert.equal(data.requests.at(-1).body.trigger, undefined);
     assert.equal(data.requests.at(-1).body.event_bindings, undefined);
     await card.locator('[data-workflow-assignment-edit]').click();
+    assert.equal(await modal.getByRole('button', {name:'Disabled', exact:true}).getAttribute('aria-pressed'), 'true');
+    await modal.getByRole('button', {name:'Enabled', exact:true}).click();
     await modal.locator('#assignment-order').fill('9');
     await modal.locator('[data-save]').click();
     await modal.waitFor({state:'detached'});
     assert.match(await card.innerText(), /Order 9 · Background/);
+    assert.equal(data.requests.at(-1).body.event_bindings.find(row => row.event_id === 'event-2').binding.enabled, true);
     await card.locator('[data-workflow-assignment-edit]').click();
     await modal.locator('[data-delete]').click();
     await modal.waitFor({state:'detached'});
