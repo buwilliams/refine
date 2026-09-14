@@ -257,16 +257,19 @@ pub(super) fn dispatch_request(words: Vec<String>) -> RefineResult<()> {
 /// The agent reassigns Goals to nodes per the instructions and syncs state —
 /// no machines are created and no SSH is involved.
 pub(super) fn dispatch_distribute_instructions(instructions: String) -> RefineResult<()> {
-    dispatch_manage(
-        format!(
-            "Distribute work across the existing fleet nodes as instructed; reassign Goals to \
-             nodes and sync state, without creating machines or connecting over SSH. \
-             Instructions: {instructions}"
-        ),
+    let runtime = resolve_system_runtime_root(PathBuf::from("run"))?;
+    let status = crate::application::projects::registry::FileProjectRegistryService::new(
+        runtime.join("8082"),
         None,
-        PathBuf::from("run"),
-        8082,
     )
+    .status()?;
+    let root = status.refine_dir.map(PathBuf::from);
+    let _templates = crate::application::templates::TemplateScope::for_root(root.as_deref())?;
+    let request = crate::application::agent_io::prompts::render(
+        crate::application::agent_io::prompts::PromptTemplate::FleetDistribute,
+        &[("message", &instructions)],
+    )?;
+    dispatch_manage(request, None, PathBuf::from("run"), 8082)
 }
 
 /// Open an interactive session with the resolved agent provider, seeded with
@@ -280,14 +283,16 @@ pub(super) fn dispatch_manage(
 ) -> RefineResult<()> {
     let runtime_root = resolve_system_runtime_root(runtime_root)?;
     let checkout = discover_refine_checkout()?;
-    if !checkout.join(FLEET_RUNBOOK_PATH).is_file() {
-        return Err(RefineError::NotFound(format!(
-            "fleet runbook not found: {}",
-            checkout.join(FLEET_RUNBOOK_PATH).display()
-        )));
-    }
+    let status = crate::application::projects::registry::FileProjectRegistryService::new(
+        runtime_root.join(port.to_string()),
+        None,
+    )
+    .status()?;
+    let root = status.refine_dir.map(PathBuf::from);
+    let _templates =
+        crate::application::templates::TemplateScope::inherit_or_root(root.as_deref())?;
     let provider = resolve_agent_provider(&runtime_root, provider)?;
-    let prompt = fleet_manage_prompt(&checkout, &request);
+    let prompt = fleet_manage_prompt(&checkout, &request)?;
     let launch = HostAgentProviderService::with_runtime_root(runtime_root.join(port.to_string()))
         .interactive_command(&provider, &prompt)?;
     launch.validate_prompt_artifact()?;

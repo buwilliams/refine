@@ -145,6 +145,10 @@ impl FileChatService {
                     record.provider_session_id.clone(),
                     None,
                 ));
+                record.template_snapshot = Some(
+                    crate::application::templates::TemplateStore::new(Some(&self.refine_dir))
+                        .snapshot()?,
+                );
                 record.in_flight = true;
                 record.last_turn_started_at = Some(now_timestamp());
                 record.updated_at = now_timestamp();
@@ -157,19 +161,26 @@ impl FileChatService {
                 path_override: self.provider_path_override(),
                 runtime_root: Some(self.runtime_root.join("agents")),
             };
-            let result = provider.invoke_detailed_with_output(
-                ProviderInvocation {
-                    stall_timeout_seconds: None,
-                    provider: record.provider.clone(),
-                    prompt: self.chat_prompt(&record, &message),
-                    session_id: record.provider_session_id.clone(),
-                    cwd: Some(self.chat_cwd(&record).display().to_string()),
-                    process_metadata: chat_process_metadata(&record),
-                },
-                |line| {
-                    let _ = self.append_provider_activity_progress(session_id, &line);
-                },
+            let _templates = crate::application::templates::TemplateScope::enter(
+                record.template_snapshot.clone().ok_or_else(|| {
+                    RefineError::InvalidInput("Chat turn has no retained Templates".into())
+                })?,
             );
+            let result = (|| {
+                provider.invoke_detailed_with_output(
+                    ProviderInvocation {
+                        stall_timeout_seconds: None,
+                        provider: record.provider.clone(),
+                        prompt: self.chat_prompt(&record, &message)?,
+                        session_id: record.provider_session_id.clone(),
+                        cwd: Some(self.chat_cwd(&record).display().to_string()),
+                        process_metadata: chat_process_metadata(&record),
+                    },
+                    |line| {
+                        let _ = self.append_provider_activity_progress(session_id, &line);
+                    },
+                )
+            })();
             let _guard = self.acquire_session_lock(session_id)?;
             let mut latest = self.load_record(session_id)?;
             if latest.closed {

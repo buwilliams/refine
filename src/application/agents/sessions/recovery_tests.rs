@@ -10,7 +10,7 @@ fn completion_contracts_require_parse_checked_atomic_replacement() {
     let signal = Path::new("/runtime/processes/goal-agent.signal.json");
 
     for phase in [None, Some("plan"), Some("criticize"), Some("revise")] {
-        let prompt = goal_agent_protocol_prompt("GOAL", signal, phase);
+        let prompt = goal_agent_protocol_prompt("GOAL", signal, phase).unwrap();
         assert!(prompt.contains("goal-agent.signal.json.tmp"));
         assert!(prompt.contains("parse-check"));
         assert!(prompt.contains("`jq .`"));

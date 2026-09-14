@@ -835,3 +835,38 @@ fn hub_sites_records_publication_and_tombstones_sync_and_invalidate_warm_indexes
         0
     );
 }
+
+#[test]
+fn template_edits_are_committed_and_converge_across_nodes() {
+    use crate::application::templates::TemplateStore;
+    let fixture = SyncFixture::new("templates");
+    let a = refine_dir_for_target_root(&fixture.a).unwrap();
+    let b = refine_dir_for_target_root(&fixture.b).unwrap();
+    TemplateStore::new(Some(&a))
+        .save("workflow", 0, "A {{skill}}")
+        .unwrap();
+    let outcome = fixture.service(&fixture.a).sync().unwrap();
+    assert!(outcome.committed && outcome.pushed);
+    fixture.service(&fixture.b).sync().unwrap();
+    assert_eq!(
+        TemplateStore::new(Some(&b))
+            .read("workflow")
+            .unwrap()
+            .prompt,
+        "A {{skill}}"
+    );
+    TemplateStore::new(Some(&a))
+        .save("agent", 0, "Agent A")
+        .unwrap();
+    TemplateStore::new(Some(&b))
+        .save("planning-agent", 0, "Planner B")
+        .unwrap();
+    fixture.service(&fixture.a).sync().unwrap();
+    fixture.service(&fixture.b).sync().unwrap();
+    fixture.service(&fixture.a).sync().unwrap();
+    for root in [&a, &b] {
+        let store = TemplateStore::new(Some(root));
+        assert_eq!(store.read("agent").unwrap().prompt, "Agent A");
+        assert_eq!(store.read("planning-agent").unwrap().prompt, "Planner B");
+    }
+}

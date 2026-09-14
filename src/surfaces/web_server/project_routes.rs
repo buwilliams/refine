@@ -206,7 +206,9 @@ impl crate::application::agent_io::structured_output::Contract for TargetAppConf
     }
 }
 
-fn target_app_generation_prompt(target_root: &std::path::Path) -> String {
+fn target_app_generation_prompt(
+    target_root: &std::path::Path,
+) -> crate::error::RefineResult<String> {
     let target_root = target_root.display().to_string();
     let target_app_contract =
         <TargetAppConfigContract as crate::application::agent_io::structured_output::Contract>::contract_json();

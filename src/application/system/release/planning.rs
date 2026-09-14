@@ -19,7 +19,7 @@ pub fn bump_version(current: &str, bump: ReleaseBump) -> RefineResult<String> {
     })
 }
 
-pub(super) fn release_goal_prompt(plan: &ReleasePlan) -> String {
+pub(super) fn release_goal_prompt(plan: &ReleasePlan) -> crate::error::RefineResult<String> {
     let changes = plan
         .changes
         .iter()

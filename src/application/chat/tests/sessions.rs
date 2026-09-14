@@ -105,7 +105,7 @@ fn file_chat_service_rebuilds_attached_goal_context_from_refine_records() {
         )
         .unwrap();
 
-    let prompt = service.chat_prompt(&session, "What changed?");
+    let prompt = service.chat_prompt(&session, "What changed?").unwrap();
     assert!(prompt.contains("Context:"));
     assert!(prompt.contains("\"id\": \"GOAL1\""));
     assert!(prompt.contains("\"name\": \"Checkout fails\""));
@@ -143,4 +143,39 @@ fn file_chat_service_ignores_orphaned_operations_for_purged_supervisor_sessions(
     );
 
     fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn chat_templates_control_the_entire_prompt_and_pin_nested_sources() {
+    use crate::application::templates::TemplateStore;
+    let root = unique_temp_dir("chat-template");
+    let refine_dir = root.join(".refine");
+    FileWorkItemService::new(&refine_dir)
+        .create_goal_summary("Goal", Some("GOAL1"))
+        .unwrap();
+    let store = TemplateStore::new(Some(&refine_dir));
+    store
+        .save("chat-session", 0, "{{instructions}} / {{message}}")
+        .unwrap();
+    store.save("goal-agent", 0, "First").unwrap();
+    let service = FileChatService::new(&refine_dir);
+    let mut session = service
+        .start_with_options(
+            ChatAttachment::Goal("GOAL1".into()),
+            Some("smoke-ai"),
+            Some("goal"),
+        )
+        .unwrap();
+    session.template_snapshot = Some(store.snapshot().unwrap());
+    store.save("goal-agent", 1, "Second").unwrap();
+    assert_eq!(
+        service.chat_prompt(&session, "{{skill}}").unwrap(),
+        "First / {{skill}}"
+    );
+    session.template_snapshot = None;
+    assert_eq!(
+        service.chat_prompt(&session, "{{skill}}").unwrap(),
+        "Second / {{skill}}"
+    );
+    fs::remove_dir_all(root).unwrap();
 }

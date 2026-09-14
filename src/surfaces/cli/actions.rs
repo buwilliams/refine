@@ -18,6 +18,7 @@ mod projects;
 mod skills;
 mod sync;
 mod system;
+mod templates;
 mod todos;
 mod workflow;
 pub use hub::HubAction;
@@ -33,6 +34,7 @@ pub use projects::ProjectAction;
 pub use skills::SkillAction;
 pub use sync::CliSyncAuthority;
 pub use system::{CliInstallTarget, SystemAction};
+pub use templates::TemplateAction;
 pub use todos::TodoAction;
 pub use workflow::{CliGoalStatus, WorkflowAction};
 
@@ -47,6 +49,11 @@ pub struct Cli {
 
 #[derive(Debug, Subcommand)]
 pub enum Commands {
+    /// Inspect, edit, and preview the Templates used for agent prompts.
+    Templates {
+        #[command(subcommand)]
+        action: TemplateAction,
+    },
     /// Manage Knowledge Hub sites, JSON data, queries and publication.
     Hub {
         #[command(subcommand)]

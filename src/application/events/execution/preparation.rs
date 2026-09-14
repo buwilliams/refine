@@ -85,6 +85,10 @@ impl FileEventService {
                         context.resolve_workspace_parameters(&mut bindings, &inputs)?;
                     }
                 }
+                let _templates = crate::application::templates::TemplateScope::pin(
+                    Some(&self.refine_dir),
+                    &mut context.metadata,
+                )?;
                 let invocation = EventInvocation {
                     id: id.clone(),
                     event: event.clone(),

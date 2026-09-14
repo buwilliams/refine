@@ -209,6 +209,17 @@ impl InProcessWebServer {
             metadata.insert("feature_id".to_string(), json!(feature_id));
         }
 
+        let _templates = if profile == "terminal" {
+            None
+        } else {
+            match crate::application::templates::TemplateScope::pin(
+                Some(&refine_dir),
+                &mut metadata,
+            ) {
+                Ok(scope) => Some(scope),
+                Err(error) => return error_response(error),
+            }
+        };
         let skill_prompt = if profile == "skill" {
             let Some(skill_id) = body.get("skill_id").and_then(Value::as_str) else {
                 return error_response(RefineError::InvalidInput("skill_id is required".into()));
@@ -296,6 +307,7 @@ impl InProcessWebServer {
                     return error_response(error);
                 }
             };
+            metadata.insert("rendered_prompt".into(), json!(prompt));
             let environment_overrides = vec![
                 ("TERM".to_string(), "xterm-256color".to_string()),
                 ("COLORTERM".to_string(), "truecolor".to_string()),

@@ -282,8 +282,16 @@ impl HostAgentProviderService {
     /// `operation_id` metadata.
     pub(crate) fn launch_managed(
         &self,
-        invocation: ProviderInvocation,
+        mut invocation: ProviderInvocation,
     ) -> RefineResult<crate::infrastructure::process::subprocess::ManagedProcess> {
+        let _templates = crate::application::templates::TemplateScope::for_delivery(
+            invocation.cwd.as_deref().map(Path::new),
+            &mut invocation.process_metadata,
+        )?;
+        invocation.process_metadata.insert(
+            "rendered_prompt".into(),
+            serde_json::json!(invocation.prompt),
+        );
         let _ = self.reap_orphan_prompt_artifacts()?;
         let (spec, binary) = self.resolve_binary_for_provider(&invocation.provider)?;
         if invocation
@@ -371,13 +379,21 @@ impl HostAgentProviderService {
 
     pub(crate) fn invoke_detailed_with_environment_and_output<F>(
         &self,
-        invocation: ProviderInvocation,
+        mut invocation: ProviderInvocation,
         environment_overrides: &[(String, String)],
         on_output: F,
     ) -> RefineResult<ProviderInvocationResult>
     where
         F: FnMut(String),
     {
+        let _templates = crate::application::templates::TemplateScope::for_delivery(
+            invocation.cwd.as_deref().map(Path::new),
+            &mut invocation.process_metadata,
+        )?;
+        invocation.process_metadata.insert(
+            "rendered_prompt".into(),
+            serde_json::json!(invocation.prompt),
+        );
         let _ = self.reap_orphan_prompt_artifacts()?;
         let (spec, binary) = self.resolve_binary_for_provider(&invocation.provider)?;
         if invocation

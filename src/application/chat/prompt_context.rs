@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use serde_json::json;
 
-use crate::application::agent_io::prompts::{PromptEngine, PromptTemplate, render};
+use crate::application::agent_io::prompts::PromptTemplate;
 use crate::application::projects::projection::FileProjectProjectionStore;
 use crate::error::{RefineError, RefineResult};
 
@@ -43,29 +43,54 @@ impl FileChatService {
         Some(joined.to_string_lossy().to_string())
     }
 
-    pub(super) fn chat_prompt(&self, record: &ChatSessionRecord, message: &str) -> String {
+    pub(super) fn chat_prompt(
+        &self,
+        record: &ChatSessionRecord,
+        message: &str,
+    ) -> RefineResult<String> {
+        use crate::application::templates::{TemplateScope, TemplateStore, TemplateValue};
+        let snapshot = match &record.template_snapshot {
+            Some(snapshot) => snapshot.clone(),
+            None => TemplateStore::new(Some(&self.refine_dir)).snapshot()?,
+        };
+        let _templates = TemplateScope::enter(snapshot);
         let attachment = match &record.attachment {
             ChatAttachment::Goal(id) => format!("Goal {id}"),
             ChatAttachment::Feature(id) => format!("Feature {id}"),
-            ChatAttachment::Supervisor => "supervisor agent".to_string(),
-            ChatAttachment::Standalone => "standalone chat".to_string(),
+            ChatAttachment::Supervisor => "supervisor agent".into(),
+            ChatAttachment::Standalone => "standalone chat".into(),
         };
-        let instructions = chat_mode_instructions(record);
-        let context = self
-            .attached_product_context(record)
-            .unwrap_or_else(|error| {
-                format!("Attachment context could not be rebuilt from refine records: {error}")
-            });
-        render(
-            PromptTemplate::Chat,
-            &[
-                ("mode", &record.mode),
-                ("attachment", &attachment),
-                ("instructions", instructions),
-                ("context", &context),
-                ("message", message),
-            ],
-        )
+        let context = match self.attached_product_context(record) {
+            Ok(context) => context,
+            Err(error) => crate::application::agent_io::prompts::render(
+                PromptTemplate::ChatContextUnavailable,
+                &[("diagnostics", &error.to_string())],
+            )?,
+        };
+        let mut values = TemplateScope::literals(&[
+            ("mode", &record.mode),
+            ("attachment", &attachment),
+            ("context", &context),
+            ("message", message),
+            ("workspace", &self.chat_cwd(record).display().to_string()),
+            ("project_root", &self.project_root().display().to_string()),
+        ]);
+        if let ChatAttachment::Goal(id) = &record.attachment {
+            if let Ok(goal) =
+                crate::application::work_items::FileWorkItemService::new(&self.refine_dir)
+                    .show_goal_detail(id)
+            {
+                values.extend(TemplateScope::context_values(&json!({"goal":goal})));
+            }
+        }
+        values.insert(
+            "instructions".into(),
+            TemplateValue::Template(format!(
+                "{{{{templates.{}}}}}",
+                chat_mode_template(record).id()
+            )),
+        );
+        TemplateScope::render(&PromptTemplate::Chat.id(), values)
     }
 
     fn attached_product_context(&self, record: &ChatSessionRecord) -> RefineResult<String> {
@@ -126,14 +151,14 @@ impl FileChatService {
     }
 }
 
-fn chat_mode_instructions(record: &ChatSessionRecord) -> &'static str {
+fn chat_mode_template(record: &ChatSessionRecord) -> PromptTemplate {
     if record.mode.eq_ignore_ascii_case("plan") {
-        return PromptEngine::load(PromptTemplate::ChatPlan);
+        return PromptTemplate::ChatPlan;
     }
-    PromptEngine::load(match &record.attachment {
+    match &record.attachment {
         ChatAttachment::Goal(_) => PromptTemplate::ChatGoal,
         ChatAttachment::Feature(_) => PromptTemplate::ChatFeature,
         ChatAttachment::Supervisor => PromptTemplate::ChatAgent,
         ChatAttachment::Standalone => PromptTemplate::ChatStandalone,
-    })
+    }
 }

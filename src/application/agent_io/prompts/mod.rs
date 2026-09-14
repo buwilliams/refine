@@ -19,6 +19,16 @@ macro_rules! prompt_templates {
                 }
             }
 
+            pub fn id(self) -> String {
+                match self {
+                    Self::ChatPlan => "planning-agent".into(),
+                    Self::ChatAgent => "agent".into(),
+                    Self::ChatGoal => "goal-agent".into(),
+                    Self::Workflow => "workflow".into(),
+                    _ => self.name().trim_start_matches("templates/").trim_end_matches(".md").replace(['/', '_'], "-"),
+                }
+            }
+
             const fn source(self) -> &'static str {
                 match self {
                     $(Self::$variant => include_str!($path)),+
@@ -29,6 +39,26 @@ macro_rules! prompt_templates {
 }
 
 prompt_templates! {
+    ChatContextUnavailable => "templates/chat-context-unavailable.md",
+    FleetManage => "templates/fleet-manage.md",
+    FleetDistribute => "templates/fleet-distribute.md",
+    SyncOwnershipDoctrine => "templates/sync-ownership-doctrine.md",
+    ConflictResolution => "templates/conflict-resolution.md",
+    ConflictAncestry => "templates/conflict-ancestry.md",
+    ConflictFeedback => "templates/conflict-feedback.md",
+    TerminalSession => "templates/terminal-session.md",
+    Workflow => "templates/workflow.md",
+    SupervisedSkill => "templates/supervised-skill.md",
+    WorkflowContext => "templates/workflow-context.md",
+    WorkflowContinuation => "templates/workflow-continuation.md",
+    WorkflowObservational => "templates/workflow-observational.md",
+    ContextSkill => "templates/context-skill.md",
+    ManualSkill => "templates/manual-skill.md",
+    SkillRepair => "templates/skill-repair.md",
+    DirectAgent => "templates/direct-agent.md",
+    GoalCompletion => "templates/goal-completion.md",
+    SignalRepair => "templates/signal-repair.md",
+    SourceUpgrade => "templates/source-upgrade.md",
     AgentProviderFileBootstrap => "agent_providers/file-bootstrap.md",
     Chat => "chat/session.md",
     ChatPlan => "chat/plan.md",
@@ -70,6 +100,7 @@ prompt_templates! {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum PromptTemplateError {
+    Resolution(String),
     DuplicateVariable(String),
     InvalidPlaceholder(String),
     MissingVariable(String),
@@ -80,6 +111,7 @@ pub enum PromptTemplateError {
 impl fmt::Display for PromptTemplateError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Resolution(message) => formatter.write_str(message),
             Self::DuplicateVariable(name) => write!(formatter, "duplicate prompt variable: {name}"),
             Self::InvalidPlaceholder(name) => {
                 write!(formatter, "invalid prompt placeholder: {name}")
@@ -125,54 +157,92 @@ impl PromptEngine {
             }
         }
 
-        let mut output = String::with_capacity(source.len());
-        let mut remaining = source;
         let mut used = BTreeSet::new();
-        while let Some(start) = remaining.find("{{") {
-            output.push_str(&remaining[..start]);
-            let placeholder = &remaining[start + 2..];
-            let Some(end) = placeholder.find("}}") else {
-                if strict {
-                    return Err(PromptTemplateError::UnclosedPlaceholder);
-                }
-                output.push_str(&remaining[start..]);
-                return Ok(output);
-            };
-            let name = placeholder[..end].trim();
-            if strict
-                && (name.is_empty()
-                    || !name
-                        .chars()
-                        .all(|character| character.is_ascii_alphanumeric() || character == '_'))
-            {
-                return Err(PromptTemplateError::InvalidPlaceholder(name.to_string()));
-            }
-            if let Some(value) = values.get(name) {
-                output.push_str(value);
-                used.insert(name);
-            } else if strict {
-                return Err(PromptTemplateError::MissingVariable(name.to_string()));
-            } else {
-                output.push_str(&remaining[start..start + 2 + end + 2]);
-            }
-            remaining = &placeholder[end + 2..];
-        }
-        output.push_str(remaining);
+        let output = Self::render_resolved(source, strict, usize::MAX, |name| {
+            Ok(values.get(name).map(|value| {
+                used.insert(name.to_string());
+                (*value).to_string()
+            }))
+        })?;
 
         if strict && let Some(name) = values.keys().find(|name| !used.contains(**name)) {
             return Err(PromptTemplateError::UnusedVariable((*name).to_string()));
         }
         Ok(output)
     }
+    /// Shared single-pass tokenizer. Resolvers may expand template-valued inputs;
+    /// their returned bytes are appended literally and never tokenized again.
+    pub fn render_resolved(
+        source: &str,
+        strict: bool,
+        max_bytes: usize,
+        mut resolve: impl FnMut(&str) -> Result<Option<String>, PromptTemplateError>,
+    ) -> Result<String, PromptTemplateError> {
+        let mut output = String::new();
+        let mut remaining = source;
+        while let Some(start) = remaining.find("{{") {
+            let escaped = start > 0 && remaining.as_bytes()[start - 1] == b'\\';
+            let placeholder = &remaining[start + 2..];
+            let Some(end) = placeholder.find("}}") else {
+                if strict {
+                    return Err(PromptTemplateError::UnclosedPlaceholder);
+                }
+                break;
+            };
+            output.push_str(&remaining[..if escaped { start - 1 } else { start }]);
+            let name = placeholder[..end].trim();
+            let token = &remaining[start..start + 2 + end + 2];
+            if escaped {
+                output.push_str(token);
+            } else {
+                if strict
+                    && (name.is_empty()
+                        || !name
+                            .chars()
+                            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.')))
+                {
+                    return Err(PromptTemplateError::InvalidPlaceholder(name.into()));
+                }
+                match resolve(name)? {
+                    Some(value) => {
+                        if value.len() > max_bytes.saturating_sub(output.len()) {
+                            return Err(PromptTemplateError::Resolution(
+                                "Expanded template exceeds the size limit".into(),
+                            ));
+                        }
+                        output.push_str(&value);
+                    }
+                    None if strict => {
+                        return Err(PromptTemplateError::MissingVariable(name.into()));
+                    }
+                    None => output.push_str(token),
+                }
+            }
+            if output.len() > max_bytes {
+                return Err(PromptTemplateError::Resolution(
+                    "Expanded template exceeds the size limit".into(),
+                ));
+            }
+            remaining = &placeholder[end + 2..];
+        }
+        if remaining.len() > max_bytes.saturating_sub(output.len()) {
+            return Err(PromptTemplateError::Resolution(
+                "Expanded template exceeds the size limit".into(),
+            ));
+        }
+        output.push_str(remaining);
+        Ok(output)
+    }
 }
 
-pub fn render(template: PromptTemplate, variables: &[(&str, &str)]) -> String {
-    PromptEngine::render(template, variables).unwrap_or_else(|error| {
-        panic!(
-            "invalid embedded prompt template {}: {error}",
-            template.name()
-        )
-    })
+pub fn render(
+    template: PromptTemplate,
+    variables: &[(&str, &str)],
+) -> crate::error::RefineResult<String> {
+    crate::application::templates::TemplateScope::render(
+        &template.id(),
+        crate::application::templates::TemplateScope::literals(variables),
+    )
 }
 
 #[cfg(test)]
@@ -294,6 +364,10 @@ mod tests {
             let word_count = PromptEngine::load(template).split_whitespace().count();
             let word_limit = match template {
                 PromptTemplate::AgentProviderFileBootstrap => 140,
+                // Existing orchestration contracts moved here unchanged.
+                PromptTemplate::GoalCompletion => 100,
+                PromptTemplate::SourceUpgrade => 150,
+                PromptTemplate::SupervisedSkill | PromptTemplate::SyncOwnershipDoctrine => 120,
                 PromptTemplate::TerminalProfileGeneralAgentWorkflow
                 | PromptTemplate::TerminalProfileToolbarAgentWorkflow => 180,
                 _ => 90,

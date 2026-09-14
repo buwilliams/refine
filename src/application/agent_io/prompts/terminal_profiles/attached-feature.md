@@ -1,2 +1,2 @@
 Attached Refine Feature context:
-{{context}}
+{{feature_context}}

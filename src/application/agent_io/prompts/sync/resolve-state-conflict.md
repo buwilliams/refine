@@ -4,7 +4,7 @@ Refine's synchronized state diverged on two nodes; each conflicted file in this 
 
 Ownership doctrine, quoted from Refine's fleet intent, as guidance:
 
-{{doctrine}}
+{{templates.sync-ownership-doctrine}}
 
 Rewrite conflicted files coherently: remove markers, keep valid JSON, invent nothing, preserve every explicit Goal owner in the doctrine, and reconcile other members without changing or deleting that Goal.
 

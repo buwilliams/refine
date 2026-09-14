@@ -377,7 +377,9 @@ impl FileGitSyncService {
             })
             .collect::<Vec<_>>();
         let workspace = materialize_conflicted_workspace(&worktrees, self, &pinned, &sides)?;
-        let context = state_conflict_context(&state_conflict_block(&conflicts, &sides));
+        let _templates =
+            crate::application::templates::TemplateScope::for_workspace(Some(&self.target_root))?;
+        let context = state_conflict_context(&state_conflict_block(&conflicts, &sides))?;
         // The attempt is charged here: everything above can fail the same way
         // on every pass, and a repeatable preparation failure that spent the
         // budget would hold a contention no agent has yet been handed. This is

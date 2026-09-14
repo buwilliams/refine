@@ -20,6 +20,7 @@ pub(in crate::surfaces::web_server) fn normalize_api_path(path: &str) -> String 
     let mut normalized = if [
         "/api/event-definitions",
         "/api/skills",
+        "/api/templates",
         "/api/event-invocations",
         "/api/hub",
         "/api/next",

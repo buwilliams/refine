@@ -48,6 +48,9 @@ impl InstalledAgentResolver {
 
 impl ConflictResolver for InstalledAgentResolver {
     fn resolve(&self, request: &ResolutionRequest<'_>) -> RefineResult<ResolverOutcome> {
+        let _templates = crate::application::templates::TemplateScope::for_workspace(Some(
+            request.workspace_dir,
+        ))?;
         let service = HostAgentProviderService::with_runtime_root(&self.agents_runtime_root);
         // Not installed means unavailable, never failed: the caller falls
         // back exactly to pre-agent behavior.
@@ -70,7 +73,7 @@ impl ConflictResolver for InstalledAgentResolver {
         };
         let invocation = ProviderInvocation {
             provider: self.provider.clone(),
-            prompt: resolution_prompt(request),
+            prompt: resolution_prompt(request)?,
             session_id: None,
             cwd: Some(cwd.display().to_string()),
             stall_timeout_seconds: self.stall_timeout_seconds,
@@ -89,16 +92,27 @@ impl ConflictResolver for InstalledAgentResolver {
 /// Everything the request carries that the agent cannot read off the
 /// workspace: the caller's domain context, how the two lines relate, and why
 /// a previous attempt was rejected.
-pub(super) fn resolution_prompt(request: &ResolutionRequest<'_>) -> String {
-    let mut prompt = request.context.trim_end().to_string();
-    let ancestry = request.ancestry.trim();
-    if !ancestry.is_empty() {
-        prompt.push_str(&format!("\n\nHow the two lines relate: {ancestry}."));
-    }
-    if let Some(feedback) = request.feedback {
-        prompt.push_str(&format!(
-            "\n\nYour previous attempt was rejected: {feedback}\nEdit the conflicted files again and correct this."
-        ));
-    }
-    prompt
+pub(super) fn resolution_prompt(request: &ResolutionRequest<'_>) -> RefineResult<String> {
+    use crate::application::agent_io::prompts::{PromptTemplate, render};
+    let ancestry = if request.ancestry.trim().is_empty() {
+        String::new()
+    } else {
+        render(
+            PromptTemplate::ConflictAncestry,
+            &[("ancestry", request.ancestry.trim())],
+        )?
+    };
+    let feedback = if let Some(feedback) = request.feedback {
+        render(PromptTemplate::ConflictFeedback, &[("feedback", feedback)])?
+    } else {
+        String::new()
+    };
+    render(
+        PromptTemplate::ConflictResolution,
+        &[
+            ("context", request.context),
+            ("ancestry_context", &ancestry),
+            ("feedback_context", &feedback),
+        ],
+    )
 }

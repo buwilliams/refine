@@ -10,7 +10,9 @@ fn file_chat_service_plan_prompt_drafts_software_specs() {
         .start_with_options(ChatAttachment::Standalone, Some("smoke-ai"), Some("plan"))
         .unwrap();
 
-    let prompt = service.chat_prompt(&session, "Plan authentication cleanup.");
+    let prompt = service
+        .chat_prompt(&session, "Plan authentication cleanup.")
+        .unwrap();
     assert!(prompt.contains("Co-design software from the user's intent"));
     assert!(prompt.contains("material unknowns"));
     assert!(prompt.contains("ask the user when necessary"));

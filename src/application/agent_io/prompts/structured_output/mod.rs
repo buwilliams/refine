@@ -9,7 +9,7 @@ pub fn repair_prompt(
     output_label: &str,
     contract_json: &str,
     directive: &RepairDirective,
-) -> String {
+) -> crate::error::RefineResult<String> {
     render(
         PromptTemplate::StructuredOutputRepair,
         &[
@@ -40,7 +40,8 @@ mod tests {
                 diagnostics: "missing criticism resolution C1".to_string(),
                 raw_output: "{not json}".to_string(),
             },
-        );
+        )
+        .unwrap();
         assert!(prompt.contains("Original phase contract"));
         assert!(prompt.contains("Repair 1/2"));
         assert!(prompt.contains("revised implementation plan"));

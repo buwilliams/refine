@@ -73,6 +73,7 @@ impl FileChatService {
             ChatAttachment::Standalone => "standalone",
         };
         let record = ChatSessionRecord {
+            template_snapshot: None,
             id: new_chat_id(),
             mode: mode.unwrap_or(attachment_mode).trim().to_string(),
             provider: provider.unwrap_or("claude").trim().to_string(),

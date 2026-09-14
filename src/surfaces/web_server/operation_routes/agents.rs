@@ -64,6 +64,22 @@ impl InProcessWebServer {
             .map(str::trim)
             .filter(|value| !value.is_empty())
             .map(ToString::to_string);
+        let root = match self.current_refine_dir() {
+            Ok(root) => root,
+            Err(error) => return error_response(error),
+        };
+        let _templates =
+            match crate::application::templates::TemplateScope::for_root(root.as_deref()) {
+                Ok(scope) => scope,
+                Err(error) => return error_response(error),
+            };
+        let prompt = match crate::application::agent_io::prompts::render(
+            crate::application::agent_io::prompts::PromptTemplate::DirectAgent,
+            &[("message", prompt)],
+        ) {
+            Ok(prompt) => prompt,
+            Err(error) => return error_response(error),
+        };
         match self.agent_provider_service().invoke(ProviderInvocation {
             stall_timeout_seconds: None,
             provider: provider.to_string(),

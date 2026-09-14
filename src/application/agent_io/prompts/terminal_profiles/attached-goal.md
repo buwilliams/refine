@@ -1,2 +1,2 @@
 Attached Refine Goal context:
-{{context}}
+{{goal_context}}

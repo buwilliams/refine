@@ -1,2 +1,2 @@
 User-provided starting context:
-{{context}}
+{{supplemental_context}}

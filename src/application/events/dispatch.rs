@@ -91,16 +91,22 @@ impl FileEventService {
         let pinned = bindings.first().ok_or_else(|| {
             RefineError::InvalidInput("This Skill has no enabled Custom trigger".into())
         })?;
-        let prompt = format!(
-            "Run this standalone Skill in the selected project. Follow its instructions and report what you did. This run is independent of Goal workflows; create or change Goals only when the Skill instructions or the user request authorize it.\n\nSkill: {}\n{}\n\nParameters:\n{}\n\nSystem context:\n{}",
-            pinned.skill.name,
-            super::prompts::render(&pinned.skill.prompt)?,
-            json!(pinned.parameters),
-            context.data["system"]
+        use crate::application::templates::{TemplateScope, TemplateValue};
+        let _templates = TemplateScope::pin(Some(&self.refine_dir), &mut context.metadata)?;
+        TemplateScope::set_values(TemplateScope::context_values(&context.data));
+        let mut values = TemplateScope::literals(&[
+            ("skill_name", &pinned.skill.name),
+            ("parameters", &json!(pinned.parameters).to_string()),
+            ("context", &context.data["system"].to_string()),
+        ]);
+        values.insert(
+            "skill".into(),
+            TemplateValue::Template(pinned.skill.prompt.clone()),
         );
+        let prompt = TemplateScope::render("manual-skill", values)?;
         Ok((
             prompt,
-            json!({"skill_id": skill_id, "skill_name": pinned.skill.name, "skill_configuration_revision": config.revision, "skill_parameters": pinned.parameters, "node_id": context.node_id}),
+            json!({"skill_id": skill_id, "skill_name": pinned.skill.name, "skill_configuration_revision": config.revision, "skill_parameters": pinned.parameters, "node_id": context.node_id, "template_snapshot": context.metadata["template_snapshot"]}),
         ))
     }
 

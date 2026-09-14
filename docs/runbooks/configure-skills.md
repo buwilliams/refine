@@ -65,7 +65,7 @@ The example files in [skills](skills/) provide **Release**, **Fetch Goals from E
 
 System context supplies `project_root`, `workspace`, `node_id`, `runtime_root`, `refine_executable`, and, when discoverable, `refine_checkout`. Use these values to keep maintenance commands tied to the intended app and running installation.
 
-Skill instructions can use `{{refine_executable}}` to insert the absolute path of the Refine executable on the executing node. For example: `Run {{refine_executable}} --help to discover commands.` Refine renders this variable before launching supervised or interactive Skill agents, including attached context Skills. Saved instructions retain the variable so they work across nodes. Other `{{...}}` text is preserved, and inserted values are not rendered again.
+Skill instructions can use `{{refine_executable}}` to insert the absolute Refine executable on the executing node, and `{{current_round_goal}}` for the current Round's request. Templates expand nested Skill variables before launching supervised or interactive agents, including attached context Skills. Saved instructions keep variables so they work across nodes. User data is inserted literally. The Workflow Template owns the shared workflow context; Skills describe their step's outcome and guardrails. See [Configure Templates](configure-templates.md) for composition, previews, and the complete variable catalog.
 
 ## Migration and recovery
 

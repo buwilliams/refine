@@ -87,6 +87,10 @@ pub const API_GROUPS: &[ApiRouteGroup] = &[
         capability: "internal system occurrences and legacy configuration compatibility",
     },
     ApiRouteGroup {
+        prefix: "/templates",
+        capability: "editable system prompt Templates and rendering previews",
+    },
+    ApiRouteGroup {
         prefix: "/skills",
         capability: "Skills with one trigger, typed inputs, cloning support and manual execution",
     },
@@ -246,5 +250,6 @@ pub use http::{HttpRequest, LocalHttpDaemon, WireResponse};
 
 mod hub_routes;
 mod outcome_routes;
+mod template_routes;
 
 mod hub_host;

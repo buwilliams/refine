@@ -210,6 +210,16 @@ impl McpTool {
 pub fn tool_catalog() -> Vec<McpTool> {
     vec![
         McpTool {
+            name: "refine_list_templates",
+            description: "List editable system prompt Templates, defaults, revisions and variables. Use refine_request for edits and previews through /templates.",
+            input_schema: empty_schema,
+            binding: ToolBinding::Api {
+                method: "GET",
+                path: "/templates",
+                path_params: &[],
+            },
+        },
+        McpTool {
             name: "refine_list_skills",
             description: "Read reusable Skill instructions, parameters and configuration revisions.",
             input_schema: empty_schema,

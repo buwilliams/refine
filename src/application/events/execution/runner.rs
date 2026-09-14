@@ -60,6 +60,13 @@ impl FileEventService {
             self.validate_retained_invocation(&invocation)?;
             return Ok(invocation);
         }
+        let _templates = crate::application::templates::TemplateScope::pin(
+            Some(&self.refine_dir),
+            &mut invocation.context.metadata,
+        )?;
+        crate::application::templates::TemplateScope::set_values(
+            crate::application::templates::TemplateScope::context_values(&invocation.context.data),
+        );
         self.validate_lifecycle(&invocation)?;
         if invocation
             .bindings
@@ -206,17 +213,21 @@ impl FileEventService {
                 })
                 .unwrap_or(default)
         };
+        use crate::application::templates::{TemplateScope, TemplateValue};
         let contexts = invocation
             .bindings
             .iter()
             .filter(|b| b.binding.mode == BindingMode::Context)
             .map(|b| {
-                Ok(format!(
-                    "{}\n{}\nParameters: {}",
-                    b.skill.name,
-                    super::super::prompts::render(&b.skill.prompt)?,
-                    json!(b.parameters)
-                ))
+                let mut values = TemplateScope::literals(&[
+                    ("skill_name", &b.skill.name),
+                    ("parameters", &json!(b.parameters).to_string()),
+                ]);
+                values.insert(
+                    "skill".into(),
+                    TemplateValue::Template(b.skill.prompt.clone()),
+                );
+                TemplateScope::render("context-skill", values)
             })
             .collect::<RefineResult<Vec<_>>>()?
             .join("\n\n");
@@ -277,28 +288,48 @@ impl FileEventService {
                     .get("verification_only")
                     .and_then(Value::as_bool)
                     == Some(true);
-                let authority = "Follow the Skill instructions and current user authorization. Use supported Refine commands for Goal changes. Preserve confirmation boundaries and retained work. A workflow change supersedes this invocation; its old result cannot advance the new work.";
-                let continuation = if invocation.context.metadata.get("resuming_work")
-                    == Some(&json!(true))
-                {
-                    "Previous execution was interrupted. Inspect retained work and output, preserve completed changes, and continue the unfinished work."
-                } else {
-                    ""
-                };
-                let prompt = format!(
-                    "{}\n\nAttached Skills:\n{}\n\nParameters:\n{}\n\nPinned context:\n{}\n\nSkill execution:\n{}\n\nRefine completion contract (supplied by the system):\n{}\nReturn one JSON object matching this contract. {authority} {continuation} Refine attaches invocation, binding, and role identity to your response; do not include identity fields. Use your judgment to decide when to stop and which outcome to report. The summary, evidence, and artifacts fields are optional context; no checklist, test commands, supporting evidence, or recovery proposal is required by Refine. {}",
-                    super::super::prompts::render(&pinned.skill.prompt)?,
-                    contexts,
-                    json!(pinned.parameters),
-                    invocation.context.data,
-                    json!({"binding_id": pinned.binding.id, "role": pinned.skill.role}),
-                    contract,
-                    if observational {
-                        "This invocation is observational: do not change files or Git state. Report your decision about the current work."
+                let mut values = TemplateScope::literals(&[
+                    ("attached_skills", &contexts),
+                    ("parameters", &json!(pinned.parameters).to_string()),
+                    ("context", &invocation.context.data.to_string()),
+                    (
+                        "execution",
+                        &json!({"binding_id": pinned.binding.id, "role": pinned.skill.role})
+                            .to_string(),
+                    ),
+                    ("completion_contract", &contract.to_string()),
+                ]);
+                values.insert(
+                    "continuation".into(),
+                    if invocation.context.metadata.get("resuming_work") == Some(&json!(true)) {
+                        TemplateValue::Template("{{templates.workflow-continuation}}".into())
                     } else {
-                        ""
-                    }
+                        TemplateValue::Literal(String::new())
+                    },
                 );
+                values.insert(
+                    "observational".into(),
+                    if observational {
+                        TemplateValue::Template("{{templates.workflow-observational}}".into())
+                    } else {
+                        TemplateValue::Literal(String::new())
+                    },
+                );
+                values.insert(
+                    "skill".into(),
+                    TemplateValue::Template(pinned.skill.prompt.clone()),
+                );
+                let template_id = if invocation
+                    .event
+                    .source
+                    .as_deref()
+                    .is_some_and(|source| source.starts_with("workflow."))
+                {
+                    "workflow"
+                } else {
+                    "supervised-skill"
+                };
+                let prompt = TemplateScope::render(template_id, values)?;
                 let pinned_invocation = invocation.clone();
                 let validate = || {
                     validate_authority()?;

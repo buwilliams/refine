@@ -12,6 +12,7 @@ mod operations_processes;
 mod project_runtime;
 mod quality_guidance;
 mod static_surface;
+mod templates;
 
 use crate::application::chat::{ChatAttachment, ChatService, FileChatService};
 use crate::infrastructure::observability::activity::{ActivityService, FileActivityService};

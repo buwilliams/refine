@@ -401,27 +401,30 @@ impl EmptyStringFallback for String {
     }
 }
 
-fn convert_lifecycle_commands_to_instructions(config: &mut TargetAppGeneratedConfig) {
+fn convert_lifecycle_commands_to_instructions(
+    config: &mut TargetAppGeneratedConfig,
+) -> RefineResult<()> {
     if config.start_instructions.trim().is_empty() && !config.start_command.trim().is_empty() {
-        config.start_instructions = command_backed_instruction("start", &config.start_command);
+        config.start_instructions = command_backed_instruction("start", &config.start_command)?;
     }
     if config.stop_instructions.trim().is_empty() && !config.stop_command.trim().is_empty() {
-        config.stop_instructions = command_backed_instruction("stop", &config.stop_command);
+        config.stop_instructions = command_backed_instruction("stop", &config.stop_command)?;
     }
     if config.build_instructions.trim().is_empty() && !config.build_command.trim().is_empty() {
-        config.build_instructions = command_backed_instruction("build", &config.build_command);
+        config.build_instructions = command_backed_instruction("build", &config.build_command)?;
     }
     config.start_command.clear();
     config.stop_command.clear();
     config.build_command.clear();
+    Ok(())
 }
 
-fn command_backed_instruction(kind: &str, command: &str) -> String {
+fn command_backed_instruction(kind: &str, command: &str) -> crate::error::RefineResult<String> {
     let template = match kind {
         "start" => PromptTemplate::TargetAppCommandStart,
         "stop" => PromptTemplate::TargetAppCommandStop,
         "build" => PromptTemplate::TargetAppCommandBuild,
-        _ => return command.trim().to_string(),
+        _ => return Ok(command.trim().to_string()),
     };
     render(template, &[("command", command.trim())])
 }
@@ -432,7 +435,7 @@ fn target_app_lifecycle_prompt(
     settings: &JsonObject,
     target_root: &Path,
     cwd: &Path,
-) -> String {
+) -> crate::error::RefineResult<String> {
     let env_json = setting(settings, "target_app_env_json");
     let health_url = first_nonempty(&[
         setting(settings, "target_app_http_check_url"),

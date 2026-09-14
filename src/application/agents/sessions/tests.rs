@@ -13,7 +13,8 @@ fn workflow_goal_agent_prompt_excludes_interactive_checkout_guidance() {
         spec,
         Path::new("/runtime/processes/goal-agent.signal.json"),
         None,
-    );
+    )
+    .unwrap();
 
     assert!(!prompt.contains("Active Refine executable"));
     assert!(!prompt.contains("checkout-local `./r`"));
@@ -32,10 +33,12 @@ fn workflow_goal_agent_prompt_excludes_interactive_checkout_guidance() {
 #[test]
 fn every_goal_agent_phase_uses_the_integer_guidance_completion_contract() {
     let signal = Path::new("/runtime/processes/goal-agent.signal.json");
-    let plan = goal_agent_protocol_prompt("PLAN_SENTINEL", signal, Some("plan"));
-    let criticize = goal_agent_protocol_prompt("CRITICIZE_SENTINEL", signal, Some("criticize"));
-    let revise = goal_agent_protocol_prompt("REVISE_SENTINEL", signal, Some("revise"));
-    let implement = goal_agent_protocol_prompt("IMPLEMENT_SENTINEL", signal, Some("implement"));
+    let plan = goal_agent_protocol_prompt("PLAN_SENTINEL", signal, Some("plan")).unwrap();
+    let criticize =
+        goal_agent_protocol_prompt("CRITICIZE_SENTINEL", signal, Some("criticize")).unwrap();
+    let revise = goal_agent_protocol_prompt("REVISE_SENTINEL", signal, Some("revise")).unwrap();
+    let implement =
+        goal_agent_protocol_prompt("IMPLEMENT_SENTINEL", signal, Some("implement")).unwrap();
 
     for prompt in [&plan, &criticize, &revise, &implement] {
         assert!(prompt.contains("zero-based integer Completion Index"));
@@ -439,7 +442,8 @@ fn workflow_goal_agent_providers_receive_the_same_composed_specification() {
         spec,
         Path::new("/runtime/processes/goal-agent.signal.json"),
         None,
-    );
+    )
+    .unwrap();
 
     for provider in [
         "claude",
@@ -1272,5 +1276,25 @@ fn silent_goal_agent_remains_autonomous_without_requesting_input() {
             std::env::remove_var("REFINE_SMOKE_AI_PATH");
         }
     }
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn edited_session_template_can_omit_the_completion_contract_entirely() {
+    use crate::application::templates::{TemplateScope, TemplateStore};
+    let root = unique_temp_dir("session-template");
+    fs::create_dir_all(&root).unwrap();
+    let store = TemplateStore::new(Some(&root));
+    store
+        .save("goal-agents-session", 0, "Only {{goal_prompt}}")
+        .unwrap();
+    // An unused completion template must not be evaluated or appended.
+    store.save("goal-completion", 0, "{{diagnostics}}").unwrap();
+    let _scope = TemplateScope::for_root(Some(&root)).unwrap();
+    assert_eq!(
+        goal_agent_protocol_prompt("{{signal_path}}", Path::new("/runtime/signal.json"), None)
+            .unwrap(),
+        "Only {{signal_path}}"
+    );
     fs::remove_dir_all(root).unwrap();
 }

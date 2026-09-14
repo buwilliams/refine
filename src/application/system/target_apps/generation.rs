@@ -2,6 +2,8 @@ use super::*;
 
 impl FileTargetAppService {
     pub fn generate_config(&self) -> RefineResult<TargetAppGeneratedConfig> {
+        let _templates =
+            crate::application::templates::TemplateScope::for_root(Some(&self.refine_dir))?;
         let settings = self.settings()?;
         let mut config = TargetAppGeneratedConfig {
             start_instructions: setting(&settings, "target_app_start_instructions"),
@@ -104,7 +106,7 @@ impl FileTargetAppService {
             notes.push("Generated stop instruction targets the configured TCP port.".to_string());
         }
         apply_static_web_server_defaults(&project_root, &mut config, &mut notes);
-        convert_lifecycle_commands_to_instructions(&mut config);
+        convert_lifecycle_commands_to_instructions(&mut config)?;
         config.notes = notes.join(" ");
         Ok(config)
     }

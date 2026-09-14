@@ -123,10 +123,19 @@ impl InProcessWebServer {
             };
         }
         let cwd = self.target_root().map(|path| path.display().to_string());
+        let _templates =
+            match crate::application::templates::TemplateScope::for_root(Some(&refine_dir)) {
+                Ok(scope) => scope,
+                Err(error) => return error_response(error),
+            };
+        let prompt = match import_extraction_prompt(&text, purpose) {
+            Ok(prompt) => prompt,
+            Err(error) => return error_response(error),
+        };
         let output = match self.agent_provider_service().invoke(ProviderInvocation {
             stall_timeout_seconds: None,
             provider: provider.clone(),
-            prompt: import_extraction_prompt(&text, purpose),
+            prompt,
             session_id: None,
             cwd,
             process_metadata: Default::default(),

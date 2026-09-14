@@ -21,13 +21,14 @@ pub const FLEET_RUNBOOK_PATH: &str = "docs/runbooks/manage-fleet.md";
 
 /// Seed prompt for a fleet-management agent session: the runbook carries the
 /// questions to ask and the CLI contract; the request carries the user's goal.
-pub fn fleet_manage_prompt(checkout_path: &Path, request: &str) -> String {
-    format!(
-        "Manage this Refine fleet. Read {runbook} in the Refine checkout at {checkout} and \
-         follow it: ask the user the questions the runbook calls for before acting, then carry \
-         the request out with the documented commands. User request: {request}",
-        runbook = FLEET_RUNBOOK_PATH,
-        checkout = checkout_path.display(),
+pub fn fleet_manage_prompt(checkout_path: &Path, request: &str) -> RefineResult<String> {
+    crate::application::agent_io::prompts::render(
+        crate::application::agent_io::prompts::PromptTemplate::FleetManage,
+        &[
+            ("runbook", FLEET_RUNBOOK_PATH),
+            ("checkout", &checkout_path.display().to_string()),
+            ("message", request),
+        ],
     )
 }
 

@@ -253,7 +253,7 @@ pub(super) fn launch_session(launch: GoalAgentLaunch) -> RefineResult<StartedSes
         .get("implementation_phase")
         .and_then(Value::as_str);
     let protocol_prompt =
-        goal_agent_protocol_prompt(&launch.prompt, &signal_path, implementation_phase);
+        goal_agent_protocol_prompt(&launch.prompt, &signal_path, implementation_phase)?;
     let launch_env_overrides = vec![
         ("TERM".to_string(), "xterm-256color".to_string()),
         ("COLORTERM".to_string(), "truecolor".to_string()),
@@ -286,6 +286,7 @@ pub(super) fn launch_session(launch: GoalAgentLaunch) -> RefineResult<StartedSes
     let completion_timeout = launch.completion_timeout;
     let idle_timeout = launch.idle_timeout;
     let mut metadata = launch.metadata;
+    metadata.insert("rendered_prompt".into(), json!(protocol_prompt));
     if let Ok(token) = std::env::var("REFINE_WORKFLOW_INCARNATION") {
         metadata.insert("workflow_incarnation".into(), json!(token));
     }

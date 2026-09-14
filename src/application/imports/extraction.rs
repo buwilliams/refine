@@ -51,7 +51,7 @@ impl Contract for ImportFeatureContract {
     }
 }
 
-pub fn import_extraction_prompt(text: &str, purpose: &str) -> String {
+pub fn import_extraction_prompt(text: &str, purpose: &str) -> crate::error::RefineResult<String> {
     let template = match purpose {
         "plan" | "feature import" | "feature_spec" | "feature-spec" | "spec" => {
             PromptTemplate::ImportFeature

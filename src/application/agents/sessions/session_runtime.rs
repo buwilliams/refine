@@ -32,7 +32,7 @@ where
 }
 
 pub(super) fn run_goal_agent_session<F, O>(
-    launch: GoalAgentLaunch,
+    mut launch: GoalAgentLaunch,
     mut on_attention: F,
     mut on_process_settlement: O,
 ) -> RefineResult<GoalAgentResult>
@@ -40,6 +40,10 @@ where
     F: FnMut(GoalAgentAttention),
     O: FnMut(&FileProcessSupervisor, &ManagedProcess, &GoalAgentSettlement) -> RefineResult<()>,
 {
+    let refine_dir =
+        crate::infrastructure::storage::project_layout::refine_dir_for_target_root(&launch.cwd)?;
+    let _templates =
+        crate::application::templates::TemplateScope::pin(Some(&refine_dir), &mut launch.metadata)?;
     let super::pty_lifecycle::StartedSession {
         supervisor,
         session_id,

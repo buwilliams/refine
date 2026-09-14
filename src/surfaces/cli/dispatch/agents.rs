@@ -85,6 +85,13 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                     cwd,
                 },
         } => {
+            let workspace = cwd.clone().or_else(|| std::env::current_dir().ok());
+            let _templates =
+                crate::application::templates::TemplateScope::for_workspace(workspace.as_deref())?;
+            let prompt = crate::application::agent_io::prompts::render(
+                crate::application::agent_io::prompts::PromptTemplate::DirectAgent,
+                &[("message", &prompt)],
+            )?;
             let output = HostAgentProviderService::new().invoke(ProviderInvocation {
                 stall_timeout_seconds: None,
                 provider,

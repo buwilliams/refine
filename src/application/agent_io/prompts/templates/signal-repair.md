@@ -1,0 +1,1 @@
+Refine rejected your completion signal: {{diagnostics}}. Rewrite it with exactly the same required JSON shape (replacement attempt {{attempt}} of {{max_repairs}}). Write and parse-check `{{signal_path}}.tmp`, then atomically rename it over `{{signal_path}}`.

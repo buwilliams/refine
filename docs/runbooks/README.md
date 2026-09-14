@@ -21,6 +21,8 @@ Runbooks:
 - [Configure Skills](configure-skills.md) — bind reusable
   agent instructions to workflow activity and custom actions, with scoped settings,
   parameters, migration, and execution evidence.
+- [Configure Templates](configure-templates.md) — edit agent context, compose
+  Skills and variables, and preview prompts.
 
 - [Install Refine](install.md) — install or update Refine, configure an agent
   provider, start the daemon, and verify the result.

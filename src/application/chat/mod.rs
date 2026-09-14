@@ -17,6 +17,8 @@ pub enum ChatAttachment {
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct ChatSessionRecord {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub template_snapshot: Option<crate::application::templates::TemplateSnapshot>,
     pub id: String,
     pub mode: String,
     pub provider: String,

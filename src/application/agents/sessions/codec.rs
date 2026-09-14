@@ -335,27 +335,18 @@ pub(super) fn cleanup_session_artifacts(command_path: &Path, signal_path: &Path)
 pub(super) fn goal_agent_protocol_prompt(
     prompt: &str,
     signal_path: &Path,
-    implementation_phase: Option<&str>,
-) -> String {
-    let completion_contract = completion_contract(signal_path, implementation_phase);
-    render(
-        PromptTemplate::GoalAgentSession,
-        &[
-            ("goal_prompt", prompt),
-            ("completion_contract", &completion_contract),
-        ],
-    )
-}
-
-fn completion_contract(signal_path: &Path, _implementation_phase: Option<&str>) -> String {
-    let destination = signal_path.display();
-    let guidance_contract = "If supplied, `guidance_applied` records only the displayed zero-based integer Completion Index for each applicable Guidance candidate, such as `[0]`; use `[]` when none apply, and never use candidate names or stable configuration IDs.";
-    let write_protocol = format!(
-        "Write the complete JSON to `{destination}.tmp`, parse-check that temporary file with `jq .` or another JSON parser, and only after it parses atomically replace `{destination}` with `mv` or an equivalent rename. Never write the completion payload directly to `{destination}`."
+    _implementation_phase: Option<&str>,
+) -> RefineResult<String> {
+    use crate::application::templates::{TemplateScope, TemplateValue};
+    let mut values = TemplateScope::literals(&[
+        ("signal_path", &signal_path.display().to_string()),
+        ("goal_prompt", prompt),
+    ]);
+    values.insert(
+        "completion_contract".into(),
+        TemplateValue::Template("{{templates.goal-completion}}".into()),
     );
-    format!(
-        "Use your judgment to decide when to stop. Choose applicable Guidance. On completion, produce `{{\"state\":\"completed\",\"message\":\"your decision and useful context\",\"guidance_applied\":[0]}}`. {guidance_contract} Planning details and implementation reports are optional context. {write_protocol}"
-    )
+    TemplateScope::render(&PromptTemplate::GoalAgentSession.id(), values)
 }
 
 pub(super) fn pty_size(cols: u16, rows: u16) -> PtySize {

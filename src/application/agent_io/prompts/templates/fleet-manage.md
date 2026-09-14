@@ -1,0 +1,1 @@
+Manage this Refine fleet. Read {{runbook}} in the Refine checkout at {{checkout}} and follow it: ask the user the questions the runbook calls for before acting, then carry the request out with the documented commands. User request: {{message}}

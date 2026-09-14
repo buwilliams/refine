@@ -79,15 +79,8 @@ pub const CONTENTION_ATTEMPT_LIMIT: u32 = 2;
 /// The ownership doctrine handed to the state resolver as guidance, quoted
 /// from `docs/intent/02-model/04-fleet.md` (a test pins the quote to the
 /// intent doc so the two cannot drift apart).
-pub const OWNERSHIP_DOCTRINE: &str = "Goal ownership changes only through supported transfer \
-surfaces. A valid one-sided node_id change is an explicit transfer and remains authoritative \
-while every other member is reconciled. Different concurrent transfers, or missing or malformed \
-operands, remain ambiguous: automatic resolution must not delete the Goal or choose its owner. \
-Timestamps, recency, current host, merge location, retry order, and merge-base ownership decide \
-nothing. Round evidence and the workflow authority that produced it (status, assignment, branch) \
-move as one coupled unit: Rounds and other identity-free ordered arrays are atomic and never split \
-from that authority. Nothing is silently destroyed: every losing side is retained as a ref before \
-publication.";
+pub const OWNERSHIP_DOCTRINE: &str =
+    include_str!("../../agent_io/prompts/templates/sync-ownership-doctrine.md");
 
 /// One conflicted path with its domain-terms summary (which goal, which
 /// members each side changed) — the vocabulary escalation speaks in.
@@ -867,13 +860,10 @@ fn needs_decision_question(conflicts: &[ConflictedPath], feedback: Option<&str>)
 }
 
 /// Render the state-conflict domain context from the per-path block.
-pub fn state_conflict_context(conflicts_block: &str) -> String {
+pub fn state_conflict_context(conflicts_block: &str) -> crate::error::RefineResult<String> {
     crate::application::agent_io::prompts::render(
         PromptTemplate::ResolveStateConflict,
-        &[
-            ("conflicts", conflicts_block),
-            ("doctrine", OWNERSHIP_DOCTRINE),
-        ],
+        &[("conflicts", conflicts_block)],
     )
 }
 
@@ -886,7 +876,7 @@ pub fn candidate_conflict_context(
     round_intent: &str,
     conflicted_files: &str,
     other_goal_reports: &str,
-) -> String {
+) -> crate::error::RefineResult<String> {
     crate::application::agent_io::prompts::render(
         PromptTemplate::ResolveCandidateConflict,
         &[
@@ -1208,7 +1198,7 @@ mod tests {
 
     #[test]
     fn state_prompt_carries_the_doctrine_and_the_conflicts() {
-        let rendered = state_conflict_context("## goal GOALA\nboth nodes changed status");
+        let rendered = state_conflict_context("## goal GOALA\nboth nodes changed status").unwrap();
         assert!(rendered.contains("goal GOALA"));
         assert!(rendered.contains("Goal ownership changes only through supported transfer"));
         assert!(rendered.contains("preserve every explicit Goal owner"));
@@ -1224,7 +1214,8 @@ mod tests {
             "fix currency",
             "src/rater.rs",
             "Goal GOALB — normalize currency:\nRewrote PolicyRater.calculate for currency.",
-        );
+        )
+        .unwrap();
         assert!(rendered.contains("add rounding"));
         assert!(rendered.contains("fix currency"));
         assert!(rendered.contains("src/rater.rs"));
@@ -1297,7 +1288,8 @@ mod tests {
                 path: GOAL_PATH.to_string(),
                 summary: "goal GOALA: both nodes changed status, updated".to_string(),
             }];
-            let context = state_conflict_context(&state_conflict_block(&conflicts, &sides));
+            let context =
+                state_conflict_context(&state_conflict_block(&conflicts, &sides)).unwrap();
             PreparedResolution {
                 lock,
                 pinned,
@@ -1599,7 +1591,7 @@ mod tests {
             feedback: Some("GOALA is not valid JSON"),
         };
 
-        let prompt = resolution_prompt(&request);
+        let prompt = resolution_prompt(&request).unwrap();
 
         assert!(prompt.contains("both nodes changed goal GOALA"), "{prompt}");
         assert!(

@@ -8,7 +8,6 @@ pub(crate) mod gate_configuration;
 pub(crate) mod migration;
 pub(crate) mod outcomes;
 mod parameters;
-mod prompts;
 mod records;
 pub(crate) mod transitions;
 pub mod workflow;

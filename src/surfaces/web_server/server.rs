@@ -58,6 +58,10 @@ impl InProcessWebServer {
             return self.handle_event_capability(request, &raw_path);
         }
 
+        if request.path == "/templates" || request.path.starts_with("/templates/") {
+            return self.handle_templates(request);
+        }
+
         if request.path.starts_with("/workflow/goals/") {
             return self.handle_workflow_control(request);
         }

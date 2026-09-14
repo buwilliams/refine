@@ -32,7 +32,7 @@ fn file_import_service_imports_text_into_feature() {
 
 #[test]
 fn plan_goal_extraction_prompt_requests_one_goal_without_a_feature() {
-    let prompt = import_extraction_prompt("Plan transcript", "plan_goal");
+    let prompt = import_extraction_prompt("Plan transcript", "plan_goal").unwrap();
 
     assert!(prompt.contains("one independently actionable Goal"));
     assert!(prompt.contains("implementation and verification context"));

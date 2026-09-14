@@ -59,11 +59,17 @@ impl InvalidSignalRecovery {
             )));
         }
 
-        Ok(InvalidSignalDisposition::Retry(format!(
-            "Refine rejected your completion signal: {diagnostic}. Rewrite it with exactly the same required JSON shape (replacement attempt {attempt} of {limit}). Write and parse-check `{signal_path}.tmp`, then atomically rename it over `{signal_path}`.\r",
-            limit = self.replacement_limit,
-            signal_path = signal_path.display()
-        )))
+        Ok(InvalidSignalDisposition::Retry(
+            render(
+                PromptTemplate::SignalRepair,
+                &[
+                    ("diagnostics", diagnostic),
+                    ("attempt", &attempt.to_string()),
+                    ("max_repairs", &self.replacement_limit.to_string()),
+                    ("signal_path", &signal_path.display().to_string()),
+                ],
+            )? + "\r",
+        ))
     }
 
     pub(super) fn reject_invalid_contract(

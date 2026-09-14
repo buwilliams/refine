@@ -3,7 +3,7 @@ pub mod contract;
 
 use serde_json::{Value, json};
 
-use crate::application::agent_io::prompts::{PromptEngine, PromptTemplate};
+use crate::application::agent_io::prompts::{PromptTemplate, render};
 use crate::application::work_items::AlreadyMergedSettlement;
 use crate::application::workflow::engine::behaviors::contract::{
     WorkflowAdvanceOutcome, WorkflowBehavior,
@@ -1305,6 +1305,8 @@ fn ensure_goal_agent_context(ctx: &WorkflowContext<'_>, goal: &Value) -> RefineR
         return Ok(context.clone());
     }
 
+    let _templates =
+        crate::application::templates::TemplateScope::for_root(Some(&ctx.refine_dir()))?;
     let context = goal_agent_context(&json!({}), &json!({"guidance": []}), goal, ctx.round_idx)?;
     ctx.work_items.update_latest_goal_round_evaluation_summary(
         &ctx.goal_id,
@@ -1364,7 +1366,7 @@ fn goal_agent_context(
             "rules": governance.get("rules").cloned().unwrap_or_else(|| json!([])),
             "configured": governance.get("configured").cloned().unwrap_or(Value::Bool(false)),
         },
-        "workflow_summary": PromptEngine::load(PromptTemplate::GoalAgentWorkflowSummary),
+        "workflow_summary": render(PromptTemplate::GoalAgentWorkflowSummary, &[])?,
         "guidance_candidates": guidance_candidates,
         "goal": goal_context,
         "previous_rounds": previous_rounds,

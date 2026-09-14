@@ -140,7 +140,7 @@ fn plan_import_result_merges_feature_behavior_and_implementation_goal_arrays() {
 
 #[test]
 fn plan_import_prompt_excludes_refine_from_feature_metadata_contract() {
-    let prompt = import_extraction_prompt("Personal Budget App\nTrack expenses.", "plan");
+    let prompt = import_extraction_prompt("Personal Budget App\nTrack expenses.", "plan").unwrap();
     assert!(prompt.contains("feature"));
     assert!(prompt.contains("implementation_goals"));
     assert!(prompt.contains("independently reviewable Goals"));
@@ -151,7 +151,7 @@ fn plan_import_prompt_excludes_refine_from_feature_metadata_contract() {
 
 #[test]
 fn feature_spec_import_prompt_uses_architecture_lenses() {
-    let prompt = import_extraction_prompt("Build a budget app.", "feature import");
+    let prompt = import_extraction_prompt("Build a budget app.", "feature import").unwrap();
     assert!(prompt.contains("Plan or feature spec"));
     assert!(prompt.contains("architecture"));
     assert!(prompt.contains("implementation order"));

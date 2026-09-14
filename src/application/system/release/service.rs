@@ -195,7 +195,9 @@ impl FileReleaseService {
         let name = format!("Prepare {}", plan.proposed_tag);
         let goal = work_items.create_goal_summary(&name, None)?;
         let goal_id = goal.goal.id.clone();
-        let prompt = release_goal_prompt(plan);
+        let _templates =
+            crate::application::templates::TemplateScope::for_root(Some(&work_items.refine_dir))?;
+        let prompt = release_goal_prompt(plan)?;
         if let Err(error) = work_items
             .append_goal_round_summary(&goal_id, "Release workflow", &prompt)
             .and_then(|_| work_items.start_goal_workflow(&goal_id))

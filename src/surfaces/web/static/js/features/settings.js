@@ -96,7 +96,9 @@ async function loadSettingsSurfaceData() {
   updateActiveNodeLabel();
   if (project.attached === false) {
     enterNoProjectMode(project);
-    return detachedSettingsSurfaceData(project);
+    const data = detachedSettingsSurfaceData(project);
+    if (activeSlug === "templates") data.templates = await api("GET", "/api/templates");
+    return data;
   }
   const needs = settingsSurfaceDataNeeds(surface, activeSlug);
   const [
@@ -136,6 +138,7 @@ async function loadSettingsSurfaceData() {
   return {
     noProject: false,
     automation: needs.skills ? await loadAutomationSettings(activeSlug) : null,
+    templates: activeSlug === "templates" ? await api("GET", "/api/templates") : null,
     hub: activeSlug === "knowledge-hub" ? await api("GET", "/api/hub/sites") : null,
     s: settings,
     diag: diag || {},
@@ -687,6 +690,7 @@ const SETTINGS_SURFACES = {
       { slug: "application", label: "Application" },
       { slug: "reporters", label: "Reporters" },
       { slug: "skills", label: "Skills" },
+      { slug: "templates", label: "Templates" },
       { slug: "knowledge-hub", label: "Knowledge Hub" },
       { slug: "target-app", label: "Target App" },
       { slug: "runtime", label: "Runtime" },
@@ -859,6 +863,7 @@ function bindRebuildCacheHandler() {
 
 
 function renderSettingsTabBody(surface, slug, data) {
+  if (slug === "templates") return renderTemplatesSettings(data.templates);
   if (data.noProject) {
     if (surface === SETTINGS_SURFACES.settings && slug === "application") {
       return renderSettingsApplicationTab({
@@ -914,6 +919,7 @@ function renderSettingsTabBody(surface, slug, data) {
       return renderNodeRuntimeConfigSections(data.s, data.activeNodeLabel, data.cli);
     }
   }
+  if (slug === "templates") return renderTemplatesSettings(data.templates);
   if (slug === "skills") return renderAutomationSettings(slug, data.automation);
   if (slug === "knowledge-hub") return renderKnowledgeHubSettings(data.hub);
   return `<p class="muted">Unknown settings tab.</p>`;
@@ -961,6 +967,7 @@ function bindSettingsNoProjectTab() {
 }
 
 function bindSettingsTabBody(surface, slug, data) {
+  if (slug === "templates") { bindTemplatesSettings(); return; }
   if (data.noProject) {
     if (surface === SETTINGS_SURFACES.settings && slug === "application") {
       bindSettingsApplicationTab(data.currentProject);
@@ -980,6 +987,7 @@ function bindSettingsTabBody(surface, slug, data) {
     else if (slug === "runtime") bindNodeRuntimeConfigControls();
 
   }
+  if (slug === "templates") bindTemplatesSettings();
   if (slug === "skills") bindAutomationSettings(slug, data.automation);
   if (slug === "knowledge-hub") bindKnowledgeHubSettings();
 }

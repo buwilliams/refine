@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
-use crate::application::agent_io::prompts::{PromptEngine, PromptTemplate, render};
+use crate::application::agent_io::prompts::PromptTemplate;
 use crate::application::work_items::FileWorkItemService;
 use crate::error::RefineError;
 use crate::infrastructure::git::with_repository_git_lock;
@@ -54,6 +54,9 @@ pub(crate) fn terminal_profile_prompt(
     feature_id: Option<&str>,
     supplemental_prompt: Option<&str>,
 ) -> Result<String, RefineError> {
+    use crate::application::templates::{TemplateScope, TemplateValue};
+    let refine_dir = server.current_refine_dir()?;
+    let _templates = TemplateScope::inherit_or_root(refine_dir.as_deref())?;
     let template = match profile {
         "agent" => PromptTemplate::ChatAgent,
         "plan" => PromptTemplate::ChatPlan,
@@ -65,24 +68,39 @@ pub(crate) fn terminal_profile_prompt(
             )));
         }
     };
-    let mut sections = vec![PromptEngine::load(template).trim().to_string()];
+    let fragment = |template: PromptTemplate| {
+        TemplateValue::Template(format!("{{{{templates.{}}}}}", template.id()))
+    };
+    let mut values = TemplateScope::literals(&[
+        ("workflow_context", ""),
+        ("active_refine", ""),
+        ("goal_attachment", ""),
+        ("feature_attachment", ""),
+        ("profile_context", ""),
+        ("supplemental_attachment", ""),
+    ]);
+    values.insert("instructions".into(), fragment(template));
     if surface == TerminalSessionLaunchSurface::Toolbar && matches!(profile, "agent" | "plan") {
-        sections.push(
-            PromptEngine::load(PromptTemplate::TerminalProfileToolbarAgentWorkflow).to_string(),
+        values.insert(
+            "workflow_context".into(),
+            fragment(PromptTemplate::TerminalProfileToolbarAgentWorkflow),
         );
     } else if surface == TerminalSessionLaunchSurface::Cli && profile == "agent" {
-        sections.push(
-            PromptEngine::load(PromptTemplate::TerminalProfileGeneralAgentWorkflow).to_string(),
+        values.insert(
+            "workflow_context".into(),
+            fragment(PromptTemplate::TerminalProfileGeneralAgentWorkflow),
         );
     }
     if profile == "agent" {
         let (executable, checkout) = active_refine_paths()?;
-        let executable = executable.display().to_string();
-        let checkout = checkout.display().to_string();
-        sections.push(render(
-            PromptTemplate::TerminalProfileActiveRefine,
-            &[("executable", &executable), ("checkout", &checkout)],
-        ));
+        values.extend(TemplateScope::literals(&[
+            ("executable", &executable.display().to_string()),
+            ("checkout", &checkout.display().to_string()),
+        ]));
+        values.insert(
+            "active_refine".into(),
+            fragment(PromptTemplate::TerminalProfileActiveRefine),
+        );
     }
     let projection = (goal_id.is_some() || feature_id.is_some())
         .then(|| server.current_projection_shared())
@@ -90,69 +108,67 @@ pub(crate) fn terminal_profile_prompt(
     if let Some(goal_id) = goal_id {
         let goal = projection
             .as_ref()
-            .expect("projection loaded for attached Goal")
+            .expect("loaded")
             .goals
             .get(goal_id)
             .ok_or_else(|| RefineError::NotFound(format!("Goal {goal_id} was not found")))?;
-        let context_value = match server.current_refine_dir()? {
-            Some(refine_dir) => FileWorkItemService::new(refine_dir).show_goal_detail(goal_id)?,
-            None => json!({
-                "id": goal.goal.id,
-                "name": goal.goal.name,
-                "status": goal.goal.status,
-                "priority": goal.goal.priority,
-                "reporter": goal.goal.reporter,
-                "assignee": goal.goal.assignee,
-                "round_count": goal.goal.round_count,
-                "feature_id": goal.goal.feature_id,
-                "node_id": goal.goal.node_id,
-                "updated": goal.goal.updated,
-            }),
+        let context = if let Some(refine_dir) = &refine_dir {
+            FileWorkItemService::new(refine_dir).show_goal_detail(goal_id)?
+        } else {
+            json!({"id":goal.goal.id,"name":goal.goal.name,"status":goal.goal.status})
         };
-        let context = serde_json::to_string_pretty(&context_value).map_err(|error| {
-            RefineError::Serialization(format!("failed to encode Goal context: {error}"))
-        })?;
-        sections.push(render(
-            PromptTemplate::TerminalProfileAttachedGoal,
-            &[("context", &context)],
-        ));
+        values.extend(TemplateScope::context_values(&json!({"goal":context})));
+        values.insert(
+            "goal_context".into(),
+            TemplateValue::Literal(
+                serde_json::to_string_pretty(&context)
+                    .map_err(|e| RefineError::Serialization(e.to_string()))?,
+            ),
+        );
+        values.insert(
+            "goal_attachment".into(),
+            fragment(PromptTemplate::TerminalProfileAttachedGoal),
+        );
     }
     if let Some(feature_id) = feature_id {
         let feature = projection
             .as_ref()
-            .expect("projection loaded for attached Feature")
+            .expect("loaded")
             .features
             .get(feature_id)
             .ok_or_else(|| RefineError::NotFound(format!("Feature {feature_id} was not found")))?;
-        let context = serde_json::to_string_pretty(&json!({
-            "id": feature.feature.id,
-            "name": feature.feature.name,
-            "description": feature.feature.description,
-            "status": feature.status,
-            "goal_ids": feature.goal_ids,
-            "updated": feature.feature.updated,
-        }))
-        .map_err(|error| {
-            RefineError::Serialization(format!("failed to encode Feature context: {error}"))
-        })?;
-        sections.push(render(
-            PromptTemplate::TerminalProfileAttachedFeature,
-            &[("context", &context)],
-        ));
+        let context = json!({"id":feature.feature.id,"name":feature.feature.name,"description":feature.feature.description,"status":feature.status,"goal_ids":feature.goal_ids,"updated":feature.feature.updated});
+        values.insert(
+            "feature_context".into(),
+            TemplateValue::Literal(serde_json::to_string_pretty(&context).unwrap()),
+        );
+        values.insert(
+            "feature_attachment".into(),
+            fragment(PromptTemplate::TerminalProfileAttachedFeature),
+        );
     }
     if profile == "plan" {
-        sections.push(PromptEngine::load(PromptTemplate::TerminalProfilePlan).to_string());
+        values.insert(
+            "profile_context".into(),
+            fragment(PromptTemplate::TerminalProfilePlan),
+        );
     } else if profile == "goal" {
-        sections
-            .push(PromptEngine::load(PromptTemplate::TerminalProfileGoalDiagnostic).to_string());
+        values.insert(
+            "profile_context".into(),
+            fragment(PromptTemplate::TerminalProfileGoalDiagnostic),
+        );
     }
     if let Some(prompt) = supplemental_prompt {
-        sections.push(render(
-            PromptTemplate::TerminalProfileSupplementalContext,
-            &[("context", prompt)],
-        ));
+        values.insert(
+            "supplemental_context".into(),
+            TemplateValue::Literal(prompt.into()),
+        );
+        values.insert(
+            "supplemental_attachment".into(),
+            fragment(PromptTemplate::TerminalProfileSupplementalContext),
+        );
     }
-    Ok(sections.join("\n\n"))
+    TemplateScope::render(&PromptTemplate::TerminalSession.id(), values)
 }
 
 pub(super) fn create_terminal_standalone_worktree(

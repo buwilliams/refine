@@ -187,10 +187,20 @@ impl InProcessWebServer {
                     self.runtime_root.as_deref(),
                     body,
                 );
+                let _templates =
+                    match crate::application::templates::TemplateScope::for_root(Some(&refine_dir))
+                    {
+                        Ok(scope) => scope,
+                        Err(error) => return error_response(error),
+                    };
+                let prompt = match target_app_generation_prompt(&service.target_root) {
+                    Ok(prompt) => prompt,
+                    Err(error) => return error_response(error),
+                };
                 match self.agent_provider_service().invoke(ProviderInvocation {
                     stall_timeout_seconds: None,
                     provider: provider.clone(),
-                    prompt: target_app_generation_prompt(&service.target_root),
+                    prompt,
                     session_id: None,
                     cwd: Some(service.target_root.display().to_string()),
                     process_metadata: Default::default(),
