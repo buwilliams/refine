@@ -54,7 +54,7 @@ pub enum Commands {
         #[command(subcommand)]
         action: TemplateAction,
     },
-    /// Manage Knowledge Hub sites, JSON data, queries and publication.
+    /// Manage Hub sites, JSON data, queries and publication.
     Hub {
         #[command(subcommand)]
         action: HubAction,

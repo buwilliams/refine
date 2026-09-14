@@ -138,7 +138,7 @@ async function loadSettingsSurfaceData() {
   return {
     noProject: false,
     workflow: activeSlug === "workflow" ? await loadWorkflowSettings() : null,
-    hub: activeSlug === "knowledge-hub" ? await api("GET", "/api/hub/sites") : null,
+    hub: activeSlug === "hubs" ? await api("GET", "/api/hub/sites") : null,
     s: settings,
     diag: diag || {},
     reps: state.reporters,
@@ -686,7 +686,7 @@ const SETTINGS_SURFACES = {
       { slug: "application", label: "Nodes" },
       { slug: "reporters", label: "Reporters" },
       { slug: "workflow", label: "Prompts" },
-      { slug: "knowledge-hub", label: "Knowledge Hub" },
+      { slug: "hubs", label: "Hubs" },
       { slug: "target-app", label: "Target App" },
       { slug: "runtime", label: "Runtime" },
     ],
@@ -914,7 +914,7 @@ function renderSettingsTabBody(surface, slug, data) {
       return renderNodeRuntimeConfigSections(data.s, data.activeNodeLabel, data.cli);
     }
   }
-  if (slug === "knowledge-hub") return renderKnowledgeHubSettings(data.hub);
+  if (slug === "hubs") return renderHubsSettings(data.hub);
   return `<p class="muted">Unknown settings tab.</p>`;
 }
 
@@ -980,7 +980,7 @@ function bindSettingsTabBody(surface, slug, data) {
     else if (slug === "runtime") bindNodeRuntimeConfigControls();
 
   }
-  if (slug === "knowledge-hub") bindKnowledgeHubSettings();
+  if (slug === "hubs") bindHubsSettings();
 }
 
 function drawSettingsSurface(surface, data, activeSlugOverride = null) {

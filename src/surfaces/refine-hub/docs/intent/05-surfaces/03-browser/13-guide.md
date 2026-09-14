@@ -1,6 +1,6 @@
 # Refine Hub and product help
 
-Refine Hub replaces the separate Guide panel. It is the permanent, built-in Knowledge Hub site for product documentation, release notes, runbooks, and design intent.
+Refine Hub replaces the separate Guide panel. It is the permanent, built-in Hub site for product documentation, release notes, runbooks, and design intent.
 
 ## Outcome
 

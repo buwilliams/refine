@@ -18,7 +18,7 @@ They should help users make Refine work correctly in their environment without r
 
 Settings consolidates the former Node and Governance navigation entries under `/#/settings/<tab>`. Workflow brings all Goal steps and their hooks, system events, custom actions, assigned Skills, and prompt Templates into one Settings tab. Skills and Templates remain shared resources with their existing storage and editing rules; Events remain the internal execution model. Governance and Quality remain workflow steps; their instructions are configured as Skills. Retired configuration routes redirect to Settings without retaining competing editors.
 
-The tab order is Processes, Application, Reporters, Skills, Knowledge Hub, Target App, and Runtime. Release work is configured as a Custom Skill, with no separate development tab.
+The tab order is Processes, Nodes, Reporters, Prompts, Hubs, Target App, and Runtime. Release work is configured as a Custom Skill, with no separate development tab.
 
 Current implementation details that matter to intent:
 
@@ -29,7 +29,7 @@ Current implementation details that matter to intent:
 - Runtime presents a blank parallel-run cap as `Automatic`. Automatic admission applies the node's resource-budget percentage to both detected logical CPU cores and currently available memory; the default is 70 percent, leaving 30 percent for shared-host work. Entering a positive parallel-run cap is an explicit absolute node-level override. Unset node, provider, and target-app limits inherit the resulting global limit;
 - node runtime settings include a validated state-sync stale threshold. Its default is longer than the normal remote-fetch cadence so routine scheduling jitter does not degrade health;
 - the Nodes view keeps fleet bootstrap health separate from state-sync health: the active node uses this daemon's evidence and other nodes remain unknown without direct evidence;
-- Detail tables, including Skill history modals and Knowledge Hub lists, open details through row clicks and Enter or Space, with visible keyboard focus. Separate destructive or inline input controls retain their own actions.
+- Detail tables, including Skill history modals and Hub lists, open details through row clicks and Enter or Space, with visible keyboard focus. Separate destructive or inline input controls retain their own actions.
 - Skills use plain labels and clickable rows with keyboard activation. Each row shows its trigger and has a Status toggle that saves enabled state without opening the editor, preserving the trigger and refreshing manual discovery. Conflicting writes refresh the current configuration;
 - the Skill modal, including Governance, uses the shared Instructions and Settings tabs, opening on Instructions. Instructions retain rendered Markdown and editing; Settings contains all configuration controls. Tab switches preserve drafts and support keyboard navigation, and validation opens the tab containing the invalid field. Its title names the Skill. Trigger, Scope, and Status share a responsive row;
 - editors reuse shared modal, input, table, and segmented styles. Parameter choices appear only for choice parameters, and new Skills have no Delete action;

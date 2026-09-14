@@ -1,4 +1,4 @@
-// Knowledge Hub is a surface adapter; all state and publication use the shared API.
+// Hub is a surface adapter; all state and publication use the shared API.
 let hubGeneration = 0;
 let hubEditor = null;
 const hubPath = site => `/api/hub/sites/${encodeURIComponent(site)}`;
@@ -42,34 +42,34 @@ async function hubAction(root, action) {
 async function hubSiteUrl(site, published) {
   return new URL(`/hub/${published ? "sites" : "preview"}/${encodeURIComponent(site)}/`, location.origin).href;
 }
-async function refreshKnowledgeHub() {
+async function refreshHubs() {
   const generation = ++hubGeneration, node = captureNodeContextGeneration();
-  const root = document.getElementById("nav-knowledge-hub"); if (!root) return;
+  const root = document.getElementById("nav-hubs"); if (!root) return;
   try {
     const data = await api("GET", "/api/hub/sites");
     if (generation !== hubGeneration || !isNodeContextGenerationCurrent(node)) return;
-    renderInto(root, `<div class="nav-menu-label nav-context-section-label">Knowledge Hub</div>${data.sites.map(({item}) => `<button class="nav-menu-item nav-control-item nav-management-item" type="button" data-hub-open="${htmlEscape(item.id)}" data-public="${!!item.publication}"><svg class="nav-menu-icon" aria-hidden="true" viewBox="0 0 24 24" focusable="false"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M3 9h18M8 13h8M8 16h5"></path></svg><span>${htmlEscape(item.name)}</span></button>`).join("")}<button class="nav-menu-item nav-control-item nav-management-item" type="button" data-hub-add><svg class="nav-menu-icon" aria-hidden="true" viewBox="0 0 24 24" focusable="false"><path d="M12 5v14M5 12h14"></path></svg><span>Add site...</span></button>`);
+    renderInto(root, `<div class="nav-menu-label nav-context-section-label">Hub</div>${data.sites.map(({item}) => `<button class="nav-menu-item nav-control-item nav-management-item" type="button" data-hub-open="${htmlEscape(item.id)}" data-public="${!!item.publication}"><svg class="nav-menu-icon" aria-hidden="true" viewBox="0 0 24 24" focusable="false"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M3 9h18M8 13h8M8 16h5"></path></svg><span>${htmlEscape(item.name)}</span></button>`).join("")}<button class="nav-menu-item nav-control-item nav-management-item" type="button" data-hub-add><svg class="nav-menu-icon" aria-hidden="true" viewBox="0 0 24 24" focusable="false"><path d="M12 5v14M5 12h14"></path></svg><span>Add Hub...</span></button>`);
     root.querySelectorAll("[data-hub-open]").forEach(b => b.onclick = () => {
       const tab = window.open("about:blank", "_blank"); if (tab) tab.opener = null;
       hubSiteUrl(b.dataset.hubOpen, b.dataset.public === "true").then(url => { if (tab) tab.location.replace(url); }).catch(e => {tab?.close(); showActionError(e);});
     });
     root.querySelector("[data-hub-add]").onclick = () => editHubSite();
-    if (typeof registerCommand === "function") registerCommand({id:"hub.manage",title:"Manage Knowledge Hub",group:"Knowledge Hub",run:openKnowledgeHub});
-  } catch (error) { if (generation === hubGeneration) root.textContent = "Knowledge Hub unavailable"; }
+    if (typeof registerCommand === "function") registerCommand({id:"hub.manage",title:"Manage Hubs",group:"Hub",run:openHubs});
+  } catch (error) { if (generation === hubGeneration) root.textContent = "Hub unavailable"; }
 }
-function openKnowledgeHub() {
-  location.hash = "#/settings/knowledge-hub";
+function openHubs() {
+  location.hash = "#/settings/hubs";
 }
-function renderKnowledgeHubSettings(data = {}) {
+function renderHubsSettings(data = {}) {
   const sites = data?.sites || [];
-  return `<section class="settings-section" data-testid="settings-knowledge-hub">
-    <div class="actions"><h3>Knowledge Hub</h3><span class="spacer"></span><button type="button" data-hub-new-site>Add site</button></div>
+  return `<section class="settings-section" data-testid="settings-hubs">
+    <div class="actions"><h3>Hubs</h3><span class="spacer"></span><button type="button" data-hub-new-site>Add Hub</button></div>
     <p class="muted">Refine Hub ships with Refine. Your own sites and saved data synchronize through this app’s state repository.</p>
     <table class="table"><thead><tr><th>Name</th><th>Publication</th><th>Maintenance</th></tr></thead><tbody>${sites.map(({item}) => `<tr data-hub-site="${htmlEscape(item.id)}" tabindex="0" aria-label="Manage ${htmlEscape(item.name)}"><td>${htmlEscape(item.name)}</td><td>${item.builtin ? "Built-in · Read-only" : item.publication ? "Published" : "Private"}</td><td>${item.skill_id ? `<button type="button" disabled title="Checking Skill availability…" data-hub-run="${htmlEscape(item.skill_id)}" data-hub-id="${htmlEscape(item.id)}">Run Skill</button>` : "No Skill assigned"}</td></tr>`).join("")}</tbody></table>
-    ${sites.length ? "" : '<p class="muted">No sites yet.</p>'}</section>`;
+    ${sites.length ? "" : '<p class="muted">No Hubs yet.</p>'}</section>`;
 }
-function bindKnowledgeHubSettings() {
-  const root = document.querySelector('[data-testid="settings-knowledge-hub"]');
+function bindHubsSettings() {
+  const root = document.querySelector('[data-testid="settings-hubs"]');
   if (!root) return;
   root.querySelector('[data-hub-new-site]').onclick = () => editHubSite();
   root.querySelectorAll('[data-hub-run]').forEach(button => button.onclick = event => { event.stopPropagation(); triggerManualSkill(button.dataset.hubRun, button.dataset.hubId); });
@@ -90,7 +90,7 @@ async function editHubSite(existing, draft = {}) {
   if (!isNodeContextGenerationCurrent(generation)) return;
   const selected = draft.skill_id || existing?.item.skill_id || "";
   const choices = (skills.items || []).filter(skill => !skill.scope?.node_id && skill.id !== "update-refine-hub");
-  const root = hubModal(existing ? "Edit site" : "Add site", `<form data-hub-site-form>
+  const root = hubModal(existing ? "Edit Hub" : "Add Hub", `<form data-hub-site-form>
     <div class="form-row"><label for="hub-site-name">Name</label><input type="text" id="hub-site-name" data-name required value="${htmlEscape(draft.name ?? existing?.item.name ?? "")}"></div>
     <div class="form-row"><label for="hub-site-description">Description</label><textarea id="hub-site-description" data-description rows="4">${htmlEscape(draft.description ?? existing?.item.description ?? "")}</textarea></div>
     <div class="form-row"><label for="hub-site-skill">Build and maintain Skill</label><select id="hub-site-skill" data-hub-skill ${existing ? "" : "required"}><option value="">Choose a Skill…</option>${choices.map(skill => `<option value="${htmlEscape(skill.id)}" ${skill.id === selected ? "selected" : ""}>${htmlEscape(skill.name)}${skill.enabled ? "" : " (disabled)"}</option>`).join("")}</select></div>
@@ -112,7 +112,7 @@ async function editHubSite(existing, draft = {}) {
       try {
         const id = existing?.item.id || hubId();
         await hubApi(root,"PUT", hubPath(id), {name,description:root.querySelector("[data-description]").value,skill_id:root.querySelector("[data-hub-skill]").value || null,revision:existing?.revision});
-        root._close(); await refreshKnowledgeHub();
+        root._close(); await refreshHubs();
         if (isSettingsRoute()) await refreshSettings({force: true});
         await openHubSite(id);
       } finally { save.disabled = false; }
@@ -124,13 +124,13 @@ async function editHubSite(existing, draft = {}) {
 }
 async function openHubSite(site) {
   if (site === "refine") { window.open("/hub/sites/refine/", "_blank", "noopener"); return; }
-  const root = hubModal("Manage site", `<div data-detail></div>`);
+  const root = hubModal("Manage Hub", `<div data-detail></div>`);
   await hubAction(root, async () => {
     const [data, collections, assets, status, skills] = await Promise.all([hubApi(root,"GET",hubPath(site)),hubApi(root,"GET",`${hubPath(site)}/collections`),hubApi(root,"GET",`${hubPath(site)}/assets`),hubApi(root,"GET",`${hubPath(site)}/status`),hubApi(root,"GET",`/api/skills?node_id=${encodeURIComponent(nodeContextActiveNodeId())}`)]);
     if (!root.isConnected || !isNodeContextGenerationCurrent(root._nodeGeneration)) return;
     const skill = skills.items?.find(skill => skill.id === data.item.skill_id);
     const runnable = skill?.enabled && skills.manual_skill_ids?.includes(skill.id);
-    root.querySelector("[data-detail]").innerHTML = `<h3>${htmlEscape(data.item.name)}</h3><p>${htmlEscape(data.item.description || "")}</p><p>${data.item.publication ? "Published" : "Private"}. Saved locally. State sync: ${htmlEscape(status.sync?.status || "unknown")}. Remote availability follows app state synchronization.</p><div class="actions"><button data-edit>Edit site</button><button data-preview>Open preview</button><button class="danger" data-delete-site>Delete site</button></div>
+    root.querySelector("[data-detail]").innerHTML = `<h3>${htmlEscape(data.item.name)}</h3><p>${htmlEscape(data.item.description || "")}</p><p>${data.item.publication ? "Published" : "Private"}. Saved locally. State sync: ${htmlEscape(status.sync?.status || "unknown")}. Remote availability follows app state synchronization.</p><div class="actions"><button data-edit>Edit Hub</button><button data-preview>Open preview</button><button class="danger" data-delete-site>Delete Hub</button></div>
     <h3>Build and maintain</h3><p>${htmlEscape(skill?.name || (data.item.skill_id ? "Assigned Skill unavailable" : "No Skill assigned"))}</p><div class="actions"><button data-run-hub-skill ${runnable ? "" : "disabled"}>Run Skill</button><button data-edit-hub-skill ${skill ? "" : "disabled"}>Edit Skill</button><a href="#/settings/workflow" data-hub-events>Manage event assignments</a></div><p class="muted">${runnable ? "Run manually, or use the Skill’s event assignments for automatic updates." : "Choose an enabled project Skill with a Custom action assignment to run it manually."}</p>
     <h3>Publication</h3><p>Publishing makes the selected collections readable through the site URL.</p>${collections.collections.map(({item})=>`<label><input type="checkbox" data-publish-collection value="${htmlEscape(item.id)}" ${data.item.publication?.collections?.includes(item.id)?"checked":""}>${htmlEscape(item.id)}</label>`).join("")}<div class="actions"><button data-publish>Publish</button><button data-unpublish ${data.item.publication?"":"disabled"}>Unpublish</button></div>
     <h3>Website files</h3><label>Upload files<input type="file" data-files multiple></label><label>Upload directory<input type="file" data-directory multiple webkitdirectory></label><button data-new-file>New text file</button><table class="table"><thead><tr><th>Path</th><th>Bytes</th></tr></thead><tbody>${Object.entries(assets.item).map(([path,v])=>`<tr data-asset="${htmlEscape(path)}" tabindex="0" aria-label="Open ${htmlEscape(path)}"><td>${htmlEscape(path)}</td><td>${v.bytes}</td></tr>`).join("")}</tbody></table>
@@ -138,12 +138,12 @@ async function openHubSite(site) {
     root.querySelector("[data-run-hub-skill]").onclick = () => {root._close();triggerManualSkill(skill.id, site);};
     root.querySelector("[data-edit-hub-skill]").onclick = () => {root._close();openSkillEditor(skill);};
     root.querySelector("[data-hub-events]").onclick = () => root._close();
-    const reload = async () => {root._close();await refreshKnowledgeHub();await openHubSite(site);};
+    const reload = async () => {root._close();await refreshHubs();await openHubSite(site);};
     root.querySelector("[data-edit]").onclick=()=>{root._close();editHubSite(data);};
     root.querySelector("[data-preview]").onclick=()=>{const tab=window.open("about:blank","_blank");if(tab)tab.opener=null;hubAction(root,async()=>{try{const url=await hubSiteUrl(site,false);if(tab)tab.location.replace(url);}catch(e){tab?.close();throw e;}});};
     root.querySelector("[data-publish]").onclick=()=>hubAction(root,async()=>{await hubApi(root,"POST",`${hubPath(site)}/publish`,{revision:data.revision,collections:[...root.querySelectorAll("[data-publish-collection]:checked")].map(c=>c.value)});await reload();});
     root.querySelector("[data-unpublish]").onclick=()=>hubAction(root,async()=>{await hubApi(root,"POST",`${hubPath(site)}/unpublish`,{revision:data.revision});await reload();});
-    root.querySelector("[data-delete-site]").onclick=()=>hubAction(root,async()=>{await hubApi(root,"DELETE",hubPath(site),{revision:data.revision});root._close();await refreshKnowledgeHub();openKnowledgeHub();if(isSettingsRoute())await refreshSettings({force:true});});
+    root.querySelector("[data-delete-site]").onclick=()=>hubAction(root,async()=>{await hubApi(root,"DELETE",hubPath(site),{revision:data.revision});root._close();await refreshHubs();openHubs();if(isSettingsRoute())await refreshSettings({force:true});});
     for(const input of root.querySelectorAll("[data-files],[data-directory]")) input.onchange=()=>hubAction(root,async()=>{let manifest=assets;for(const file of input.files){if(file.size>16*1024*1024)throw new Error("Assets must be at most 16 MiB");const path=file.webkitRelativePath?file.webkitRelativePath.split("/").slice(1).join("/"):file.name;manifest=await hubApi(root,"PUT",`${hubPath(site)}/assets`,{path,revision:manifest.revision,bytes_base64:await hubFileBase64(file)});}await reload();});
     bindAutomationRows(root, "[data-asset]", row=>{root._close();editHubAsset(site,row.dataset.asset,assets.revision);});
     root.querySelector("[data-new-file]").onclick=()=>{root._close();editHubAsset(site,"",assets.revision);};
@@ -217,8 +217,8 @@ function editHubRecord(site,collection,record) {
   root.querySelector("[data-write]").onclick=()=>hubAction(root,async()=>{await hubApi(root,"PUT",path,{data:JSON.parse(root.querySelector("[data-data]").value),revision:record?.revision,request_id:hubId()});root._close();await openHubCollection(site,collection);});
   root.querySelector("[data-remove]").onclick=()=>hubAction(root,async()=>{await hubApi(root,"DELETE",path,{revision:record.revision});root._close();await openHubCollection(site,collection);});
 }
-document.getElementById("nav-create-menu")?.addEventListener("toggle",event=>{if(event.target.open)refreshKnowledgeHub();});
-window.addEventListener("load",refreshKnowledgeHub);
+document.getElementById("nav-create-menu")?.addEventListener("toggle",event=>{if(event.target.open)refreshHubs();});
+window.addEventListener("load",refreshHubs);
 
 async function* hubImportRecords(file) {
   const reader=file.stream().getReader(), decoder=new TextDecoder();

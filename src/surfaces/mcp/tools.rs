@@ -259,7 +259,7 @@ pub fn tool_catalog() -> Vec<McpTool> {
         },
         McpTool {
             name: "refine_hub_sites",
-            description: "List Knowledge Hub sites. Manage assets, collections, records, indexes, queries and publication through /api/hub routes with refine_request.",
+            description: "List Hub sites. Manage assets, collections, records, indexes, queries and publication through /api/hub routes with refine_request.",
             input_schema: empty_schema,
             binding: ToolBinding::Api {
                 method: "GET",

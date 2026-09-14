@@ -67,7 +67,7 @@ function hydrateNodeSelector(project, registry) {
 
 function nodeContextDirtySurfaces() {
   const dirty = [];
-  if (typeof hubEditor !== "undefined" && hubEditor?.isConnected && hubEditor.dataset.nodeContextDirty === "true") dirty.push({label: hubEditor.dataset.nodeContextLabel || "Knowledge Hub", root: hubEditor});
+  if (typeof hubEditor !== "undefined" && hubEditor?.isConnected && hubEditor.dataset.nodeContextDirty === "true") dirty.push({label: hubEditor.dataset.nodeContextLabel || "Hub", root: hubEditor});
   if (typeof automationEditor !== "undefined" && automationEditor?.dataset.nodeContextDirty === "true") dirty.push({label: "Events or Skills", root: automationEditor});
   const newGoal = document.querySelector("[data-testid='new-goal-modal']");
   const newGoalPrompt = newGoal?.querySelector("[data-testid='new-goal-prompt']");

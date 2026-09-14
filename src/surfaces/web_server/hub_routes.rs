@@ -1,4 +1,4 @@
-//! Knowledge Hub adapters share the Application service with CLI and MCP.
+//! Hub adapters share the Application service with CLI and MCP.
 use super::support::*;
 use super::*;
 use crate::application::hub::Hub;
@@ -169,7 +169,7 @@ impl InProcessWebServer {
                     )),
                 },
                 _ => Err(RefineError::NotFound(
-                    "Knowledge Hub route not found".into(),
+                    "Hub route not found".into(),
                 )),
             }
         })();

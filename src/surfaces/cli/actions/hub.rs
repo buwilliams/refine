@@ -1,7 +1,7 @@
 use super::*;
 #[derive(Debug, Subcommand)]
 pub enum HubAction {
-    /// List Knowledge Hub sites.
+    /// List Hub sites.
     List,
     /// Inspect a site and its revision.
     Show { site: String },

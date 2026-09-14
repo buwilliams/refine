@@ -14,7 +14,7 @@ impl QueryPermit {
                 (count < 4).then_some(count + 1)
             })
             .map(|_| Self)
-            .map_err(|_| RefineError::Degraded("Knowledge Hub query capacity is busy".into()))
+            .map_err(|_| RefineError::Degraded("Hub query capacity is busy".into()))
     }
 }
 impl Drop for QueryPermit {

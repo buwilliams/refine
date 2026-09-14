@@ -65,7 +65,9 @@ pub fn page(name: &str) -> RefineResult<Vec<u8>> {
     for (label, prefix) in groups {
         nav.push_str(&format!(
             "<details {}><summary>{label}</summary>",
-            if name.starts_with(prefix) && !prefix.is_empty() {
+            if (name.starts_with(prefix) && !prefix.is_empty())
+                || (name == "index.md" && prefix == "product/")
+            {
                 "open"
             } else {
                 ""
@@ -96,7 +98,17 @@ pub fn page(name: &str) -> RefineResult<Vec<u8>> {
         }
         nav.push_str("</details>");
     }
-    Ok(format!(r#"<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{} · Refine Hub</title><base href="/hub/sites/refine/{base}"><link rel="stylesheet" href="/hub/sites/refine/hub.css"><script defer src="/hub/sites/refine/hub.js"></script></head><body><header><a href="/hub/sites/refine/">Refine Hub</a><span>Built-in · Refine {}</span></header><div class="layout"><nav aria-label="Documentation"><label for="hub-search">Find a page</label><input id="hub-search" type="search" placeholder="Search documentation"><p id="hub-search-status" role="status"></p>{nav}</nav><main><article>{content}</article><footer>Ships with Refine · <a href="/hub/sites/refine/authoring.md">Ask your agent to update Refine Hub</a></footer></main></div></body></html>"#,escape(&title(name,bytes)),env!("CARGO_PKG_VERSION")).into_bytes())
+    let section = groups
+        .iter()
+        .find(|(_, prefix)| !prefix.is_empty() && name.starts_with(prefix))
+        .map(|(label, _)| *label)
+        .unwrap_or("Explore Refine");
+    let page_class = if name == "index.md" {
+        "home-page"
+    } else {
+        "document-page"
+    };
+    Ok(format!(r#"<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{} · Refine Hub</title><base href="/hub/sites/refine/{base}"><link rel="stylesheet" href="/hub/sites/refine/hub.css"><script defer src="/hub/sites/refine/hub.js"></script></head><body class="{page_class}"><a class="skip-link" href="/hub/sites/refine/{name}#main-content">Skip to content</a><header class="hub-header"><a class="hub-brand" href="/hub/sites/refine/"><span class="brand-mark" aria-hidden="true">r</span><span>Refine <span class="brand-section">Hub</span></span></a><div class="header-actions"><span class="version-badge">Refine {}</span><button class="menu-toggle" type="button" aria-expanded="false" aria-controls="hub-navigation" hidden>Browse pages</button></div></header><div class="layout"><nav class="sidebar" id="hub-navigation" aria-label="Documentation"><div class="search-field"><label for="hub-search">Find your next step</label><input id="hub-search" type="search" placeholder="Search pages…"><p id="hub-search-status" role="status"></p></div><a class="hub-overview" href="/hub/sites/refine/">Hub overview <span aria-hidden="true">↗</span></a>{nav}<div class="sidebar-note">Your product field guide.<br>Available offline. Updated with Refine.</div></nav><main id="main-content" tabindex="-1"><div class="page-category">{section}</div><article>{content}</article><footer><span>Built for teams and fleets of agents.</span><a href="/hub/sites/refine/authoring.md">Update Refine Hub <span aria-hidden="true">↗</span></a></footer></main><aside class="page-outline" aria-label="On this page" hidden><p>On this page</p><div data-outline></div></aside></div></body></html>"#,escape(&title(name,bytes)),env!("CARGO_PKG_VERSION")).into_bytes())
 }
 
 #[cfg(test)]

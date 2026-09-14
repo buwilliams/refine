@@ -20,7 +20,7 @@ pub struct ApiRouteGroup {
 pub const API_GROUPS: &[ApiRouteGroup] = &[
     ApiRouteGroup {
         prefix: "/api/hub",
-        capability: "Knowledge Hub sites, assets, JSON collections, indexes, queries and publishing",
+        capability: "Hub sites, assets, JSON collections, indexes, queries and publishing",
     },
     ApiRouteGroup {
         prefix: "/workflow/goals",

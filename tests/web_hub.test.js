@@ -43,7 +43,7 @@ function hubFixture() {
   return { fixture, sites, collections, records, writes };
 }
 
-test("Knowledge Hub uses the existing origin and manages sites and paginated records", { skip: SKIP }, async () => {
+test("Hub uses the existing origin and manages sites and paginated records", { skip: SKIP }, async () => {
   const data = hubFixture();
   const app = await openApp({ fixture: data.fixture });
   const page = app.page;
@@ -137,7 +137,7 @@ test("Hub modal rows open from cells and keyboards; Controls uses the shared men
     await page.goto(`${app.origin}/#/goals`);
     await page.getByTestId("create-menu-toggle").click();
     await page.locator('[data-hub-add]').waitFor();
-    const menu = await page.locator('#nav-knowledge-hub button').evaluateAll(buttons => buttons.map(button => ({
+    const menu = await page.locator('#nav-hubs button').evaluateAll(buttons => buttons.map(button => ({
       classes: button.className, icons: button.querySelectorAll('svg.nav-menu-icon').length,
       width: button.getBoundingClientRect().width, border: getComputedStyle(button).borderTopWidth,
       textOffset: button.querySelector('span').getBoundingClientRect().left - button.getBoundingClientRect().left
@@ -152,10 +152,10 @@ test("Hub modal rows open from cells and keyboards; Controls uses the shared men
       assert.equal(item.textOffset, menu[0].textOffset);
     }
     await page.getByTestId("create-menu-toggle").click();
-    await page.goto(`${app.origin}/#/settings/knowledge-hub`);
+    await page.goto(`${app.origin}/#/settings/hubs`);
     await page.locator('[data-hub-new-site]').waitFor();
     const tabs = await page.locator('.settings-tab').allTextContents();
-    assert.equal(tabs[tabs.indexOf('Prompts') + 1], 'Knowledge Hub');
+    assert.equal(tabs[tabs.indexOf('Prompts') + 1], 'Hubs');
     await page.locator('[data-hub-new-site]').click();
     await page.locator('[data-hub-skill]').waitFor();
     assert.equal(await page.locator('.form-row label[for="hub-site-name"]').count(), 1);
@@ -213,7 +213,7 @@ test("Refine Hub opens documentation instead of the site editor", { skip: SKIP }
   const app = await openApp({fixture:data.fixture});
   try {
     await app.page.context().route("**/hub/sites/refine/", route => route.fulfill({contentType:"text/html",body:"<h1>Refine Hub</h1>"}));
-    await app.page.goto(`${app.origin}/#/settings/knowledge-hub`);
+    await app.page.goto(`${app.origin}/#/settings/hubs`);
     const row = app.page.locator('[data-hub-site="refine"]');
     await row.waitFor();
     assert.match(await row.innerText(),/Built-in · Read-only/);
@@ -240,7 +240,7 @@ test('Refine Hub offers its protected Skill and passes the selected Hub into a m
     return data.fixture(path,request);
   }});
   try {
-    await app.page.goto(`${app.origin}/#/settings/knowledge-hub`);
+    await app.page.goto(`${app.origin}/#/settings/hubs`);
     await app.page.evaluate(() => {createToolbarTab = async (mode, options) => {window.testHubLaunch = {mode, options};};});
     await app.page.locator('[data-hub-run="update-refine-hub"]').click();
     await app.page.locator('#event-parameter-0').fill('Explain the new Hub workflow');

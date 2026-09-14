@@ -1,4 +1,4 @@
-# Knowledge Hub
+# Hub
 
 ## Key Ideas
 
@@ -9,11 +9,11 @@
 
 ## Purpose
 
-Knowledge Hub gives people and agents a durable place for reports, significant events, historical logs, and other structured knowledge. Skills can use this capability without owning it or requiring a separate database service.
+Hub gives people and agents a durable place for reports, significant events, historical logs, and other structured knowledge. Skills can use this capability without owning it or requiring a separate database service.
 
 ## Expected Role
 
-Controls > Knowledge Hub lists sites, opens them in new tabs, and offers Add site. Full management lives in Settings > Knowledge Hub, immediately after Workflow. Site rows open their editors; Add site uses the shared modal field layout and Save/Cancel footer. Published sites use `/hub/sites/<site>/`; draft previews use `/hub/preview/<site>/`. These routes share the Refine installation's existing hosting and access boundary. Publication does not create an independent authentication boundary within that server.
+New Goal > Hub lists sites, opens them in new tabs, and offers Add Hub. Full management lives in Settings > Hubs, immediately after Prompts. Site rows open their editors; Add Hub uses the shared modal field layout and Save/Cancel footer. Published sites use `/hub/sites/<site>/`; draft previews use `/hub/preview/<site>/`. These routes share the Refine installation's existing hosting and access boundary. Publication does not create an independent authentication boundary within that server.
 
 Site and collection identifiers remain stable when display names change. Updates use revision checks, and record imports preserve explicit identifiers. Publishing selects one complete static asset manifest atomically, so editing a draft does not partially change a published site. Public collection queries are read-only.
 

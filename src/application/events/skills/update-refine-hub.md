@@ -12,5 +12,6 @@ Readers understand the current product and what changed. Write in plain language
 
 - Refine Hub ships from src/surfaces/refine-hub in the Refine source checkout ({{refine_checkout}}). Update those source files; the built-in Hub API is read-only. Do not put product documentation in the target application's user Hub storage.
 - Check the current implementation and interface. Cover the requested release period, describe final behavior, and leave out superseded designs.
+- Preserve the Hub’s visual language: clear type hierarchy, generous spacing, restrained color, and useful cards for entry points. Keep long documents readable, and check mobile, light, and dark views.
 - Keep navigation and links consistent. Check changed pages, links, and screenshots in the Hub and website surfaces.
 - Explain that source changes reach users when they update Refine. Follow the user's request for committing, publishing, and rebuilding.

@@ -11,4 +11,4 @@ function initGuide() {
     openGuide({ itemId: button.dataset.guideLabelItem });
   });
 }
-registerCommand({ id: "hub.refine", title: "Open Refine Hub", group: "Knowledge Hub", aliases: ["guide", "documentation", "release notes"], run: () => window.open("/hub/sites/refine/", "_blank", "noopener") });
+registerCommand({ id: "hub.refine", title: "Open Refine Hub", group: "Hub", aliases: ["guide", "documentation", "release notes"], run: () => window.open("/hub/sites/refine/", "_blank", "noopener") });

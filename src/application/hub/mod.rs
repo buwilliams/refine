@@ -1,4 +1,4 @@
-//! Knowledge Hub capability shared by all surfaces. Durable JSON is authoritative.
+//! Hub capability shared by all surfaces. Durable JSON is authoritative.
 use crate::error::{RefineError, RefineResult};
 fn reject_symlinks(path: &Path) -> RefineResult<()> {
     for component in path.ancestors() {

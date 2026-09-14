@@ -12,7 +12,7 @@ impl LocalHttpDaemon {
                 (relative, true)
             } else {
                 return Err(RefineError::NotFound(
-                    "Knowledge Hub site route not found".into(),
+                    "Hub site route not found".into(),
                 ));
             };
             if !path.ends_with('/')

@@ -26,3 +26,37 @@ document.querySelectorAll('h1,h2,h3,h4,h5,h6').forEach(heading => {
   heading.id = slug + (count ? `-${count}` : '');
 });
 if (location.hash) document.getElementById(decodeURIComponent(location.hash.slice(1)))?.scrollIntoView();
+
+// Keep long documents easy to scan without adding more navigation on the home page.
+const outline = document.querySelector('.page-outline');
+const headings = [...document.querySelectorAll('article h2')];
+if (outline && headings.length > 1 && !document.body.classList.contains('home-page')) {
+  const links = headings.map(heading => {
+    const link = document.createElement('a');
+    link.textContent = heading.textContent;
+    link.href = `${location.pathname}#${encodeURIComponent(heading.id)}`;
+    outline.querySelector('[data-outline]').append(link);
+    return link;
+  });
+  outline.hidden = false;
+  const observer = new IntersectionObserver(entries => {
+    const entry = entries.find(entry => entry.isIntersecting);
+    if (!entry) return;
+    links.forEach((link, index) => {
+      if (headings[index] === entry.target) link.setAttribute('aria-current', 'location');
+      else link.removeAttribute('aria-current');
+    });
+  }, {rootMargin: '-80px 0px -60% 0px'});
+  headings.forEach(heading => observer.observe(heading));
+}
+const menu = document.querySelector('.menu-toggle');
+if (menu) {
+  document.body.classList.add('js');
+  menu.hidden = false;
+  menu.addEventListener('click', () => {
+    const open = menu.getAttribute('aria-expanded') !== 'true';
+    menu.setAttribute('aria-expanded', String(open));
+    document.querySelector('#hub-navigation').classList.toggle('is-open', open);
+    if (open) search.focus();
+  });
+}
