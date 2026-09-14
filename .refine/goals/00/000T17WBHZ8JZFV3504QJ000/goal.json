@@ -3,7 +3,7 @@
   "branch_name": "refine/00000T17WBHZ8JZFV3504QJ000/round-1",
   "candidate_commit": null,
   "created": "2026-09-14T10:51:58Z",
-  "event_generation": 4,
+  "event_generation": 5,
   "feature_id": null,
   "feature_order": null,
   "id": "00000T17WBHZ8JZFV3504QJ000",
@@ -205,6 +205,26 @@
           "revision": 43,
           "schema_version": 2,
           "skills": {}
+        },
+        "5:default:workflow.cancelled.enter": {
+          "events": {
+            "workflow.cancelled.enter": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.cancelled.enter",
+              "kind": "system",
+              "name": "Workflow Cancelled Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.cancelled.enter"
+            }
+          },
+          "revision": 78,
+          "schema_version": 3,
+          "skills": {}
         }
       },
       "logs": [],
@@ -273,9 +293,9 @@
       "workspace_branch": "refine/00000T17WBHZ8JZFV3504QJ000/round-1"
     }
   ],
-  "status": "failed",
+  "status": "cancelled",
   "target_branch": "main",
-  "updated": "2026-09-14T10:53:17Z",
+  "updated": "2026-09-14T15:46:07Z",
   "workflow_controls": [
     {
       "actor": "operator",
@@ -286,6 +306,16 @@
       "request_id": "585eecdd-f6fd-4c00-aaf9-a1f53b5ffe22",
       "source_round": 1,
       "to": "todo"
+    },
+    {
+      "actor": "operator",
+      "at": "2026-09-14T15:46:07Z",
+      "forced": false,
+      "from": "failed",
+      "reason": "Explicit cancellation",
+      "request_id": "7b216f0c-573d-4509-9da9-3dc19d16788b",
+      "source_round": 1,
+      "to": "cancelled"
     }
   ],
   "workflow_events": [
@@ -329,7 +359,18 @@
       "round_idx": 0,
       "to": "failed",
       "workflow_revision": 10
+    },
+    {
+      "at": "2026-09-14T15:46:07.680020213+00:00",
+      "forced": true,
+      "from": "failed",
+      "generation": 5,
+      "node_id": "default",
+      "round_idx": 0,
+      "supersedes_execution": true,
+      "to": "cancelled",
+      "workflow_revision": 11
     }
   ],
-  "workflow_revision": 10
+  "workflow_revision": 11
 }
