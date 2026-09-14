@@ -73,7 +73,7 @@ function renderWorkflowAssignments(data, source) {
         <strong>${htmlEscape(skill.name)}</strong>
           <span class="muted small">${source === "custom" ? "Custom action" : `Order ${binding.order || 0}`} · ${htmlEscape({blocking:"Required",background:"Background",context:"Context only"}[binding.mode] || binding.mode || "Required")} · ${scope ? `Node: ${htmlEscape(scope)}` : "Project"}${disabled ? " · Disabled" : ""}</span>
           ${source === "custom" && event.name && event.id !== "custom" ? `<span class="muted small">${htmlEscape(event.name)}</span>` : ""}
-        <div class="workflow-assignment-actions"><button type="button" class="secondary" data-workflow-skill="${htmlEscape(skill.id)}" aria-label="Edit ${htmlEscape(skill.name)} Skill">Edit Skill</button><button type="button" class="secondary" data-workflow-preview="${index}">${binding.mode === "context" ? "Preview context" : "Preview prompt"}</button><button type="button" class="secondary" data-workflow-assignment-edit="${index}">Assignment settings</button></div>
+        <div class="workflow-assignment-actions"><button type="button" class="secondary" data-workflow-skill="${htmlEscape(skill.id)}" aria-label="Edit ${htmlEscape(skill.name)} Skill">Edit Skill</button><button type="button" class="secondary" data-workflow-preview="${index}">${binding.mode === "context" ? "Preview context" : "Preview prompt"}</button><button type="button" class="secondary" data-workflow-assignment-edit="${index}">Assignment settings</button>${source === "custom" ? `<button type="button" data-workflow-run="${htmlEscape(skill.id)}" ${disabled || binding.mode === "context" || (data.skills.manual_skill_ids && !data.skills.manual_skill_ids.includes(skill.id)) ? 'disabled title="This Skill is not available for manual execution on this node"' : ""}>Run Skill</button>` : ""}</div>
       </article>`;
     }).join("")}</div>` : '<p class="workflow-empty muted">No Skills assigned. Add a Skill to run work at this trigger.</p>'}
   </section>`;
@@ -141,6 +141,7 @@ function bindWorkflowSettings(data) {
   root.querySelectorAll("[data-workflow-skill]").forEach(button => { button.onclick = () => openSkillEditor(data.skills.items.find(skill => skill.id === button.dataset.workflowSkill)); });
   root.querySelectorAll("[data-workflow-existing]").forEach(button => { button.onclick = () => openWorkflowAssignment(data, button.dataset.workflowExisting); });
   root.querySelectorAll("[data-workflow-assignment-edit]").forEach(button => { button.onclick = () => openWorkflowAssignment(data, workflowCurrentSource(data), workflowAssignments(data, workflowCurrentSource(data))[Number(button.dataset.workflowAssignmentEdit)]); });
+  root.querySelectorAll("[data-workflow-run]").forEach(button => { button.onclick = () => triggerManualSkill(button.dataset.workflowRun); });
   root.querySelectorAll("[data-workflow-preview]").forEach(button => { button.onclick = () => previewWorkflowAssignment(data, workflowCurrentSource(data), Number(button.dataset.workflowPreview), button); });
   if (workflowSettingsView === "resources") {
     bindTemplatesSettings();

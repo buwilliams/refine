@@ -1772,3 +1772,24 @@ test("Governance editor tabs preserve drafts and reveal invalid fields before sa
     assert.deepEqual(app.pageErrors, []);
   } finally { await app.close(); }
 });
+
+
+test("Workflow Custom action cards run Skills with typed parameters", {skip:SKIP}, async () => {
+  const data = skillFixture(), app = await openApp({fixture:data.fixture});
+  try {
+    const page = app.page;
+    await page.goto(`${app.origin}/#/settings/workflow`);
+    await page.locator('[data-workflow-view="custom"]').click();
+    await page.locator('[data-workflow-assignment="inspect"] [data-workflow-run]').click();
+    const modal = page.getByTestId('automation-modal');
+    await modal.locator('[data-parameter-index="0"]').fill('7');
+    await modal.getByRole('button', {name:'Run Skill',exact:true}).click();
+    await modal.waitFor({state:'detached'});
+    await page.locator('[data-testid="terminal-profile"]').filter({hasText:'Inspect release'}).waitFor();
+    assert.equal(data.launches.length,1);
+    assert.equal(data.launches[0].skill_id,'inspect');
+    assert.deepEqual(data.launches[0].parameters,{count:7});
+    assert.equal(data.launches[0].goal_id,undefined);
+    assert.deepEqual(app.pageErrors,[]);
+  } finally {await app.close();}
+});
