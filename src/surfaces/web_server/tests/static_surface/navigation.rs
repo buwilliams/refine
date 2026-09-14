@@ -118,7 +118,6 @@ fn static_main_nav_consolidates_context_and_controls() {
 
     for control_id in [
         r#"id="target-app-indicator""#,
-        r#"id="global-node""#,
         r#"id="workflow-status-indicator""#,
         r#"id="btn-command-palette""#,
         r#"id="btn-refine-issue""#,
@@ -144,8 +143,10 @@ fn static_main_nav_consolidates_context_and_controls() {
     assert!(index.find(r#"id="global-reporter""#).unwrap() < menu_start);
     assert!(!menu.contains(r#"id="global-reporter""#));
     assert!(!menu.contains(r#"id="btn-source-update""#));
-    assert!(menu.contains(r#"aria-label="Node""#));
-    assert!(menu.contains(r#"data-testid="global-node""#));
+    assert!(index.find(r#"id="global-node""#).unwrap() < menu_start);
+    assert!(!menu.contains(r#"id="global-node""#));
+    assert!(index.contains(r#"aria-label="Node""#));
+    assert!(index.contains(r#"data-testid="global-node""#));
     assert!(node_context.contains("function reconcileNodeContext"));
     assert!(
         node_context.contains(r#"api("GET", "/api/project/status", undefined, { cache: false })"#)

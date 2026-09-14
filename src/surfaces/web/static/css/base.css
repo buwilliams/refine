@@ -115,7 +115,7 @@ pre {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  min-width: 92px;
+  min-width: 112px;
   line-height: 1.1;
   color: inherit;
   text-decoration: none;
@@ -125,22 +125,12 @@ pre {
 }
 .brand-logo {
   display: block;
-  width: 82px;
-  height: 25px;
+  width: 112px;
+  height: 34px;
   object-fit: contain;
   object-position: left center;
 }
-.brand-node {
-  margin-top: -2px;
-  color: var(--color-text-soft);
-  font-size: 11px;
-  font-weight: 500;
-  line-height: 1.2;
-  max-width: 160px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+
 .nav { display: flex; align-items: center; gap: 4px; flex: 1; min-width: 0; }
 .nav a {
   text-decoration: none;
@@ -173,10 +163,10 @@ pre {
   filter: none;
 }
 .topbar-actions select { width: 100%; }
-.nav-reporter { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
-.nav-reporter label { color: var(--color-text-muted); font-size: 13px; }
-.topbar-actions .nav-reporter select { width: auto; max-width: 170px; height: 34px; }
-.topbar-actions .nav-reporter select:focus { outline: none; box-shadow: none; }
+.nav-context-picker { position: relative; flex: 0 0 auto; }
+.nav-context-picker label { position: absolute; top: 4px; left: 10px; z-index: 1; pointer-events: none; color: var(--color-text-muted); font-size: 8px; font-weight: 600; line-height: 1; letter-spacing: .06em; text-transform: uppercase; }
+.topbar-actions .nav-context-picker select { width: 150px; max-width: 170px; height: 34px; padding: 12px 28px 1px 10px; font-size: 12px; line-height: 16px; }
+.topbar-actions .nav-context-picker select:focus { outline: none; box-shadow: none; }
 
 .nav-command-button { font: inherit; }
 .nav-issue-button {

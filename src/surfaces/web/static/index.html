@@ -24,7 +24,6 @@
     <a class="brand" href="#/" data-route="dashboard" data-node-scope-destination="dashboard" aria-label="Refine dashboard">
       <img class="brand-logo brand-logo-light" src="/static/images/refine_logo_transparent.png" alt="refine">
       <img class="brand-logo brand-logo-dark" src="/static/images/refine_logo_transparent_darkmode.png" alt="refine">
-      <div class="brand-node" id="active-node-label">-</div>
     </a>
     <nav class="nav" data-testid="primary-nav">
       <a href="#/" data-route="dashboard" data-node-scope-destination="dashboard" data-testid="nav-dashboard">Dashboard</a>
@@ -34,7 +33,13 @@
       <a href="#/settings/processes" data-route="settings" data-testid="nav-settings">Settings</a>
     </nav>
     <div class="topbar-actions">
-      <div class="nav-reporter">
+      <div class="nav-context-picker nav-node">
+        <label for="global-node">Node</label>
+        <select id="global-node" aria-label="Node" data-testid="global-node" disabled>
+          <option value="">No node</option>
+        </select>
+      </div>
+      <div class="nav-context-picker nav-reporter">
         <label for="global-reporter">Reporter</label>
         <select id="global-reporter" aria-label="Reporter" data-testid="global-reporter"></select>
       </div>
@@ -71,10 +76,6 @@
             </a>
             <div class="quick-status-actions" id="quick-target-actions" aria-label="Target application actions"></div>
           </div>
-          <label class="nav-menu-label nav-context-section-label" for="global-node">Node</label>
-          <select id="global-node" aria-label="Node" data-testid="global-node" disabled>
-            <option value="">No node</option>
-          </select>
           <section id="nav-knowledge-hub" aria-label="Knowledge Hub"></section>
           <section id="nav-manual-skills" aria-label="Skills"></section>
           <div class="nav-menu-label nav-context-section-label">Tools and Support</div>

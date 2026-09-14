@@ -254,16 +254,12 @@ test("project status active node drives the browser title, navigation, and Goal 
       marker: '[data-testid="goals-table"]',
     });
     await app.page.waitForFunction(() => document.title === "Port Owner - refine");
-    const activeNodeLabel = app.page.locator("#active-node-label");
+    assert.equal(await app.page.locator("#active-node-label").count(), 0);
     assert.equal(await app.page.title(), "Port Owner - refine");
-    assert.equal(await activeNodeLabel.textContent(), "Port Owner");
-    assert.equal(await activeNodeLabel.getAttribute("title"), "Port Owner");
     assert.equal(await app.page.locator(".goals-node-cell").textContent(), "Port Owner");
     assert.doesNotMatch(
       [
         await app.page.title(),
-        await activeNodeLabel.textContent(),
-        await activeNodeLabel.getAttribute("title"),
         await app.page.locator(".goals-node-cell").textContent(),
       ].join(" "),
       /Stale Base Node/,
@@ -315,7 +311,7 @@ test("Controls Node selector switches by ID and refreshes the visible Node conte
     await app.page.waitForFunction(() => document.title === "Beta - refine");
     assert.equal(new URL(app.page.url()).hash, "#/");
     assert.equal(await selector.inputValue(), "node-b");
-    assert.equal(await app.page.locator("#active-node-label").textContent(), "Beta");
+    assert.equal(await selector.locator("option:checked").textContent(), "Beta");
     assert.deepEqual(requests, [["POST", "/api/nodes/activate", { node_id: "node-b" }]]);
     assert.deepEqual(app.pageErrors, []);
   } finally {

@@ -85,17 +85,11 @@ function governanceReviewStatus(round) {
 }
 
 function updateActiveNodeLabel() {
-  const el = document.getElementById("active-node-label");
   const project = state.project || {};
   const active = project.active_node || null;
   const activeId = project.active_node_id || "";
   const label = (typeof active === "string" ? active : (active?.display_name || active?.name))
     || activeId || "none";
-  const visibleLabel = project.attached === false ? "none" : label;
-  if (el) {
-    el.textContent = visibleLabel;
-    el.title = el.textContent;
-  }
   updatePageTitle(project.attached === false ? "" : label);
 }
 
