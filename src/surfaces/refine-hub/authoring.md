@@ -1,19 +1,13 @@
-# Contribute to Refine Hub
+# Update Refine Hub with your agent
 
-Refine Hub's source lives in `src/surfaces/refine-hub/`. The build bundles its Markdown, images, and other assets into the executable. Both the application and website serve this bundle. User-created hubs continue to live in project state.
+Ask your agent to update Refine Hub. Tell it which page needs attention, what is missing or wrong, and what readers should understand afterward.
 
-## Write for the reader
+For example:
 
-Product guides explain how to accomplish a task. Design intent records the system's purpose, architecture, and rules. Runbooks describe operational procedures. Keep each document in its relevant section and link to it instead of copying it.
+> Update Refine Hub's getting-started guide to explain how to choose a Node. Check the current interface, use plain language, and include a screenshot. Verify the page and its links.
 
-## Add a release
+For release notes, give your agent the version and coverage period:
 
-Create `releases/<version>.md` with the title “Refine <version> — What you need to know.” State the release coverage period and review the changes across that whole period. Describe the final shipped behavior, combining related fixes and omitting reverted or superseded designs. Add one subsection for each major change. Explain what changed, why the reader cares, where to find it, and whether they need to do anything. Add screenshots of the actual interface and links to the relevant product guides.
+> Update the Refine 4.3.1 release notes to cover changes since September 2, 2026. Group the major changes under “What you need to know.” Describe the final shipped behavior, leave out superseded designs, and include screenshots where they help.
 
-Store screenshots beside release notes in a version-specific image directory. Keep historical screenshots unchanged. Update the home page to link to the newest release.
-
-## Check your change
-
-Use relative links between hub pages. Build Refine and open `/hub/sites/refine/` to check the page, its images, links, and narrow-screen layout. The website's `/docs` page uses the same hub content. Existing `/read/docs/...` and raw `/docs/...` URLs remain supported.
-
-Keep the root README as the repository entry point. Markdown used as an agent prompt, package metadata, or a third-party license is not product documentation and stays with its owning code.
+Your agent can handle the documentation, screenshots, and checks together. Refine Hub ships with Refine, so ask the agent to rebuild and update Refine when the changes are ready.

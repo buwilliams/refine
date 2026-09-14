@@ -31,7 +31,8 @@ fn local_http_daemon_serves_website_and_markdown_from_repo_root() {
     assert!(docs_home.contains("<h1>Refine Hub</h1>"));
     assert!(docs_home.contains("What you need to know"));
     assert!(docs_home.contains("/hub/sites/refine/product/get-started.md"));
-    assert!(docs_home.contains("/hub/sites/refine/releases/4.3.0.md"));
+    assert!(docs_home.contains("/hub/sites/refine/releases/4.3.1.md"));
+    assert!(!docs_home.contains("/hub/sites/refine/releases/4.3.0.md"));
 
     let raw_doc = daemon.handle_wire_request(HttpRequest {
         method: "GET".to_string(),

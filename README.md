@@ -6,4 +6,4 @@ Product documentation, release notes, design intent, and runbooks live in **Refi
 
 Start with the [installation runbook](src/surfaces/refine-hub/docs/runbooks/install.md), [product overview](src/surfaces/refine-hub/overview.md), or [what’s new](src/surfaces/refine-hub/releases/4.3.1.md).
 
-Hub content ships with Refine and is available offline. To contribute documentation, edit files in `src/surfaces/refine-hub/`; the application and website use the same content.
+Hub content ships with Refine and is available offline. To improve the documentation, ask your agent to update Refine Hub. The application and website use the same content.
