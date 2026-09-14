@@ -323,7 +323,7 @@ const GUIDE_CATEGORIES = [
       guideItem("nav-reporter", "Reporter", "Educate and configure",
         "The reporter selector chooses who new Goals are submitted as.",
         "Action: pick or add the reporter before creating Goals.",
-        { selector: "#global-reporter", openContextMenu: true },
+        { selector: "#global-reporter" },
         { canUseDefault: false }),
       guideItem("nav-create-goal", "Creating Goal", "Educate",
         "Create a Goal when you have an actionable instruction for an agent.",

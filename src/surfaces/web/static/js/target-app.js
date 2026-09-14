@@ -4,7 +4,7 @@
 // one-click toggle, so typical users can't take the app down by
 // accident). Green/running links to the configured App URL when present;
 // every other state links to Node, where the Start / Stop controls live.
-// The visible label names the active project.
+// The tooltip names the active project.
 
 let _targetAppSnapshot = null;
 let _agentStatusRefreshTimer = null;
@@ -91,7 +91,21 @@ async function refreshAgentStatusIndicator() {
   }
 }
 
+function applyWorkflowStatusSnapshot(snap) {
+  const indicator = document.getElementById("workflow-status-indicator");
+  if (!indicator) return;
+  const health = snap.workflow_health;
+  const status = snap.error ? "unknown" : health?.healthy === false ? "down"
+    : health?.state === "paused" || snap.paused === true ? "paused"
+    : health?.healthy === true ? "running" : "unknown";
+  indicator.dataset.state = status;
+  const label = health?.state || status;
+  indicator.title = `Workflow: ${label}${health?.reason ? ` — ${health.reason}` : snap.error ? ` — ${snap.error}` : ""}`;
+  indicator.setAttribute("aria-label", `${indicator.title}; click to view processes`);
+}
+
 function applyAgentStatusSnapshot(snap) {
+  applyWorkflowStatusSnapshot(snap);
   const indicator = document.getElementById("agent-status-indicator");
   if (!indicator) return;
   const processes = Array.isArray(snap.processes) ? snap.processes : [];

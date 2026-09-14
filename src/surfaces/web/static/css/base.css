@@ -173,6 +173,9 @@ pre {
   filter: none;
 }
 .topbar-actions select { width: 100%; }
+.nav-reporter { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+.nav-reporter label { color: var(--color-text-muted); font-size: 13px; }
+.topbar-actions .nav-reporter select { width: auto; max-width: 170px; height: 34px; }
 
 .nav-command-button { font: inherit; }
 .nav-issue-button {
@@ -412,8 +415,11 @@ pre {
   box-shadow: 0 0 0 3px var(--color-warning-soft);
   animation: target-app-pulse 1.1s ease-in-out infinite;
 }
+.workflow-status-indicator[data-state="running"] .target-app-dot,
 .agent-status-indicator[data-state="running"] .target-app-dot { background: var(--color-success); box-shadow: 0 0 0 3px var(--color-success-soft); }
+.workflow-status-indicator[data-state="paused"] .target-app-dot,
 .agent-status-indicator[data-state="paused"] .target-app-dot { background: var(--color-warning); box-shadow: 0 0 0 3px var(--color-warning-soft); }
+.workflow-status-indicator[data-state="down"] .target-app-dot,
 .agent-status-indicator[data-state="down"] .target-app-dot { background: var(--color-danger); box-shadow: 0 0 0 3px var(--color-danger-soft); }
 @keyframes target-app-pulse {
   0%, 100% { opacity: 1; }
@@ -499,7 +505,7 @@ h3 {
     flex: 0 0 100%;
     min-width: 0;
     justify-content: flex-start;
-    overflow-x: auto;
+    flex-wrap: wrap;
     padding-bottom: 2px;
   }
   .nav-context-main {

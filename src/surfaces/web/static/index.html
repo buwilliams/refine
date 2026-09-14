@@ -34,6 +34,10 @@
       <a href="#/settings/processes" data-route="settings" data-testid="nav-settings">Settings</a>
     </nav>
     <div class="topbar-actions">
+      <div class="nav-reporter">
+        <label for="global-reporter">Reporter</label>
+        <select id="global-reporter" aria-label="Reporter" data-testid="global-reporter"></select>
+      </div>
       <details class="nav-menu nav-context-menu" id="nav-context-menu">
         <summary class="nav-context-summary" aria-label="Open quick actions" data-testid="context-menu-toggle">
           <span class="nav-context-main">
@@ -53,7 +57,7 @@
              data-testid="context-target-app-status"
              data-state="unknown">
             <span class="target-app-dot" aria-hidden="true"></span>
-            <span>Application</span>
+            <span>Target application status</span>
           </a>
           <a id="agent-status-indicator" class="agent-status-indicator nav-menu-item nav-control-item"
              href="#/settings/processes"
@@ -63,12 +67,16 @@
             <span class="target-app-dot" aria-hidden="true"></span>
             <span>Agent status</span>
           </a>
+          <a id="workflow-status-indicator" class="workflow-status-indicator nav-menu-item nav-control-item"
+             href="#/settings/processes" aria-label="Workflow status: unknown; click to view processes"
+             title="Workflow status: unknown" data-state="unknown">
+            <span class="target-app-dot" aria-hidden="true"></span>
+            <span>Workflow status</span>
+          </a>
           <label class="nav-menu-label nav-context-section-label" for="global-node">Node</label>
           <select id="global-node" aria-label="Node" data-testid="global-node" disabled>
             <option value="">No node</option>
           </select>
-          <label class="nav-menu-label nav-context-section-label" for="global-reporter">Reporter</label>
-          <select id="global-reporter" aria-label="Reporter" data-testid="global-reporter"></select>
           <section id="nav-knowledge-hub" aria-label="Knowledge Hub"></section>
           <section id="nav-manual-skills" aria-label="Skills"></section>
           <div class="nav-menu-label nav-context-section-label">Tools and Support</div>
