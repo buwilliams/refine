@@ -85,3 +85,5 @@
 .template-catalog-table [hidden] { display: none; }
 
 .template-catalog-table [data-template-catalog-row] { cursor: pointer; }
+
+.resource-pagination { margin-top: 16px; }
