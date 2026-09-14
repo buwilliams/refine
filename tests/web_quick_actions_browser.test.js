@@ -70,3 +70,39 @@ test('Target application actions honor configuration, confirm start and stop, an
     assert.deepEqual(app.pageErrors,[]);
   } finally {await app.close();}
 });
+
+test('Custom topbar pickers share split borders, support keyboard selection, and retain Reporter after cancelled creation', {skip:SKIP}, async()=>{
+  const app=await openApp({fixture(path){
+    if(path==='/api/reporters')return {reporters:[{name:'Reporter'},{name:'Reviewer'}]};
+    return apiFixture(path);
+  }});
+  try{
+    const {page}=app;
+    await page.goto(app.origin);
+    const picker=page.locator('[data-topbar-picker="reporter"]');
+    await page.waitForFunction(()=>document.querySelector('#global-reporter').value==='Reporter');
+    assert.equal(await page.locator('#global-reporter').isVisible(),false);
+    for (const mode of ['light','dark']) {
+      await page.evaluate(mode=>document.documentElement.dataset.theme=mode,mode);
+      const colors=await picker.locator('[role="option"][aria-selected="false"]').first().evaluate(el=>({text:getComputedStyle(el).color,expected:getComputedStyle(document.documentElement).getPropertyValue('--color-text').trim()}));
+      assert.equal(colors.text, await page.evaluate(color=>{const el=document.createElement('span');el.style.color=color;document.body.append(el);const value=getComputedStyle(el).color;el.remove();return value;},colors.expected));
+    }
+    await page.evaluate(()=>document.documentElement.dataset.theme='light');
+    await picker.locator('summary').press('ArrowDown');
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Enter');
+    assert.equal(await picker.locator('[data-picker-value]').textContent(),'Reviewer');
+    assert.equal(await page.evaluate(()=>localStorage.getItem('refine_last_reporter')),'Reviewer');
+    await picker.locator('summary').click();
+    await picker.getByRole('option',{name:'+ Add new reporter…',exact:true}).click();
+    await page.getByTestId('modal-cancel').click();
+    await page.waitForFunction(()=>document.querySelector('[data-topbar-picker="reporter"] [data-picker-value]').textContent==='Reviewer');
+    const heights=await page.locator('.nav-picker-summary, .nav-context-menu > summary, #btn-new-goal').evaluateAll(els=>els.map(el=>el.getBoundingClientRect().height));
+    assert.deepEqual(heights,[34,34,34,34]);
+    assert.equal(await picker.locator('.nav-context-more').evaluate(el=>getComputedStyle(el).borderLeftWidth),'1px');
+    await picker.locator('summary').click();
+    await page.locator('[data-topbar-picker="node"] > summary').click();
+    assert.equal(await picker.getAttribute('open'),null);
+    assert.deepEqual(app.pageErrors,[]);
+  }finally{await app.close();}
+});

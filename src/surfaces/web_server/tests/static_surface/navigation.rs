@@ -107,9 +107,9 @@ fn static_main_nav_consolidates_context_and_controls() {
         .expect("controls summary should close");
     let summary = &menu[..summary_end];
 
-    assert!(summary.contains(r#"aria-label="Open quick actions""#));
+    assert!(summary.contains(r#"aria-label="Open actions""#));
     assert!(summary.contains(r#"class="nav-context-icon""#));
-    assert!(summary.contains("<span>Quick Actions</span>"));
+    assert!(summary.contains("<span>Actions</span>"));
     assert!(summary.contains(r#"class="nav-context-main""#));
     assert!(summary.contains(r#"class="nav-context-more" aria-hidden="true""#));
     assert!(!summary.contains("target-app-dot"));

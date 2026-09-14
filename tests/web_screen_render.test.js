@@ -307,7 +307,8 @@ test("Controls Node selector switches by ID and refreshes the visible Node conte
     const selector = app.page.locator('[data-testid="global-node"]');
     assert.deepEqual(await selector.locator("option").allTextContents(), ["Alpha", "Beta"]);
     assert.equal(await selector.inputValue(), "node-a");
-    await selector.selectOption("node-b");
+    await app.page.locator('[data-topbar-picker="node"] > summary').click();
+    await app.page.locator('[data-topbar-picker="node"]').getByRole("option", {name:"Beta",exact:true}).click();
     await app.page.waitForFunction(() => document.title === "Beta - refine");
     assert.equal(new URL(app.page.url()).hash, "#/");
     assert.equal(await selector.inputValue(), "node-b");

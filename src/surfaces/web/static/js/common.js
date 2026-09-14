@@ -1604,6 +1604,7 @@ async function handleReporterAdd(sel) {
                                   "", { title: "Add reporter" });
   if (!name || !name.trim()) {
     sel.value = state.lastReporter || "";
+    if (typeof syncTopbarPickers === "function") syncTopbarPickers();
     return null;
   }
   try {
@@ -1625,6 +1626,7 @@ async function handleReporterAdd(sel) {
   } catch (e) {
     toast(`Could not add reporter: ${e.message}`, "error");
     sel.value = state.lastReporter || "";
+    if (typeof syncTopbarPickers === "function") syncTopbarPickers();
     return null;
   }
 }
@@ -1648,6 +1650,7 @@ function setLastReporter(name) {
   else localStorage.removeItem("refine_last_reporter");
   const g = $("#global-reporter");
   if (g) g.value = name;
+  if (typeof syncTopbarPickers === "function") syncTopbarPickers();
   // Keep any in-page "Submitting as X" indicator in sync without re-rendering
   // the form (which would lose the user's typed-but-unsubmitted text).
   for (const el of $$(".js-reporter-name")) el.textContent = name;

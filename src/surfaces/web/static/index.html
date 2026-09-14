@@ -33,23 +33,29 @@
       <a href="#/settings/processes" data-route="settings" data-testid="nav-settings">Settings</a>
     </nav>
     <div class="topbar-actions">
-      <div class="nav-context-picker nav-node">
-        <label for="global-node">Node</label>
-        <select id="global-node" aria-label="Node" data-testid="global-node" disabled>
-          <option value="">No node</option>
-        </select>
-      </div>
-      <div class="nav-context-picker nav-reporter">
-        <label for="global-reporter">Reporter</label>
-        <select id="global-reporter" aria-label="Reporter" data-testid="global-reporter"></select>
-      </div>
+      <details class="nav-menu nav-context-picker" data-topbar-picker="node">
+        <summary class="nav-context-summary nav-picker-summary" aria-label="Choose Node" aria-haspopup="listbox">
+          <span class="nav-picker-copy"><span class="nav-picker-label">Node</span><span data-picker-value>Loading…</span></span>
+          <span class="nav-context-more" aria-hidden="true"></span>
+        </summary>
+        <select id="global-node" aria-label="Node" data-testid="global-node" hidden tabindex="-1" disabled></select>
+        <div class="nav-menu-panel nav-picker-options" role="listbox" aria-label="Choose Node"></div>
+      </details>
+      <details class="nav-menu nav-context-picker" data-topbar-picker="reporter">
+        <summary class="nav-context-summary nav-picker-summary" aria-label="Choose Reporter" aria-haspopup="listbox">
+          <span class="nav-picker-copy"><span class="nav-picker-label">Reporter</span><span data-picker-value>Loading…</span></span>
+          <span class="nav-context-more" aria-hidden="true"></span>
+        </summary>
+        <select id="global-reporter" aria-label="Reporter" data-testid="global-reporter" hidden tabindex="-1"></select>
+        <div class="nav-menu-panel nav-picker-options" role="listbox" aria-label="Choose Reporter"></div>
+      </details>
       <details class="nav-menu nav-context-menu" id="nav-context-menu">
-        <summary class="nav-context-summary" aria-label="Open quick actions" data-testid="context-menu-toggle">
+        <summary class="nav-context-summary" aria-label="Open actions" data-testid="context-menu-toggle">
           <span class="nav-context-main">
             <svg class="nav-context-icon" aria-hidden="true" viewBox="0 0 24 24" focusable="false">
               <path d="m13 2-9 12h7l-1 8 10-12h-7l1-8Z"></path>
             </svg>
-            <span>Quick Actions</span>
+            <span>Actions</span>
           </span>
           <span class="nav-context-more" aria-hidden="true"></span>
         </summary>
@@ -151,6 +157,7 @@
 
   <script src="/static/js/common.js"></script>
   <script src="/static/js/node-context.js"></script>
+  <script src="/static/js/topbar-pickers.js"></script>
   <script src="/static/js/node-scope-navigation.js"></script>
   <script src="/static/vendor/idiomorph/idiomorph.min.js"></script>
   <script src="/static/js/dom-morph.js"></script>
