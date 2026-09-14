@@ -3,7 +3,7 @@
   "branch_name": "refine/00000T17WBHZ8JZFV3504QJ000/round-1",
   "candidate_commit": null,
   "created": "2026-09-14T10:51:58Z",
-  "event_generation": 3,
+  "event_generation": 4,
   "feature_id": null,
   "feature_order": null,
   "id": "00000T17WBHZ8JZFV3504QJ000",
@@ -185,6 +185,26 @@
               }
             }
           }
+        },
+        "4:default:workflow.failed.enter": {
+          "events": {
+            "workflow.failed.enter": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.failed.enter",
+              "kind": "system",
+              "name": "Workflow Failed Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.failed.enter"
+            }
+          },
+          "revision": 43,
+          "schema_version": 2,
+          "skills": {}
         }
       },
       "logs": [],
@@ -253,9 +273,9 @@
       "workspace_branch": "refine/00000T17WBHZ8JZFV3504QJ000/round-1"
     }
   ],
-  "status": "plan",
+  "status": "failed",
   "target_branch": "main",
-  "updated": "2026-09-14T10:52:02Z",
+  "updated": "2026-09-14T10:53:17Z",
   "workflow_controls": [
     {
       "actor": "operator",
@@ -299,7 +319,17 @@
       "round_idx": 0,
       "to": "plan",
       "workflow_revision": 6
+    },
+    {
+      "at": "2026-09-14T10:53:17.233882257+00:00",
+      "forced": true,
+      "from": "plan",
+      "generation": 4,
+      "node_id": "default",
+      "round_idx": 0,
+      "to": "failed",
+      "workflow_revision": 10
     }
   ],
-  "workflow_revision": 9
+  "workflow_revision": 10
 }

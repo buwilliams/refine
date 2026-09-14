@@ -175,11 +175,23 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
+  "state": "error",
+  "results": {
+    "default-plan": {
+      "invocation_id": "0b95ece8b53df1e30bcc2460721c9bce628cde9296d5c68b5c8fb813a2f23c19",
+      "binding_id": "default-plan",
+      "role": "plan",
+      "outcome": "error",
+      "summary": "{\"type\":\"item.completed\",\"item\":{\"id\":\"item_9\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"rg -n 'nav-menu|close.*Menu' src/surfaces/web/static/js/*.js; sed -n '335,370p' src/surfaces/web/static/js/features/settings_skills.js; sed -n '410,428p' src/surfaces/web/static/js/features/settings_skills.js; sed -n '44,62p' src/surfaces/web/static/js/features/knowledge-hub.js; rg -n 'knowledge-hub|skills' src/surfaces/web/static/js/features/settings.js | head -16; head -40 tests/support/web_app",
+      "evidence": [],
+      "artifacts": {
+        "fault_kind": "execution"
+      }
+    }
+  },
   "attempts": [],
   "created_at": "2026-09-14T10:52:02.394396175+00:00",
-  "completed_at": null,
-  "error": null,
+  "completed_at": "2026-09-14T10:53:17.463452207+00:00",
+  "error": "Goal 00000T17WBHZ8JZFV3504QJ000 no longer authorizes plan work on node default",
   "action_applied": false
 }
