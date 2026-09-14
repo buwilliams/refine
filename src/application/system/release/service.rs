@@ -287,6 +287,13 @@ impl FileReleaseService {
                     ))
                 })
         };
+        let hub_notes = format!("refine-hub/releases/{}.md", plan.proposed_version);
+        // Retain the notes path chosen during preparation, including pre-Hub releases.
+        let release_notes = if plan.documentation_files.contains(&hub_notes) {
+            hub_notes
+        } else {
+            "RELEASE_NOTES.md".to_string()
+        };
         Ok(TrustedPreparation {
             preparation_id: preparation_id.to_string(),
             goal_id: goal_id.clone(),
@@ -295,7 +302,7 @@ impl FileReleaseService {
             branch: required("branch_name")?,
             target_branch: required("target_branch")?,
             candidate_commit: required("candidate_commit")?,
-            release_notes: "RELEASE_NOTES.md".to_string(),
+            release_notes,
         })
     }
 

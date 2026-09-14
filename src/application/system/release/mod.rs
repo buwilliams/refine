@@ -152,3 +152,12 @@ pub trait ReleaseHost {
 
 #[cfg(test)]
 mod tests;
+
+/// Keep product release notes in the same source as the shipped documentation.
+fn release_notes_path(repo: &std::path::Path, version: &str) -> String {
+    if repo.join("refine-hub/index.md").is_file() {
+        format!("refine-hub/releases/{version}.md")
+    } else {
+        "RELEASE_NOTES.md".into()
+    }
+}

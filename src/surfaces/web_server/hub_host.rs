@@ -1,6 +1,7 @@
 //! Static Hub sites are served by the existing Refine HTTP server under /hub/.
 use super::*;
 use crate::error::{RefineError, RefineResult};
+use sha2::Digest;
 impl LocalHttpDaemon {
     pub(super) fn hub_wire(&self, request: &HttpRequest) -> WireResponse {
         let result = (|| -> RefineResult<WireResponse> {
@@ -25,11 +26,12 @@ impl LocalHttpDaemon {
                 return Ok(response);
             }
             let parts: Vec<_> = relative.split('/').collect();
-            let hub = self.server.hub_service()?;
+
             if let [site, "api", collection, "query"] = parts.as_slice() {
                 if request.method != "POST" {
                     return Err(RefineError::InvalidInput("Queries require POST".into()));
                 }
+                let hub = self.server.hub_service()?;
                 let query = serde_json::from_slice(request.body.as_deref().unwrap_or(b"{}"))
                     .map_err(|e| RefineError::InvalidInput(e.to_string()))?;
                 return Ok(WireResponse::json(ApiResponse::json(
@@ -55,8 +57,15 @@ impl LocalHttpDaemon {
             } else {
                 name
             };
-            let (bytes, hash) = hub.asset(site, &name, public)?;
+            let (bytes, hash) = if site == crate::application::hub::builtin::ID {
+                let bytes = crate::application::hub::builtin::page(&name)?;
+                let hash = format!("{:x}", sha2::Sha256::digest(&bytes));
+                (bytes, hash)
+            } else {
+                self.server.hub_service()?.asset(site, &name, public)?
+            };
             let mime = match name.rsplit('.').next().unwrap_or("") {
+                "md" if site == crate::application::hub::builtin::ID => "text/html; charset=utf-8",
                 "html" => "text/html; charset=utf-8",
                 "css" => "text/css; charset=utf-8",
                 "js" | "mjs" => "text/javascript; charset=utf-8",

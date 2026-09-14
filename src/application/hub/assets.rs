@@ -25,6 +25,9 @@ fn asset_name(name: &str) -> RefineResult<()> {
 }
 impl Hub {
     pub fn assets(&self, site: &str) -> RefineResult<Value> {
+        if site == builtin::ID {
+            return Ok(envelope(builtin::manifest()));
+        }
         self.load_site(site)?;
         let path = self.site(site)?.join("assets.json");
         Ok(envelope(if path.exists() {
@@ -99,6 +102,11 @@ impl Hub {
     }
     pub fn asset(&self, site: &str, name: &str, public: bool) -> RefineResult<(Vec<u8>, String)> {
         asset_name(name)?;
+        if site == builtin::ID {
+            let bytes = builtin::raw(name)?.to_vec();
+            let hash = digest(&bytes);
+            return Ok((bytes, hash));
+        }
         let v = self.load_site(site)?;
         let manifest = if public {
             v["publication"]["assets"].clone()

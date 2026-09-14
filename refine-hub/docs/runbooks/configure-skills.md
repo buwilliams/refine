@@ -63,7 +63,7 @@ Headless invocation history retains selected configuration, inputs, results, pro
 
 ## Operational Skills
 
-The example files in [skills](skills/) provide **Release**, **Fetch Goals from Email**, and **Fetch Goals from Email on startup**. They are editable project configuration, not global defaults. Save each through `refine skills save ID --revision REVISION --file FILE`, reading the current revision before each save. The startup Skill queues the Custom fetch Skill with an occurrence-specific request ID and exits immediately; it must not wait for the child agent while holding an execution slot.
+The example files in [skills](skills/index.md) provide **Release**, **Fetch Goals from Email**, and **Fetch Goals from Email on startup**. They are editable project configuration, not global defaults. Save each through `refine skills save ID --revision REVISION --file FILE`, reading the current revision before each save. The startup Skill queues the Custom fetch Skill with an occurrence-specific request ID and exits immediately; it must not wait for the child agent while holding an execution slot.
 
 System context supplies `project_root`, `workspace`, `node_id`, `runtime_root`, `refine_executable`, and, when discoverable, `refine_checkout`. Use these values to keep maintenance commands tied to the intended app and running installation.
 

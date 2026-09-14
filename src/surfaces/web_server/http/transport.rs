@@ -232,12 +232,41 @@ impl LocalHttpDaemon {
         let path = path.split('?').next().unwrap_or(path);
         let website_mode = website_index_path(static_root).is_file();
 
-        if website_mode && matches!(path, "/docs" | "/docs/") {
-            return Some(render_docs_landing_page());
-        }
-
-        if website_mode && (path == "/read" || path.starts_with("/read/")) {
-            return Some(render_markdown_document(static_root, path));
+        if website_mode {
+            let builtin = crate::application::hub::builtin::page;
+            if matches!(path, "/docs" | "/docs/" | "/read" | "/read/") {
+                return Some(match builtin("index.md") {
+                    Ok(bytes) => WireResponse::bytes(200, "text/html; charset=utf-8", bytes),
+                    Err(error) => WireResponse::json(error_response(error)),
+                });
+            }
+            let rendered = path.starts_with("/read/");
+            let requested = path.trim_start_matches("/read").trim_start_matches('/');
+            let name = requested.strip_prefix("refine-hub/").unwrap_or(requested);
+            if rendered || name.starts_with("docs/") || requested.starts_with("refine-hub/") {
+                let name = if name == "README.md" {
+                    "overview.md"
+                } else {
+                    name
+                };
+                let result = if rendered {
+                    builtin(name)
+                } else {
+                    crate::application::hub::builtin::raw(name).map(|bytes| bytes.to_vec())
+                };
+                return Some(match result {
+                    Ok(bytes) => WireResponse::bytes(
+                        200,
+                        if rendered {
+                            "text/html; charset=utf-8"
+                        } else {
+                            content_type_for_path(Path::new(name))
+                        },
+                        bytes,
+                    ),
+                    Err(error) => WireResponse::json(error_response(error)),
+                });
+            }
         }
 
         let relative = match path {

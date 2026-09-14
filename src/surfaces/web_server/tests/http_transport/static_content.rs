@@ -28,21 +28,14 @@ fn local_http_daemon_serves_website_and_markdown_from_repo_root() {
     assert_eq!(docs_home.status, 200);
     assert_eq!(docs_home.content_type, "text/html; charset=utf-8");
     let docs_home = String::from_utf8(docs_home.body).unwrap();
-    assert!(docs_home.contains("<h1 id=\"docs-home-title\">How Refine works.</h1>"));
-    assert!(docs_home.contains("One product, four responsibilities."));
-    assert!(docs_home.contains("<h3>Model</h3>"));
-    assert!(docs_home.contains("<h3>Application</h3>"));
-    assert!(docs_home.contains("<h3>Infrastructure</h3>"));
-    assert!(docs_home.contains("<h3>Surfaces</h3>"));
-    assert!(docs_home.contains("Browser Details"));
-    assert!(
-        docs_home.contains(r#"href="/read/docs/intent/05-surfaces/03-browser/00-overview.md""#)
-    );
-    assert!(docs_home.contains(r#"href="/read/docs/intent/05-surfaces/05-agent.md""#));
+    assert!(docs_home.contains("<h1>Refine Hub</h1>"));
+    assert!(docs_home.contains("What you need to know"));
+    assert!(docs_home.contains("/hub/sites/refine/product/get-started.md"));
+    assert!(docs_home.contains("/hub/sites/refine/releases/4.3.0.md"));
 
     let raw_doc = daemon.handle_wire_request(HttpRequest {
         method: "GET".to_string(),
-        path: "/docs/runbooks/install.md".to_string(),
+        path: "/refine-hub/docs/runbooks/install.md".to_string(),
         headers: BTreeMap::new(),
         body: None,
     });
@@ -64,12 +57,12 @@ fn local_http_daemon_serves_website_and_markdown_from_repo_root() {
     assert!(
         String::from_utf8(compatibility_doc.body)
             .unwrap()
-            .contains("docs/runbooks/install.md")
+            .contains("runbooks/install.md")
     );
 
     let rendered_doc = daemon.handle_wire_request(HttpRequest {
         method: "GET".to_string(),
-        path: "/read/docs/runbooks/install.md".to_string(),
+        path: "/read/refine-hub/docs/runbooks/install.md".to_string(),
         headers: BTreeMap::new(),
         body: None,
     });
@@ -77,47 +70,27 @@ fn local_http_daemon_serves_website_and_markdown_from_repo_root() {
     assert_eq!(rendered_doc.content_type, "text/html; charset=utf-8");
     let rendered_doc = String::from_utf8(rendered_doc.body).unwrap();
     assert!(rendered_doc.contains("<h1>Install or Update Refine</h1>"));
-    assert!(rendered_doc.contains("Raw Markdown"));
-    assert!(
-        rendered_doc.contains(r#"<div class="menu-docs" aria-label="Documentation sections">"#)
-    );
-    assert!(!rendered_doc.contains(r#"class="reader-nav""#));
-    assert_eq!(rendered_doc.matches(r#"class="doc-pager""#).count(), 2);
-    assert!(rendered_doc.contains(r#">Docs home</a>"#));
-    assert!(rendered_doc.contains(r#"href="/docs""#));
-    assert!(rendered_doc.contains("/read/docs/intent/02-model/01-node.md"));
-
-    let design_doc = daemon.handle_wire_request(HttpRequest {
-        method: "GET".to_string(),
-        path: "/read/docs/intent/01-design.md".to_string(),
-        headers: BTreeMap::new(),
-        body: None,
-    });
-    assert_eq!(design_doc.status, 200);
-    let design_doc = String::from_utf8(design_doc.body).unwrap();
-    assert_eq!(design_doc.matches(r#"class="doc-pager""#).count(), 2);
-    assert!(design_doc.contains(
-        r#"<a class="doc-pager-link" href="/read/docs/intent/README.md"><span>Previous</span><strong>Design Intent</strong></a>"#
-    ));
-    assert!(
-        design_doc.contains(r#"<a class="doc-pager-link" href="/read/docs/intent/02-model/01-node.md"><span>Next</span><strong>Node</strong></a>"#)
-    );
-
-    let intent_toc = daemon.handle_wire_request(HttpRequest {
-        method: "GET".to_string(),
-        path: "/read/docs/intent/README.md".to_string(),
-        headers: BTreeMap::new(),
-        body: None,
-    });
-    assert_eq!(intent_toc.status, 200);
-    let intent_toc = String::from_utf8(intent_toc.body).unwrap();
-    assert!(intent_toc.contains("<h1>Design Intent</h1>"));
-    assert!(!intent_toc.contains("<h1>Table of Contents</h1>"));
-    assert!(intent_toc.contains(r#"href="/read/docs/intent/01-design.md""#));
-    assert!(
-        intent_toc
-            .contains(r#"href="/read/docs/intent/03-application/02-workflow/00-overview.md""#)
-    );
+    assert!(rendered_doc.contains("Refine Hub"));
+    assert!(rendered_doc.contains("<base href=\"/hub/sites/refine/docs/runbooks/\">"));
+    // Old public documentation URLs still resolve to the same bundled source.
+    for path in [
+        "/read/docs/runbooks/install.md",
+        "/docs/runbooks/install.md",
+        "/hub/sites/refine/docs/runbooks/install.md",
+    ] {
+        let response = daemon.handle_wire_request(HttpRequest {
+            method: "GET".into(),
+            path: path.into(),
+            headers: BTreeMap::new(),
+            body: None,
+        });
+        assert_eq!(response.status, 200, "{path}");
+        assert!(
+            String::from_utf8(response.body)
+                .unwrap()
+                .contains("Install or Update Refine")
+        );
+    }
 
     let hidden = daemon.handle_wire_request(HttpRequest {
         method: "GET".to_string(),
@@ -126,4 +99,65 @@ fn local_http_daemon_serves_website_and_markdown_from_repo_root() {
         body: None,
     });
     assert_ne!(hidden.status, 200);
+}
+
+#[test]
+fn refine_hub_is_available_without_a_target_and_rejects_mutation() {
+    let daemon = LocalHttpDaemon::new(server_with_projection(), None);
+    for path in [
+        "/hub/sites/refine/",
+        "/hub/sites/refine/product/get-started.md",
+        "/hub/sites/refine/hub.css",
+        "/hub/sites/refine/releases/images/4.3/prompts.png",
+        "/api/hub/sites",
+        "/api/hub/sites/refine",
+    ] {
+        let response = daemon.handle_wire_request(HttpRequest {
+            method: "GET".into(),
+            path: path.into(),
+            headers: BTreeMap::new(),
+            body: None,
+        });
+        assert_eq!(
+            response.status,
+            200,
+            "{path}: {}",
+            String::from_utf8_lossy(&response.body)
+        );
+    }
+    for (method, path) in [
+        ("DELETE", "/api/hub/sites/refine"),
+        ("PUT", "/api/hub/sites/refine/assets"),
+        ("POST", "/api/hub/sites/refine/unpublish"),
+        ("PUT", "/api/hub/sites/refine/collections/docs"),
+    ] {
+        let response = daemon.handle_wire_request(HttpRequest {
+            method: method.into(),
+            path: path.into(),
+            headers: BTreeMap::new(),
+            body: Some(b"{}".to_vec()),
+        });
+        assert!(response.status >= 400, "{method} {path}");
+        assert!(String::from_utf8_lossy(&response.body).contains("read-only"));
+    }
+    let first = daemon.handle_wire_request(HttpRequest {
+        method: "GET".into(),
+        path: "/hub/sites/refine/".into(),
+        headers: BTreeMap::new(),
+        body: None,
+    });
+    let etag = first
+        .extra_headers
+        .iter()
+        .find(|(key, _)| key == "ETag")
+        .unwrap()
+        .1
+        .clone();
+    let cached = daemon.handle_wire_request(HttpRequest {
+        method: "GET".into(),
+        path: "/hub/sites/refine/".into(),
+        headers: BTreeMap::from([("if-none-match".into(), etag)]),
+        body: None,
+    });
+    assert_eq!(cached.status, 304);
 }

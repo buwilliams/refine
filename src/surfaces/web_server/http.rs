@@ -1,6 +1,5 @@
 mod background_loops;
 mod daemon_adapter;
-mod docs;
 mod events;
 mod runtime;
 mod static_content;
@@ -27,10 +26,8 @@ use axum::http::{HeaderMap, Method, StatusCode, Uri};
 use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::response::{IntoResponse, Response};
 use axum::routing::any;
-use docs::*;
 #[cfg(test)]
 use events::should_write_sse_frame;
-use pulldown_cmark::{CowStr, Event as MarkdownEvent, Options, Parser, Tag, html};
 use serde_json::{Value, json};
 use static_content::*;
 use tokio::sync::{Notify, broadcast, oneshot};
@@ -672,15 +669,6 @@ pub struct HttpRequest {
     pub path: String,
     pub headers: BTreeMap<String, String>,
     pub body: Option<Vec<u8>>,
-}
-
-fn escape_html(value: &str) -> String {
-    value
-        .replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&#39;")
 }
 
 fn content_type_for_path(path: &Path) -> &'static str {

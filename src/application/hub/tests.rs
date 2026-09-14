@@ -253,3 +253,41 @@ fn hub_ordered_indexes_aggregate_page_and_invalidate_after_updates() {
     query::invalidate(&hub.root);
     fs::remove_dir_all(temp).unwrap();
 }
+
+#[test]
+fn refine_hub_is_bundled_and_immutable_across_application_operations() {
+    let temp = std::env::temp_dir().join(format!("refine-builtin-hub-{}", uuid::Uuid::new_v4()));
+    let hub = Hub::new(temp.join("state"), temp.join("runtime"));
+    let site = hub.show("refine").unwrap();
+    assert_eq!(site["item"]["name"], "Refine Hub");
+    assert_eq!(hub.sites().unwrap()["sites"].as_array().unwrap().len(), 1);
+    assert!(
+        !temp.exists(),
+        "reading built-in content must not create project state"
+    );
+    let rev = site["revision"].as_str().unwrap();
+    assert!(
+        hub.save_site("refine", &json!({"name":"Changed","revision":rev}))
+            .is_err()
+    );
+    assert!(hub.delete_site("refine", rev).is_err());
+    assert!(hub.publish("refine", rev, &[], false).is_err());
+    assert!(
+        hub.save_asset("refine", "index.md", b"bad", None, false)
+            .is_err()
+    );
+    assert!(hub.save_collection("refine", "docs", &json!({})).is_err());
+    assert_eq!(hub.show("refine").unwrap(), site);
+    assert!(!hub.directory().join("sites/refine").exists());
+    assert!(builtin::raw("../Cargo.toml").is_err());
+    let page = String::from_utf8(builtin::page("index.html").unwrap()).unwrap();
+    assert!(page.contains("<h1>Refine Hub</h1>"));
+    assert!(
+        builtin::raw("releases/images/4.3/prompts.png")
+            .unwrap()
+            .starts_with(b"\x89PNG")
+    );
+    hub.save_site("mine", &json!({"name":"My docs"})).unwrap();
+    assert_eq!(hub.sites().unwrap()["sites"].as_array().unwrap().len(), 2);
+    let _ = fs::remove_dir_all(temp);
+}

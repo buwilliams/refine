@@ -83,16 +83,6 @@ html[data-theme="dark"] .role-pill.governance_integrator {
 html[data-theme="dark"] .draft-error { color: var(--color-danger); }
 html[data-theme="dark"] .import-duplicate { border-color: #80671f; }
 
-html[data-theme="dark"] .guide-panel {
-  box-shadow: -8px 0 24px rgba(0, 0, 0, 0.38);
-}
-html[data-theme="dark"] .guide-reference-search input {
-  color: var(--color-text);
-  background: var(--color-surface-raised);
-}
-html[data-theme="dark"] .guide-reference-search-icon { color: var(--color-text-muted); }
-html[data-theme="dark"] .guide-item.active { color: var(--color-text); }
-
 html[data-theme="dark"] .todo-list-nav-item:hover:not(:disabled) {
   background: rgba(96, 165, 250, 0.10);
 }

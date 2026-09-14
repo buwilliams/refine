@@ -12,7 +12,7 @@ use crate::model::project::{
 pub const CURRENT_PROJECT_SCHEMA_VERSION: u64 = 2;
 const LEGACY_0_TO_1_ID: &str = "legacy-0-to-1";
 const GOALS_PROMPT_1_TO_2_ID: &str = "goals-prompt-1-to-2";
-const V2_TO_V4_RUNBOOK: &str = "docs/runbooks/v2-to-v4-migration-runbook.md";
+const V2_TO_V4_RUNBOOK: &str = "refine-hub/docs/runbooks/v2-to-v4-migration-runbook.md";
 
 #[derive(Clone, Debug)]
 pub struct FileProjectMigrationService {

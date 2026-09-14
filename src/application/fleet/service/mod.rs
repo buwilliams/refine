@@ -17,7 +17,7 @@ use crate::model::node::{Node, NodeRegistry};
 // state still migrates into the node registry.
 pub const LEGACY_CLUSTER_REGISTRY_FILE: &str = "cluster.json";
 
-pub const FLEET_RUNBOOK_PATH: &str = "docs/runbooks/manage-fleet.md";
+pub const FLEET_RUNBOOK_PATH: &str = "refine-hub/docs/runbooks/manage-fleet.md";
 
 /// Seed prompt for a fleet-management agent session: the runbook carries the
 /// questions to ask and the CLI contract; the request carries the user's goal.

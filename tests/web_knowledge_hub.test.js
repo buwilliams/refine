@@ -150,7 +150,7 @@ test("Hub modal rows open from cells and keyboards; Controls uses the shared men
     await page.goto(`${app.origin}/#/settings/knowledge-hub`);
     await page.locator('[data-hub-new-site]').waitFor();
     const tabs = await page.locator('.settings-tab').allTextContents();
-    assert.equal(tabs[tabs.indexOf('Workflow') + 1], 'Knowledge Hub');
+    assert.equal(tabs[tabs.indexOf('Prompts') + 1], 'Knowledge Hub');
     await page.locator('[data-hub-new-site]').click();
     assert.equal(await page.locator('.form-row label[for="hub-site-name"]').count(), 1);
     assert.equal(await page.locator('.form-row label[for="hub-site-description"]').count(), 1);
@@ -198,5 +198,27 @@ test("Skill history opens runs from row cells and keyboard activation", {skip: S
       await app.page.locator('[data-close]').click();
     }
     assert.deepEqual(app.pageErrors, []);
+  } finally { await app.close(); }
+});
+
+test("Refine Hub opens documentation instead of the site editor", { skip: SKIP }, async () => {
+  const data = hubFixture();
+  data.sites.set("refine", {revision:"bundled",item:{id:"refine",name:"Refine Hub",builtin:true,read_only:true,publication:{version:"4.3.0"}}});
+  const app = await openApp({fixture:data.fixture});
+  try {
+    await app.page.context().route("**/hub/sites/refine/", route => route.fulfill({contentType:"text/html",body:"<h1>Refine Hub</h1>"}));
+    await app.page.goto(`${app.origin}/#/settings/knowledge-hub`);
+    const row = app.page.locator('[data-hub-site="refine"]');
+    await row.waitFor();
+    assert.match(await row.innerText(),/Built-in · Read-only/);
+    const opened = app.page.waitForEvent("popup");
+    await row.focus();
+    await app.page.keyboard.press("Enter");
+    const popup = await opened;
+    await popup.waitForURL(`${app.origin}/hub/sites/refine/`);
+    assert.equal(await app.page.getByTestId("hub-modal").count(),0);
+    assert.equal(await app.page.locator('#guide-panel').count(),0);
+    assert.equal(data.writes.length,0);
+    await popup.close();
   } finally { await app.close(); }
 });

@@ -491,7 +491,8 @@ fn wrapper_test_command_routes_to_cargo_and_xtask_suites() {
 #[test]
 fn install_runbook_distinguishes_product_installation_from_service_registration() {
     let repo = env!("CARGO_MANIFEST_DIR");
-    let runbook = fs::read_to_string(format!("{repo}/docs/runbooks/install.md")).unwrap();
+    let runbook =
+        fs::read_to_string(format!("{repo}/refine-hub/docs/runbooks/install.md")).unwrap();
     let gitignore = fs::read_to_string(format!("{repo}/.gitignore")).unwrap();
 
     assert!(!runbook.contains("scripts/install.sh"));

@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use std::process::Command;
 
 fn main() {
+    bundle_refine_hub();
     println!("cargo:rerun-if-env-changed=REFINE_BUILD_SOURCE_COMMIT");
     println!("cargo:rerun-if-changed=src");
     println!("cargo:rerun-if-changed=vendor");
@@ -91,4 +92,44 @@ fn register_git_inputs() {
         println!("cargo:rerun-if-changed={}", PathBuf::from(path).display());
     }
     println!("cargo:rerun-if-changed={}", git_dir.join("index").display());
+}
+
+fn bundle_refine_hub() {
+    fn visit(root: &std::path::Path, path: &std::path::Path, entries: &mut Vec<String>) {
+        let mut children: Vec<_> = std::fs::read_dir(path)
+            .unwrap()
+            .map(|e| e.unwrap().path())
+            .collect();
+        children.sort();
+        for child in children {
+            if child.is_dir() {
+                visit(root, &child, entries);
+            } else {
+                let name = child
+                    .strip_prefix(root)
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .replace('\\', "/");
+                let absolute = child.canonicalize().unwrap();
+                entries.push(format!(
+                    "({:?}, include_bytes!({:?}) as &'static [u8]),",
+                    name,
+                    absolute.to_str().unwrap()
+                ));
+            }
+        }
+    }
+    println!("cargo:rerun-if-changed=refine-hub");
+    let mut entries = Vec::new();
+    visit(
+        std::path::Path::new("refine-hub"),
+        std::path::Path::new("refine-hub"),
+        &mut entries,
+    );
+    std::fs::write(
+        PathBuf::from(env::var("OUT_DIR").unwrap()).join("refine_hub.rs"),
+        format!("&[{}]", entries.join("\n")),
+    )
+    .unwrap();
 }

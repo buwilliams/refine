@@ -122,8 +122,8 @@ function renderNoProjectEmptyState(title = "Refine") {
     <h2>${htmlEscape(title)}</h2>
     <div class="empty-state" data-testid="no-project-empty">
       <div class="empty-state-title">No app configured.</div>
-      <p class="muted">Open the Guide to configure Refine and attach an app.</p>
-      <button type="button" class="secondary" id="empty-open-guide" data-testid="no-project-open-guide">Open Guide</button>
+      <p class="muted">Open Refine Hub to configure Refine and attach an app.</p>
+      <button type="button" class="secondary" id="empty-open-guide" data-testid="no-project-open-guide">Open Refine Hub</button>
     </div>`;
   $("#empty-open-guide")?.addEventListener("click", () => {
     if (typeof openGuide === "function") {
@@ -157,14 +157,7 @@ function enterNoProjectMode(project = null, { openGuidePanel = false } = {}) {
     sseSource.close();
     sseSource = null;
   }
-  if (openGuidePanel && typeof openGuide === "function") {
-    openGuide({
-      context: "no-app",
-      categoryId: "get-started",
-      itemId: "quickstart-add-app",
-      openTarget: true,
-    });
-  }
+
 }
 
 function refreshCurrentSettingsSurface(options = {}) {
@@ -1172,13 +1165,7 @@ async function applyProjectAttachResult(result, options = {}) {
   } else {
     navigate();
   }
-  if (options.openGuide && typeof openGuide === "function") {
-    openGuide({
-      context: result.config_created ? "app-created" : "app-existing",
-      categoryId: "node",
-      itemId: "project-application",
-    });
-  }
+
 }
 
 // ---- Modals (replace native prompt / confirm) -------------------------------

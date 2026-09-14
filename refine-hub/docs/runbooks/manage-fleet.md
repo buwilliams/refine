@@ -232,7 +232,7 @@ state appears on it before distributing work.
 - A Goal never schedules on its owning node: read the Goal's own round logs
   (`runtime/goals/<shard>/<id>/logs.jsonl` under that node's live-state
   directory) — settled failures and retries land there, in the Goal's durable
-  state. See "Refine-owned durable state" in `docs/runbooks/install.md` for
+  state. See "Refine-owned durable state" in `refine-hub/docs/runbooks/install.md` for
   the other Refine-owned artifacts an operator may encounter.
 
 ## Recover a contested first contact
@@ -241,7 +241,7 @@ Use this procedure only when a node joining an existing fleet fails closed:
 its live store already carries non-bootstrap records that contest content on
 the configured remote's `refine/state` branch, and there is no shared history
 to merge from. Ordinary divergence between nodes that share history is decided
-automatically (see `docs/runbooks/state-sync-recovery.md`).
+automatically (see `refine-hub/docs/runbooks/state-sync-recovery.md`).
 
 The daemon normally converges this automatically with remote authority. On an
 opted-out node, review the divergence and settle it in one command:

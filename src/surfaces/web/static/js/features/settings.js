@@ -412,9 +412,8 @@ function renderSettingsGuideIcon(itemId = "", title = "setting") {
             class="settings-guide-icon"
             data-guide-label-item="${htmlEscape(itemId)}"
             data-testid="settings-guide-${htmlEscape(itemId)}"
-            tabindex="-1"
-            title="Open Guide: ${htmlEscape(title)}"
-            aria-label="Open Guide for ${htmlEscape(title)}">
+            title="Open Refine Hub: ${htmlEscape(title)}"
+            aria-label="Open Refine Hub for ${htmlEscape(title)}">
       <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
         <circle cx="12" cy="12" r="9"></circle>
         <path d="M9.8 9.4a2.4 2.4 0 0 1 4.4 1.3c0 1.7-2.2 2.1-2.2 3.8"></path>
@@ -924,7 +923,7 @@ function renderSettingsNoProjectTab(title = "Settings") {
     <section class="settings-section" data-testid="settings-no-project">
       <h3>No app configured.</h3>
       <p class="muted">Open the Guide to configure Refine and attach an app before using ${htmlEscape(title)} settings.</p>
-      <button type="button" class="secondary" data-settings-open-guide data-testid="settings-open-guide">Open Guide</button>
+      <button type="button" class="secondary" data-settings-open-guide data-testid="settings-open-guide">Open Refine Hub</button>
     </section>`;
 }
 
@@ -936,7 +935,7 @@ function renderDetachedNodeConfig(body) {
         Node configuration is shown for reference. Attach an app before saving
         application or runtime settings.
       </p>
-      <button type="button" class="secondary" data-settings-open-guide data-testid="settings-open-guide">Open Guide</button>
+      <button type="button" class="secondary" data-settings-open-guide data-testid="settings-open-guide">Open Refine Hub</button>
     </section>
     ${disableSettingsControls(body)}`;
 }

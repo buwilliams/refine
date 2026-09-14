@@ -24,7 +24,7 @@ State synchronizes symmetrically on `refine/state`; application branches remain 
 
 How divergent `refine/state` heads converge is the persistence-sync
 Application's persistence-sync policy, not Fleet's
-(`docs/intent/03-application/04-persistence-sync.md`). Fleet keeps only the
+(`refine-hub/docs/intent/03-application/04-persistence-sync.md`). Fleet keeps only the
 principles that outlast any mechanism — and they are more than prose:
 persistence sync hands this doctrine verbatim to the resolving agent as its
 guidance, and a test pins that quote to this document so code and intent

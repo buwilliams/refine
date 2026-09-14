@@ -3,11 +3,11 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use refine::application::system::release::{FileReleaseService, ReleaseBump};
 use refine::infrastructure::process::supervisor::runtime::{
     DEFAULT_APP_ID, RuntimePathInputs, RuntimePathLayout, current_runtime_os,
 };
 use refine::surfaces::web_server::{API_CONTRACT_VERSION, API_GROUPS};
-use refine::application::system::release::{FileReleaseService, ReleaseBump};
 use serde_json::json;
 
 fn main() {
@@ -363,7 +363,7 @@ fn repo_root() -> Result<PathBuf, String> {
     let mut current =
         std::env::current_dir().map_err(|error| format!("failed to inspect cwd: {error}"))?;
     loop {
-        if current.join("docs/intent/README.md").is_file() {
+        if current.join("refine-hub/docs/intent/README.md").is_file() {
             return Ok(current);
         }
         if !current.pop() {

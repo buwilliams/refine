@@ -64,8 +64,8 @@ function renderKnowledgeHubSettings(data = {}) {
   const sites = data?.sites || [];
   return `<section class="settings-section" data-testid="settings-knowledge-hub">
     <div class="actions"><h3>Knowledge Hub</h3><span class="spacer"></span><button type="button" data-hub-new-site>Add site</button></div>
-    <p class="muted">Sites and saved data belong to this app and synchronize through its state repository.</p>
-    <table class="table"><thead><tr><th>Name</th><th>Publication</th></tr></thead><tbody>${sites.map(({item}) => `<tr data-hub-site="${htmlEscape(item.id)}" tabindex="0" aria-label="Manage ${htmlEscape(item.name)}"><td>${htmlEscape(item.name)}</td><td>${item.publication ? "Published" : "Private"}</td></tr>`).join("")}</tbody></table>
+    <p class="muted">Refine Hub ships with Refine. Your own sites and saved data synchronize through this app’s state repository.</p>
+    <table class="table"><thead><tr><th>Name</th><th>Publication</th></tr></thead><tbody>${sites.map(({item}) => `<tr data-hub-site="${htmlEscape(item.id)}" tabindex="0" aria-label="Manage ${htmlEscape(item.name)}"><td>${htmlEscape(item.name)}</td><td>${item.builtin ? "Built-in · Read-only" : item.publication ? "Published" : "Private"}</td></tr>`).join("")}</tbody></table>
     ${sites.length ? "" : '<p class="muted">No sites yet.</p>'}</section>`;
 }
 function bindKnowledgeHubSettings() {
@@ -102,6 +102,7 @@ function editHubSite(existing) {
   root.querySelector('[data-name]').focus();
 }
 async function openHubSite(site) {
+  if (site === "refine") { window.open("/hub/sites/refine/", "_blank", "noopener"); return; }
   const root = hubModal("Manage site", `<div data-detail></div>`);
   await hubAction(root, async () => {
     const [data, collections, assets, status] = await Promise.all([hubApi(root,"GET",hubPath(site)),hubApi(root,"GET",`${hubPath(site)}/collections`),hubApi(root,"GET",`${hubPath(site)}/assets`),hubApi(root,"GET",`${hubPath(site)}/status`)]);

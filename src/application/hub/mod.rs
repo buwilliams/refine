@@ -52,6 +52,7 @@ use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Path, PathBuf};
 mod assets;
+pub mod builtin;
 pub mod query;
 #[cfg(test)]
 mod tests;
@@ -108,6 +109,9 @@ impl Hub {
         self.root.join("hub")
     }
     fn site(&self, site: &str) -> RefineResult<PathBuf> {
+        if site == builtin::ID {
+            return Err(invalid("Refine Hub is built-in and read-only"));
+        }
         Ok(self.directory().join("sites").join(id(site)?))
     }
     fn collection(&self, site: &str, collection: &str) -> RefineResult<PathBuf> {
@@ -123,6 +127,9 @@ impl Hub {
             .join(format!("{key}.json")))
     }
     fn load_site(&self, site: &str) -> RefineResult<Value> {
+        if site == builtin::ID {
+            return Ok(builtin::site());
+        }
         let v: Value = read_json(&self.site(site)?.join("site.json"))?;
         if v["deleted"] == true {
             return Err(RefineError::NotFound("Site was deleted".into()));
@@ -150,7 +157,9 @@ impl Hub {
                 }
             }
         }
+        rows.retain(|v| v["item"]["id"] != builtin::ID);
         rows.sort_by_key(|v| v["item"]["name"].as_str().unwrap_or("").to_lowercase());
+        rows.insert(0, envelope(builtin::site()));
         Ok(json!({"sites":rows}))
     }
     pub fn show(&self, site: &str) -> RefineResult<Value> {
@@ -189,6 +198,9 @@ impl Hub {
         })
     }
     pub fn collections(&self, site: &str) -> RefineResult<Value> {
+        if site == builtin::ID {
+            return Ok(json!({"collections":[]}));
+        }
         self.load_site(site)?;
         let mut rows = vec![];
         let dir = self.site(site)?.join("collections");
@@ -369,6 +381,11 @@ impl Hub {
         Ok(json!({"results":results}))
     }
     pub fn status(&self, site: &str) -> RefineResult<Value> {
+        if site == builtin::ID {
+            return Ok(
+                json!({"site":envelope(builtin::site()),"local_available":true,"builtin":true,"sync":{"status":"bundled"}}),
+            );
+        }
         let value = self.load_site(site)?;
         let target =
             crate::infrastructure::storage::project_layout::target_root_for_refine_dir(&self.root)?;

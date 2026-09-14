@@ -89,11 +89,17 @@ impl ReleaseHost for ShellReleaseHost {
         let completed_goals = completed_goal_summaries(&self.repo_root)?;
         let mut version_files = vec!["Cargo.toml".to_string(), "Cargo.lock".to_string()];
         version_files.retain(|path| self.repo_root.join(path).is_file());
-        let documentation_files = ["RELEASE_NOTES.md", "docs/story.md"]
-            .into_iter()
-            .filter(|path| self.repo_root.join(path).exists() || *path == "RELEASE_NOTES.md")
-            .map(str::to_string)
-            .collect();
+        let mut documentation_files = vec![release_notes_path(&self.repo_root, &proposed_version)];
+        for path in [
+            "refine-hub/index.md",
+            "refine-hub/authoring.md",
+            "refine-hub/docs/story.md",
+            "docs/story.md",
+        ] {
+            if self.repo_root.join(path).is_file() {
+                documentation_files.push(path.to_string());
+            }
+        }
         let gates = release_gate_commands(&self.repo_root);
         let tag_prefix = previous_tag
             .as_deref()

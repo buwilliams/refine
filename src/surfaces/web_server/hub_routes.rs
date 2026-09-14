@@ -17,6 +17,44 @@ impl InProcessWebServer {
     }
     pub(super) fn handle_hub(&self, request: ApiRequest) -> ApiResponse {
         let result = (|| -> RefineResult<Value> {
+            let builtin = crate::application::hub::builtin::ID;
+            if matches!(request.path.as_str(), "/hub" | "/hub/sites")
+                && request.method == "GET"
+                && self.current_refine_dir()?.is_none()
+            {
+                let site = crate::application::hub::builtin::site();
+                return Ok(json!({"sites":[{"item":site,"revision":"bundled"}]}));
+            }
+            if request.path.split('/').nth(3) == Some(builtin) {
+                let record = || json!({"item":crate::application::hub::builtin::site(),"revision":"bundled"});
+                return match (request.method.as_str(), request.path.as_str()) {
+                    ("GET", "/hub/sites/refine") => Ok(record()),
+                    ("GET", "/hub/sites/refine/collections") => Ok(json!({"collections":[]})),
+                    ("GET", "/hub/sites/refine/status") => Ok(
+                        json!({"site":record(),"builtin":true,"local_available":true,"sync":{"status":"bundled"}}),
+                    ),
+                    ("GET", "/hub/sites/refine/assets") => Ok(
+                        json!({"item":crate::application::hub::builtin::manifest(),"revision":"bundled"}),
+                    ),
+                    ("POST", "/hub/sites/refine/assets") => {
+                        let body = request.body.as_ref().ok_or_else(|| {
+                            RefineError::InvalidInput("Asset path required".into())
+                        })?;
+                        let bytes = crate::application::hub::builtin::raw(
+                            body["path"].as_str().unwrap_or(""),
+                        )?;
+                        Ok(
+                            json!({"bytes_base64":base64::engine::general_purpose::STANDARD.encode(bytes)}),
+                        )
+                    }
+                    ("GET", _) => Err(RefineError::NotFound(
+                        "Refine Hub resource not found".into(),
+                    )),
+                    _ => Err(RefineError::InvalidInput(
+                        "Refine Hub is built-in and read-only".into(),
+                    )),
+                };
+            }
             let hub = self.hub_service()?;
             let parts: Vec<_> = request.path.trim_start_matches('/').split('/').collect();
             if matches!(request.method.as_str(), "PUT" | "POST" | "DELETE")
