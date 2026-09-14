@@ -54,7 +54,12 @@
         "workspace": "/home/buddy/projects/refine-next"
       }
     },
-    "metadata": {}
+    "metadata": {
+      "event_operation_id": "1a0a0993b98a5a1a9",
+      "started_bindings": {
+        "trigger-2124c51c-8d1f-44b7-8a07-7a989a68227f": "2026-09-14T15:46:31.980303299+00:00"
+      }
+    }
   },
   "bindings": [
     {
@@ -96,7 +101,7 @@
       }
     }
   ],
-  "state": "pending",
+  "state": "running",
   "results": {},
   "attempts": [],
   "created_at": "2026-09-14T11:34:17.799992427+00:00",
