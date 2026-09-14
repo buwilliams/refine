@@ -26,8 +26,13 @@ function fixture() {
       if (request.method() === 'PUT') {
         const body = request.postDataJSON();
         assert.equal(body.revision, revision);
-        skills.push({...body.item, trigger_source: body.trigger.source});
-        events.push({id: 'added', source: body.trigger.source, enabled: true, bindings: [{...body.trigger, skill_id: id, enabled: true}]});
+        if (body.event_bindings) {
+          events.forEach(event => { event.bindings = event.bindings.filter(binding => binding.skill_id !== id); });
+          body.event_bindings.forEach(assignment => events.find(event => event.id === assignment.event_id).bindings.push(assignment.binding));
+        }
+        const existing = skills.find(skill => skill.id === id);
+        if (existing) Object.assign(existing, body.item); else skills.push({...body.item, trigger_source: body.trigger?.source});
+        if (body.trigger) events.push({id: 'added', source: body.trigger.source, enabled: true, bindings: [{...body.trigger, skill_id: id, enabled: true}]});
         revision++;
       }
       const item = skills.find(skill => skill.id === id);
@@ -58,6 +63,8 @@ test('Workflow covers every step and hook, system events, custom actions, and sh
     }
     await page.locator('[data-workflow-step="review"]').click();
     await page.locator('[data-workflow-hook="success"]').click();
+    assert.equal(await page.locator('[data-workflow-hook="success"]').innerText(), 'On success (2)');
+    assert.equal(await page.locator('[data-workflow-assignment="review"].workflow-skill-card button').count(), 3);
     assert.deepEqual(await page.locator('[data-workflow-assignment]').evaluateAll(rows => rows.map(row => row.dataset.workflowAssignment)), ['context', 'review']);
     assert.match(await page.locator('[data-workflow-assignment="context"]').innerText(), /Order -1 · Context only · Project/);
     assert.equal(await page.locator(".workflow-prompts").count(), 0);
@@ -65,18 +72,17 @@ test('Workflow covers every step and hook, system events, custom actions, and sh
     await page.locator('[data-workflow-view="goals"]').press('ArrowRight');
     assert.equal(await page.locator('[data-workflow-view="system"]').getAttribute('aria-selected'), 'true');
     assert.match(await page.locator('[data-workflow-assignment="startup"]').innerText(), /Node: node-a · Disabled/);
-    await page.locator('#workflow-system-source').selectOption('node.example.ready');
+    await page.locator('[data-workflow-system="node.example.ready"]').click();
     assert.match(await page.locator('.workflow-empty').innerText(), /No Skills assigned/);
     await page.locator('[data-workflow-view="custom"]').click();
     assert.equal(await page.locator('[data-workflow-assignment="custom"]').count(), 1);
     assert.equal(await page.locator("[data-workflow-template]").count(), 0);
     await page.locator('[data-workflow-view="resources"]').click();
-    await page.locator('[data-testid="settings-skills"]').waitFor();
-    await page.locator('[data-workflow-resource] [data-choice="templates"]').click();
     await page.locator('[data-testid="settings-templates"]').waitFor();
-    await page.locator('[data-map-expand="$skill"]').click();
-    assert.equal(await page.locator('[data-map-node="purpose"]').count(), 1);
-    assert.equal(await page.locator('[data-map-node="architecture"]').count(), 1);
+    assert.equal(await page.locator('[data-resource-skill]').count(), 4);
+    assert.equal(await page.locator('[data-template-id="purpose"]').count(), 1);
+    assert.equal(await page.locator('[data-template-id="architecture"]').count(), 1);
+    assert.equal(await page.locator('.template-map').count(), 0);
     await page.setViewportSize({width: 390, height: 844});
     await page.locator('[data-workflow-view="goals"]').click();
     assert.equal(await page.locator('[data-testid="settings-workflow"]').evaluate(el => el.scrollWidth > el.clientWidth), false);
@@ -132,6 +138,52 @@ test('Adding a Skill from a non-agent hook preserves the selected trigger throug
     const save = data.requests.find(request => request.method === 'PUT');
     assert.equal(save.body.trigger.source, 'workflow.done.exit');
     assert.equal(save.body.item.prompt, 'Publish the result.');
+    assert.deepEqual(app.pageErrors, []);
+  } finally { await app.close(); }
+});
+
+test('Existing Skills can be reused and assignment edits preserve other triggers', {skip: SKIP}, async () => {
+  const data = fixture(), app = await openApp(data);
+  try {
+    const {page} = app;
+    await page.goto(`${app.origin}/#/settings/workflow`);
+    await page.locator('[data-workflow-view="system"]').click();
+    await page.locator('[data-workflow-existing]').click();
+    const modal = page.locator('[data-testid="automation-modal"]');
+    await modal.locator('#assignment-skill').selectOption('review');
+    await modal.locator('#assignment-mode').selectOption('background');
+    await modal.locator('#assignment-order').fill('7');
+    await modal.locator('[data-save]').click();
+    await modal.waitFor({state:'detached'});
+    const card = page.locator('[data-workflow-assignment="review"]');
+    assert.match(await card.innerText(), /Order 7 · Background/);
+    let save = data.requests.at(-1).body;
+    assert.equal(save.event_bindings.length, 2);
+    assert.deepEqual(save.event_bindings.find(row => row.event_id === 'event-0').binding, {id:'binding-0',skill_id:'review',enabled:true,order:2,mode:'blocking',scope:{}});
+    await card.locator('[data-workflow-skill]').click();
+    await modal.locator('[data-skill-tab="settings"]').click();
+    assert.equal(await modal.locator('[data-trigger-source]').isVisible(), false);
+    await modal.locator('#automation-name').fill('Shared review');
+    await modal.locator('[data-save]').click();
+    await modal.waitFor({state:'detached'});
+    assert.equal(data.requests.at(-1).body.trigger, undefined);
+    assert.equal(data.requests.at(-1).body.event_bindings, undefined);
+    await card.locator('[data-workflow-assignment-edit]').click();
+    await modal.locator('#assignment-order').fill('9');
+    await modal.locator('[data-save]').click();
+    await modal.waitFor({state:'detached'});
+    assert.match(await card.innerText(), /Order 9 · Background/);
+    await card.locator('[data-workflow-assignment-edit]').click();
+    await modal.locator('[data-delete]').click();
+    await modal.waitFor({state:'detached'});
+    assert.equal(await card.count(), 0);
+    save = data.requests.at(-1).body;
+    assert.equal(save.event_bindings.length, 1);
+    assert.equal(save.event_bindings[0].event_id, 'event-0');
+    await page.locator('[data-workflow-view="goals"]').click();
+    await page.locator('[data-workflow-step="review"]').click();
+    await page.locator('[data-workflow-hook="success"]').click();
+    assert.match(await card.innerText(), /Shared review/);
     assert.deepEqual(app.pageErrors, []);
   } finally { await app.close(); }
 });

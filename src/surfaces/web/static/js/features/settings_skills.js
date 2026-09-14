@@ -269,13 +269,13 @@ async function openSkillEditor(original = null, clone = false, defaults = {}) {
   const readInputs = () => Object.fromEntries([...root.querySelectorAll("[data-input-name]")].filter(input => input.value.trim()).map(input => [input.dataset.inputName, input.value.trim()]));
   function drawContext(inputs = readInputs()) {
     const names = [...root.querySelectorAll("[data-parameter] [data-name]")].map(input => input.value.trim()).filter(Boolean);
-    root.querySelector("[data-context-options]").hidden = !names.length;
+    root.querySelector("[data-context-options]").hidden = editing || !names.length;
     root.querySelector("[data-context-inputs]").innerHTML = names.map(name => `<div class="form-row"><label>${htmlEscape(name)}</label><input type="text" aria-label="${htmlEscape(name)} context source" data-input-name="${htmlEscape(name)}" value="${htmlEscape(inputs[name] || "")}" list="skill-context-sources" placeholder="Use default or ask when run"></div>`).join("");
   }
   function updateTrigger() {
     const source = root.querySelector("[data-trigger-source]").value;
     root.querySelector("[data-automatic-options]").hidden = source === "custom";
-    root.querySelector("[data-trigger-help]").textContent = source === "custom" ? "Run from Controls → Skills or the CLI. Web runs open in an agent tab." : "Runs automatically at this point. Refine supplies the context and expected result.";
+    root.querySelector("[data-trigger-help]").textContent = source === "custom" ? "Run from New Goal → Skills or the CLI. Web runs open in an agent tab." : "Runs automatically at this point. Refine supplies the context and expected result.";
   }
   root.querySelector("[data-add-parameter]").onclick = () => {
     dirty(); root.querySelector("[data-parameters]").insertAdjacentHTML("beforeend", parameterRows([{}]));
@@ -304,6 +304,12 @@ async function openSkillEditor(original = null, clone = false, defaults = {}) {
     if (event.target.matches("[data-trigger-source]")) updateTrigger();
   });
   drawContext(trigger.inputs); updateTrigger();
+  if (editing) {
+    root.querySelector('[data-trigger-source]').closest('.form-row').hidden = true;
+    root.querySelector('[data-trigger-help]').textContent = 'Shared instructions apply to every assignment. Manage triggers and their settings in Workflow.';
+    root.querySelector('[data-automatic-options]').hidden = true;
+    root.querySelector('[data-context-options]').hidden = true;
+  }
   let saving = false;
   async function save(remove = false) {
     if (saving) return;
@@ -324,7 +330,7 @@ async function openSkillEditor(original = null, clone = false, defaults = {}) {
         const scope = readAutomationScope(root.querySelector("[data-scope]"));
         const source = root.querySelector("[data-trigger-source]").value;
         const edited = {id: item.id, name: root.querySelector("#automation-name").value.trim(), prompt: root.querySelector("[data-prompt]").value, enabled: root.querySelector("[data-enabled]").dataset.value === "true", scope, parameters: readParameters(root), provenance: item.provenance || null};
-        await api("PUT", path, {revision, item: edited, trigger: {id: trigger.id, source, mode: source === "custom" ? "blocking" : root.querySelector("[data-mode]").dataset.value, order: Number(root.querySelector("[data-order]").value), inputs: readInputs()}});
+        await api("PUT", path, {revision, item: edited, ...(!editing ? {trigger: {id: trigger.id, source, mode: source === "custom" ? "blocking" : root.querySelector("[data-mode]").dataset.value, order: Number(root.querySelector("[data-order]").value), inputs: readInputs()}} : {})});
       }
       root._close(); await refreshSettings({force: true}); await refreshManualSkills();
     } catch (e) {

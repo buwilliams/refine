@@ -1071,7 +1071,7 @@ fn v2_migration_splits_assignments_preserves_overrides_and_is_idempotent() {
     )
     .unwrap();
     let migrated = service.config().unwrap();
-    assert_eq!(migrated.schema_version, 2);
+    assert_eq!(migrated.schema_version, SCHEMA_VERSION);
     assert_eq!(migrated.revision, old.revision + 1);
     assert_eq!(migrated.skills.len(), old.skills.len() + 2);
     assert_eq!(
@@ -1194,7 +1194,7 @@ fn manual_skills_select_one_skill_validate_inputs_and_pin_replay_without_a_goal(
 }
 
 #[test]
-fn single_trigger_save_rejects_multiple_and_derives_the_workflow_result_contract() {
+fn reusable_skill_assignments_preserve_shared_edits_and_derive_the_workflow_result_contract() {
     let fixture = Fixture::new();
     let service = fixture.service();
     let revision = service.config().unwrap().revision;
@@ -1215,9 +1215,24 @@ fn single_trigger_save_rejects_multiple_and_derives_the_workflow_result_contract
         )
         .unwrap();
     assert!(run.bindings.iter().all(|b| b.skill.role == "quality"));
-    assert!(service.save("skills", "review", json!({"revision":config.revision,"item":item,"event_bindings":[{"event_id":"custom","binding":{"id":"one","skill_id":"review"}},{"event_id":"workflow.quality.enter","binding":{"id":"two","skill_id":"review"}}]})).is_err());
-    assert_eq!(*service.config().unwrap(), *config);
-    service.remove("skills", "review", config.revision).unwrap();
+    let saved = service.save("skills", "review", json!({"revision":config.revision,"item":item,"event_bindings":[{"event_id":"custom","binding":{"id":"one","skill_id":"review"}},{"event_id":"workflow.quality.enter","binding":{"id":"two","skill_id":"review"}}]})).unwrap();
+    let shown = service.show_skill("review").unwrap();
+    assert!(shown["trigger"].is_null());
+    assert_eq!(shown["triggers"].as_array().unwrap().len(), 2);
+    let shared = service.config().unwrap();
+    for (source, expected_role) in [("custom", "task"), ("workflow.quality.enter", "quality")] {
+        let prepared = service.prepare_pinned(&shared, &shared.events[source], service.manual_context(&fixture.0, &json!({})).unwrap(), BTreeMap::new(), &format!("shared-{expected_role}")).unwrap();
+        let binding = prepared.bindings.iter().find(|binding| binding.skill.id == "review").unwrap();
+        assert_eq!(binding.skill.role, expected_role);
+    }
+    let edited = service.save("skills", "review", json!({"revision":saved["revision"],"item":{"name":"Review", "prompt":"Updated shared instructions"}})).unwrap();
+    assert_eq!(service.show_skill("review").unwrap()["triggers"], shown["triggers"]);
+    assert!(service.save("skills", "review", json!({"revision":edited["revision"], "item":item,"trigger":{"source":"custom"}})).is_err());
+    // Removing one assignment retains the shared Skill and its other assignment.
+    let detached = service.save("skills", "review", json!({"revision":edited["revision"],"item":edited["item"],"event_bindings":[{"event_id":"workflow.quality.enter","binding":{"id":"two","skill_id":"review"}}]})).unwrap();
+    assert_eq!(service.show_skill("review").unwrap()["triggers"].as_array().unwrap().len(), 1);
+    assert_eq!(service.show_skill("review").unwrap()["item"]["prompt"], "Updated shared instructions");
+    service.remove("skills", "review", detached["revision"].as_u64().unwrap()).unwrap();
     assert_eq!(
         service.config().unwrap().events["workflow.quality.enter"]
             .bindings
@@ -1411,4 +1426,19 @@ fn default_workflow_skills_include_editable_project_guidance_and_catalog_uses_sh
         service.catalog()["completion_contract"],
         crate::application::agent_io::contracts::skill_result::report_contract()
     );
+}
+
+#[test]
+fn reusable_skills_upgrade_preserves_existing_configuration() {
+    let fixture = Fixture::new();
+    let service = fixture.service();
+    let mut old = (*service.config().unwrap()).clone();
+    old.schema_version = 2;
+    crate::infrastructure::storage::automation::write_json(&service.refine_dir.join("automation/config.json"), &old).unwrap();
+    let upgraded = service.config().unwrap();
+    assert_eq!(upgraded.schema_version, SCHEMA_VERSION);
+    assert_eq!(upgraded.revision, old.revision + 1);
+    assert_eq!(upgraded.skills, old.skills);
+    assert_eq!(upgraded.events, old.events);
+    assert_eq!(*service.config().unwrap(), *upgraded);
 }

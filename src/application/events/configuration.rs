@@ -106,7 +106,13 @@ impl FileEventService {
         let store = AutomationStore::new(&self.refine_dir);
         let config = store.initialize(|| super::migration::migrate(&self.refine_dir))?;
         let config = if config.schema_version < SCHEMA_VERSION {
-            store.upgrade(super::migration::single_trigger_skills)?
+            store.upgrade(|config| {
+                if config.schema_version < 2 {
+                    super::migration::single_trigger_skills(config)?;
+                }
+                config.schema_version = SCHEMA_VERSION;
+                Ok(())
+            })?
         } else {
             config
         };
@@ -131,23 +137,23 @@ impl FileEventService {
             })
         }).collect();
         Ok(
-            json!({"revision": config.revision, "item": skill_value(skill), "trigger": triggers.first()}),
+            json!({"revision": config.revision, "item": skill_value(skill), "trigger": if triggers.len() == 1 { triggers.first() } else { None }, "triggers": triggers}),
         )
     }
     pub fn list(&self, collection: &str, node: Option<&str>) -> RefineResult<Value> {
         let config = self.config()?;
-        let trigger_sources: std::collections::BTreeMap<_, _> = config
-            .events
-            .values()
-            .flat_map(|event| {
-                event.bindings.iter().map(move |b| {
-                    (
-                        b.skill_id.as_str(),
-                        event.source.as_deref().unwrap_or(CUSTOM_EVENT_ID),
-                    )
-                })
-            })
-            .collect();
+        let mut trigger_sources = std::collections::BTreeMap::<&str, Vec<&str>>::new();
+        for event in config.events.values() {
+            for binding in &event.bindings {
+                let sources = trigger_sources
+                    .entry(binding.skill_id.as_str())
+                    .or_default();
+                let source = event.source.as_deref().unwrap_or(CUSTOM_EVENT_ID);
+                if !sources.contains(&source) {
+                    sources.push(source);
+                }
+            }
+        }
         let items: Vec<Value> = match collection {
             "skills" => config
                 .skills
@@ -155,7 +161,16 @@ impl FileEventService {
                 .filter(|s| node.is_none_or(|n| s.scope.applies(n)))
                 .map(|skill| {
                     let mut value = skill_value(skill);
-                    value["trigger_source"] = json!(trigger_sources.get(skill.id.as_str()));
+                    let sources = trigger_sources
+                        .get(skill.id.as_str())
+                        .cloned()
+                        .unwrap_or_default();
+                    value["trigger_source"] = json!(if sources.len() == 1 {
+                        sources.first()
+                    } else {
+                        None
+                    });
+                    value["trigger_sources"] = json!(sources);
                     value
                 })
                 .collect(),
@@ -201,7 +216,7 @@ impl FileEventService {
         }
         if body.get("triggers").is_some() {
             return Err(RefineError::InvalidInput(
-                "A Skill has one trigger; use trigger instead of triggers".into(),
+                "Use event_bindings to save multiple assignments".into(),
             ));
         }
         let revision = body
@@ -226,6 +241,7 @@ impl FileEventService {
         }
         object.insert("id".into(), json!(id));
         object.remove("trigger_source");
+        object.remove("trigger_sources");
         // The Skill editor owns its assignments. Apply the complete selection with
         // the Skill under the same revision fence; leave other Skills untouched.
         let assignments = body
@@ -257,6 +273,11 @@ impl FileEventService {
                     let skill: Skill = serde_json::from_value(item.clone())
                         .map_err(|e| RefineError::InvalidInput(e.to_string()))?;
                     let is_new = !config.skills.contains_key(id);
+                    if trigger.is_some() && prior.values().map(Vec::len).sum::<usize>() > 1 {
+                        return Err(RefineError::InvalidInput(
+                            "This Skill has multiple assignments. Use event_bindings to edit assignments, or omit trigger to edit the shared Skill.".into(),
+                        ));
+                    }
                     if body.get("create_only") == Some(&json!(true)) && !is_new {
                         return Err(RefineError::Conflict(
                             "A Skill with this ID already exists".into(),

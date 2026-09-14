@@ -1179,10 +1179,10 @@ test("every Node, Project, and legacy Settings tab renders and refreshes", { ski
       ["#/node/processes", '[data-testid="settings-pane-processes"].active'],
       ["#/node/target-app", '[data-testid="target-app-copy-node"]'],
       ["#/node/runtime", '[data-testid="runtime-recheck-auth"]'],
-      ["#/node/releases", '[data-testid="settings-skills"]'],
-      ["#/project/governance", '[data-testid="settings-skills"]'],
-      ["#/settings/events", '[data-testid="settings-skills"]'],
-      ["#/settings/skills", '[data-testid="settings-skills"]'],
+      ["#/node/releases", '[data-testid="settings-templates"]'],
+      ["#/project/governance", '[data-testid="settings-templates"]'],
+      ["#/settings/events", '[data-testid="settings-templates"]'],
+      ["#/settings/skills", '[data-testid="settings-templates"]'],
       ["#/settings", '[data-testid="settings-pane-processes"].active'],
     ]) {
       await assertScreenRenders(app, { route, marker });
@@ -1519,17 +1519,17 @@ test("Custom Skills open a selected agent tab with typed inputs and no Goal cont
   } finally { await app.close(); }
 });
 
-test("Skills use one trigger, shared modal controls and clickable rows with cloning", {skip:SKIP}, async () => {
+test("Shared Skills preserve assignments and support modal controls and cloning", {skip:SKIP}, async () => {
   const data = skillFixture();
   const app = await openApp({fixture:data.fixture});
   try {
     const page = app.page;
     await page.goto(`${app.origin}/#/settings/events`);
-    await page.locator('[data-testid="settings-skills"]').waitFor();
+    await page.locator('[data-testid="settings-templates"]').waitFor();
     assert.equal(new URL(page.url()).hash,"#/settings/skills");
     assert.deepEqual(await page.locator('.settings-tab').allTextContents().then(labels=>labels.map(s=>s.trim())),["Processes","Nodes","Reporters","Workflow","Knowledge Hub","Target App","Runtime"]);
-    assert.equal(await page.locator('[data-testid="automation-table"] td:first-child button').count(),0);
-    await page.locator('[data-automation-row]').focus(); await page.keyboard.press('Enter');
+    assert.equal(await page.locator('[data-resource-skill]').count(),1);
+    await page.locator('[data-resource-skill]').focus(); await page.keyboard.press('Enter');
     const modal = page.locator('[data-testid="automation-modal"]');
     await modal.waitFor();
     assert.equal(await modal.locator('.modal-title').textContent(), 'Inspect release — Edit Skill');
@@ -1559,10 +1559,7 @@ test("Skills use one trigger, shared modal controls and clickable rows with clon
     assert.equal(await modal.locator('[data-role], [data-add-binding], [data-overrides]').count(),0);
     assert.doesNotMatch(await modal.textContent(),/Result role|Override project assignment/);
     assert.equal(await modal.locator('[data-automatic-options]').isVisible(),false);
-    await modal.locator('[data-trigger-source]').selectOption('workflow.quality.enter');
-    assert.equal(await modal.locator('[data-automatic-options]').isVisible(),true);
-    await modal.locator('[data-mode] [data-choice="background"]').click();
-    await modal.locator('[data-order]').fill('3');
+    assert.equal(await modal.locator('[data-trigger-source]').isVisible(),false);
     await modal.locator('[data-scope] [data-choice="node"]').click();
     assert.equal(await modal.locator('[data-scope-node]').inputValue(),'node-a');
     const parameter = modal.locator('[data-parameter]');
@@ -1570,19 +1567,17 @@ test("Skills use one trigger, shared modal controls and clickable rows with clon
     await parameter.locator('[data-kind]').selectOption('choice');
     await parameter.locator('[data-choices]').fill('stable, beta'); await parameter.locator('[data-choices]').press('Tab');
     await parameter.locator('[data-default]').selectOption('beta');
-    await modal.locator('[data-input-name="channel"]').fill('system.node_id');
+    assert.equal(await modal.locator('[data-context-options]').isVisible(),false);
     await modal.locator('#automation-name').focus();
     const style = await modal.locator('#automation-name').evaluate(input => {const s=getComputedStyle(input); return {height:s.height,weight:s.fontWeight,border:s.borderColor,outline:s.outlineColor};});
     assert.deepEqual(style,{height:'34px',weight:'400',border:style.border,outline:style.border});
     await modal.locator('[data-save]').click(); await modal.waitFor({state:'detached'});
     assert.match(data.writes[0].item.prompt, /## Release instructions/);
-    assert.equal(data.writes[0].trigger.source,'workflow.quality.enter');
-    assert.equal(data.writes[0].trigger.mode,'background');
-    assert.equal(data.writes[0].trigger.order,3);
+    assert.equal(data.writes[0].trigger,undefined);
     assert.equal(data.writes[0].item.scope.node_id,'node-a');
     assert.equal(data.writes[0].item.role,undefined);
     assert.equal(data.records[0].item.parameters[0].default,'beta');
-    await page.locator('[data-automation-row]').click();
+    await page.locator('[data-resource-skill]').click();
     await modal.locator('[data-clone-skill]').click();
     await modal.getByRole('tab', {name: 'Settings', exact: true}).click();
     await modal.locator('#automation-name').waitFor();
@@ -1594,45 +1589,36 @@ test("Skills use one trigger, shared modal controls and clickable rows with clon
     assert.equal(data.records.length,2);
     assert.notEqual(data.records[0].item.id,data.records[1].item.id);
     assert.equal(data.records[1].trigger.source,'custom');
-    assert.equal(data.records[0].trigger.source,'workflow.quality.enter');
+    assert.equal(data.records[0].trigger.source,'custom');
     assert.deepEqual(app.pageErrors,[]);
   } finally { await app.close(); }
 });
 
-test("Skill status toggles preserve the trigger, fence duplicate saves and refresh conflicts", {skip:SKIP}, async () => {
-  const data = skillFixture(); let releaseWrite;
-  const pending = new Promise(resolve=>{releaseWrite=resolve;});
-  let held = false;
-  const app = await openApp({fixture:async (pathname,request)=>{
-    if (request.method()==='PUT' && !held) {held=true;await pending;}
-    return data.fixture(pathname,request);
-  }});
+test("Shared Skill status saves preserve assignments and retain conflicting drafts", {skip:SKIP}, async () => {
+  const data = skillFixture();
+  const app = await openApp({fixture:data.fixture});
   try {
     const page = app.page; await page.goto(`${app.origin}/#/settings/skills`);
-    const status = page.locator('[data-automation-status="inspect"]');
-    await status.locator('[data-choice="false"]').click();
-    assert.equal(await status.locator('[data-choice="true"]').isDisabled(),true);
-    await status.locator('[data-choice="false"]').evaluate(button=>button.click());
-    releaseWrite();
-    await status.locator('[data-choice="false"][aria-pressed="true"]').waitFor();
-    assert.equal(data.writes.length,1); assert.equal(data.writes[0].trigger,undefined);
+    await page.locator('[data-resource-skill="inspect"]').click();
+    const modal = page.getByTestId('automation-modal');
+    await modal.getByRole('tab', {name:'Settings',exact:true}).click();
+    await modal.locator('[data-enabled] [data-choice="false"]').click();
+    await modal.locator('[data-save]').click();
+    await modal.waitFor({state:'detached'});
+    assert.equal(data.writes.length,1);
+    assert.equal(data.writes[0].trigger,undefined);
     assert.equal(data.records[0].trigger.source,'custom');
     await page.waitForFunction(()=>!commandRegistry.has('skill.manual.inspect'));
-    assert.equal(await page.locator('[data-testid="automation-modal"]').count(),0);
-    await page.reload(); await status.locator('[data-choice="false"][aria-pressed="true"]').waitFor();
-    await status.locator('[data-choice="true"]').focus(); await page.keyboard.press('Enter');
-    await page.waitForFunction(()=>commandRegistry.has('skill.manual.inspect'));
-    await page.route('**/api/skills/inspect',route=>{
-      if(route.request().method()!=='PUT') return route.fallback();
-      data.records[0].item.name='Renamed concurrently';
-      return route.fulfill({status:409,contentType:'application/json',body:JSON.stringify({error:{code:'conflict',message:'Configuration changed. Refresh before saving.'}})});
-    });
-    await status.locator('[data-choice="false"]').click();
-    await page.locator('[data-automation-row]').filter({hasText:'Renamed concurrently'}).waitFor();
-    assert.equal(await status.locator('[data-choice="true"]').getAttribute('aria-pressed'),'true');
-    assert.equal(data.writes.length,2);
+    await page.locator('[data-resource-skill="inspect"]').click();
+    await modal.getByRole('tab', {name:'Settings',exact:true}).click();
+    await modal.locator('[data-enabled] [data-choice="true"]').click();
+    await page.route('**/api/skills/inspect',route => route.request().method() !== 'PUT' ? route.fallback() : route.fulfill({status:409,contentType:'application/json',body:JSON.stringify({error:'Configuration changed'})}));
+    await modal.locator('[data-save]').click();
+    await modal.locator('[data-automation-error]').filter({hasText:'draft is retained'}).waitFor();
+    assert.equal(await modal.locator('[data-enabled]').getAttribute('data-value'),'true');
+    assert.equal(data.records[0].item.enabled,false);
     assert.deepEqual(app.pageErrors,[]);
-  } finally {releaseWrite();await app.close();}
+  } finally {await app.close();}
 });
 
 
@@ -1641,7 +1627,7 @@ test("New Skill starts with instructions and reveals required settings before sa
   const app = await openApp({fixture:data.fixture});
   try {
     await app.page.goto(`${app.origin}/#/settings/skills`);
-    await app.page.locator('[data-automation-new]').click();
+    await app.page.locator('[data-resource-new]').click();
     const modal = app.page.locator('[data-testid="automation-modal"]');
     await modal.locator('[data-prompt]').waitFor();
     assert.equal(await modal.locator('[data-prompt]').isVisible(), true);
@@ -1673,11 +1659,11 @@ test("Skill History opens once after refreshes and repeated clicks with spaced p
   try {
     const page = app.page;
     await page.goto(`${app.origin}/#/settings/skills`);
-    await page.locator('[data-event-history]').waitFor();
-    assert.deepEqual(await page.locator('[data-testid="settings-skills"] > .actions > button').allTextContents(), ['History','New Skill']);
+    await page.locator('[data-workflow-history]').waitFor();
+    assert.equal(await page.locator('[data-workflow-history]').innerText(), 'Run history');
     await page.evaluate(async () => {
       await refreshSettings({force:true}); await refreshSettings({force:true});
-      const button=document.querySelector('[data-event-history]'); button.click(); button.click(); button.click();
+      const button=document.querySelector('[data-workflow-history]'); button.click(); button.click(); button.click();
     });
     const modal=page.locator('[data-testid="automation-modal"]');
     await modal.waitFor();
@@ -1702,7 +1688,7 @@ test("Skill history explains waiting, background outcomes, and report repair", {
   }});
   try {
     await app.page.goto(`${app.origin}/#/settings/skills`);
-    await app.page.locator('[data-event-history]').click();
+    await app.page.locator('[data-workflow-history]').click();
     await app.page.getByText("Waiting for checkout", {exact:true}).waitFor();
     await app.page.locator('[data-open-run="RUN"]').click();
     await app.page.getByText("Workflow gate: satisfied", {exact:true}).waitFor();
@@ -1724,7 +1710,7 @@ for (const cryptoMode of ["without-randomUUID", "without-crypto"]) {
         else Object.defineProperty(globalThis.crypto, "randomUUID", {value:undefined,configurable:true});
       }, cryptoMode);
       await app.page.goto(`${app.origin}/#/settings/skills`);
-      await app.page.locator('[data-automation-new]').click();
+      await app.page.locator('[data-resource-new]').click();
       const modal = app.page.locator('[data-testid="automation-modal"]');
       await modal.locator('[data-prompt]').fill('Inspect the current release.');
       await modal.locator('[data-save]').click();
@@ -1732,7 +1718,7 @@ for (const cryptoMode of ["without-randomUUID", "without-crypto"]) {
       await modal.locator('[data-save]').click();
       await modal.waitFor({state:'detached'});
       assert.match(data.writes[0].item.id, /^skill-[A-Za-z0-9-]+$/);
-      await app.page.locator('[data-automation-edit="inspect"]').click();
+      await app.page.locator('[data-resource-skill="inspect"]').click();
       await modal.locator('[data-clone-skill]').click();
       await modal.locator('[data-save]').click();
       await modal.waitFor({state:'detached'});
@@ -1754,7 +1740,7 @@ test("Governance editor tabs preserve drafts and reveal invalid fields before sa
   try {
     const page = app.page;
     await page.goto(`${app.origin}/#/settings/skills`);
-    await page.locator('[data-automation-row]').click();
+    await page.locator('[data-resource-skill]').click();
     const modal = page.getByTestId('automation-modal');
     const instructions = modal.getByRole('tab', {name:'Instructions', exact:true});
     const settings = modal.getByRole('tab', {name:'Settings', exact:true});

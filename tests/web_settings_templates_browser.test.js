@@ -59,7 +59,7 @@ test('Templates editor previews nested values, saves revisions, and retains conf
   } finally { await app.close(); }
 });
 
-test('Template map explains uses, deduplicates shared partials, and follows edited references', {skip: SKIP}, async () => {
+test('Resource catalog explains uses, filters types, and follows edited references', {skip: SKIP}, async () => {
   const rows = [
     {item: {id: 'workflow', revision: 0, prompt: '{{templates.workflow-context}}\n{{templates.supervised-skill}}'}, name: 'Workflow', usage: {kind: 'template', group: 'workflow', description: 'Used in all four workflow steps.'}},
     {item: {id: 'workflow-context', revision: 0, prompt: 'Shared coordination context'}, name: 'Workflow Context', usage: {kind: 'partial', group: 'workflow', description: 'Shared workflow guidance.'}},
@@ -77,11 +77,9 @@ test('Template map explains uses, deduplicates shared partials, and follows edit
   try {
     const {page} = app;
     await page.goto(`${app.origin}/#/settings/templates`);
-    await page.locator('.template-map').waitFor();
-    await page.locator('[data-map-expand="supervised-skill"]').click();
-    assert.equal(await page.locator('[data-map-node="workflow-context"]').count(), 1);
-    await page.waitForFunction(() => document.querySelectorAll('.template-map-lines path').length === 4);
-    assert.equal(await page.locator('[data-map-node="$skill"]').count(), 1);
+    await page.locator('[data-template-catalog-row]').first().waitFor();
+    assert.equal(await page.locator('.template-map').count(), 0);
+    assert.equal(await page.locator('[data-template-view]').count(), 0);
     const partialRow = page.locator('[data-template-catalog-row]', {hasText: 'Workflow Context'}).filter({has: page.locator('[data-template-id="workflow-context"]')});
     assert.match(await partialRow.innerText(), /Partial/);
     assert.match(await partialRow.innerText(), /Included by .*Workflow/);
@@ -94,11 +92,32 @@ test('Template map explains uses, deduplicates shared partials, and follows edit
     await dialog.locator('#template-prompt').fill('No included partials');
     await dialog.locator('[data-save]').click();
     await dialog.waitFor({state: 'detached'});
-    await page.waitForFunction(() => document.querySelectorAll('[data-map-node]').length === 1);
-    assert.equal(await page.locator('.template-map-lines path').count(), 0);
-    await page.locator('[data-template-view="tasks"]').click();
-    assert.equal(await page.locator('[data-map-node="source-upgrade"]').count(), 1);
+    assert.match(await partialRow.innerText(), /Included by Supervised Skill/);
+    assert.doesNotMatch(await partialRow.innerText(), /Included by Workflow/);
+    await page.locator('[data-resource-type]').selectOption('Partial');
     assert.equal(await page.locator('[data-template-catalog-row]:visible').count(), 1);
+    await page.locator('[data-template-catalog-search]').fill('does not exist');
+    assert.equal(await page.locator('[data-template-catalog-empty]').isVisible(), true);
     assert.deepEqual(app.pageErrors, []);
   } finally { await app.close(); }
+});
+
+test('Resource pagination stays bounded and search reaches entries on later pages', {skip: SKIP}, async () => {
+  const rows = Array.from({length:25}, (_,i) => ({item:{id:`entry-${i}`,prompt:'Instructions',revision:0},name:`Resource ${String(i).padStart(2,'0')}`,usage:{kind:'partial',description:'Shared guidance'}}));
+  const app = await openApp({fixture(path) { return path === '/api/templates' ? {items:rows} : apiFixture(path); }});
+  try {
+    const {page} = app;
+    await page.goto(`${app.origin}/#/settings/templates`);
+    await page.locator('[data-resource-next]').click();
+    assert.equal(await page.locator('[data-template-catalog-row]:visible').count(),12);
+    assert.equal(await page.locator('[data-resource-range]').innerText(),'13–24 of 25 resources');
+    await page.locator('[data-resource-next]').click();
+    assert.equal(await page.locator('[data-template-catalog-row]:visible').count(),1);
+    assert.equal(await page.locator('[data-resource-next]').isDisabled(),true);
+    await page.locator('[data-template-catalog-search]').fill('Resource 02');
+    assert.equal(await page.locator('[data-template-catalog-row]:visible').count(),1);
+    assert.equal(await page.locator('[data-template-id="entry-2"]').isVisible(),true);
+    assert.equal(await page.locator('[data-resource-previous]').isDisabled(),true);
+    assert.deepEqual(app.pageErrors,[]);
+  } finally {await app.close();}
 });

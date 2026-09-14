@@ -92,7 +92,7 @@ pub const API_GROUPS: &[ApiRouteGroup] = &[
     },
     ApiRouteGroup {
         prefix: "/skills",
-        capability: "Skills with one trigger, typed inputs, cloning support and manual execution",
+        capability: "Reusable Skills with trigger assignments, typed inputs, cloning support and manual execution",
     },
     ApiRouteGroup {
         prefix: "/event-invocations",

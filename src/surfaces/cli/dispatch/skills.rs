@@ -22,9 +22,15 @@ pub(super) fn skills(action: SkillAction) -> RefineResult<()> {
         } => {
             let mut item = config_input::decode_config_input(payload, Default::default(), "Skill")?;
             let triggers = item.as_object_mut().and_then(|item| item.remove("trigger"));
+            let assignments = item
+                .as_object_mut()
+                .and_then(|item| item.remove("event_bindings"));
             let mut body = json!({"revision": revision, "item": item});
             if let Some(triggers) = triggers {
                 body["trigger"] = triggers;
+            }
+            if let Some(assignments) = assignments {
+                body["event_bindings"] = assignments;
             }
             daemon_json("PUT", &item_path(&path, &id)?, Some(body))?
         }
@@ -55,6 +61,7 @@ pub(super) fn skills(action: SkillAction) -> RefineResult<()> {
                 current["trigger"]["source"] = json!(source);
             }
             // The observed global revision fences creation, including concurrent clones.
+            current.as_object_mut().unwrap().remove("triggers");
             current["create_only"] = json!(true);
             daemon_json("PUT", &item_path(&path, &new_id)?, Some(current))?
         }

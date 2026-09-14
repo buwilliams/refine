@@ -3,7 +3,6 @@ let workflowSettingsView = "goals";
 let workflowSettingsStep = "plan";
 let workflowSettingsHook = "enter";
 let workflowSettingsSystemSource = "";
-let workflowSettingsResource = "skills";
 let workflowSettingsRoute = "";
 let workflowSettingsData = null;
 const workflowHookLabels = {enter: "On entry", success: "On success", error: "On error", exit: "On exit"};
@@ -65,17 +64,16 @@ function workflowCurrentSource(data) {
 function renderWorkflowAssignments(data, source) {
   const assignments = workflowAssignments(data, source);
   return `<section class="workflow-trigger-details" aria-label="${htmlEscape(workflowSourceLabel(source))}">
-    <div class="actions"><h4>${source.startsWith("workflow.") ? "Assigned Skills" : htmlEscape(workflowSourceLabel(source))}</h4><span class="spacer"></span><button type="button" data-workflow-add="${htmlEscape(source)}">Add Skill</button></div>
+    <div class="actions"><h4>${source.startsWith("workflow.") ? "Assigned Skills" : htmlEscape(workflowSourceLabel(source))}</h4><span class="spacer"></span><button type="button" class="secondary" data-workflow-existing="${htmlEscape(source)}">Add existing Skill</button><button type="button" data-workflow-add="${htmlEscape(source)}">Create Skill</button></div>
     <p class="muted">${source === "custom" ? "Skills launched manually or by a custom event. Manual terminals and automatic runs have separate prompt templates." : "Choose a Skill to edit its instructions and settings. Skills run in the order shown; context-only Skills add instructions to the other agents."}</p>
     ${assignments.length ? `<div class="workflow-assignment-list">${assignments.map(({skill, binding, event}, index) => {
       const disabled = !skill.enabled || event.enabled === false || binding.enabled === false;
       const scope = skill.scope?.node_id || binding.scope?.node_id || event.scope?.node_id;
-      return `<article class="workflow-assignment" data-workflow-assignment="${htmlEscape(skill.id)}">
-        <button type="button" class="secondary workflow-skill-card" data-workflow-skill="${htmlEscape(skill.id)}" aria-label="Edit ${htmlEscape(skill.name)} Skill">
-          <span class="workflow-skill-card-title"><strong>${htmlEscape(skill.name)}</strong><span class="workflow-skill-edit">Edit Skill →</span></span>
+      return `<article class="workflow-assignment workflow-skill-card" data-workflow-assignment="${htmlEscape(skill.id)}">
+        <strong>${htmlEscape(skill.name)}</strong>
           <span class="muted small">${source === "custom" ? "Custom action" : `Order ${binding.order || 0}`} · ${htmlEscape({blocking:"Required",background:"Background",context:"Context only"}[binding.mode] || binding.mode || "Required")} · ${scope ? `Node: ${htmlEscape(scope)}` : "Project"}${disabled ? " · Disabled" : ""}</span>
           ${source === "custom" && event.name && event.id !== "custom" ? `<span class="muted small">${htmlEscape(event.name)}</span>` : ""}
-        </button><div class="workflow-assignment-actions"><button type="button" class="secondary" data-workflow-preview="${index}">${binding.mode === "context" ? "Preview context" : "Preview prompt"}</button></div>
+        <div class="workflow-assignment-actions"><button type="button" class="secondary" data-workflow-skill="${htmlEscape(skill.id)}" aria-label="Edit ${htmlEscape(skill.name)} Skill">Edit Skill</button><button type="button" class="secondary" data-workflow-preview="${index}">${binding.mode === "context" ? "Preview context" : "Preview prompt"}</button><button type="button" class="secondary" data-workflow-assignment-edit="${index}">Assignment settings</button></div>
       </article>`;
     }).join("")}</div>` : '<p class="workflow-empty muted">No Skills assigned. Add a Skill to run work at this trigger.</p>'}
   </section>`;
@@ -87,7 +85,6 @@ function renderWorkflowSettings(data) {
     workflowSettingsRoute = route;
     const legacy = parseHash().tab;
     workflowSettingsView = ["skills", "templates"].includes(legacy) ? "resources" : "goals";
-    if (["skills", "templates"].includes(legacy)) workflowSettingsResource = legacy;
   }
   return `<div id="workflow-settings-surface">${workflowSettingsContent(data)}</div>`;
 }
@@ -96,9 +93,7 @@ function workflowSettingsContent(data) {
   if (data.detached) {
     content = `<p class="muted">Attach a project to configure steps, event triggers, and Skills. Built-in Templates remain available to explore.</p>${renderTemplatesSettings(data.templates)}`;
   } else if (workflowSettingsView === "resources") {
-    content = `<div class="actions workflow-resource-switch">${automationChoices("data-workflow-resource", "Shared resources", [["skills", "Skills"], ["templates", "Templates and partials"]], workflowSettingsResource)}</div>
-      <p class="muted">Skills define the work; Templates assemble the agent's context. Each resource shows its assignments or where it is used.</p>
-      ${workflowSettingsResource === "skills" ? renderAutomationSettings("skills", data.skills) : renderTemplatesSettings(data.templates)}`;
+    content = renderTemplatesSettings({...data.templates, workflowData: data});
   } else {
     const source = workflowCurrentSource(data);
     if (workflowSettingsView === "goals") {
@@ -106,10 +101,10 @@ function workflowSettingsContent(data) {
       content += `<div class="workflow-step-picker" role="group" aria-label="Goal workflow steps">${steps.map(step => {
         const count = workflowSources(data).filter(source => source.startsWith(`workflow.${step}.`)).reduce((sum, source) => sum + workflowAssignments(data, source).length, 0);
         return `<button type="button" class="secondary" data-workflow-step="${htmlEscape(step)}" aria-pressed="${step === workflowSettingsStep}"><strong>${htmlEscape(step[0].toUpperCase() + step.slice(1))}</strong><span class="muted small">${count} ${count === 1 ? "Skill" : "Skills"}</span></button>`;
-      }).join("")}</div><div class="flat-tabs workflow-hook-tabs" role="tablist" aria-label="${htmlEscape(workflowSettingsStep)} triggers">${Object.entries(workflowHookLabels).filter(([key]) => workflowSources(data).includes(`workflow.${workflowSettingsStep}.${key}`)).map(([key,label]) => `<button type="button" role="tab" id="workflow-hook-${key}" aria-controls="workflow-hook-panel" data-workflow-hook="${key}" aria-selected="${key === workflowSettingsHook}" tabindex="${key === workflowSettingsHook ? 0 : -1}">${label}</button>`).join("")}</div>`;
+      }).join("")}</div><div class="flat-tabs workflow-hook-tabs" role="tablist" aria-label="${htmlEscape(workflowSettingsStep)} triggers">${Object.entries(workflowHookLabels).filter(([key]) => workflowSources(data).includes(`workflow.${workflowSettingsStep}.${key}`)).map(([key,label]) => `<button type="button" role="tab" id="workflow-hook-${key}" aria-controls="workflow-hook-panel" data-workflow-hook="${key}" aria-selected="${key === workflowSettingsHook}" tabindex="${key === workflowSettingsHook ? 0 : -1}">${label} (${workflowAssignments(data, `workflow.${workflowSettingsStep}.${key}`).length})</button>`).join("")}</div>`;
     } else if (workflowSettingsView === "system") {
       const sources = workflowSources(data).filter(source => source !== "custom" && !source.startsWith("workflow."));
-      content += `<div class="workflow-system-picker"><label for="workflow-system-source">System event</label><select id="workflow-system-source">${sources.map(item => `<option value="${htmlEscape(item)}" ${item === source ? "selected" : ""}>${htmlEscape(workflowSourceLabel(item))}</option>`).join("")}</select></div>`;
+      content += `<div class="workflow-step-picker workflow-system-picker" role="group" aria-label="System events">${sources.map(item => `<button type="button" class="secondary" data-workflow-system="${htmlEscape(item)}" aria-pressed="${item === source}"><strong>${htmlEscape(workflowSourceLabel(item))}</strong><span class="muted small">${workflowAssignments(data, item).length} Skills</span></button>`).join("")}</div>`;
     }
     content += source ? (workflowSettingsView === "goals" ? `<div id="workflow-hook-panel" role="tabpanel" aria-labelledby="workflow-hook-${workflowSettingsHook}">${renderWorkflowAssignments(data, source)}</div>` : renderWorkflowAssignments(data, source)) : '<p class="muted">No system event triggers are available.</p>';
   }
@@ -140,14 +135,15 @@ function bindWorkflowSettings(data) {
   bindWorkflowTabGroup(root, "[data-workflow-view]", "workflowView", value => { workflowSettingsView = value; });
   bindWorkflowTabGroup(root, "[data-workflow-hook]", "workflowHook", value => { workflowSettingsHook = value; });
   root.querySelectorAll("[data-workflow-step]").forEach(button => { button.onclick = () => { workflowSettingsStep = button.dataset.workflowStep; redrawWorkflowSettings(); root.querySelector(`[data-workflow-step="${workflowSettingsStep}"]`)?.focus({preventScroll:true}); }; });
-  root.querySelector("#workflow-system-source")?.addEventListener("change", event => { workflowSettingsSystemSource = event.target.value; redrawWorkflowSettings(); });
+  root.querySelectorAll("[data-workflow-system]").forEach(button => { button.onclick = () => { workflowSettingsSystemSource = button.dataset.workflowSystem; redrawWorkflowSettings(); document.querySelector(`[data-workflow-system="${CSS.escape(workflowSettingsSystemSource)}"]`)?.focus({preventScroll:true}); }; });
   root.querySelector("[data-workflow-history]").onclick = () => openEventHistory();
   root.querySelectorAll("[data-workflow-add]").forEach(button => { button.onclick = () => openSkillEditor(null, false, {source: button.dataset.workflowAdd}); });
   root.querySelectorAll("[data-workflow-skill]").forEach(button => { button.onclick = () => openSkillEditor(data.skills.items.find(skill => skill.id === button.dataset.workflowSkill)); });
+  root.querySelectorAll("[data-workflow-existing]").forEach(button => { button.onclick = () => openWorkflowAssignment(data, button.dataset.workflowExisting); });
+  root.querySelectorAll("[data-workflow-assignment-edit]").forEach(button => { button.onclick = () => openWorkflowAssignment(data, workflowCurrentSource(data), workflowAssignments(data, workflowCurrentSource(data))[Number(button.dataset.workflowAssignmentEdit)]); });
   root.querySelectorAll("[data-workflow-preview]").forEach(button => { button.onclick = () => previewWorkflowAssignment(data, workflowCurrentSource(data), Number(button.dataset.workflowPreview), button); });
-  root.querySelectorAll("[data-workflow-resource] button").forEach(button => { button.onclick = () => { workflowSettingsResource = button.dataset.choice; redrawWorkflowSettings(); }; });
   if (workflowSettingsView === "resources") {
-    if (workflowSettingsResource === "skills") bindAutomationSettings("skills", data.skills); else bindTemplatesSettings();
+    bindTemplatesSettings();
   }
 }
 
@@ -180,4 +176,56 @@ async function previewWorkflowAssignment(data, source, index, button) {
     await openTemplateEditor(previewTemplate, {previewValues: values, initialTab: "preview", previewOnly: true, description: `${current.item.name} at ${workflowSourceLabel(source)}. Sample data only; this does not run the Skill.`});
   } catch (error) { showActionError(error); }
   finally { if (button.isConnected) button.disabled = false; }
+}
+
+async function openWorkflowAssignment(data, source, row = null) {
+  if (automationEditor || automationEditorOpening) return;
+  const generation = captureNodeContextGeneration();
+  const assigned = new Set(workflowAssignments(data, source).map(row => row.skill.id));
+  const choices = row ? [row.skill] : data.skills.items.filter(skill => !assigned.has(skill.id));
+  const root = automationModal(row ? `${row.skill.name} — Assignment` : `Add existing Skill — ${workflowSourceLabel(source)}`, `
+    <p class="muted">${row ? "These settings apply only to this assignment. Edit Skill changes its instructions everywhere it is used." : "Reuse a Skill here without changing its other assignments."}</p>
+    <div class="form-row"><label for="assignment-skill">Skill</label><select id="assignment-skill" ${row ? "disabled" : ""}>${choices.map(skill => `<option value="${htmlEscape(skill.id)}">${htmlEscape(skill.name)}</option>`).join("")}</select></div>
+    ${choices.length ? "" : '<p class="muted">No unassigned Skills are available for this trigger. Create a Skill instead.</p>'}
+    <div class="form-row"><label for="assignment-mode">How it runs</label><select id="assignment-mode">${Object.entries({blocking:"Required",background:"Background",context:"Context only"}).map(([value,label]) => `<option value="${value}" ${value === (row?.binding.mode || "blocking") ? "selected" : ""}>${label}</option>`).join("")}</select></div>
+    <div class="form-row"><label for="assignment-order">Order</label><input id="assignment-order" type="number" min="-2147483648" max="2147483647" step="1" required value="${row?.binding.order || 0}"></div>
+    <div class="form-row"><label for="assignment-enabled">Enabled</label><input id="assignment-enabled" type="checkbox" ${row?.binding.enabled !== false ? "checked" : ""}></div>
+    <div data-assignment-inputs></div>`);
+  automationEditor = root;
+  const picker = root.querySelector('#assignment-skill');
+  const drawInputs = () => {
+    const skill = choices.find(skill => skill.id === picker.value);
+    renderInto(root.querySelector('[data-assignment-inputs]'), (skill?.parameters || []).map(parameter => `<div class="form-row"><label>${htmlEscape(parameter.name)} context</label><input data-assignment-input="${htmlEscape(parameter.name)}" aria-label="${htmlEscape(parameter.name)} context" placeholder="Use default, or enter a context path" value="${htmlEscape(row?.binding.inputs?.[parameter.name] || '')}"></div>`).join(''));
+  };
+  picker.onchange = drawInputs; drawInputs();
+  root.querySelector('[data-save]').disabled = !choices.length;
+  const remove = root.querySelector('[data-delete]');
+  remove.hidden = !row; remove.textContent = 'Remove assignment';
+  let saving = false;
+  const save = async deleting => {
+    if (saving) return;
+    saving = true;
+    root.querySelectorAll('.modal-actions button').forEach(button => button.disabled = true);
+    try {
+      if (!isNodeContextGenerationCurrent(generation)) throw new Error('The selected node changed. Reopen this assignment.');
+      const order = root.querySelector('#assignment-order');
+      if (!deleting && !order.reportValidity()) return;
+      const skill = choices.find(skill => skill.id === picker.value);
+      const current = await api('GET', `/api/skills/${encodeURIComponent(skill.id)}`);
+      if (current.revision !== data.skills.revision) throw new Error('Workflow configuration changed. Reopen this assignment before saving.');
+      const assignments = data.events.items.flatMap(event => (event.bindings || []).filter(binding => binding.skill_id === skill.id && !(row && event.id === row.event.id && binding.id === row.binding.id)).map(binding => ({event_id:event.id, binding})));
+      if (!deleting) {
+        const event = row?.event || data.events.items.find(event => (event.source || 'custom') === source);
+        if (!event) throw new Error('This event is no longer available. Refresh the Workflow.');
+        const inputs = {...(row?.binding.inputs || {})};
+        root.querySelectorAll('[data-assignment-input]').forEach(input => { if (input.value.trim()) inputs[input.dataset.assignmentInput] = input.value.trim(); else delete inputs[input.dataset.assignmentInput]; });
+        assignments.push({event_id:event.id, binding:{...row?.binding, id:row?.binding.id || newSkillId(), skill_id:skill.id, enabled:root.querySelector('#assignment-enabled').checked, mode:root.querySelector('#assignment-mode').value, order:Number(order.value), scope:row?.binding.scope || skill.scope || {node_id:null}, inputs}});
+      }
+      await api('PUT', `/api/skills/${encodeURIComponent(skill.id)}`, {revision:current.revision, item:current.item, event_bindings:assignments});
+      root._close(); await refreshSettings({force:true}); await refreshManualSkills();
+    } catch (error) { root.querySelector('[data-automation-error]').textContent = error.message; }
+    finally { saving = false; root.querySelectorAll('.modal-actions button').forEach(button => button.disabled = false); }
+  };
+  root.querySelector('[data-save]').onclick = () => save(false);
+  remove.onclick = () => save(true);
 }

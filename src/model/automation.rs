@@ -6,7 +6,7 @@ use serde_json::Value;
 
 use super::workflow::GoalStatus;
 
-pub const SCHEMA_VERSION: u32 = 2;
+pub const SCHEMA_VERSION: u32 = 3;
 pub const MAX_CONFIG_BYTES: usize = 16 * 1024 * 1024;
 pub const CUSTOM_EVENT_ID: &str = "custom";
 pub const WORKFLOW_STEPS: [&str; 10] = [
@@ -251,7 +251,7 @@ impl AutomationConfig {
         {
             return Err("Events/Skills configuration exceeds 16 MiB".into());
         }
-        if ![1, SCHEMA_VERSION].contains(&self.schema_version) {
+        if ![1, 2, SCHEMA_VERSION].contains(&self.schema_version) {
             return Err("unsupported Events/Skills schema".into());
         }
         if self.events.len() > 1024 || self.skills.len() > 1024 {
@@ -275,7 +275,6 @@ impl AutomationConfig {
             validate_parameters(&skill.parameters)?;
         }
         let catalog = system_catalog();
-        let mut assigned_skills = BTreeSet::new();
         for (id, event) in &self.events {
             if id != &event.id || !valid_id(id) || event.name.trim().is_empty() {
                 return Err(format!("invalid Event {id}"));
@@ -306,9 +305,6 @@ impl AutomationConfig {
             }
             let mut ids = BTreeSet::new();
             for binding in &event.bindings {
-                if self.schema_version >= 2 && !assigned_skills.insert(&binding.skill_id) {
-                    return Err("A Skill has one trigger. Clone the Skill to use it at another trigger point.".into());
-                }
                 if !valid_id(&binding.id) || !ids.insert(&binding.id) {
                     return Err("invalid or repeated binding ID".into());
                 }
