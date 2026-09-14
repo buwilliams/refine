@@ -17,7 +17,8 @@ test('Templates editor previews nested values, saves revisions, and retains conf
   try {
     const {page} = app;
     await page.goto(`${app.origin}/#/settings/templates`);
-    await page.locator('[data-template-id="workflow"]').first().click();
+    await page.locator('[data-template-id="workflow"]').first().focus();
+    await page.keyboard.press('Enter');
     const dialog = page.locator('[data-testid="automation-modal"]');
     await dialog.waitFor();
     assert.equal(await dialog.locator('[data-delete]').count(), 0);
@@ -79,8 +80,9 @@ test('Resource catalog explains uses, filters types, and follows edited referenc
     await page.goto(`${app.origin}/#/settings/templates`);
     await page.locator('[data-template-catalog-row]').first().waitFor();
     assert.equal(await page.locator('.template-map').count(), 0);
+    assert.equal(await page.locator('[data-template-catalog-row] button').count(), 0);
     assert.equal(await page.locator('[data-template-view]').count(), 0);
-    const partialRow = page.locator('[data-template-catalog-row]', {hasText: 'Workflow Context'}).filter({has: page.locator('[data-template-id="workflow-context"]')});
+    const partialRow = page.locator('[data-template-catalog-row][data-template-id="workflow-context"]');
     assert.match(await partialRow.innerText(), /Partial/);
     assert.match(await partialRow.innerText(), /Included by .*Workflow/);
     await page.locator('[data-template-catalog-search]').fill('source upgrade');
