@@ -189,7 +189,7 @@ function editHubRecord(site,collection,record) {
   root.querySelector("[data-write]").onclick=()=>hubAction(root,async()=>{await hubApi(root,"PUT",path,{data:JSON.parse(root.querySelector("[data-data]").value),revision:record?.revision,request_id:hubId()});root._close();await openHubCollection(site,collection);});
   root.querySelector("[data-remove]").onclick=()=>hubAction(root,async()=>{await hubApi(root,"DELETE",path,{revision:record.revision});root._close();await openHubCollection(site,collection);});
 }
-document.getElementById("nav-context-menu")?.addEventListener("toggle",event=>{if(event.target.open)refreshKnowledgeHub();});
+document.getElementById("nav-create-menu")?.addEventListener("toggle",event=>{if(event.target.open)refreshKnowledgeHub();});
 window.addEventListener("load",refreshKnowledgeHub);
 
 async function* hubImportRecords(file) {

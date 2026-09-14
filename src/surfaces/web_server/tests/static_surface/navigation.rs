@@ -94,7 +94,7 @@ fn static_main_nav_consolidates_context_and_controls() {
     let releases = fs::read_to_string(static_root.join("js/features/source_update.js")).unwrap();
 
     let menu_start = index
-        .find(r#"<details class="nav-menu nav-context-menu" id="nav-context-menu">"#)
+        .find(r#"<details class="nav-menu nav-create-menu" id="nav-create-menu">"#)
         .expect("controls menu should exist");
     let menu_end = menu_start
         + index[menu_start..]
@@ -107,14 +107,11 @@ fn static_main_nav_consolidates_context_and_controls() {
         .expect("controls summary should close");
     let summary = &menu[..summary_end];
 
-    assert!(summary.contains(r#"aria-label="Open actions""#));
-    assert!(summary.contains(r#"class="nav-context-icon""#));
-    assert!(summary.contains("<span>Actions</span>"));
-    assert!(summary.contains(r#"class="nav-context-main""#));
-    assert!(summary.contains(r#"class="nav-context-more" aria-hidden="true""#));
-    assert!(!summary.contains("target-app-dot"));
-    assert!(!summary.contains("context-app-name"));
-    assert!(!summary.contains("context-reporter-name"));
+    assert!(summary.contains(r#"aria-label="Open New Goal menu""#));
+    assert!(summary.contains("nav-create-more"));
+    assert!(!index.contains(r#"id="nav-context-menu""#));
+    assert!(menu.contains(r#"id="btn-new-feature""#));
+    assert!(menu.contains(r#"id="btn-import""#));
 
     for control_id in [
         r#"id="target-app-indicator""#,

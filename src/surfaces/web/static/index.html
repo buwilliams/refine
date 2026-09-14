@@ -49,17 +49,14 @@
         <select id="global-reporter" aria-label="Reporter" data-testid="global-reporter" hidden tabindex="-1"></select>
         <div class="nav-menu-panel nav-picker-options" role="listbox" aria-label="Choose Reporter"></div>
       </details>
-      <details class="nav-menu nav-context-menu" id="nav-context-menu">
-        <summary class="nav-context-summary" aria-label="Open actions" data-testid="context-menu-toggle">
-          <span class="nav-context-main">
-            <svg class="nav-context-icon" aria-hidden="true" viewBox="0 0 24 24" focusable="false">
-              <path d="m13 2-9 12h7l-1 8 10-12h-7l1-8Z"></path>
-            </svg>
-            <span>Actions</span>
-          </span>
-          <span class="nav-context-more" aria-hidden="true"></span>
-        </summary>
-        <div class="nav-menu-panel nav-context-panel">
+      <div class="nav-create-group">
+        <a class="btn nav-action nav-create-primary" href="#/goals/new" id="btn-new-goal" data-testid="nav-new-goal">+ New Goal</a>
+        <details class="nav-menu nav-create-menu" id="nav-create-menu">
+          <summary class="btn nav-action nav-create-more" aria-label="Open New Goal menu" data-testid="create-menu-toggle"></summary>
+          <div class="nav-menu-panel nav-create-panel nav-context-panel">
+            <div class="nav-menu-label">Create</div>
+            <a class="nav-menu-item" href="#/features/new" id="btn-new-feature" data-testid="nav-new-feature">New Feature</a>
+            <a class="nav-menu-item" href="#/goals/import" id="btn-import" data-testid="nav-import-goals">Import</a>
           <div class="nav-menu-label">Status</div>
           <div class="quick-status-row">
             <a id="workflow-status-indicator" class="workflow-status-indicator nav-menu-item nav-control-item"
@@ -126,15 +123,6 @@
             </svg>
             <span>Guide</span>
           </a>
-        </div>
-      </details>
-      <div class="nav-create-group">
-        <a class="btn nav-action nav-create-primary" href="#/goals/new" id="btn-new-goal" data-testid="nav-new-goal">+ New Goal</a>
-        <details class="nav-menu nav-create-menu" id="nav-create-menu">
-          <summary class="btn nav-action nav-create-more" aria-label="More create actions" data-testid="create-menu-toggle"></summary>
-          <div class="nav-menu-panel nav-create-panel">
-            <a class="nav-menu-item" href="#/features/new" id="btn-new-feature" data-testid="nav-new-feature">New Feature</a>
-            <a class="nav-menu-item" href="#/goals/import" id="btn-import" data-testid="nav-import-goals">Import</a>
           </div>
         </details>
       </div>

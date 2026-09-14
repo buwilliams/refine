@@ -418,5 +418,5 @@ async function openEventHistory(id = null, offset = 0, goalId = null) {
   finally { automationHistoryOpening = false; }
 }
 
-document.getElementById("nav-context-menu")?.addEventListener("toggle", event => { if (event.target.open) refreshManualSkills(); });
+document.getElementById("nav-create-menu")?.addEventListener("toggle", event => { if (event.target.open) refreshManualSkills(); });
 window.addEventListener("load", () => refreshManualSkills());

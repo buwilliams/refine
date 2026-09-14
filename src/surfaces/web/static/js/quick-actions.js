@@ -13,7 +13,7 @@ function quickActionButton(action, label, icon, disabled = false) {
 }
 
 function quickConfigureLink(destination, label) {
-  return `<a class="quick-configure" href="${destination}" aria-label="${label}" title="${label}"><svg class="nav-menu-icon" aria-hidden="true" viewBox="0 0 24 24" focusable="false"><path d="M4 7h16M4 17h16"></path><circle cx="9" cy="7" r="3"></circle><circle cx="15" cy="17" r="3"></circle></svg></a>`;
+  return `<a class="nav-menu-item quick-configure" href="${destination}" aria-label="${label}" title="${label}"><svg class="nav-menu-icon" aria-hidden="true" viewBox="0 0 24 24" focusable="false"><path d="M4 7h16M4 17h16"></path><circle cx="9" cy="7" r="3"></circle><circle cx="15" cy="17" r="3"></circle></svg></a>`;
 }
 
 function renderQuickTargetActions(snap) {

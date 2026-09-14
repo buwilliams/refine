@@ -563,3 +563,5 @@ h3 {
 .quick-status-actions button:hover:not(:disabled), .quick-status-actions .quick-configure:hover { background: var(--color-surface-muted); }
 .quick-status-actions button:disabled { opacity: .4; cursor: default; }
 .nav-context-panel:has(.quick-status-row) { min-width: 310px; }
+
+.nav-create-panel.nav-context-panel { max-height: min(680px, calc(100dvh - 220px)); overflow-y: auto; }

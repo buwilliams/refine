@@ -145,10 +145,10 @@ test("Controls switches to dark mode and restores the stored theme on reload", {
   try {
     await app.page.emulateMedia({ colorScheme: "light" });
     await app.page.goto(`${app.origin}/#/`);
-    await app.page.waitForSelector('[data-testid="context-menu-toggle"]');
+    await app.page.waitForSelector('[data-testid="create-menu-toggle"]');
     await app.page.evaluate(() => localStorage.removeItem("refine_color_theme"));
     await app.page.reload();
-    await app.page.locator('[data-testid="context-menu-toggle"]').click();
+    await app.page.locator('[data-testid="create-menu-toggle"]').click();
     await app.page.locator('[data-testid="nav-theme-toggle"]').click();
 
     const dark = await app.page.evaluate(() => {
@@ -303,7 +303,7 @@ test("Controls Node selector switches by ID and refreshes the visible Node conte
   const app = await openApp({ fixture });
   try {
     await assertScreenRenders(app, { route: "#/", marker: "#dash" });
-    await app.page.locator('[data-testid="context-menu-toggle"]').click();
+    await app.page.locator('[data-testid="create-menu-toggle"]').click();
     const selector = app.page.locator('[data-testid="global-node"]');
     assert.deepEqual(await selector.locator("option").allTextContents(), ["Alpha", "Beta"]);
     assert.equal(await selector.inputValue(), "node-a");
@@ -1492,7 +1492,7 @@ test("Custom Skills open a selected agent tab with typed inputs and no Goal cont
     const page = app.page;
     await page.goto(`${app.origin}/#/settings/skills`);
     await page.evaluate(() => { state.currentGoal = "GOAL1"; });
-    await page.locator('#nav-context-menu > summary').click();
+    await page.locator('#nav-create-menu > summary').click();
     const nav = page.locator('#nav-manual-skills');
     await nav.locator('[data-manual-skill="inspect"]').waitFor();
     assert.equal(await nav.locator('.nav-menu-label.nav-context-section-label').textContent(),"Skills");

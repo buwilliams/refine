@@ -1016,7 +1016,7 @@ async function openGuideItemTarget(item) {
     return;
   }
   if (target.openContextMenu) {
-    const menu = document.getElementById("nav-context-menu");
+    const menu = document.getElementById("nav-create-menu");
     if (menu) menu.open = true;
   } else {
     closeTopbarMenus();
