@@ -55,6 +55,10 @@
       }
     },
     "metadata": {
+      "event_operation_id": "1a0a0580826800dd0",
+      "started_bindings": {
+        "trigger-2124c51c-8d1f-44b7-8a07-7a989a68227f": "2026-09-14T14:35:18.970037244+00:00"
+      },
       "template_snapshot": {
         "records": {
           "agent": {
@@ -386,7 +390,7 @@
       }
     }
   ],
-  "state": "pending",
+  "state": "running",
   "results": {},
   "attempts": [],
   "created_at": "2026-09-14T12:22:52.053244020+00:00",
