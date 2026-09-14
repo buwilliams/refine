@@ -5,7 +5,7 @@ function renderProjectApplicationsSection({
 }) {
   return `
     <section class="settings-section">
-      <h3>Applications</h3>
+      <h3>Target Application</h3>
       <p class="scope-label muted small">Project-wide</p>
       <p class="muted small">
         Current app: <code>${htmlEscape(state.project?.target_root || "Not attached")}</code>

@@ -684,7 +684,7 @@ const SETTINGS_SURFACES = {
     storageKey: "refine_settings_tab",
     tabs: [
       { slug: "processes", label: "Processes" },
-      { slug: "application", label: "Application" },
+      { slug: "application", label: "Nodes" },
       { slug: "reporters", label: "Reporters" },
       { slug: "workflow", label: "Workflow" },
       { slug: "knowledge-hub", label: "Knowledge Hub" },

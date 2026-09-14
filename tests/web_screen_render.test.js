@@ -1530,7 +1530,7 @@ test("Skills use one trigger, shared modal controls and clickable rows with clon
     await page.goto(`${app.origin}/#/settings/events`);
     await page.locator('[data-testid="settings-skills"]').waitFor();
     assert.equal(new URL(page.url()).hash,"#/settings/skills");
-    assert.deepEqual(await page.locator('.settings-tab').allTextContents().then(labels=>labels.map(s=>s.trim())),["Processes","Application","Reporters","Workflow","Knowledge Hub","Target App","Runtime"]);
+    assert.deepEqual(await page.locator('.settings-tab').allTextContents().then(labels=>labels.map(s=>s.trim())),["Processes","Nodes","Reporters","Workflow","Knowledge Hub","Target App","Runtime"]);
     assert.equal(await page.locator('[data-testid="automation-table"] td:first-child button').count(),0);
     await page.locator('[data-automation-row]').focus(); await page.keyboard.press('Enter');
     const modal = page.locator('[data-testid="automation-modal"]');
