@@ -246,7 +246,7 @@ pre {
   display: inline-flex;
   align-items: center;
   height: 34px;
-  max-width: 150px;
+  white-space: nowrap;
   padding: 0;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -501,9 +501,6 @@ h3 {
     justify-content: flex-start;
     overflow-x: auto;
     padding-bottom: 2px;
-  }
-  .nav-context-summary {
-    max-width: 150px;
   }
   .nav-context-main {
     padding-left: 8px;
