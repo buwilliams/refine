@@ -400,11 +400,47 @@
       }
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "error",
+  "results": {
+    "trigger-2124c51c-8d1f-44b7-8a07-7a989a68227f": {
+      "invocation_id": "0d1c3e399a1459245c6c233fb6ac152b8c099968e809051f52ea6a638b78ff04",
+      "binding_id": "trigger-2124c51c-8d1f-44b7-8a07-7a989a68227f",
+      "role": "task",
+      "outcome": "error",
+      "summary": "Could not queue fetch-goals-from-email: this invocation's completion contract omits invocation_id, and no invocation ID is exposed in the process environment. No trigger command was run or configuration changed.",
+      "evidence": [],
+      "artifacts": null
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "trigger-2124c51c-8d1f-44b7-8a07-7a989a68227f",
+      "checkout": {
+        "observation": {
+          "branch": "main",
+          "head_commit": "114157fc2912090091769222d1f33a66d868a81b",
+          "status_porcelain": []
+        },
+        "tree": "8615780b9cb1a512986984752630dd02cfe4f408"
+      },
+      "checkout_recorded": true,
+      "diagnostic": null,
+      "host_bound_result": true,
+      "observational_violation": false,
+      "operation_id": null,
+      "process_id": "proc-1789400694771-678426-364",
+      "prompt_bytes": 2098,
+      "provider_session_id": null,
+      "purpose": "work",
+      "raw_output": "{\"outcome\":\"error\",\"summary\":\"Could not queue fetch-goals-from-email: this invocation's completion contract omits invocation_id, and no invocation ID is exposed in the process environment. No trigger command was run or configuration changed.\"}",
+      "received_at": "2026-09-14T15:45:05.687999814+00:00",
+      "started_at": "2026-09-14T15:44:54.720145884+00:00",
+      "workflow_revision": null
+    }
+  ],
   "created_at": "2026-09-14T14:46:10.810138934+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-14T15:45:05.742922107+00:00",
   "error": null,
   "action_applied": false
 }
