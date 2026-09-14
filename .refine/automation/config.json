@@ -1,6 +1,6 @@
 {
   "schema_version": 3,
-  "revision": 78,
+  "revision": 79,
   "skills": {
     "default-governance": {
       "id": "default-governance",
@@ -103,6 +103,27 @@
         }
       ],
       "provenance": null
+    },
+    "update-refine-hub": {
+      "id": "update-refine-hub",
+      "name": "Update Refine Hub",
+      "prompt": "# Update Refine Hub\n\nYou are running a Skill in Refine, which coordinates agents and Goals that may be working in parallel. The Refine CLI is at {{refine_executable}}; use --help to discover commands.\n\nBuild and maintain Refine Hub's product documentation and release notes using the requested change in Parameters.\n\n## Outcome\n\nReaders understand the current product and what changed. Write in plain language with only enough detail to help them use Refine. For releases, group major changes under “What you need to know” and include screenshots where they clarify the shipped interface.\n\n## Guardrails\n\n- Refine Hub ships from src/surfaces/refine-hub in the Refine source checkout ({{refine_checkout}}). Update those source files; the built-in Hub API is read-only. Do not put product documentation in the target application's user Hub storage.\n- Check the current implementation and interface. Cover the requested release period, describe final behavior, and leave out superseded designs.\n- Keep navigation and links consistent. Check changed pages, links, and screenshots in the Hub and website surfaces.\n- Explain that source changes reach users when they update Refine. Follow the user's request for committing, publishing, and rebuilding.\n",
+      "role": "task",
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [
+        {
+          "name": "request",
+          "description": "What should Refine Hub explain or update? Include the version and coverage dates for release notes.",
+          "kind": "text",
+          "required": true,
+          "default": null,
+          "choices": []
+        }
+      ],
+      "provenance": "refine-builtin"
     }
   },
   "events": {
@@ -163,6 +184,32 @@
           "order": 0,
           "scope": {
             "node_id": "default"
+          },
+          "overrides": null,
+          "inputs": {}
+        }
+      ],
+      "on_success": null
+    },
+    "update-refine-hub": {
+      "id": "update-refine-hub",
+      "name": "Update Refine Hub",
+      "kind": "custom",
+      "source": null,
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [],
+      "bindings": [
+        {
+          "id": "update-refine-hub",
+          "skill_id": "update-refine-hub",
+          "enabled": true,
+          "mode": "blocking",
+          "order": 0,
+          "scope": {
+            "node_id": null
           },
           "overrides": null,
           "inputs": {}
