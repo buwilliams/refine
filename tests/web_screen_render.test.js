@@ -1463,6 +1463,7 @@ function skillFixture() {
   const records = [{item:{id:"inspect",name:"Inspect release",prompt:"Inspect the release.",enabled:true,scope:{node_id:null},parameters:[{name:"count",kind:"number",required:true,default:3}]},trigger:{id:"inspect-trigger",source:"custom",enabled:true,mode:"blocking",order:0,scope:{node_id:null},inputs:{}}}];
   const writes = [], launches = [];
   const fixture = (pathname, request) => {
+    if (pathname === "/api/event-definitions") return {revision, items:records.map(r => ({id:r.trigger.id, source:r.trigger.source === "custom" ? null : r.trigger.source, enabled:true, bindings:[{...r.trigger, skill_id:r.item.id}]}))};
     if (pathname === "/api/skills") return {revision, items:records.map(r => ({...r.item,trigger_source:r.trigger.source})), manual_skill_ids:records.filter(r => r.item.enabled && r.trigger.source === "custom").map(r => r.item.id)};
     if (pathname.startsWith("/api/skills/") && pathname !== "/api/skills/catalog") {
       const id = pathname.split("/")[3]; const record = records.find(r => r.item.id === id);
@@ -1529,7 +1530,7 @@ test("Skills use one trigger, shared modal controls and clickable rows with clon
     await page.goto(`${app.origin}/#/settings/events`);
     await page.locator('[data-testid="settings-skills"]').waitFor();
     assert.equal(new URL(page.url()).hash,"#/settings/skills");
-    assert.deepEqual(await page.locator('.settings-tab').allTextContents().then(labels=>labels.map(s=>s.trim())),["Processes","Application","Reporters","Skills","Knowledge Hub","Target App","Runtime"]);
+    assert.deepEqual(await page.locator('.settings-tab').allTextContents().then(labels=>labels.map(s=>s.trim())),["Processes","Application","Reporters","Workflow","Knowledge Hub","Target App","Runtime"]);
     assert.equal(await page.locator('[data-testid="automation-table"] td:first-child button').count(),0);
     await page.locator('[data-automation-row]').focus(); await page.keyboard.press('Enter');
     const modal = page.locator('[data-testid="automation-modal"]');

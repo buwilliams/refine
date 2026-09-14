@@ -72,13 +72,18 @@ fn static_main_nav_exposes_refine_source_update_affordance() {
 }
 
 #[test]
-fn static_settings_replace_retired_editors_with_skills() {
+fn static_settings_consolidate_skills_and_templates_in_workflow() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surfaces/web/static");
     let index = fs::read_to_string(root.join("index.html")).unwrap();
     let settings = fs::read_to_string(root.join("js/features/settings.js")).unwrap();
     assert!(index.contains("settings_skills.js"));
+    assert!(index.contains("settings_templates.js"));
+    assert!(index.contains("settings_workflow.js"));
+    assert!(settings.contains("slug: \"workflow\""));
+    assert!(!settings.contains("slug: \"skills\""));
+    assert!(!settings.contains("slug: \"templates\""));
     assert!(!settings.contains("slug: \"events\""));
-    assert!(settings.contains("slug: \"skills\""));
+
     for retired in [
         "settings_governance.js",
         "settings_guidance.js",

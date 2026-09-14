@@ -33,7 +33,7 @@ secret are not synchronized through refine-state.
 ## Install and run the Skills
 
 Save [Fetch Goals from Email](skills/fetch-goals-from-email.json) through
-**Settings → Skills** or `refine skills save`, using the latest configuration
+**Settings → Workflow → Shared resources → Skills** or `refine skills save`, using the latest configuration
 revision. Choose the node that owns the mailbox connection. Open
 **Controls → Skills → Fetch Goals from Email** to run it in an agent tab.
 

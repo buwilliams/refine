@@ -36,6 +36,8 @@ function templateComposition(data) {
       edges.push({from: id, to: "$skill", conditional: true});
     }
   });
+  const skillPartials = new Set((data.skills || []).flatMap(skill => [...(skill.prompt || "").matchAll(/(?<!\\){{\s*templates\.([\w-]+)\s*}}/g)].map(match => match[1])));
+  skillPartials.forEach(id => { if (rows.has(id)) edges.push({from: "$skill", to: id, conditional: true}); });
   return {rows, edges};
 }
 
@@ -67,7 +69,7 @@ function renderTemplateMap(data) {
   const columns = [];
   levels.forEach((level, id) => { (columns[level] ||= []).push(id); });
   const card = id => {
-    if (id === "$skill") return `<div class="template-map-node template-map-skill" data-map-node="$skill"><span class="muted small">Skill</span><a href="#/settings/skills">Assigned Skill</a><p class="muted small">Selected for this step or task.</p></div>`;
+    if (id === "$skill") return `<div class="template-map-node template-map-skill" data-map-node="$skill"><span class="muted small">Skill</span><a href="#/settings/skills">Assigned Skill</a><p class="muted small">Selected for this step or task.</p>${edges.some(edge => edge.from === "$skill") ? `<button type="button" class="template-map-expand" data-map-expand="$skill" aria-expanded="${templateMapExpanded.has("$skill")}">${templateMapExpanded.has("$skill") ? "Hide" : "Show"} partials used by Skills</button>` : ""}</div>`;
     const row = rows.get(id), children = edges.filter(edge => edge.from === id);
     return `<div class="template-map-node" data-map-node="${htmlEscape(id)}">
       <span class="muted small">${row.usage?.kind === "partial" ? "Partial" : "Template"}</span>
@@ -84,7 +86,7 @@ function renderTemplateMap(data) {
 
 function renderTemplatesCatalog(data = {}) {
   const descriptions = {
-    workflow: "All four steps use Workflow with the Skill assigned to that step. Shared partials keep the common context in one place.",
+    workflow: "Skills on any Goal step or hook use Workflow. Choose Goal steps to manage their assignments. Shared partials keep the common context in one place.",
     interactive: "Toolbar and CLI terminals use Terminal Session. Managed chats use Chat Session. Each includes instructions for the selected agent mode.",
     tasks: "Imports, releases, fleet management, target-app operations, and state repair each have a specific starting template.",
     all: "Every editable entry, including reusable partials and reference entries without a current built-in launch.",
@@ -97,12 +99,11 @@ function renderTemplatesCatalog(data = {}) {
     <h3>Templates</h3><p class="muted">Templates build the prompts Refine sends to agents. Partials are reusable pieces included inside those prompts.</p>
     <div class="flat-tabs template-catalog-tabs" role="tablist" aria-label="Template uses">${Object.entries(templateCatalogViews).map(([key, label]) => `<button type="button" role="tab" id="template-view-${key}" aria-controls="template-catalog-panel" data-template-view="${key}" aria-selected="${key === templateCatalogView}" tabindex="${key === templateCatalogView ? 0 : -1}">${label}</button>`).join("")}</div>
     <div role="tabpanel" id="template-catalog-panel" aria-labelledby="template-view-${templateCatalogView}"><p class="muted">${descriptions[templateCatalogView]}</p>
-    ${templateCatalogView === "workflow" ? `<ol class="template-workflow-steps" aria-label="Goal workflow">${[["Plan", "Define the approach"], ["Implement", "Build the plan"], ["Quality", "Test the outcome"], ["Governance", "Verify the Goal"]].map(([name, detail]) => `<li><strong>${name}</strong><span class="muted small">${detail}</span></li>`).join("")}</ol>` : ""}
     <div data-template-map-host>${renderTemplateMap(data)}</div>
     <label class="template-catalog-search">Find a template or partial<input type="search" data-template-catalog-search placeholder="Search names and where they are used…"></label>
     <div class="template-catalog-table"><table class="table"><thead><tr><th>Name</th><th>Type</th><th>Where Refine uses it</th><th>Composition</th></tr></thead><tbody>
       ${items.map(row => {
-        const id = row.item.id, parents = [...new Set(edges.filter(edge => edge.to === id).map(edge => rows.get(edge.from).name))];
+        const id = row.item.id, parents = [...new Set(edges.filter(edge => edge.to === id).flatMap(edge => edge.from === "$skill" ? (data.skills || []).filter(skill => [...(skill.prompt || "").matchAll(/(?<!\\){{\s*templates\.([\w-]+)\s*}}/g)].some(match => match[1] === id)).map(skill => `Skill: ${skill.name}`) : [rows.get(edge.from).name]))];
         const group = row.usage?.group || "workflow";
         const visible = templateCatalogView === "all" || group === templateCatalogView || (group === "delivery" && templateCatalogView !== "all");
         return `<tr data-template-catalog-row data-template-group="${htmlEscape(group)}" data-template-search="${htmlEscape(`${row.name} ${row.usage?.description || ""} ${parents.join(" ")}`.toLowerCase())}"${visible ? "" : " hidden"}>

@@ -1,0 +1,197 @@
+// Workflow is a view over the existing revision-fenced Skills, events, and Templates.
+let workflowSettingsView = "goals";
+let workflowSettingsStep = "plan";
+let workflowSettingsHook = "enter";
+let workflowSettingsSystemSource = "";
+let workflowSettingsResource = "skills";
+let workflowSettingsRoute = "";
+let workflowSettingsData = null;
+const workflowHookLabels = {enter: "On entry", success: "On success", error: "On error", exit: "On exit"};
+const workflowViewLabels = {goals: "Goal steps", system: "System events", custom: "Custom actions", resources: "Shared resources"};
+
+async function loadWorkflowSettings(detached = false) {
+  if (detached) return {detached: true, skills: {items: []}, events: {items: []}, catalog: {sources: []}, templates: await api("GET", "/api/templates")};
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const [skills, events, catalog, templates] = await Promise.all([
+      api("GET", "/api/skills"), api("GET", "/api/event-definitions"),
+      api("GET", "/api/event-definitions/catalog"), api("GET", "/api/templates"),
+    ]);
+    if (skills.revision == null || events.revision == null || skills.revision === events.revision) return {skills, events, catalog, templates: {...templates, skills: skills.items}};
+  }
+  throw new Error("Workflow configuration changed while loading. Refresh to see the latest assignments.");
+}
+
+function workflowSources(data) {
+  return [...new Set([...(data.catalog.sources || []), ...(data.events.items || []).map(event => event.source).filter(Boolean), ...(data.skills.items || []).map(skill => skill.trigger_source).filter(Boolean)])];
+}
+function workflowStepNames(data) {
+  return [...new Set(workflowSources(data).filter(source => source.startsWith("workflow.")).map(source => source.split(".")[1]))];
+}
+function workflowSourceLabel(source) {
+  if (source === "custom") return "Manual and custom actions";
+  if (source === "node.startup.ready") return "Node ready after startup";
+  if (source?.startsWith("workflow.")) return skillTriggerLabel(source);
+  return (source || "").split(/[._-]/).map(word => word[0]?.toUpperCase() + word.slice(1)).join(" ");
+}
+function workflowAssignments(data, source) {
+  const skills = new Map(data.skills.items.map(skill => [skill.id, skill]));
+  const assignments = [];
+  for (const event of data.events.items || []) {
+    if ((event.source || "custom") !== source) continue;
+    for (const binding of event.bindings || []) {
+      const skill = skills.get(binding.skill_id);
+      if (skill) assignments.push({skill, binding, event});
+    }
+  }
+  // Older servers may list Skills without event projections. Keep their editor reachable.
+  for (const skill of skills.values()) {
+    if (skill.trigger_source === source && !assignments.some(row => row.skill.id === skill.id)) assignments.push({skill, binding: {order: 0, mode: "blocking"}, event: {enabled: true}});
+  }
+  return assignments.sort((a, b) => (a.binding.order || 0) - (b.binding.order || 0) || a.skill.id.localeCompare(b.skill.id));
+}
+function workflowCurrentSource(data) {
+  if (workflowSettingsView === "custom") return "custom";
+  if (workflowSettingsView === "system") {
+    const sources = workflowSources(data).filter(source => source !== "custom" && !source.startsWith("workflow."));
+    if (!sources.includes(workflowSettingsSystemSource)) workflowSettingsSystemSource = sources[0] || "";
+    return workflowSettingsSystemSource;
+  }
+  const steps = workflowStepNames(data);
+  if (!steps.includes(workflowSettingsStep)) workflowSettingsStep = steps[0] || "plan";
+  const hooks = workflowSources(data).filter(source => source.startsWith(`workflow.${workflowSettingsStep}.`)).map(source => source.split(".")[2]);
+  if (!hooks.includes(workflowSettingsHook)) workflowSettingsHook = hooks[0] || "enter";
+  return `workflow.${workflowSettingsStep}.${workflowSettingsHook}`;
+}
+function renderWorkflowAssignments(data, source) {
+  const assignments = workflowAssignments(data, source);
+  const templateId = source.startsWith("workflow.") ? "workflow" : "supervised-skill";
+  const skillPartials = assignments.flatMap(({skill}) => [...(skill.prompt || "").matchAll(/(?<!\\){{\s*templates\.([\w-]+)\s*}}/g)].map(match => match[1]));
+  const templateIds = [...new Set([templateId, "goal-agents-session", "skill-repair", "signal-repair", ...(source === "custom" ? ["manual-skill"] : []), ...skillPartials])];
+  return `<section class="workflow-trigger-details" aria-label="${htmlEscape(workflowSourceLabel(source))}">
+    <div class="actions"><h4>${htmlEscape(workflowSourceLabel(source))}</h4><span class="spacer"></span><button type="button" data-workflow-add="${htmlEscape(source)}">Add Skill</button></div>
+    <p class="muted">${source === "custom" ? "Skills launched manually or by a custom event. Manual terminals and automatic runs have separate prompt templates." : "Assigned Skills run in the order shown. Context Skills contribute instructions to the other agents at this trigger."}</p>
+    ${assignments.length ? `<div class="workflow-assignment-list">${assignments.map(({skill, binding, event}, index) => {
+      const disabled = !skill.enabled || event.enabled === false || binding.enabled === false;
+      const scope = skill.scope?.node_id || binding.scope?.node_id || event.scope?.node_id;
+      return `<article class="workflow-assignment" data-workflow-assignment="${htmlEscape(skill.id)}">
+        <div><span class="muted small">${source === "custom" ? "Custom action" : `Order ${binding.order || 0}`} · ${htmlEscape({blocking:"Required",background:"Background",context:"Context only"}[binding.mode] || binding.mode || "Required")} · ${scope ? `Node: ${htmlEscape(scope)}` : "Project"}${disabled ? " · Disabled" : ""}</span>
+          <h5><button type="button" class="template-list-name" data-workflow-skill="${htmlEscape(skill.id)}">${htmlEscape(skill.name)}</button></h5>
+          ${source === "custom" && event.name && event.id !== "custom" ? `<p class="muted small">${htmlEscape(event.name)}</p>` : ""}
+        </div><div class="workflow-assignment-actions"><button type="button" class="secondary" data-workflow-preview="${index}">${binding.mode === "context" ? "Preview context" : "Preview prompt"}</button><button type="button" class="secondary" data-workflow-skill="${htmlEscape(skill.id)}">Edit Skill</button></div>
+      </article>`;
+    }).join("")}</div>` : '<p class="workflow-empty muted">No Skills assigned. Add a Skill to run work at this trigger.</p>'}
+    <div class="workflow-prompts"><h4>Prompt composition</h4><p class="muted small">These Templates and their partials are shared. Editing them affects every trigger that uses them. Preview uses sample task data and does not launch an agent.</p>
+      <div class="workflow-template-links">${templateIds.filter(id => data.templates.items.some(row => row.item.id === id)).map(id => {
+        const row = data.templates.items.find(row => row.item.id === id);
+        return `<button type="button" class="secondary" data-workflow-template="${htmlEscape(id)}" title="${htmlEscape(row.usage?.description || "Edit shared template")}">${htmlEscape(row.name)}</button>`;
+      }).join("")}</div>
+      <button type="button" class="template-map-expand" data-workflow-composition="${templateId}">Explore shared Templates and partials →</button>
+    </div>
+  </section>`;
+}
+function renderWorkflowSettings(data) {
+  workflowSettingsData = data;
+  const route = location.hash;
+  if (workflowSettingsRoute !== route) {
+    workflowSettingsRoute = route;
+    const legacy = parseHash().tab;
+    workflowSettingsView = ["skills", "templates"].includes(legacy) ? "resources" : "goals";
+    if (["skills", "templates"].includes(legacy)) workflowSettingsResource = legacy;
+  }
+  return `<div id="workflow-settings-surface">${workflowSettingsContent(data)}</div>`;
+}
+function workflowSettingsContent(data) {
+  let content = "";
+  if (data.detached) {
+    content = `<p class="muted">Attach a project to configure steps, event triggers, and Skills. Built-in Templates remain available to explore.</p>${renderTemplatesSettings(data.templates)}`;
+  } else if (workflowSettingsView === "resources") {
+    content = `<div class="actions workflow-resource-switch">${automationChoices("data-workflow-resource", "Shared resources", [["skills", "Skills"], ["templates", "Templates and partials"]], workflowSettingsResource)}</div>
+      <p class="muted">Skills define the work; Templates assemble the agent's context. Each resource shows its assignments or where it is used.</p>
+      ${workflowSettingsResource === "skills" ? renderAutomationSettings("skills", data.skills) : renderTemplatesSettings(data.templates)}`;
+  } else {
+    const source = workflowCurrentSource(data);
+    if (workflowSettingsView === "goals") {
+      const steps = workflowStepNames(data);
+      content += `<div class="workflow-step-picker" role="group" aria-label="Goal workflow steps">${steps.map(step => {
+        const count = workflowSources(data).filter(source => source.startsWith(`workflow.${step}.`)).reduce((sum, source) => sum + workflowAssignments(data, source).length, 0);
+        return `<button type="button" class="secondary" data-workflow-step="${htmlEscape(step)}" aria-pressed="${step === workflowSettingsStep}"><strong>${htmlEscape(step[0].toUpperCase() + step.slice(1))}</strong><span class="muted small">${count} ${count === 1 ? "Skill" : "Skills"}</span></button>`;
+      }).join("")}</div><div class="flat-tabs workflow-hook-tabs" role="tablist" aria-label="${htmlEscape(workflowSettingsStep)} triggers">${Object.entries(workflowHookLabels).filter(([key]) => workflowSources(data).includes(`workflow.${workflowSettingsStep}.${key}`)).map(([key,label]) => `<button type="button" role="tab" id="workflow-hook-${key}" aria-controls="workflow-hook-panel" data-workflow-hook="${key}" aria-selected="${key === workflowSettingsHook}" tabindex="${key === workflowSettingsHook ? 0 : -1}">${label}</button>`).join("")}</div>`;
+    } else if (workflowSettingsView === "system") {
+      const sources = workflowSources(data).filter(source => source !== "custom" && !source.startsWith("workflow."));
+      content += `<div class="workflow-system-picker"><label for="workflow-system-source">System event</label><select id="workflow-system-source">${sources.map(item => `<option value="${htmlEscape(item)}" ${item === source ? "selected" : ""}>${htmlEscape(workflowSourceLabel(item))}</option>`).join("")}</select></div>`;
+    }
+    content += source ? (workflowSettingsView === "goals" ? `<div id="workflow-hook-panel" role="tabpanel" aria-labelledby="workflow-hook-${workflowSettingsHook}">${renderWorkflowAssignments(data, source)}</div>` : renderWorkflowAssignments(data, source)) : '<p class="muted">No system event triggers are available.</p>';
+  }
+  return `<section class="settings-section" data-testid="settings-workflow">
+    <div class="actions"><h3>Workflow</h3><span class="spacer"></span>${data.detached ? "" : '<button type="button" class="secondary" data-workflow-history>Run history</button>'}</div>
+    <p class="muted">Choose when work happens, then manage its Skills and the context sent to agents.</p>
+    ${data.detached ? "" : `<div class="flat-tabs workflow-view-tabs" role="tablist" aria-label="Workflow configuration">${Object.entries(workflowViewLabels).map(([key,label]) => `<button type="button" role="tab" id="workflow-view-${key}" aria-controls="workflow-view-panel" data-workflow-view="${key}" aria-selected="${key === workflowSettingsView}" tabindex="${key === workflowSettingsView ? 0 : -1}">${label}</button>`).join("")}</div>`}
+    <div class="workflow-view-content" id="workflow-view-panel"${data.detached ? "" : ` role="tabpanel" aria-labelledby="workflow-view-${workflowSettingsView}"`}>${content}</div></section>`;
+}
+function redrawWorkflowSettings() {
+  renderInto(document.getElementById("workflow-settings-surface"), workflowSettingsContent(workflowSettingsData), () => bindWorkflowSettings(workflowSettingsData));
+}
+function bindWorkflowTabGroup(root, selector, keyName, select) {
+  root.querySelectorAll(selector).forEach(button => {
+    button.onclick = () => { select(button.dataset[keyName]); redrawWorkflowSettings(); document.querySelector(`${selector}[data-${keyName.replace(/[A-Z]/g, c => "-" + c.toLowerCase())}="${button.dataset[keyName]}"]`)?.focus({preventScroll:true}); };
+    button.onkeydown = event => {
+      const buttons = [...root.querySelectorAll(selector)], index = buttons.indexOf(button);
+      const next = event.key === "ArrowRight" ? (index + 1) % buttons.length : event.key === "ArrowLeft" ? (index + buttons.length - 1) % buttons.length : event.key === "Home" ? 0 : event.key === "End" ? buttons.length - 1 : null;
+      if (next === null) return;
+      event.preventDefault(); buttons[next].click();
+    };
+  });
+}
+function bindWorkflowSettings(data) {
+  const root = document.querySelector('[data-testid="settings-workflow"]');
+  if (!root) return;
+  if (data.detached) { bindTemplatesSettings(); return; }
+  bindWorkflowTabGroup(root, "[data-workflow-view]", "workflowView", value => { workflowSettingsView = value; });
+  bindWorkflowTabGroup(root, "[data-workflow-hook]", "workflowHook", value => { workflowSettingsHook = value; });
+  root.querySelectorAll("[data-workflow-step]").forEach(button => { button.onclick = () => { workflowSettingsStep = button.dataset.workflowStep; redrawWorkflowSettings(); root.querySelector(`[data-workflow-step="${workflowSettingsStep}"]`)?.focus({preventScroll:true}); }; });
+  root.querySelector("#workflow-system-source")?.addEventListener("change", event => { workflowSettingsSystemSource = event.target.value; redrawWorkflowSettings(); });
+  root.querySelector("[data-workflow-history]").onclick = () => openEventHistory();
+  root.querySelectorAll("[data-workflow-add]").forEach(button => { button.onclick = () => openSkillEditor(null, false, {source: button.dataset.workflowAdd}); });
+  root.querySelectorAll("[data-workflow-skill]").forEach(button => { button.onclick = () => openSkillEditor(data.skills.items.find(skill => skill.id === button.dataset.workflowSkill)); });
+  root.querySelectorAll("[data-workflow-template]").forEach(button => { button.onclick = () => openTemplateEditor(button.dataset.workflowTemplate); });
+  root.querySelectorAll("[data-workflow-preview]").forEach(button => { button.onclick = () => previewWorkflowAssignment(data, workflowCurrentSource(data), Number(button.dataset.workflowPreview), button); });
+  root.querySelector("[data-workflow-composition]")?.addEventListener("click", event => {
+    templateMapRoot = event.currentTarget.dataset.workflowComposition; templateMapExpanded = new Set([templateMapRoot]);
+    templateCatalogView = "all"; workflowSettingsView = "resources"; workflowSettingsResource = "templates"; redrawWorkflowSettings();
+  });
+  root.querySelectorAll("[data-workflow-resource] button").forEach(button => { button.onclick = () => { workflowSettingsResource = button.dataset.choice; redrawWorkflowSettings(); }; });
+  if (workflowSettingsView === "resources") {
+    if (workflowSettingsResource === "skills") bindAutomationSettings("skills", data.skills); else bindTemplatesSettings();
+  }
+}
+
+async function previewWorkflowAssignment(data, source, index, button) {
+  const generation = captureNodeContextGeneration(), rows = workflowAssignments(data, source), row = rows[index];
+  if (!row) return;
+  button.disabled = true;
+  try {
+    // Read the same revision used to display the assignment before composing a sample.
+    const current = await api("GET", `/api/skills/${encodeURIComponent(row.skill.id)}`);
+    if (current.revision !== data.skills.revision) throw new Error("This Workflow changed. Refresh before previewing its assigned Skills.");
+    const parameters = Object.fromEntries((current.item.parameters || []).filter(p => p.default != null).map(p => [p.name, p.default]));
+    const role = /^workflow\.(plan|implement|quality|governance)\.enter$/.exec(source)?.[1] || "task";
+    const values = {skill: {template: current.item.prompt}, skill_name: current.item.name, parameters: JSON.stringify(parameters), workflow_step: source.startsWith("workflow.") ? source.split(".")[1] : "", current_round_goal: "Sample Goal request", context: "{}", execution: JSON.stringify({binding_id: row.binding.id, role}), completion_contract: JSON.stringify(data.catalog.completion_contract || {}), continuation: "", observational: "", attached_skills: ""};
+    const node = row.skill.scope?.node_id || nodeContextActiveNodeId();
+    const contexts = rows.filter(item => item.binding.mode === "context" && item.skill.enabled && item.binding.enabled !== false && item.event.enabled !== false && [item.skill.scope, item.binding.scope, item.event.scope].every(scope => !scope?.node_id || scope.node_id === node));
+    const rendered = await Promise.all(contexts.map(context => api("POST", "/api/templates/context-skill/preview", {values: {...values, skill: {template: context.skill.prompt}, skill_name: context.skill.name, parameters: JSON.stringify(Object.fromEntries((context.skill.parameters || []).filter(p => p.default != null).map(p => [p.name, p.default])))}})));
+    values.attached_skills = rendered.map(result => result.prompt).join("\n\n");
+    if (!isNodeContextGenerationCurrent(generation)) return;
+    const templateId = row.binding.mode === "context" ? "context-skill" : source.startsWith("workflow.") ? "workflow" : "supervised-skill";
+    let previewTemplate = templateId;
+    if (row.binding.mode !== "context") {
+      const prompt = await api("POST", `/api/templates/${templateId}/preview`, {values});
+      values.goal_prompt = prompt.prompt;
+      values.signal_path = "/runtime/sample-completion.json";
+      values.completion_contract = {template: "{{templates.goal-completion}}"};
+      previewTemplate = "goal-agents-session";
+    }
+    if (!isNodeContextGenerationCurrent(generation)) return;
+    await openTemplateEditor(previewTemplate, {previewValues: values, initialTab: "preview", previewOnly: true, description: `${current.item.name} at ${workflowSourceLabel(source)}. Sample data only; this does not run the Skill.`});
+  } catch (error) { showActionError(error); }
+  finally { if (button.isConnected) button.disabled = false; }
+}

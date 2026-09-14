@@ -1396,3 +1396,19 @@ fn deleted_round_invocation_cannot_be_recreated_by_late_skill_output() {
     assert_eq!(rejected.unwrap(), true);
     assert!(!service.invocation_path(&invocation.id).unwrap().exists());
 }
+
+#[test]
+fn default_workflow_skills_include_editable_project_guidance_and_catalog_uses_shared_contract() {
+    let fixture = Fixture::new();
+    let service = fixture.service();
+    let config = service.config().unwrap();
+    for step in ["plan", "implement", "quality", "governance"] {
+        let prompt = &config.skills[&format!("default-{step}")].prompt;
+        assert!(prompt.contains("{{templates.purpose}}"));
+        assert!(prompt.contains("{{templates.architecture}}"));
+    }
+    assert_eq!(
+        service.catalog()["completion_contract"],
+        crate::application::agent_io::contracts::skill_result::report_contract()
+    );
+}

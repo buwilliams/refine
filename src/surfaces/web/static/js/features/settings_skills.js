@@ -176,7 +176,7 @@ function skillTriggerLabel(source) {
   if (source === "custom") return "Custom";
   if (source === "node.startup.ready") return "Node starts";
   const match = source?.match(/^workflow\.(.+)\.(enter|exit|error|success)$/);
-  return match ? `${match[1][0].toUpperCase() + match[1].slice(1)} ${({enter:"starts",exit:"exits",error:"error",success:"success"})[match[2]]}` : "Unconfigured";
+  return match ? `${match[1][0].toUpperCase() + match[1].slice(1)} ${({enter:"starts",exit:"exits",error:"error",success:"success"})[match[2]]}` : source ? source.split(/[._-]/).map(word => word[0]?.toUpperCase() + word.slice(1)).join(" ") : "Unconfigured";
 }
 
 let skillIdSequence = 0;
@@ -192,7 +192,7 @@ function newSkillId() {
   return `skill-${Date.now().toString(36)}-${(++skillIdSequence).toString(36)}-${Math.random().toString(36).slice(2)}`;
 }
 
-async function openSkillEditor(original = null, clone = false) {
+async function openSkillEditor(original = null, clone = false, defaults = {}) {
   if (automationEditor || automationEditorOpening) return;
   automationEditorOpening = true;
   const generation = captureNodeContextGeneration();
@@ -206,7 +206,7 @@ async function openSkillEditor(original = null, clone = false) {
     if (!isNodeContextGenerationCurrent(generation)) return;
     sources = catalog.sources; revision = current.revision;
     item = original ? structuredClone(current.item) : {id: newSkillId(), name: "", prompt: "", enabled: true, scope: {node_id: null}, parameters: []};
-    trigger = current.trigger || {source: "custom", mode: "blocking", order: 0, inputs: {}};
+    trigger = current.trigger || {source: defaults.source || "custom", mode: "blocking", order: 0, inputs: {}};
     if (clone) { item.id = newSkillId(); item.name += " copy"; trigger = {...trigger, id: undefined}; }
   } catch (error) { showActionError(error); return; }
   finally { automationEditorOpening = false; }

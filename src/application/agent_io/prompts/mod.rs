@@ -48,6 +48,8 @@ prompt_templates! {
     ConflictFeedback => "templates/conflict-feedback.md",
     TerminalSession => "templates/terminal-session.md",
     Workflow => "templates/workflow.md",
+    Purpose => "templates/purpose.md",
+    Architecture => "templates/architecture.md",
     SupervisedSkill => "templates/supervised-skill.md",
     WorkflowContext => "templates/workflow-context.md",
     WorkflowContinuation => "templates/workflow-continuation.md",

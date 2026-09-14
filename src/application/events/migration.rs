@@ -58,6 +58,7 @@ fn build_config(originals: &serde_json::Map<String, Value>, quality: &Value) -> 
         ("quality", format!("Independently review the finalized plans and candidate implementation. Follow the project instructions, investigate and correct defects as appropriate, and use your judgment to decide the outcome.\n\nProject Quality instructions and tests:\n{}", serde_json::to_string_pretty(&quality).unwrap_or_default())),
         ("governance", format!("Review the exact candidate against the project's stated intent and attached Skills. Read the accepted plans, implementation and Quality evidence and actual diff. Use context to distinguish actual problems from hypothetical risks or preferences. Follow the Skill instructions and current user authorization; use supported Refine commands for workflow changes. Use your judgment to decide the outcome; share any useful context for subsequent work.\n\nProject intent and rules:\n{}", serde_json::to_string_pretty(&governance).unwrap_or_default())),
     ] {
+        let prompt = format!("{prompt}\n\n{{{{templates.purpose}}}}\n\n{{{{templates.architecture}}}}");
         let id = format!("default-{role}");
         config.skills.insert(id.clone(), Skill { id, name: title(role), prompt, role: role.into(), enabled: true, scope: Scope::default(), parameters: Vec::new(), provenance: Some("refine-default-v1".into()) });
     }

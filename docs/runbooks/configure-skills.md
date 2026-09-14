@@ -1,6 +1,6 @@
 # Configure Skills
 
-Use **Controls → Settings → Skills** to configure repeatable agent work. Each Skill has one trigger, plain-text instructions, an enabled state, project or node scope, and optional typed inputs. Choose **Custom** for a manually runnable action, or a workflow or lifecycle point for automatic work. Events remain internal; there is no separate Events editor or CLI group.
+Use **Controls → Settings → Workflow** to configure repeatable agent work. Each Skill has one trigger, plain-text instructions, an enabled state, project or node scope, and optional typed inputs. Choose **Custom** for a manually runnable action, or a workflow or lifecycle point for automatic work. Events remain internal; there is no separate Events editor or CLI group.
 
 Refine supplies Plan, Implement, Quality, and Governance Skills at their respective Enter triggers. Refine determines the expected result from the trigger. Plan and Implement require an enabled required Skill. Quality and Governance pass when no enabled required Skills apply, recording that no agent checks ran while retaining candidate and integration checks. The default Plan Skill chooses its own planning method.
 
@@ -12,7 +12,9 @@ refine skills list
 refine skills show default-quality
 ```
 
-In the browser, click a Skill row to edit it or use its Status toggle to enable or disable it directly. The modal shows rendered instructions first; use the edit icon to change their Markdown. Open **Skill settings** below to change the name, trigger, scope, status, inputs, and workflow options. **Clone Skill** copies instructions and inputs into an independent new Skill; choose a different trigger for the copy.
+Choose a Goal step and its entry, success, error, or exit hook, a system event, or a custom action. Every step is available, including steps with no Skills. **Add Skill** starts with the selected trigger. Assignments show order, run mode, scope, and enabled state. **Preview prompt** combines the Skill, matching context Skills, and shared Templates using sample data; it never launches an agent. **Shared resources → Skills** lists every Skill.
+
+In the browser, click a Skill row to edit it or use its Status toggle to enable or disable it directly. The modal shows rendered instructions first; use the edit icon to change their Markdown. Open the **Settings** tab to change the name, trigger, scope, status, inputs, and workflow options. **Clone Skill** copies instructions and inputs into an independent new Skill; choose a different trigger for the copy.
 
 For CLI configuration, create a JSON file such as:
 
@@ -74,3 +76,5 @@ Initial migration converts Governance and Quality policy into default Skill prom
 Use supported configuration surfaces after migration. Legacy files do not regain authority. Pristine defaults on a freshly attached node can adopt synchronized project configuration; authored edits retain the normal conflict boundary. Do not repair configuration by deleting Goal history or rewriting results.
 
 The Skill API provides `/skills`, `/skills/catalog`, `/skills/{id}`, `/skills/{id}/inputs`, and `/skills/{id}/trigger`. Saves accept `{revision,item,trigger}`. The browser uses an explicit `skill` profile on `/terminal/session`. Internal Event and invocation routes remain for system execution and compatibility; `/events` retains its streaming meaning. MCP exposes Skill listing, trigger discovery, and manual launch, with generic requests for editing and run control.
+
+The default Plan, Implement, Quality, and Governance Skills include `{{templates.purpose}}` and `{{templates.architecture}}`. Edit these shared partials with a short description of your project’s purpose and design rules. They provide guidance without requiring agents to read intent documents. Existing saved Skills remain user-owned; add these references to any other Skill that needs them.

@@ -237,3 +237,48 @@ fn catalog_explains_launches_partials_and_reference_only_entries() {
             .contains("no current built-in launch")
     );
 }
+
+#[test]
+fn purpose_and_architecture_expand_from_skills_and_share_revisioned_project_overrides() {
+    let f = Fixture::new();
+    let store = f.store();
+    for id in ["purpose", "architecture"] {
+        assert_eq!(store.read(id).unwrap().revision, 0);
+        assert!(!store.read(id).unwrap().prompt.is_empty());
+    }
+    assert!(!f.0.join("templates").exists());
+    store
+        .save("purpose", 0, "Help users achieve {{current_round_goal}}.")
+        .unwrap();
+    store
+        .save(
+            "architecture",
+            0,
+            "Keep shared behavior in the application layer.",
+        )
+        .unwrap();
+    store.save("workflow", 0, "{{skill}}").unwrap();
+    let snapshot = store.snapshot().unwrap();
+    let mut values = TemplateScope::literals(&[("current_round_goal", "Keep {{skill}} literal")]);
+    values.insert(
+        "skill".into(),
+        TemplateValue::Template(
+            "Plan the work.\n{{templates.purpose}}\n{{templates.architecture}}".into(),
+        ),
+    );
+    let rendered = snapshot.render("workflow", &values).unwrap();
+    assert_eq!(
+        rendered,
+        "Plan the work.\nHelp users achieve Keep {{skill}} literal.\nKeep shared behavior in the application layer."
+    );
+    store.save("purpose", 1, "New purpose").unwrap();
+    assert_eq!(snapshot.render("workflow", &values).unwrap(), rendered);
+    assert!(
+        store
+            .snapshot()
+            .unwrap()
+            .render("workflow", &values)
+            .unwrap()
+            .contains("New purpose")
+    );
+}

@@ -114,7 +114,7 @@ impl FileEventService {
         Ok(config)
     }
     pub fn catalog(&self) -> Value {
-        json!({"sources": system_catalog(), "custom_source": CUSTOM_EVENT_ID, "roles": WORKFLOW_STEPS.iter().copied().chain(std::iter::once("task")).collect::<Vec<_>>()})
+        json!({"sources": system_catalog(), "custom_source": CUSTOM_EVENT_ID, "completion_contract": crate::application::agent_io::contracts::skill_result::report_contract(), "roles": WORKFLOW_STEPS.iter().copied().chain(std::iter::once("task")).collect::<Vec<_>>()})
     }
     pub fn skill_catalog(&self) -> Value {
         json!({"sources": std::iter::once(CUSTOM_EVENT_ID.to_string()).chain(system_catalog()).collect::<Vec<_>>()})

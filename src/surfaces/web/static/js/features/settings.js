@@ -97,7 +97,7 @@ async function loadSettingsSurfaceData() {
   if (project.attached === false) {
     enterNoProjectMode(project);
     const data = detachedSettingsSurfaceData(project);
-    if (activeSlug === "templates") data.templates = await api("GET", "/api/templates");
+    if (activeSlug === "workflow") data.workflow = await loadWorkflowSettings(true);
     return data;
   }
   const needs = settingsSurfaceDataNeeds(surface, activeSlug);
@@ -137,8 +137,7 @@ async function loadSettingsSurfaceData() {
     </option>`).join("");
   return {
     noProject: false,
-    automation: needs.skills ? await loadAutomationSettings(activeSlug) : null,
-    templates: activeSlug === "templates" ? await api("GET", "/api/templates") : null,
+    workflow: activeSlug === "workflow" ? await loadWorkflowSettings() : null,
     hub: activeSlug === "knowledge-hub" ? await api("GET", "/api/hub/sites") : null,
     s: settings,
     diag: diag || {},
@@ -162,7 +161,6 @@ async function loadSettingsSurfaceData() {
 function settingsSurfaceDataNeeds(surface, slug) {
   const needs = {
     settings: false,
-    skills: false,
     diagnostics: false,
     reporters: false,
     dashboard: false,
@@ -174,7 +172,6 @@ function settingsSurfaceDataNeeds(surface, slug) {
   else if (slug === "reporters") { needs.reporters = true; needs.nodes = true; }
   else if (slug === "target-app" || slug === "runtime") { needs.settings = true; needs.nodes = true; }
   else if (slug === "processes") { needs.processes = true; needs.source = true; }
-  else if (slug === "skills") needs[slug] = true;
   return needs;
 }
 
@@ -689,8 +686,7 @@ const SETTINGS_SURFACES = {
       { slug: "processes", label: "Processes" },
       { slug: "application", label: "Application" },
       { slug: "reporters", label: "Reporters" },
-      { slug: "skills", label: "Skills" },
-      { slug: "templates", label: "Templates" },
+      { slug: "workflow", label: "Workflow" },
       { slug: "knowledge-hub", label: "Knowledge Hub" },
       { slug: "target-app", label: "Target App" },
       { slug: "runtime", label: "Runtime" },
@@ -710,7 +706,7 @@ function isSettingsRoute(route = state.currentRoute) {
 }
 
 function normalizeSettingsTab(slug, surface = settingsSurfaceForRoute()) {
-  if (["events", "releases"].includes(slug)) return "skills";
+  if (["skills", "templates", "events", "releases"].includes(slug)) return "workflow";
   if (slug === "system") return "processes";
   if (slug === "agents") return "processes";
   if (surface === SETTINGS_SURFACES.settings && (slug === "application-config" || slug === "target-app-config")) {
@@ -863,7 +859,7 @@ function bindRebuildCacheHandler() {
 
 
 function renderSettingsTabBody(surface, slug, data) {
-  if (slug === "templates") return renderTemplatesSettings(data.templates);
+  if (slug === "workflow") return renderWorkflowSettings(data.workflow);
   if (data.noProject) {
     if (surface === SETTINGS_SURFACES.settings && slug === "application") {
       return renderSettingsApplicationTab({
@@ -919,8 +915,6 @@ function renderSettingsTabBody(surface, slug, data) {
       return renderNodeRuntimeConfigSections(data.s, data.activeNodeLabel, data.cli);
     }
   }
-  if (slug === "templates") return renderTemplatesSettings(data.templates);
-  if (slug === "skills") return renderAutomationSettings(slug, data.automation);
   if (slug === "knowledge-hub") return renderKnowledgeHubSettings(data.hub);
   return `<p class="muted">Unknown settings tab.</p>`;
 }
@@ -967,7 +961,7 @@ function bindSettingsNoProjectTab() {
 }
 
 function bindSettingsTabBody(surface, slug, data) {
-  if (slug === "templates") { bindTemplatesSettings(); return; }
+  if (slug === "workflow") { bindWorkflowSettings(data.workflow); return; }
   if (data.noProject) {
     if (surface === SETTINGS_SURFACES.settings && slug === "application") {
       bindSettingsApplicationTab(data.currentProject);
@@ -987,8 +981,6 @@ function bindSettingsTabBody(surface, slug, data) {
     else if (slug === "runtime") bindNodeRuntimeConfigControls();
 
   }
-  if (slug === "templates") bindTemplatesSettings();
-  if (slug === "skills") bindAutomationSettings(slug, data.automation);
   if (slug === "knowledge-hub") bindKnowledgeHubSettings();
 }
 

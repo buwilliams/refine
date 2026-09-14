@@ -15,7 +15,17 @@ pub fn usage(template: PromptTemplate) -> TemplateUsage {
         Workflow => (
             "template",
             "workflow",
-            "Builds the Skill prompt for Plan, Implement, Quality, and Governance.",
+            "Builds the Skill prompt for any Goal step or workflow hook.",
+        ),
+        Purpose => (
+            "partial",
+            "workflow",
+            "Project purpose and intended user outcome. Included by the default Plan, Implement, Quality, and Governance Skills; edit it to describe your project.",
+        ),
+        Architecture => (
+            "partial",
+            "workflow",
+            "Project structure and shared design rules. Included by the default Plan, Implement, Quality, and Governance Skills; edit it to describe your project.",
         ),
         GoalAgentSession => (
             "template",

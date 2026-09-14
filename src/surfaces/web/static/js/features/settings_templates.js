@@ -6,7 +6,7 @@ function renderTemplatesSettings(data = {}) {
 }
 function bindTemplatesSettings() { bindTemplatesCatalog(activeTemplatesCatalog); }
 
-async function openTemplateEditor(id) {
+async function openTemplateEditor(id, options = {}) {
   if (automationEditor || automationEditorOpening) return;
   automationEditorOpening = true;
   const generation = captureNodeContextGeneration();
@@ -37,6 +37,7 @@ async function openTemplateEditor(id) {
     }
   }
   collectValues(current.item.prompt);
+  Object.assign(values, options.previewValues || {});
   const tabs = {edit: "Edit", preview: "Preview", variables: "Variables", default: "Default"};
   const entries = [
     ...current.variables.map(v => ({name: v.name, label: v.name, description: v.description, group: "Variables"})),
@@ -65,7 +66,7 @@ async function openTemplateEditor(id) {
       <button type="button" class="secondary" data-template-use-default>Use default in editor</button>`,
   };
   const root = automationModal(current.name, `
-    ${current.usage ? `<p class="muted template-editor-usage">${htmlEscape(current.usage.description)}</p>` : ""}
+    ${options.description || current.usage ? `<p class="muted template-editor-usage">${htmlEscape(options.description || current.usage.description)}</p>` : ""}
     <div class="flat-tabs template-tabs" role="tablist" aria-label="Template editor">
       ${Object.entries(tabs).map(([key, label]) => `<button type="button" role="tab" id="template-tab-${key}" aria-controls="template-panel-${key}" aria-selected="${key === "edit"}" tabindex="${key === "edit" ? 0 : -1}" data-template-tab="${key}">${label}</button>`).join("")}
     </div>
@@ -93,7 +94,7 @@ async function openTemplateEditor(id) {
   root.querySelectorAll("[data-template-tab]").forEach(tab => {
     tab.onclick = () => selectTab(tab.dataset.templateTab);
     tab.onkeydown = event => {
-      const keys = Object.keys(tabs), index = keys.indexOf(tab.dataset.templateTab);
+      const keys = options.previewOnly ? ["preview"] : Object.keys(tabs), index = keys.indexOf(tab.dataset.templateTab);
       const next = event.key === "ArrowRight" ? (index + 1) % keys.length
         : event.key === "ArrowLeft" ? (index + keys.length - 1) % keys.length
         : event.key === "Home" ? 0 : event.key === "End" ? keys.length - 1 : null;
@@ -147,7 +148,12 @@ async function openTemplateEditor(id) {
     } catch (e) {
       if (preview) { status.textContent = "Preview could not be rendered."; root.querySelector("[data-template-result]").textContent = ""; }
       error(e.status === 409 ? new Error("This Template changed. Your draft is retained; reopen the Template before saving.") : e);
-    } finally { busy = false; previewButton.disabled = false; saveButton.disabled = state.project?.attached === false; }
+    } finally { busy = false; previewButton.disabled = false; saveButton.disabled = options.previewOnly || state.project?.attached === false; }
+  }
+  if (options.previewOnly) {
+    saveButton.hidden = true;
+    root.querySelector("[data-close]").textContent = "Close";
+    root.querySelectorAll("[data-template-tab]").forEach(tab => { tab.hidden = tab.dataset.templateTab !== "preview"; });
   }
   if (state.project?.attached === false) {
     saveButton.disabled = true;
@@ -155,4 +161,5 @@ async function openTemplateEditor(id) {
   }
   saveButton.onclick = () => action(saveButton, false);
   previewButton.onclick = () => action(previewButton, true);
+  if (options.initialTab) selectTab(options.initialTab);
 }

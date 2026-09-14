@@ -15,7 +15,7 @@ confirmation.
 
 ## Prepare
 
-1. Configure the [Release Skill](skills/release.json) in **Settings → Skills**.
+1. Configure the [Release Skill](skills/release.json) in **Settings → Workflow → Shared resources → Skills**.
 2. Open **Controls → Skills → Release** and enter the requested version change or operation.
 3. The Skill uses the shared release commands to preview the version, commits, affected files, and gates. Ask it to prepare the release when ready.
 4. Preparation creates a normal Goal with a managed worktree, visible workflow state, and agent logs.

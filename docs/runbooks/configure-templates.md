@@ -1,12 +1,14 @@
 # Configure Templates
 
-Templates control the context and instructions Refine sends to agents. Open **Settings → Templates** to edit Workflow, Planning Agent, Agent, Goal Agent, or a specialized launch, completion, repair, or transport template. Entries have fixed names and cannot be created or deleted. An empty template is allowed.
+Templates control the context and instructions Refine sends to agents. Open **Settings → Workflow → Shared resources → Templates and partials** to edit Workflow, Planning Agent, Agent, Goal Agent, or a specialized launch, completion, repair, or transport template. Entries have fixed names and cannot be created or deleted. An empty template is allowed.
 
-The catalog starts with the Goal workflow and an expandable composition map. Each entry explains where Refine uses it. Templates build prompts; partials are reusable pieces included by those templates. Solid lines follow saved references, and dashed lines show pieces selected by a launch when needed. Shared partials appear once. The All entries view also identifies reference entries without a current built-in launch.
+The Workflow screen connects Goal steps, system events, and custom actions to assigned Skills and their prompt Templates. The shared Template catalog includes an expandable composition map. Each entry explains where Refine uses it. Templates build prompts; partials are reusable pieces included by those templates. Solid lines follow saved references, and dashed lines show pieces selected by a launch when needed. Shared partials appear once. The All entries view also identifies reference entries without a current built-in launch.
 
 The editor uses Edit, Preview, Variables, and Default tabs. Preview renders on opening, and Variables supports searching and inserting at the cursor. Saving checks the revision you opened; if another user saved first, your draft stays open with a conflict message. Without an attached project, defaults can be viewed and previewed.
 
 ## Variables
+
+The **Purpose** and **Architecture** partials provide brief project guidance. Replace their minimal defaults with your project’s purpose, intended user outcome, structure, and design rules. Include them as `{{templates.purpose}}` and `{{templates.architecture}}` in Skills; new default Plan, Implement, Quality, and Governance Skills already include both. Saved Skills are not automatically rewritten.
 
 Use `{{skill}}` for the selected Skill, `{{refine_executable}}` for the absolute Refine executable on the executing node, and `{{current_round_goal}}` for the current Round's request. `{{templates.workflow-context}}` includes another Template. The variable picker and `refine templates variables` list the available names. Operation-specific values are supplied by the launch using that template; a required value unavailable in that launch produces a rendering error. Shared optional values are empty outside their applicable context.
 
@@ -33,3 +35,5 @@ Each edited entry is stored in `templates/<id>.json` within the attached project
 Workflow invocations retain their Template sources and revisions. Retries use that snapshot; later invocations use newly saved Templates. Each chat turn takes a new snapshot. Runtime values, including the executable path, come from the executing node. Provider process metadata retains the snapshot and rendered prompt for managed noninteractive launches.
 
 All Refine-authored prompt instructions belong to editable Templates or Skills. Outer templates decide which context, completion contracts, and repair instructions to include. Removing response instructions does not remove backend response validation: an agent returning an invalid response still fails normally. Provider-owned instructions and existing provider conversation history are outside Refine's Templates.
+
+Legacy `#/settings/skills` and `#/settings/templates` links open the corresponding shared resources within Workflow.

@@ -16,7 +16,7 @@ They should help users make Refine work correctly in their environment without r
 
 ## Expected Role
 
-Settings consolidates the former Node and Governance navigation entries under `/#/settings/<tab>`. Skills have a tab in the node configuration surface; Events remain an internal concept. Governance and Quality remain workflow steps; their instructions are configured as Skills. Retired configuration routes redirect to Settings without retaining competing editors.
+Settings consolidates the former Node and Governance navigation entries under `/#/settings/<tab>`. Workflow brings all Goal steps and their hooks, system events, custom actions, assigned Skills, and prompt Templates into one Settings tab. Skills and Templates remain shared resources with their existing storage and editing rules; Events remain the internal execution model. Governance and Quality remain workflow steps; their instructions are configured as Skills. Retired configuration routes redirect to Settings without retaining competing editors.
 
 The tab order is Processes, Application, Reporters, Skills, Knowledge Hub, Target App, and Runtime. Release work is configured as a Custom Skill, with no separate development tab.
 

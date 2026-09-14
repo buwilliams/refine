@@ -77,8 +77,7 @@ test('Template map explains uses, deduplicates shared partials, and follows edit
   try {
     const {page} = app;
     await page.goto(`${app.origin}/#/settings/templates`);
-    await page.locator('.template-workflow-steps').waitFor();
-    assert.equal(await page.locator('.template-workflow-steps li').count(), 4);
+    await page.locator('.template-map').waitFor();
     await page.locator('[data-map-expand="supervised-skill"]').click();
     assert.equal(await page.locator('[data-map-node="workflow-context"]').count(), 1);
     await page.waitForFunction(() => document.querySelectorAll('.template-map-lines path').length === 4);
