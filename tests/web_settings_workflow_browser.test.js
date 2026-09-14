@@ -60,8 +60,8 @@ test('Workflow covers every step and hook, system events, custom actions, and sh
     await page.locator('[data-workflow-hook="success"]').click();
     assert.deepEqual(await page.locator('[data-workflow-assignment]').evaluateAll(rows => rows.map(row => row.dataset.workflowAssignment)), ['context', 'review']);
     assert.match(await page.locator('[data-workflow-assignment="context"]').innerText(), /Order -1 · Context only · Project/);
-    assert.equal(await page.locator('[data-workflow-template="purpose"]').count(), 1);
-    assert.equal(await page.locator('[data-workflow-template="architecture"]').count(), 1);
+    assert.equal(await page.locator(".workflow-prompts").count(), 0);
+    assert.equal(await page.getByRole("button", {name:"Edit Review instructions Skill",exact:true}).count(), 1);
     await page.locator('[data-workflow-view="goals"]').press('ArrowRight');
     assert.equal(await page.locator('[data-workflow-view="system"]').getAttribute('aria-selected'), 'true');
     assert.match(await page.locator('[data-workflow-assignment="startup"]').innerText(), /Node: node-a · Disabled/);
@@ -69,7 +69,7 @@ test('Workflow covers every step and hook, system events, custom actions, and sh
     assert.match(await page.locator('.workflow-empty').innerText(), /No Skills assigned/);
     await page.locator('[data-workflow-view="custom"]').click();
     assert.equal(await page.locator('[data-workflow-assignment="custom"]').count(), 1);
-    assert.equal(await page.locator('[data-workflow-template="manual-skill"]').count(), 1);
+    assert.equal(await page.locator("[data-workflow-template]").count(), 0);
     await page.locator('[data-workflow-view="resources"]').click();
     await page.locator('[data-testid="settings-skills"]').waitFor();
     await page.locator('[data-workflow-resource] [data-choice="templates"]').click();

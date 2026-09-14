@@ -64,29 +64,20 @@ function workflowCurrentSource(data) {
 }
 function renderWorkflowAssignments(data, source) {
   const assignments = workflowAssignments(data, source);
-  const templateId = source.startsWith("workflow.") ? "workflow" : "supervised-skill";
-  const skillPartials = assignments.flatMap(({skill}) => [...(skill.prompt || "").matchAll(/(?<!\\){{\s*templates\.([\w-]+)\s*}}/g)].map(match => match[1]));
-  const templateIds = [...new Set([templateId, "goal-agents-session", "skill-repair", "signal-repair", ...(source === "custom" ? ["manual-skill"] : []), ...skillPartials])];
   return `<section class="workflow-trigger-details" aria-label="${htmlEscape(workflowSourceLabel(source))}">
-    <div class="actions"><h4>${htmlEscape(workflowSourceLabel(source))}</h4><span class="spacer"></span><button type="button" data-workflow-add="${htmlEscape(source)}">Add Skill</button></div>
-    <p class="muted">${source === "custom" ? "Skills launched manually or by a custom event. Manual terminals and automatic runs have separate prompt templates." : "Assigned Skills run in the order shown. Context Skills contribute instructions to the other agents at this trigger."}</p>
+    <div class="actions"><h4>${source.startsWith("workflow.") ? "Assigned Skills" : htmlEscape(workflowSourceLabel(source))}</h4><span class="spacer"></span><button type="button" data-workflow-add="${htmlEscape(source)}">Add Skill</button></div>
+    <p class="muted">${source === "custom" ? "Skills launched manually or by a custom event. Manual terminals and automatic runs have separate prompt templates." : "Choose a Skill to edit its instructions and settings. Skills run in the order shown; context-only Skills add instructions to the other agents."}</p>
     ${assignments.length ? `<div class="workflow-assignment-list">${assignments.map(({skill, binding, event}, index) => {
       const disabled = !skill.enabled || event.enabled === false || binding.enabled === false;
       const scope = skill.scope?.node_id || binding.scope?.node_id || event.scope?.node_id;
       return `<article class="workflow-assignment" data-workflow-assignment="${htmlEscape(skill.id)}">
-        <div><span class="muted small">${source === "custom" ? "Custom action" : `Order ${binding.order || 0}`} · ${htmlEscape({blocking:"Required",background:"Background",context:"Context only"}[binding.mode] || binding.mode || "Required")} · ${scope ? `Node: ${htmlEscape(scope)}` : "Project"}${disabled ? " · Disabled" : ""}</span>
-          <h5><button type="button" class="template-list-name" data-workflow-skill="${htmlEscape(skill.id)}">${htmlEscape(skill.name)}</button></h5>
-          ${source === "custom" && event.name && event.id !== "custom" ? `<p class="muted small">${htmlEscape(event.name)}</p>` : ""}
-        </div><div class="workflow-assignment-actions"><button type="button" class="secondary" data-workflow-preview="${index}">${binding.mode === "context" ? "Preview context" : "Preview prompt"}</button><button type="button" class="secondary" data-workflow-skill="${htmlEscape(skill.id)}">Edit Skill</button></div>
+        <button type="button" class="secondary workflow-skill-card" data-workflow-skill="${htmlEscape(skill.id)}" aria-label="Edit ${htmlEscape(skill.name)} Skill">
+          <span class="workflow-skill-card-title"><strong>${htmlEscape(skill.name)}</strong><span class="workflow-skill-edit">Edit Skill →</span></span>
+          <span class="muted small">${source === "custom" ? "Custom action" : `Order ${binding.order || 0}`} · ${htmlEscape({blocking:"Required",background:"Background",context:"Context only"}[binding.mode] || binding.mode || "Required")} · ${scope ? `Node: ${htmlEscape(scope)}` : "Project"}${disabled ? " · Disabled" : ""}</span>
+          ${source === "custom" && event.name && event.id !== "custom" ? `<span class="muted small">${htmlEscape(event.name)}</span>` : ""}
+        </button><div class="workflow-assignment-actions"><button type="button" class="secondary" data-workflow-preview="${index}">${binding.mode === "context" ? "Preview context" : "Preview prompt"}</button></div>
       </article>`;
     }).join("")}</div>` : '<p class="workflow-empty muted">No Skills assigned. Add a Skill to run work at this trigger.</p>'}
-    <div class="workflow-prompts"><h4>Prompt composition</h4><p class="muted small">These Templates and their partials are shared. Editing them affects every trigger that uses them. Preview uses sample task data and does not launch an agent.</p>
-      <div class="workflow-template-links">${templateIds.filter(id => data.templates.items.some(row => row.item.id === id)).map(id => {
-        const row = data.templates.items.find(row => row.item.id === id);
-        return `<button type="button" class="secondary" data-workflow-template="${htmlEscape(id)}" title="${htmlEscape(row.usage?.description || "Edit shared template")}">${htmlEscape(row.name)}</button>`;
-      }).join("")}</div>
-      <button type="button" class="template-map-expand" data-workflow-composition="${templateId}">Explore shared Templates and partials →</button>
-    </div>
   </section>`;
 }
 function renderWorkflowSettings(data) {
@@ -153,12 +144,7 @@ function bindWorkflowSettings(data) {
   root.querySelector("[data-workflow-history]").onclick = () => openEventHistory();
   root.querySelectorAll("[data-workflow-add]").forEach(button => { button.onclick = () => openSkillEditor(null, false, {source: button.dataset.workflowAdd}); });
   root.querySelectorAll("[data-workflow-skill]").forEach(button => { button.onclick = () => openSkillEditor(data.skills.items.find(skill => skill.id === button.dataset.workflowSkill)); });
-  root.querySelectorAll("[data-workflow-template]").forEach(button => { button.onclick = () => openTemplateEditor(button.dataset.workflowTemplate); });
   root.querySelectorAll("[data-workflow-preview]").forEach(button => { button.onclick = () => previewWorkflowAssignment(data, workflowCurrentSource(data), Number(button.dataset.workflowPreview), button); });
-  root.querySelector("[data-workflow-composition]")?.addEventListener("click", event => {
-    templateMapRoot = event.currentTarget.dataset.workflowComposition; templateMapExpanded = new Set([templateMapRoot]);
-    templateCatalogView = "all"; workflowSettingsView = "resources"; workflowSettingsResource = "templates"; redrawWorkflowSettings();
-  });
   root.querySelectorAll("[data-workflow-resource] button").forEach(button => { button.onclick = () => { workflowSettingsResource = button.dataset.choice; redrawWorkflowSettings(); }; });
   if (workflowSettingsView === "resources") {
     if (workflowSettingsResource === "skills") bindAutomationSettings("skills", data.skills); else bindTemplatesSettings();
