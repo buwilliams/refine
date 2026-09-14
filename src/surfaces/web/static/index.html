@@ -45,18 +45,23 @@
           <span class="nav-context-more" aria-hidden="true"></span>
         </summary>
         <div class="nav-menu-panel nav-context-panel">
-          <div class="nav-menu-label">Application</div>
-          <a id="target-app-indicator" class="target-app-indicator nav-context-status"
+          <div class="nav-menu-label">Status</div>
+          <a id="target-app-indicator" class="target-app-indicator nav-menu-item nav-control-item"
              href="#/settings/processes"
              aria-label="Target application status (click to manage)"
              title="Target application status"
              data-testid="context-target-app-status"
              data-state="unknown">
             <span class="target-app-dot" aria-hidden="true"></span>
-            <span class="nav-control-copy">
-              <span class="target-app-label">Application</span>
-              <span class="nav-control-status target-app-state">Status unknown</span>
-            </span>
+            <span>Application</span>
+          </a>
+          <a id="agent-status-indicator" class="agent-status-indicator nav-menu-item nav-control-item"
+             href="#/settings/processes"
+             aria-label="Agent status (click to view processes)"
+             title="Agent status"
+             data-state="unknown">
+            <span class="target-app-dot" aria-hidden="true"></span>
+            <span>Agent status</span>
           </a>
           <label class="nav-menu-label nav-context-section-label" for="global-node">Node</label>
           <select id="global-node" aria-label="Node" data-testid="global-node" disabled>
@@ -64,21 +69,9 @@
           </select>
           <label class="nav-menu-label nav-context-section-label" for="global-reporter">Reporter</label>
           <select id="global-reporter" aria-label="Reporter" data-testid="global-reporter"></select>
-          <div class="nav-menu-label nav-context-section-label">Status and actions</div>
-          <a id="agent-status-indicator" class="agent-status-indicator nav-menu-item nav-control-item"
-             href="#/settings/processes"
-             aria-label="Agent status (click to view processes)"
-             title="Agent status"
-             data-state="unknown">
-            <span class="target-app-dot" aria-hidden="true"></span>
-            <span class="nav-control-copy">
-              <span>Agent status</span>
-              <span class="nav-control-status agent-status-label">Status unknown</span>
-            </span>
-          </a>
           <section id="nav-knowledge-hub" aria-label="Knowledge Hub"></section>
           <section id="nav-manual-skills" aria-label="Skills"></section>
-          <div class="nav-menu-label nav-context-section-label">Management</div>
+          <div class="nav-menu-label nav-context-section-label">Tools and Support</div>
           <button class="nav-menu-item nav-control-item nav-management-item nav-command-button" id="btn-command-palette"
                   data-testid="command-palette-button"
                   aria-label="Open command palette">
