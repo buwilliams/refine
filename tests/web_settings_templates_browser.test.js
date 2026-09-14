@@ -123,3 +123,46 @@ test('Resource pagination stays bounded and search reaches entries on later page
     assert.deepEqual(app.pageErrors,[]);
   } finally {await app.close();}
 });
+
+test('Agent map switches launch paths, follows saved includes, and opens resource editors', {skip:SKIP}, async () => {
+  const prompts = {'goal-agents-session':'{{goal_prompt}} {{completion_contract}}',workflow:'{{templates.supervised-skill}}','supervised-skill':'{{skill}}','goal-completion':'Complete','manual-skill':'{{skill}}','terminal-session':'{{instructions}}','chat-session':'{{instructions}}','planning-agent':'{{templates.purpose}}',agent:'General instructions','goal-agent':'Goal instructions',purpose:'Project purpose','source-upgrade':'Upgrade'};
+  const items = Object.entries(prompts).map(([id,prompt]) => ({name:id,item:{id,prompt,revision:0},usage:{kind:['purpose','planning-agent','agent','goal-agent'].includes(id)?'partial':'template',group:id==='source-upgrade'?'tasks':'workflow'}}));
+  const app = await openApp({fixture(path) {
+    if(path==='/api/templates') return {items};
+    if(path.startsWith('/api/templates/')) return {...items.find(row=>row.item.id===path.split('/').pop()),default_prompt:'Default',variables:[]};
+    return apiFixture(path);
+  }});
+  try {
+    const {page}=app;
+    await page.goto(`${app.origin}/#/settings/templates`);
+    const map=page.locator('.resource-map-overview');
+    assert.equal(await map.getAttribute('open'),null);
+    await map.locator(':scope > summary').click();
+    assert.equal(await map.locator('[data-map-template="workflow"]').isVisible(),true);
+    const type=map.locator('[data-resource-map-type]');
+    await type.selectOption('planning');
+    assert.equal(await map.locator('[data-map-template="planning-agent"]').isVisible(),true);
+    assert.equal(await map.locator('[data-map-template="goal-agent"]').count(),0);
+    await map.locator('[data-resource-map-variant]').selectOption('chat-session');
+    assert.equal(await map.locator('[data-map-template="chat-session"]').isVisible(),true);
+    await map.locator('.resource-map-includes').nth(1).locator(':scope > summary').click();
+    await map.locator('[data-map-template="purpose"]').click();
+    const modal=page.getByTestId('automation-modal');
+    await modal.locator('#template-prompt').waitFor();
+    assert.equal(await modal.locator('#template-prompt').inputValue(),'Project purpose');
+    await modal.locator('[data-close]').click();
+    await type.selectOption('skill');
+    assert.equal(await map.locator('[data-map-template="manual-skill"]').isVisible(),true);
+    await map.locator('[data-resource-map-variant]').selectOption('supervised-skill');
+    assert.equal(await map.locator('[data-map-template="goal-agents-session"]').isVisible(),true);
+    await type.selectOption('general');
+    assert.equal(await map.locator('[data-map-template="agent"]').isVisible(),true);
+    await type.selectOption('goal');
+    assert.equal(await map.locator('[data-map-template="goal-agent"]').isVisible(),true);
+    await type.selectOption('system');
+    assert.equal(await map.locator('[data-map-template="source-upgrade"]').isVisible(),true);
+    await page.setViewportSize({width:390,height:844});
+    assert.equal(await map.evaluate(el=>el.scrollWidth>el.clientWidth),false);
+    assert.deepEqual(app.pageErrors,[]);
+  } finally {await app.close();}
+});

@@ -87,3 +87,24 @@
 .template-catalog-table [data-template-catalog-row] { cursor: pointer; }
 
 .resource-pagination { margin-top: 16px; }
+
+.resource-map-overview { margin: 0 0 20px; border: 1px solid var(--border); border-radius: var(--radius-md); }
+.resource-map-overview > summary { padding: 12px 16px; cursor: pointer; font-weight: 600; }
+.resource-map-body { padding: 0 16px 16px; }
+.resource-map-controls { flex-wrap: wrap; align-items: end; }
+.resource-map-controls label { display: flex; flex-direction: column; gap: 6px; }
+.resource-map-flow { display: grid; grid-template-columns: minmax(0, 2fr) minmax(180px, 1fr); gap: 24px; align-items: start; }
+.resource-map-tree, .resource-map-tree ul { list-style: none; padding: 0; margin: 0; }
+.resource-map-tree ul { margin: 8px 0 0 12px; padding-left: 16px; border-left: 1px solid var(--border); }
+.resource-map-tree li + li { margin-top: 10px; }
+.resource-map-node { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.resource-map-node button { height: auto; min-height: 34px; white-space: normal; text-align: left; }
+.resource-map-includes > summary { cursor: pointer; margin-top: 6px; color: var(--muted); font-size: 12px; }
+.resource-map-result { display: flex; gap: 16px; align-items: start; padding-top: 8px; }
+.resource-map-result > span { color: var(--muted); font-size: 22px; }
+.resource-map-result p { margin: 6px 0 0; }
+@media (max-width: 650px) {
+  .resource-map-flow { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .resource-map-result > span { transform: rotate(90deg); }
+  .resource-map-controls label { max-width: 100%; }
+}

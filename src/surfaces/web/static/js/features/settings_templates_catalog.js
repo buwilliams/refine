@@ -48,6 +48,7 @@ function renderTemplatesCatalog(data = {}) {
   resources.sort((a,b) => a.name.localeCompare(b.name));
   return `<section class="settings-section" data-testid="settings-templates">
     <p class="muted">Skills describe the work. Templates build agent prompts. Partials provide reusable guidance inside Skills and Templates. Edits apply everywhere a resource is used.</p>
+    <div data-resource-map-host>${renderResourceMap(data)}</div>
     <div class="actions resource-filters"><label class="template-catalog-search">Find a resource<input type="search" data-template-catalog-search placeholder="Search names and where they are used…"></label><label>Type<select data-resource-type><option value="">All resources</option><option>Skill</option><option>Template</option><option>Partial</option></select></label>${data.workflowData ? '<button type="button" data-resource-new>Create Skill</button>' : ""}</div>
     <div class="template-catalog-table"><table class="table"><thead><tr><th>Name</th><th>Type</th><th>Where it is used</th></tr></thead><tbody>
     ${resources.map(row => `<tr data-template-catalog-row tabindex="0" aria-label="Edit ${htmlEscape(row.name)} ${row.kind}" ${row.attribute}="${htmlEscape(row.id)}" data-resource-kind="${row.kind}" data-template-search="${htmlEscape(`${row.name} ${row.description} ${row.included || ""}`.toLowerCase())}"><td>${htmlEscape(row.name)}${row.customized ? '<span class="muted small">Customized</span>' : ""}</td><td>${row.kind}</td><td>${htmlEscape(row.description)}${row.included ? `<p class="muted small">${htmlEscape(row.included)}</p>` : ""}</td></tr>`).join("")}
@@ -56,6 +57,7 @@ function renderTemplatesCatalog(data = {}) {
 function bindTemplatesCatalog(data) {
   const section = document.querySelector('[data-testid="settings-templates"]');
   if (!section) return;
+  bindResourceMap(data);
   bindAutomationRows(section, "[data-template-id]", row => openTemplateEditor(row.dataset.templateId));
   bindAutomationRows(section, "[data-resource-skill]", row => openSkillEditor(data.workflowData.skills.items.find(skill => skill.id === row.dataset.resourceSkill)));
   section.querySelector("[data-resource-new]")?.addEventListener("click", () => openSkillEditor());
