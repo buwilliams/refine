@@ -65,14 +65,22 @@ impl TemplateStore {
     pub fn show(&self, id: &str) -> RefineResult<Value> {
         let item = self.read(id)?;
         Ok(
-            json!({"item":item,"name":definition(id).unwrap().name,"customized":item.revision > 0,"default_prompt":definition(id).unwrap().default_prompt,"variables":super::variables()}),
+            json!({"item":item,"name":definition(id).unwrap().name,"customized":item.revision > 0,"default_prompt":definition(id).unwrap().default_prompt,"usage":self.usage(id),"variables":super::variables()}),
         )
+    }
+
+    fn usage(&self, id: &str) -> super::usage::TemplateUsage {
+        let template = crate::application::agent_io::prompts::PromptTemplate::ALL
+            .iter()
+            .find(|template| template.id() == id)
+            .expect("catalog entry");
+        super::usage::usage(*template)
     }
 
     pub fn list(&self) -> RefineResult<Value> {
         Ok(json!({"items": definitions().iter().map(|definition| {
             let item = self.read(&definition.id)?;
-            Ok(json!({"name":definition.name,"customized":item.revision > 0,"item":item}))
+            Ok(json!({"name":definition.name,"customized":item.revision > 0,"usage":self.usage(&definition.id),"item":item}))
         }).collect::<RefineResult<Vec<_>>>()?}))
     }
 

@@ -213,3 +213,27 @@ fn delivery_retains_task_values_within_the_same_pinned_operation() {
         "Pinned request"
     );
 }
+
+#[test]
+fn catalog_explains_launches_partials_and_reference_only_entries() {
+    let store = TemplateStore::new(None);
+    assert_eq!(store.show("workflow").unwrap()["usage"]["kind"], "template");
+    assert_eq!(
+        store.show("workflow-context").unwrap()["usage"]["kind"],
+        "partial"
+    );
+    assert_eq!(
+        store.show("planning-agent").unwrap()["usage"]["group"],
+        "interactive"
+    );
+    let list = store.list().unwrap();
+    for row in list["items"].as_array().unwrap() {
+        assert!(!row["usage"]["description"].as_str().unwrap().is_empty());
+    }
+    assert!(
+        store.show("goal-agents-spec").unwrap()["usage"]["description"]
+            .as_str()
+            .unwrap()
+            .contains("no current built-in launch")
+    );
+}

@@ -1,21 +1,10 @@
-// System-owned template identities, with project-owned editable content.
+// The catalog map and editor share the same project-owned Template sources.
+let activeTemplatesCatalog = {};
 function renderTemplatesSettings(data = {}) {
-  const primary = ["workflow", "planning-agent", "agent", "goal-agent"];
-  const rows = [...(data.items || [])].sort((a, b) => {
-    const rank = id => primary.includes(id) ? primary.indexOf(id) : primary.length;
-    return rank(a.item.id) - rank(b.item.id) || a.name.localeCompare(b.name);
-  });
-  return `<section class="settings-section" data-testid="settings-templates">
-    <h3>Templates</h3><p class="muted">Control the context and instructions Refine sends to agents. Variables insert Skills and task information.</p>
-    <table class="table"><thead><tr><th>Name</th><th>Content</th></tr></thead><tbody>${rows.map(row => `<tr tabindex="0" data-template-id="${htmlEscape(row.item.id)}" aria-label="Edit ${htmlEscape(row.name)}"><td>${htmlEscape(row.name)}</td><td>${row.customized ? "Customized" : "Default"}</td></tr>`).join("")}</tbody></table></section>`;
+  activeTemplatesCatalog = data;
+  return `<div id="template-catalog-surface">${renderTemplatesCatalog(data)}</div>`;
 }
-
-function bindTemplatesSettings() {
-  document.querySelectorAll("[data-template-id]").forEach(row => {
-    row.onclick = () => openTemplateEditor(row.dataset.templateId);
-    row.onkeydown = event => { if (["Enter", " "].includes(event.key)) { event.preventDefault(); openTemplateEditor(row.dataset.templateId); } };
-  });
-}
+function bindTemplatesSettings() { bindTemplatesCatalog(activeTemplatesCatalog); }
 
 async function openTemplateEditor(id) {
   if (automationEditor || automationEditorOpening) return;
@@ -27,49 +16,143 @@ async function openTemplateEditor(id) {
     if (!isNodeContextGenerationCurrent(generation)) return;
   } catch (error) { showActionError(error); return; }
   finally { automationEditorOpening = false; }
-  const values = Object.fromEntries(current.variables.filter(v => v.name !== "refine_executable").map(v => [v.name, ""]));
-  values.skill = {template: "Implement {{current_round_goal}}. Use {{refine_executable}} when needed."};
-  values.current_round_goal = "The current Round's request";
-  values.workflow_step = "implement";
-  const root = automationModal(`${current.name} — Edit Template`, `
-    ${renderSettingsMarkdownField({id: "template-prompt", title: "Template", value: current.item.prompt, rows: 16})}
-    <details><summary>Variables and templates</summary><p class="muted">Skills and referenced templates expand their variables. Messages, Goal text, and other task data remain literal. Use a backslash before {{ to show a literal variable.</p>
-    <div class="form-row"><label for="template-insert">Insert variable or template</label><select id="template-insert"><option value="">Choose…</option><optgroup label="Variables">${current.variables.map(v => `<option value="${htmlEscape(v.name)}">${htmlEscape(v.name)} — ${htmlEscape(v.description)}</option>`).join("")}</optgroup><optgroup label="Templates">${catalog.items.map(v => `<option value="templates.${htmlEscape(v.item.id)}">${htmlEscape(v.name)}</option>`).join("")}</optgroup></select></div></details>
-    <details><summary>Preview with sample values</summary><label for="template-values">Sample values (JSON)</label><textarea id="template-values" rows="8" style="width:100%">${htmlEscape(JSON.stringify(values, null, 2))}</textarea><button type="button" class="secondary" data-template-preview>Render preview</button><pre data-template-result style="white-space:pre-wrap;overflow-wrap:anywhere" aria-live="polite"></pre></details>
-    <details><summary>Built-in default</summary><pre style="white-space:pre-wrap">${htmlEscape(current.default_prompt)}</pre></details>`);
+  // Keep sample input focused on the variables this template actually includes.
+  const samples = {
+    skill: {template: "Implement {{current_round_goal}}. Use {{refine_executable}} when needed."},
+    current_round_goal: "The current Round's request",
+    workflow_step: "Implement",
+  };
+  const values = {}, visited = new Set();
+  function collectValues(source) {
+    for (const match of source.matchAll(/(?<!\\){{\s*([\w.-]+)\s*}}/g)) {
+      const name = match[1];
+      if (visited.has(name)) continue;
+      visited.add(name);
+      if (name.startsWith("templates.")) {
+        collectValues(catalog.items.find(row => row.item.id === name.slice(10))?.item.prompt || "");
+      } else if (name !== "refine_executable") {
+        values[name] = samples[name] ?? "";
+        if (values[name]?.template) collectValues(values[name].template);
+      }
+    }
+  }
+  collectValues(current.item.prompt);
+  const tabs = {edit: "Edit", preview: "Preview", variables: "Variables", default: "Default"};
+  const entries = [
+    ...current.variables.map(v => ({name: v.name, label: v.name, description: v.description, group: "Variables"})),
+    ...catalog.items.map(v => ({name: `templates.${v.item.id}`, label: v.name, description: v.usage?.description || `Include the ${v.name} template.`, group: v.usage?.kind === "partial" ? "Partials" : "Templates"})),
+  ];
+  const panels = {
+    edit: `<label class="sr-only" for="template-prompt">Template content</label>
+      <p class="muted template-tab-intro">Write the instructions sent to the agent. Use Variables to insert Skills, task information, or another template.</p>
+      <textarea id="template-prompt" class="template-source" spellcheck="false">${htmlEscape(current.item.prompt)}</textarea>`,
+    preview: `<div class="template-preview-toolbar"><p class="muted">See the complete prompt with sample values.</p><button type="button" class="secondary" data-template-preview>Refresh preview</button></div>
+      <details class="template-samples"><summary>Sample values</summary><label class="sr-only" for="template-values">Sample values (JSON)</label>
+        <p class="muted small">These values are for preview only. Use {"template": "…"} for text that expands its own variables.</p>
+        <textarea id="template-values" class="template-source" rows="7" spellcheck="false">${htmlEscape(JSON.stringify(values, null, 2))}</textarea></details>
+      <p class="muted small" data-template-preview-status role="status"></p>
+      <pre class="template-output" data-template-result></pre>`,
+    variables: `<p class="muted template-tab-intro">Insert a variable at your cursor. Skills and templates expand their own variables; user messages and Goal text stay literal.</p>
+      <label class="sr-only" for="template-variable-search">Find a variable or template</label>
+      <input type="search" id="template-variable-search" placeholder="Find a variable or template…" autocomplete="off">
+      <div class="template-variable-list">${entries.map(entry => `<div class="template-variable" data-variable-search="${htmlEscape(`${entry.label} ${entry.name} ${entry.description}`.toLowerCase())}">
+        <div><span class="muted small">${entry.group}</span><div><code>{{${htmlEscape(entry.name)}}}</code></div><p class="muted small">${htmlEscape(entry.description)}</p></div>
+        <button type="button" class="secondary" data-template-insert="${htmlEscape(entry.name)}" aria-label="Insert ${htmlEscape(entry.label)}">Insert</button></div>`).join("")}</div>
+      <p class="muted" data-template-no-matches hidden>No matching variables or templates.</p>
+      <p class="muted small">Use a backslash before {{ to keep a variable as literal text.</p>`,
+    default: `<p class="muted template-tab-intro">The built-in starting point for this template.</p>
+      <pre class="template-output">${htmlEscape(current.default_prompt)}</pre>
+      <button type="button" class="secondary" data-template-use-default>Use default in editor</button>`,
+  };
+  const root = automationModal(current.name, `
+    ${current.usage ? `<p class="muted template-editor-usage">${htmlEscape(current.usage.description)}</p>` : ""}
+    <div class="flat-tabs template-tabs" role="tablist" aria-label="Template editor">
+      ${Object.entries(tabs).map(([key, label]) => `<button type="button" role="tab" id="template-tab-${key}" aria-controls="template-panel-${key}" aria-selected="${key === "edit"}" tabindex="${key === "edit" ? 0 : -1}" data-template-tab="${key}">${label}</button>`).join("")}
+    </div>
+    ${Object.entries(panels).map(([key, content]) => `<div class="round-tab-panel template-panel" role="tabpanel" id="template-panel-${key}" aria-labelledby="template-tab-${key}" data-template-panel="${key}"${key === "edit" ? "" : " hidden"}>${content}</div>`).join("")}`);
   automationEditor = root;
+  root.querySelector(".modal").classList.add("template-editor-modal");
   root.querySelector("[data-delete]").remove();
-  root.querySelector("[data-settings-markdown-edit]").remove();
-  root.querySelector("[data-settings-markdown-preview]").hidden = true;
   const editor = root.querySelector("#template-prompt");
-  editor.hidden = false;
+  const previewButton = root.querySelector("[data-template-preview]");
+  const saveButton = root.querySelector("[data-save]");
+  saveButton.textContent = "Save template";
   root.dataset.nodeContextDirty = "false";
-  root.addEventListener("input", () => { root.dataset.nodeContextDirty = "true"; });
-  const error = e => { root.querySelector("[data-automation-error]").textContent = e.message || String(e); };
-  root.querySelector("#template-insert").onchange = event => {
-    if (!event.target.value) return;
-    editor.setRangeText(`{{${event.target.value}}}`, editor.selectionStart, editor.selectionEnd, "end");
-    editor.dispatchEvent(new Event("input", {bubbles: true})); editor.focus(); event.target.value = "";
+  editor.addEventListener("input", () => { root.dataset.nodeContextDirty = "true"; });
+  const error = e => { root.querySelector("[data-automation-error]").textContent = e?.message || (e ? String(e) : ""); };
+  function selectTab(key, focus = false) {
+    root.querySelectorAll("[data-template-tab]").forEach(tab => {
+      const active = tab.dataset.templateTab === key;
+      tab.setAttribute("aria-selected", String(active));
+      tab.tabIndex = active ? 0 : -1;
+      if (active && focus) tab.focus();
+    });
+    root.querySelectorAll("[data-template-panel]").forEach(panel => { panel.hidden = panel.dataset.templatePanel !== key; });
+    if (key === "preview") action(previewButton, true);
+  }
+  root.querySelectorAll("[data-template-tab]").forEach(tab => {
+    tab.onclick = () => selectTab(tab.dataset.templateTab);
+    tab.onkeydown = event => {
+      const keys = Object.keys(tabs), index = keys.indexOf(tab.dataset.templateTab);
+      const next = event.key === "ArrowRight" ? (index + 1) % keys.length
+        : event.key === "ArrowLeft" ? (index + keys.length - 1) % keys.length
+        : event.key === "Home" ? 0 : event.key === "End" ? keys.length - 1 : null;
+      if (next === null) return;
+      event.preventDefault(); selectTab(keys[next], true);
+    };
+  });
+  root.querySelectorAll("[data-template-insert]").forEach(button => {
+    button.onclick = () => {
+      editor.setRangeText(`{{${button.dataset.templateInsert}}}`, editor.selectionStart, editor.selectionEnd, "end");
+      editor.dispatchEvent(new Event("input", {bubbles: true}));
+      selectTab("edit"); editor.focus();
+    };
+  });
+  root.querySelector("#template-variable-search").oninput = event => {
+    const query = event.target.value.trim().toLowerCase();
+    let count = 0;
+    root.querySelectorAll("[data-variable-search]").forEach(row => {
+      row.hidden = !row.dataset.variableSearch.includes(query);
+      if (!row.hidden) count++;
+    });
+    root.querySelector("[data-template-no-matches]").hidden = count > 0;
+  };
+  root.querySelector("[data-template-use-default]").onclick = async () => {
+    if (editor.value !== current.item.prompt && editor.value !== current.default_prompt
+      && !await modalConfirm("Replace your draft with the built-in default?")) return;
+    if (!root.isConnected) return;
+    editor.value = current.default_prompt;
+    editor.dispatchEvent(new Event("input", {bubbles: true}));
+    selectTab("edit"); editor.focus();
   };
   let busy = false;
   async function action(button, preview) {
     if (busy) return;
     if (!isNodeContextGenerationCurrent(generation)) { error(new Error("The selected project changed. Reopen this editor before saving.")); return; }
     busy = true;
-    button.disabled = true;
+    previewButton.disabled = true;
+    saveButton.disabled = true;
+    error(null);
+    const status = root.querySelector("[data-template-preview-status]");
+    if (preview) status.textContent = "Rendering preview…";
     try {
       const body = preview ? {prompt: editor.value, values: JSON.parse(root.querySelector("#template-values").value)} : {revision: current.item.revision, prompt: editor.value};
       const result = await api(preview ? "POST" : "PUT", `/api/templates/${encodeURIComponent(id)}${preview ? "/preview" : ""}`, body);
       if (!isNodeContextGenerationCurrent(generation) || !root.isConnected) return;
-      if (preview) root.querySelector("[data-template-result]").textContent = result.prompt;
-      else { root._close(); await refreshSettings({force: true}); }
-    } catch (e) { error(e.status === 409 ? new Error("This Template changed. Your draft is retained; reopen the Template before saving.") : e); }
-    finally { busy = false; button.disabled = false; }
+      if (preview) {
+        root.querySelector("[data-template-result]").textContent = result.prompt;
+        status.textContent = editor.value !== body.prompt ? "Draft changed. Refresh preview to see your latest edits."
+          : result.prompt ? "Preview ready" : "This template produces an empty prompt.";
+      } else { root._close(); await refreshSettings({force: true}); }
+    } catch (e) {
+      if (preview) { status.textContent = "Preview could not be rendered."; root.querySelector("[data-template-result]").textContent = ""; }
+      error(e.status === 409 ? new Error("This Template changed. Your draft is retained; reopen the Template before saving.") : e);
+    } finally { busy = false; previewButton.disabled = false; saveButton.disabled = state.project?.attached === false; }
   }
   if (state.project?.attached === false) {
-    root.querySelector("[data-save]").disabled = true;
-    root.querySelector("[data-save]").title = "Attach a project to edit Templates";
+    saveButton.disabled = true;
+    saveButton.title = "Attach a project to edit Templates";
   }
-  root.querySelector("[data-save]").onclick = event => action(event.currentTarget, false);
-  root.querySelector("[data-template-preview]").onclick = event => action(event.currentTarget, true);
+  saveButton.onclick = () => action(saveButton, false);
+  previewButton.onclick = () => action(previewButton, true);
 }

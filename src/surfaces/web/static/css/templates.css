@@ -1,0 +1,103 @@
+/* Template editing keeps navigation and actions in place while content scrolls. */
+.template-editor-modal {
+  width: min(1000px, calc(100vw - 32px));
+  max-width: 1000px;
+  height: min(780px, calc(100dvh - 40px));
+}
+.template-editor-modal .modal-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+}
+.template-editor-modal .template-tabs { flex-shrink: 0; }
+.template-editor-modal .template-panel {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px 0;
+}
+.template-editor-modal .template-panel[data-template-panel="edit"] {
+  display: flex;
+  flex-direction: column;
+}
+.template-editor-modal .template-panel[hidden] { display: none; }
+.template-tab-intro { margin: 0 0 14px; }
+.template-source {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: var(--font-mono, monospace);
+  font-size: 14px;
+  line-height: 1.65;
+  tab-size: 2;
+}
+#template-prompt { flex: 1; min-height: 180px; resize: none; margin: 0; }
+.template-preview-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
+.template-preview-toolbar p { margin: 0; }
+.template-preview-toolbar button { flex-shrink: 0; }
+.template-samples { margin-bottom: 16px; }
+.template-samples summary { cursor: pointer; }
+.template-output { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.65; margin: 0 0 16px; }
+#template-variable-search { width: 100%; box-sizing: border-box; margin-bottom: 8px; }
+.template-variable { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--color-border-subtle); }
+.template-variable > div { min-width: 0; }
+.template-variable code { overflow-wrap: anywhere; }
+.template-variable p { margin: 4px 0 0; }
+.template-variable button { flex-shrink: 0; }
+@media (max-width: 600px) {
+  .template-editor-modal { width: calc(100vw - 24px); height: calc(100dvh - 24px); }
+  .template-preview-toolbar { flex-wrap: wrap; }
+  .template-tabs { gap: 16px; }
+}
+.template-editor-modal .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.template-output { max-height: none; overflow: visible; }
+#template-variable-search {
+  padding: 9px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  font: inherit;
+  color: var(--fg);
+  background: var(--bg, white);
+}
+.template-editor-usage { flex-shrink: 0; margin: 0 0 12px; }
+
+/* Template composition is a small, expandable graph, not a wall of source files. */
+.template-workflow-steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); list-style: none; padding: 0; gap: 24px; margin: 24px 0; }
+.template-workflow-steps li { position: relative; display: flex; flex-direction: column; gap: 4px; border-bottom: 2px solid var(--color-border-subtle); padding-bottom: 12px; }
+.template-workflow-steps li:not(:last-child)::after { content: "→"; position: absolute; right: -19px; top: 2px; color: var(--muted); }
+.template-map-scroll { overflow: auto; border: 1px solid var(--color-border-subtle); border-radius: 8px; background: var(--color-surface-subtle, #f8fafc); }
+.template-map { position: relative; display: flex; align-items: center; gap: 56px; width: max-content; min-width: 100%; box-sizing: border-box; padding: 24px; }
+.template-map-column { display: flex; flex-direction: column; gap: 20px; width: 210px; flex-shrink: 0; z-index: 1; }
+.template-map-node { display: flex; flex-direction: column; gap: 8px; padding: 14px; border: 1px solid var(--color-border-subtle); border-radius: 8px; background: var(--bg, white); }
+.template-map-lines { position: absolute; top: 0; left: 0; pointer-events: none; overflow: visible; }
+.template-map-lines path { fill: none; stroke: var(--muted); stroke-width: 1.5; }
+button.template-map-name, button.template-list-name { border: 0; background: transparent; color: var(--fg); font: inherit; font-weight: 600; text-align: left; padding: 0; box-shadow: none; }
+button.template-map-name:hover, button.template-list-name:hover { color: var(--accent); text-decoration: underline; background: transparent; }
+button.template-map-expand { border: 0; background: transparent; color: var(--accent); text-align: left; padding: 0; font-size: 12px; box-shadow: none; }
+.template-map-skill p { margin: 0; }
+.template-map-legend { margin: 10px 0 24px; }
+.template-catalog-search { display: flex; flex-direction: column; gap: 8px; max-width: 480px; margin-bottom: 16px; }
+.template-catalog-search input { border: 1px solid var(--color-border); border-radius: 6px; padding: 9px 12px; font: inherit; background: var(--bg, white); color: var(--fg); }
+.template-catalog-table { overflow: auto; }
+.template-catalog-table table { min-width: 660px; }
+.template-catalog-table td:first-child { min-width: 160px; }
+.template-catalog-table td:first-child > span { display: block; margin-top: 4px; }
+.template-catalog-table td:nth-child(3) { width: 60%; }
+.template-catalog-table td p { margin: 5px 0 0; }
+.template-catalog-table [hidden] { display: none; }
+@media (max-width: 600px) {
+  .template-catalog-tabs { gap: 16px; }
+  .template-workflow-steps { gap: 16px; font-size: 12px; }
+  .template-workflow-steps li:not(:last-child)::after { right: -14px; }
+  .template-workflow-steps .small { font-size: 11px; }
+}

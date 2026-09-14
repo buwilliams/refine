@@ -2,7 +2,9 @@
 
 Templates control the context and instructions Refine sends to agents. Open **Settings → Templates** to edit Workflow, Planning Agent, Agent, Goal Agent, or a specialized launch, completion, repair, or transport template. Entries have fixed names and cannot be created or deleted. An empty template is allowed.
 
-The editor shows the built-in default, available variables, and a preview using sample values. Saving checks the revision you opened; if another user saved first, your draft stays open with a conflict message. Without an attached project, defaults can be viewed and previewed.
+The catalog starts with the Goal workflow and an expandable composition map. Each entry explains where Refine uses it. Templates build prompts; partials are reusable pieces included by those templates. Solid lines follow saved references, and dashed lines show pieces selected by a launch when needed. Shared partials appear once. The All entries view also identifies reference entries without a current built-in launch.
+
+The editor uses Edit, Preview, Variables, and Default tabs. Preview renders on opening, and Variables supports searching and inserting at the cursor. Saving checks the revision you opened; if another user saved first, your draft stays open with a conflict message. Without an attached project, defaults can be viewed and previewed.
 
 ## Variables
 

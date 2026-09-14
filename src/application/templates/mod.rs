@@ -2,6 +2,7 @@
 mod catalog;
 mod rendering;
 mod store;
+mod usage;
 
 pub use catalog::{definition, definitions, variables};
 pub use rendering::{TemplateScope, TemplateSnapshot, TemplateValue, Variables};
