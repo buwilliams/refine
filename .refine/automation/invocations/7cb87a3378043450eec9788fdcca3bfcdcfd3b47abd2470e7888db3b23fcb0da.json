@@ -400,11 +400,47 @@
       }
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "error",
+  "results": {
+    "trigger-2124c51c-8d1f-44b7-8a07-7a989a68227f": {
+      "invocation_id": "7cb87a3378043450eec9788fdcca3bfcdcfd3b47abd2470e7888db3b23fcb0da",
+      "binding_id": "trigger-2124c51c-8d1f-44b7-8a07-7a989a68227f",
+      "role": "task",
+      "outcome": "error",
+      "summary": "The supplied completion contract omits invocation_id. Could not construct startup-email-<invocation_id>; no child Skill was queued and no configuration was changed.",
+      "evidence": [],
+      "artifacts": null
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "trigger-2124c51c-8d1f-44b7-8a07-7a989a68227f",
+      "checkout": {
+        "observation": {
+          "branch": "main",
+          "head_commit": "3f1b6712ca8d128825bd4a35b6482f91c4b950b4",
+          "status_porcelain": []
+        },
+        "tree": "845bed7d561d602056dfdd5b4a275462a948d762"
+      },
+      "checkout_recorded": true,
+      "diagnostic": null,
+      "host_bound_result": true,
+      "observational_violation": false,
+      "operation_id": null,
+      "process_id": "proc-1789400872401-694773-2",
+      "prompt_bytes": 2098,
+      "provider_session_id": null,
+      "purpose": "work",
+      "raw_output": "{\"outcome\":\"error\",\"summary\":\"The supplied completion contract omits invocation_id. Could not construct startup-email-<invocation_id>; no child Skill was queued and no configuration was changed.\"}",
+      "received_at": "2026-09-14T15:48:00.238786284+00:00",
+      "started_at": "2026-09-14T15:47:52.352712168+00:00",
+      "workflow_revision": null
+    }
+  ],
   "created_at": "2026-09-14T15:47:50.822028149+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-14T15:48:00.288238771+00:00",
   "error": null,
   "action_applied": false
 }
