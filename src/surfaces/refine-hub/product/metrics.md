@@ -2,6 +2,8 @@
 
 **Metrics Hub** ships with Refine. Open it from **New Goal → Hub**, or from **Settings → Hubs**. It reports on the attached target app, including Goals received from other nodes through state synchronization.
 
+![Metrics Hub with time horizons, key statistics, and delivery trends](../releases/images/4.3/metrics-overview.png)
+
 ## Start with a fresh snapshot
 
 Choose **Refresh statistics** in Metrics Hub. Refine calculates and saves the report without launching an agent or changing Goals. The page shows its last refresh time and flags snapshots older than 24 hours. The saved aggregate synchronizes through refine-state; it contains no Goal prompts, reports, or source code.
