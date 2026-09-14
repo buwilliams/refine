@@ -1527,7 +1527,7 @@ test("Shared Skills preserve assignments and support modal controls and cloning"
     await page.goto(`${app.origin}/#/settings/events`);
     await page.locator('[data-testid="settings-templates"]').waitFor();
     assert.equal(new URL(page.url()).hash,"#/settings/skills");
-    assert.deepEqual(await page.locator('.settings-tab').allTextContents().then(labels=>labels.map(s=>s.trim())),["Processes","Nodes","Reporters","Workflow","Knowledge Hub","Target App","Runtime"]);
+    assert.deepEqual(await page.locator('.settings-tab').allTextContents().then(labels=>labels.map(s=>s.trim())),["Processes","Nodes","Reporters","Prompts","Knowledge Hub","Target App","Runtime"]);
     assert.equal(await page.locator('[data-resource-skill]').count(),1);
     await page.locator('[data-resource-skill]').focus(); await page.keyboard.press('Enter');
     const modal = page.locator('[data-testid="automation-modal"]');

@@ -849,6 +849,10 @@ impl InProcessWebServer {
             return self.handle_goal_round_log_append(request);
         }
 
+        if request.method == "GET" && request.path.starts_with("/work/goals/") && request.path.ends_with("/prompts") {
+            return self.handle_goal_prompts(request);
+        }
+
         if request.method == "GET"
             && request.path.starts_with("/work/goals/")
             && request.path.ends_with("/logs")

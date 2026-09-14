@@ -271,7 +271,7 @@ const GUIDE_CATEGORIES = [
     description: "Reusable agent instructions and the activity that triggers them.",
     items: [
       guideItem("skills-configure", "Skills", "Educate and configure",
-        "Skills contain reusable instructions, scope, and optional inputs. Assign an existing Skill to Goal steps, system events, or custom actions in Settings → Workflow. Each assignment has its own run settings; editing a Skill updates its instructions everywhere it is used. Refine determines the expected result from the trigger.",
+        "Skills contain reusable instructions, scope, and optional inputs. Assign an existing Skill to Goal steps, system events, or custom actions in Settings → Prompts. Each assignment has its own run settings; editing a Skill updates its instructions everywhere it is used. Refine determines the expected result from the trigger.",
         "Default: Plan, Implement, Quality, and Governance have required Skills at their Enter triggers.",
         { hash: "#/settings/skills", selector: "[data-testid='settings-skills']" }),
       guideItem("skills-run", "Run a Skill", "Educate and operate",

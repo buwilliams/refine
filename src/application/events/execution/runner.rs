@@ -257,6 +257,12 @@ impl FileEventService {
                 );
                 if let Some(goal_id) = &invocation.context.goal_id {
                     metadata.insert("goal_id".into(), json!(goal_id));
+                    if let Some(round_idx) = invocation.context.data["goal"]["rounds"]
+                        .as_array()
+                        .and_then(|rounds| rounds.len().checked_sub(1))
+                    {
+                        metadata.entry("round_idx").or_insert(json!(round_idx));
+                    }
                     // Lifecycle and standalone Skills need the same durable launch
                     // occurrence as workflow-owned agents, including the Skill that
                     // submits a redirect. Keep current recovered launch metadata when

@@ -39,7 +39,7 @@ test("flat workflow tabs put each step's artifacts before its own activity and p
   try {
     const { page } = app;
     const tabs = page.locator('.round-tabs [role="tab"]');
-    assert.deepEqual(await tabs.allTextContents(), ["Request", "Plan", "Implement", "Quality", "Governance", "Activity"]);
+    assert.deepEqual(await tabs.allTextContents(), ["Request", "Plan", "Implement", "Quality", "Governance", "Prompts", "Activity"]);
     assert.equal(await page.locator('[data-round-tab="plan"]').getAttribute("aria-selected"), "true");
     for (const step of steps) {
       await page.locator(`[data-round-tab="${step}"]`).click();

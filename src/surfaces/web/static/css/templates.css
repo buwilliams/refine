@@ -108,3 +108,7 @@
   .resource-map-result > span { transform: rotate(90deg); }
   .resource-map-controls label { max-width: 100%; }
 }
+
+.goal-prompt-controls { flex-wrap: wrap; align-items: end; }
+.goal-prompt-controls label { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 6px; }
+.goal-recorded-prompt { white-space: pre-wrap; overflow-wrap: anywhere; font: 13px/1.6 var(--font-mono, monospace); max-height: 60vh; overflow: auto; padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-md); }

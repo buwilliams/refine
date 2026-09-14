@@ -12,6 +12,11 @@ impl InProcessWebServer {
             let body = request.body.unwrap_or_else(|| json!({}));
             match (request.method.as_str(), parts.as_slice()) {
                 ("GET", ["templates"]) => store.list(),
+                ("POST", ["templates", "reset"]) => {
+                    let revisions = serde_json::from_value::<std::collections::BTreeMap<String, u64>>(body["revisions"].clone())
+                        .map_err(|_| RefineError::InvalidInput("Template revisions are required".into()))?;
+                    store.reset(&revisions)
+                }
                 ("GET", ["templates", "variables"]) => Ok(json!({"items":crate::application::templates::variables()})),
                 ("GET", ["templates", id]) => store.show(id),
                 ("PUT", ["templates", id]) => {

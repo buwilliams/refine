@@ -111,7 +111,7 @@ function workflowSettingsContent(data) {
     content += source ? (workflowSettingsView === "goals" ? `<div id="workflow-hook-panel" role="tabpanel" aria-labelledby="workflow-hook-${workflowSettingsHook}">${renderWorkflowAssignments(data, source)}</div>` : renderWorkflowAssignments(data, source)) : '<p class="muted">No system event triggers are available.</p>';
   }
   return `<section class="settings-section" data-testid="settings-workflow">
-    <div class="actions"><h3>Workflow</h3><span class="spacer"></span>${data.detached ? "" : '<button type="button" class="secondary" data-workflow-history>Run history</button>'}</div>
+    <div class="actions"><h3>Prompts</h3><span class="spacer"></span>${data.detached ? "" : '<button type="button" class="secondary" data-workflow-history>Run history</button>'}</div>
     <p class="muted">Choose when work happens, then manage its Skills and the context sent to agents.</p>
     ${data.detached ? "" : `<div class="flat-tabs workflow-view-tabs" role="tablist" aria-label="Workflow configuration">${Object.entries(workflowViewLabels).map(([key,label]) => `<button type="button" role="tab" id="workflow-view-${key}" aria-controls="workflow-view-panel" data-workflow-view="${key}" aria-selected="${key === workflowSettingsView}" tabindex="${key === workflowSettingsView ? 0 : -1}">${label}</button>`).join("")}</div>`}
     <div class="workflow-view-content" id="workflow-view-panel"${data.detached ? "" : ` role="tabpanel" aria-labelledby="workflow-view-${workflowSettingsView}"`}>${content}</div></section>`;

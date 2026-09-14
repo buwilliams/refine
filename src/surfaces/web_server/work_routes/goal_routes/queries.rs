@@ -1,6 +1,32 @@
 use super::*;
 
 impl InProcessWebServer {
+    pub(crate) fn handle_goal_prompts(&self, request: ApiRequest) -> ApiResponse {
+        let Some(goal_id) = request
+            .path
+            .strip_prefix("/work/goals/")
+            .and_then(|path| path.strip_suffix("/prompts"))
+        else {
+            return goal_id_required();
+        };
+        let refine_dir = require_refine_dir!(self, "read Goal prompts");
+        if let Err(error) = self.work_item_service(refine_dir).show_goal_detail(goal_id) {
+            return error_response(error);
+        }
+        let Some(runtime) = &self.runtime_root else {
+            return runtime_root_unavailable("read Goal prompts");
+        };
+        let target = match self.current_target_root() {
+            Ok(Some(target)) => target,
+            Ok(None) => return target_root_unavailable("read Goal prompts"),
+            Err(error) => return error_response(error),
+        };
+        match crate::application::agents::prompt_history::goal_prompts(runtime, &target, goal_id) {
+            Ok(value) => ApiResponse::json(200, value),
+            Err(error) => error_response(error),
+        }
+    }
+
     pub(crate) fn handle_goal_bulk_update(&self, request: ApiRequest) -> ApiResponse {
         let refine_dir = require_refine_dir!(self, "bulk update work items");
         let Some(body) = request.body.as_ref() else {

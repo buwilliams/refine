@@ -436,6 +436,7 @@ function drawGoalDetail(goal) {
 }
 
 function bindGoalDetailControls() {
+  document.querySelectorAll('[data-round-panel="prompts"]:not([hidden]) [data-goal-prompts]').forEach(root => loadGoalPrompts(root));
   $$(".round-tabs [role=tab]").forEach(tab => {
     const select = (target, focus = false) => {
       const body = target.closest(".round-body");
@@ -448,6 +449,7 @@ function bindGoalDetailControls() {
       body.querySelectorAll("[data-round-panel]").forEach(panel => {
         panel.hidden = panel.dataset.roundPanel !== target.dataset.roundTab;
       });
+      if (target.dataset.roundTab === "prompts") loadGoalPrompts(body.querySelector("[data-goal-prompts]"));
       if (focus) target.focus();
     };
     bindOnce(tab, "click", () => select(tab));
@@ -924,6 +926,7 @@ function renderRound(rnd, idx, isLatest, prevRoundOpen = {}, prevPlanHistoryOpen
     request: `<div class="round-request" data-testid="goal-round-detail-prompt">${htmlEscape(rnd.prompt || "")}</div>`,
     ...Object.fromEntries(GOAL_AUTOMATED_STEPS.map(step => [step,
       renderRoundStep(rnd, idx, step, goal, prevPlanHistoryOpen)])),
+    prompts: renderGoalPrompts(goal.id, idx),
     activity: renderRoundHistory(goal, rnd, idx, isLatest),
   };
   return `

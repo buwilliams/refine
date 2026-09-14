@@ -80,7 +80,7 @@ test('Resource catalog explains uses, filters types, and follows edited referenc
     await page.goto(`${app.origin}/#/settings/templates`);
     await page.locator('[data-template-catalog-row]').first().waitFor();
     assert.equal(await page.locator('.template-map').count(), 0);
-    assert.equal(await page.locator('[data-template-catalog-row] button').count(), 0);
+    assert.equal(await page.locator('[data-template-catalog-row] td:first-child button').count(), 0);
     assert.equal(await page.locator('[data-template-view]').count(), 0);
     const partialRow = page.locator('[data-template-catalog-row][data-template-id="workflow-context"]');
     assert.match(await partialRow.innerText(), /Partial/);

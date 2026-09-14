@@ -686,7 +686,7 @@ const SETTINGS_SURFACES = {
       { slug: "processes", label: "Processes" },
       { slug: "application", label: "Nodes" },
       { slug: "reporters", label: "Reporters" },
-      { slug: "workflow", label: "Workflow" },
+      { slug: "workflow", label: "Prompts" },
       { slug: "knowledge-hub", label: "Knowledge Hub" },
       { slug: "target-app", label: "Target App" },
       { slug: "runtime", label: "Runtime" },
@@ -706,7 +706,7 @@ function isSettingsRoute(route = state.currentRoute) {
 }
 
 function normalizeSettingsTab(slug, surface = settingsSurfaceForRoute()) {
-  if (["skills", "templates", "events", "releases"].includes(slug)) return "workflow";
+  if (["skills", "templates", "events", "releases", "prompts"].includes(slug)) return "workflow";
   if (slug === "system") return "processes";
   if (slug === "agents") return "processes";
   if (surface === SETTINGS_SURFACES.settings && (slug === "application-config" || slug === "target-app-config")) {

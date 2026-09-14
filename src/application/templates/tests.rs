@@ -282,3 +282,36 @@ fn purpose_and_architecture_expand_from_skills_and_share_revisioned_project_over
             .contains("New purpose")
     );
 }
+
+#[test]
+fn reset_is_scoped_revision_fenced_and_validates_the_final_graph() {
+    let f = Fixture::new(); let store = f.store();
+    store.save("workflow", 0, "Customized workflow").unwrap();
+    store.save("supervised-skill", 0, "{{templates.workflow}}").unwrap();
+    store.save("planning-agent", 0, "Keep this planning customization").unwrap();
+    let before = store.snapshot().unwrap();
+    assert!(store.reset(&[("workflow".into(),1),("supervised-skill".into(),0)].into()).is_err());
+    assert_eq!(store.snapshot().unwrap().records, before.records);
+    // Resetting Workflow alone would create a cycle with the customized Supervised Skill.
+    assert!(store.reset(&[("workflow".into(),1)].into()).is_err());
+    store.reset(&[("workflow".into(),1),("supervised-skill".into(),1)].into()).unwrap();
+    assert_eq!(store.read("workflow").unwrap().prompt, definition("workflow").unwrap().default_prompt);
+    assert_eq!(store.read("supervised-skill").unwrap().prompt, definition("supervised-skill").unwrap().default_prompt);
+    assert_eq!(store.read("planning-agent").unwrap(), before.records["planning-agent"]);
+    assert_eq!(store.show("workflow").unwrap()["customized"], false);
+    assert_eq!(store.read("workflow").unwrap().revision, 2);
+}
+
+#[test]
+fn interrupted_reset_finishes_before_templates_are_read() {
+    let f = Fixture::new(); let store = f.store();
+    store.save("workflow",0,"Custom workflow").unwrap();
+    store.save("planning-agent",0,"Custom planning").unwrap();
+    let records: Vec<_> = ["workflow","planning-agent"].into_iter().map(|id|TemplateRecord{id:id.into(),revision:2,prompt:definition(id).unwrap().default_prompt}).collect();
+    crate::infrastructure::storage::automation::write_json(&f.0.join("templates/reset-pending.json"),&records).unwrap();
+    // Simulate an interruption after just one record was written.
+    crate::infrastructure::storage::automation::write_json(&f.0.join("templates/workflow.json"),&records[0]).unwrap();
+    let snapshot = store.snapshot().unwrap();
+    for record in records { assert_eq!(snapshot.records[&record.id],record); }
+    assert!(!f.0.join("templates/reset-pending.json").exists());
+}
