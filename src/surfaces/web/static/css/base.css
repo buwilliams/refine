@@ -176,6 +176,7 @@ pre {
 .nav-reporter { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
 .nav-reporter label { color: var(--color-text-muted); font-size: 13px; }
 .topbar-actions .nav-reporter select { width: auto; max-width: 170px; height: 34px; }
+.topbar-actions .nav-reporter select:focus { outline: none; box-shadow: none; }
 
 .nav-command-button { font: inherit; }
 .nav-issue-button {
@@ -555,3 +556,12 @@ h3 {
 
 .row { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
 .row > * { min-width: 0; }
+
+/* Compact actions beneath the status links in Quick Actions. */
+.quick-status-row { display: flex; flex-direction: column; align-items: stretch; gap: 2px; margin-bottom: 8px; }
+.quick-status-row > a { flex: 1; min-width: 0; }
+.quick-status-actions { display: flex; flex: 0 0 auto; gap: 4px; padding-left: 24px; }
+.quick-status-actions button, .quick-status-actions .quick-configure { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; padding: 5px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--card); box-shadow: var(--shadow-sm); }
+.quick-status-actions button:hover:not(:disabled), .quick-status-actions .quick-configure:hover { background: var(--color-surface-muted); }
+.quick-status-actions button:disabled { opacity: .4; cursor: default; }
+.nav-context-panel:has(.quick-status-row) { min-width: 310px; }

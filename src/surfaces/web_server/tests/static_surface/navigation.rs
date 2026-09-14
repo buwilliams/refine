@@ -107,9 +107,9 @@ fn static_main_nav_consolidates_context_and_controls() {
         .expect("controls summary should close");
     let summary = &menu[..summary_end];
 
-    assert!(summary.contains(r#"aria-label="Open controls""#));
+    assert!(summary.contains(r#"aria-label="Open quick actions""#));
     assert!(summary.contains(r#"class="nav-context-icon""#));
-    assert!(summary.contains("<span>Controls</span>"));
+    assert!(summary.contains("<span>Quick Actions</span>"));
     assert!(summary.contains(r#"class="nav-context-main""#));
     assert!(summary.contains(r#"class="nav-context-more" aria-hidden="true""#));
     assert!(!summary.contains("target-app-dot"));
@@ -119,9 +119,7 @@ fn static_main_nav_consolidates_context_and_controls() {
     for control_id in [
         r#"id="target-app-indicator""#,
         r#"id="global-node""#,
-        r#"id="global-reporter""#,
-        r#"id="agent-status-indicator""#,
-        r#"id="btn-source-update""#,
+        r#"id="workflow-status-indicator""#,
         r#"id="btn-command-palette""#,
         r#"id="btn-refine-issue""#,
         r#"id="btn-theme-toggle""#,
@@ -137,28 +135,28 @@ fn static_main_nav_consolidates_context_and_controls() {
         );
     }
 
-    assert!(menu.contains(r#"class="nav-control-status target-app-state""#));
-    let node_select = menu.find(r#"id="global-node""#).unwrap();
-    let reporter_select = menu.find(r#"id="global-reporter""#).unwrap();
+    assert!(menu.contains("<span>Target application status</span>"));
+    assert!(menu.contains("<span>Workflow status</span>"));
     assert!(
-        node_select < reporter_select,
-        "Node should be immediately before Reporter"
+        menu.find(r#"id="workflow-status-indicator""#).unwrap()
+            < menu.find(r#"id="target-app-indicator""#).unwrap()
     );
-    assert!(menu[node_select..reporter_select].contains(r#"aria-label="Node""#));
-    assert!(menu[node_select..reporter_select].contains(r#"data-testid="global-node""#));
+    assert!(index.find(r#"id="global-reporter""#).unwrap() < menu_start);
+    assert!(!menu.contains(r#"id="global-reporter""#));
+    assert!(!menu.contains(r#"id="btn-source-update""#));
+    assert!(menu.contains(r#"aria-label="Node""#));
+    assert!(menu.contains(r#"data-testid="global-node""#));
     assert!(node_context.contains("function reconcileNodeContext"));
     assert!(
         node_context.contains(r#"api("GET", "/api/project/status", undefined, { cache: false })"#)
     );
     assert!(node_context.contains(r#"api("GET", "/api/nodes", undefined, { cache: false })"#));
-    assert!(menu.contains(r#"class="nav-control-status agent-status-label""#));
-    assert!(menu.contains(r#"class="nav-control-status nav-source-update-status""#));
+    assert!(!menu.contains(r#"id="agent-status-indicator""#));
     assert!(menu.contains(r#"class="nav-control-status nav-theme-status""#));
-    assert!(menu.contains("<span>Report a bug to Refine Devs</span>"));
+    assert!(menu.contains("<span>Contact Refine Devs</span>"));
     assert!(!menu.contains("<span>Report a bug</span>"));
-    assert!(menu.contains(
-        r##"<a class="nav-menu-item nav-management-item" href="#/settings/processes" data-route="settings">"##
-    ));
+    assert!(index.contains(r#"data-testid="nav-settings">Settings</a>"#));
+    assert!(!menu.contains("<span>Settings</span>"));
     assert!(menu.contains(r#"aria-pressed="false""#));
     assert!(theme.contains(r#"const STORAGE_KEY = "refine_color_theme""#));
     assert!(theme.contains(r#"new CustomEvent("refine-theme-change""#));
@@ -195,17 +193,17 @@ html[data-theme="dark"] .brand-logo-dark {
         "theme bootstrap should run before styles paint"
     );
     let management_start = menu
-        .find(r#">Management</div>"#)
+        .find(r#">Tools and Support</div>"#)
         .expect("management section should exist");
-    let source_update_start = menu
-        .find(r#"id="btn-source-update""#)
+    let first_tool_start = menu
+        .find(r#"id="btn-command-palette""#)
         .expect("source update control should exist");
     let guide_start = menu
         .find(r#"id="nav-guide-open""#)
         .expect("guide management control should exist");
     assert!(
-        management_start < source_update_start && source_update_start < guide_start,
-        "source update should be the first management control"
+        management_start < first_tool_start && first_tool_start < guide_start,
+        "command palette should be the first tool"
     );
     assert!(menu.contains(
         r#"class="nav-menu-item nav-control-item nav-management-item nav-command-button""#

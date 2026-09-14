@@ -50,29 +50,27 @@
         </summary>
         <div class="nav-menu-panel nav-context-panel">
           <div class="nav-menu-label">Status</div>
-          <a id="target-app-indicator" class="target-app-indicator nav-menu-item nav-control-item"
-             href="#/settings/processes"
-             aria-label="Target application status (click to manage)"
-             title="Target application status"
-             data-testid="context-target-app-status"
-             data-state="unknown">
-            <span class="target-app-dot" aria-hidden="true"></span>
-            <span>Target application status</span>
-          </a>
-          <a id="agent-status-indicator" class="agent-status-indicator nav-menu-item nav-control-item"
-             href="#/settings/processes"
-             aria-label="Agent status (click to view processes)"
-             title="Agent status"
-             data-state="unknown">
-            <span class="target-app-dot" aria-hidden="true"></span>
-            <span>Agent status</span>
-          </a>
-          <a id="workflow-status-indicator" class="workflow-status-indicator nav-menu-item nav-control-item"
-             href="#/settings/processes" aria-label="Workflow status: unknown; click to view processes"
-             title="Workflow status: unknown" data-state="unknown">
-            <span class="target-app-dot" aria-hidden="true"></span>
-            <span>Workflow status</span>
-          </a>
+          <div class="quick-status-row">
+            <a id="workflow-status-indicator" class="workflow-status-indicator nav-menu-item nav-control-item"
+               href="#/settings/processes" aria-label="Workflow status: unknown; click to view processes"
+               title="Workflow status: unknown" data-state="unknown">
+              <span class="target-app-dot" aria-hidden="true"></span>
+              <span>Workflow status</span>
+            </a>
+            <div class="quick-status-actions" id="quick-workflow-actions" aria-label="Workflow actions"></div>
+          </div>
+          <div class="quick-status-row">
+            <a id="target-app-indicator" class="target-app-indicator nav-menu-item nav-control-item"
+               href="#/settings/processes"
+               aria-label="Target application status (click to manage)"
+               title="Target application status"
+               data-testid="context-target-app-status"
+               data-state="unknown">
+              <span class="target-app-dot" aria-hidden="true"></span>
+              <span>Target application status</span>
+            </a>
+            <div class="quick-status-actions" id="quick-target-actions" aria-label="Target application actions"></div>
+          </div>
           <label class="nav-menu-label nav-context-section-label" for="global-node">Node</label>
           <select id="global-node" aria-label="Node" data-testid="global-node" disabled>
             <option value="">No node</option>
@@ -130,8 +128,6 @@
           <div class="nav-menu-panel nav-create-panel">
             <a class="nav-menu-item" href="#/features/new" id="btn-new-feature" data-testid="nav-new-feature">New Feature</a>
             <a class="nav-menu-item" href="#/goals/import" id="btn-import" data-testid="nav-import-goals">Import</a>
-            <a class="nav-menu-item" href="https://github.com/buwilliams/refine/issues/new"
-               id="btn-refine-issue-menu" data-testid="nav-refine-issue-menu">Contact Refine Devs</a>
           </div>
         </details>
       </div>
@@ -196,6 +192,7 @@
   <script src="/static/js/features/settings_nodes.js"></script>
   <script src="/static/js/features/settings_reporters.js"></script>
   <script src="/static/js/features/settings.js"></script>
+  <script src="/static/js/quick-actions.js"></script>
   <script src="/static/js/target-app.js"></script>
   <script src="/static/js/commands.js"></script>
   <script src="/static/js/command-palette.js"></script>

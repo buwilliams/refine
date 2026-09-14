@@ -65,8 +65,7 @@ function scheduleAgentStatusRefresh() {
 
 async function refreshAgentStatusIndicator() {
   const nodeGeneration = captureNodeContextGeneration();
-  const indicator = document.getElementById("agent-status-indicator");
-  if (!indicator) return;
+  if (!document.getElementById("workflow-status-indicator") && !document.getElementById("agent-status-indicator")) return;
   if (!hasAttachedProject()) {
     applyAgentStatusSnapshot({
       runner_reachable: false,
@@ -92,6 +91,7 @@ async function refreshAgentStatusIndicator() {
 }
 
 function applyWorkflowStatusSnapshot(snap) {
+  if (typeof renderQuickWorkflowActions === "function") renderQuickWorkflowActions(snap);
   const indicator = document.getElementById("workflow-status-indicator");
   if (!indicator) return;
   const health = snap.workflow_health;
@@ -135,6 +135,7 @@ function applyAgentStatusSnapshot(snap) {
 
 function applyTargetAppSnapshot(snap) {
   _targetAppSnapshot = snap;
+  if (typeof renderQuickTargetActions === "function") renderQuickTargetActions(snap);
   const indicator = document.getElementById("target-app-indicator");
   if (!indicator) return;
   const appState = snap.state === "running" && snap.has_status_checks === false
@@ -183,6 +184,7 @@ function applyTargetAppSnapshot(snap) {
 }
 
 async function runTargetAppAction(action) {
+  const nodeGeneration = captureNodeContextGeneration();
   // action is "start", "stop", or "build". Called from the buttons on System.
   const snap = _targetAppSnapshot || {};
   const hasPrompt = action === "start"
@@ -209,7 +211,7 @@ async function runTargetAppAction(action) {
       okLabel: isStop ? "Stop" : (isBuild ? "Build" : "Start"),
       danger: isStop },
   );
-  if (!ok) return;
+  if (!ok || !isNodeContextGenerationCurrent(nodeGeneration)) return;
   // Optimistic UI flip so the dot transitions immediately.
   applyTargetAppSnapshot({
     ..._targetAppSnapshot,
