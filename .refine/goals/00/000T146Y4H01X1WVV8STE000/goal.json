@@ -3,7 +3,7 @@
   "branch_name": "refine/00000T146Y4H01X1WVV8STE000/round-1-execution-9de1f61f-c5fe-49b7-9885-957fa54e0b11",
   "candidate_commit": "bd003f501a51c20497a61f6db6942a5eb7e542ea",
   "created": "2026-09-11T14:27:52Z",
-  "event_generation": 47,
+  "event_generation": 48,
   "feature_id": null,
   "feature_order": null,
   "id": "00000T146Y4H01X1WVV8STE000",
@@ -91,9 +91,20 @@
           }
         }
       },
-      "failure_at": "2026-09-13T12:01:52Z",
-      "failure_category": "integration",
-      "failure_message": "replacement candidate failed exact-candidate Quality",
+      "failure_at": "",
+      "failure_category": "",
+      "failure_history": [
+        {
+          "failure_at": "2026-09-13T12:01:52Z",
+          "failure_category": "integration",
+          "failure_message": "replacement candidate failed exact-candidate Quality",
+          "occurrence": {
+            "generation": 46,
+            "round_idx": 0
+          }
+        }
+      ],
+      "failure_message": "",
       "gate_configurations": {
         "43:default:workflow.plan.enter": {
           "events": {
@@ -417,6 +428,26 @@
                 "node_id": null
               },
               "source": "workflow.failed.enter"
+            }
+          },
+          "revision": 43,
+          "schema_version": 2,
+          "skills": {}
+        },
+        "48:default:workflow.cancelled.enter": {
+          "events": {
+            "workflow.cancelled.enter": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.cancelled.enter",
+              "kind": "system",
+              "name": "Workflow Cancelled Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.cancelled.enter"
             }
           },
           "revision": 43,
@@ -3247,9 +3278,9 @@
       ]
     }
   ],
-  "status": "failed",
+  "status": "cancelled",
   "target_branch": "main",
-  "updated": "2026-09-13T12:01:52Z",
+  "updated": "2026-09-14T10:51:33Z",
   "workflow_context": "Reproduce the existing authored Round using the new workflow stability implementation. Preserve earlier work and reports as history; run the configured workflow checks on the replacement candidate.",
   "workflow_controls": [
     {
@@ -3480,6 +3511,16 @@
       "request_id": "5b243819-dd05-4a90-b29e-db5a8f2e5499",
       "source_round": 1,
       "to": "plan"
+    },
+    {
+      "actor": "operator",
+      "at": "2026-09-14T10:51:33Z",
+      "forced": false,
+      "from": "failed",
+      "reason": "Explicit cancellation",
+      "request_id": "e1e8e9e9-75a2-4b53-8362-b7c548d2f3cb",
+      "source_round": 1,
+      "to": "cancelled"
     }
   ],
   "workflow_events": [
@@ -3832,7 +3873,18 @@
       "round_idx": 0,
       "to": "failed",
       "workflow_revision": 201
+    },
+    {
+      "at": "2026-09-14T10:51:33.628850138+00:00",
+      "forced": true,
+      "from": "failed",
+      "generation": 48,
+      "node_id": "default",
+      "round_idx": 0,
+      "supersedes_execution": true,
+      "to": "cancelled",
+      "workflow_revision": 202
     }
   ],
-  "workflow_revision": 201
+  "workflow_revision": 202
 }
