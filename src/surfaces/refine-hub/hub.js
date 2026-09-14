@@ -1,19 +1,26 @@
 const search = document.querySelector('#hub-search');
 const sections = [...document.querySelectorAll('nav details')];
-const initial = sections.map(section => section.open);
+const links = [...document.querySelectorAll('nav details a')];
+let beforeSearch = null;
 search.addEventListener('input', () => {
   const query = search.value.trim().toLowerCase();
+  if (query && !beforeSearch) beforeSearch = sections.map(section => section.open);
   let count = 0;
-  sections.forEach((section, index) => {
-    let matches = 0;
-    section.querySelectorAll('a').forEach(link => {
-      link.hidden = !link.textContent.toLowerCase().includes(query);
-      if (!link.hidden) matches++;
-    });
-    count += matches;
-    section.hidden = !matches;
-    section.open = query ? !!matches : initial[index];
+  links.forEach(link => {
+    const labels = [link.textContent];
+    for (let parent = link.parentElement; parent && parent.tagName !== 'NAV'; parent = parent.parentElement) {
+      if (parent.tagName === 'DETAILS') labels.push(parent.querySelector(':scope > summary').textContent);
+    }
+    link.hidden = !!query && !labels.join(' ').toLowerCase().includes(query);
+    if (!link.hidden) count++;
   });
+  sections.forEach((section, index) => {
+    const matches = [...section.querySelectorAll('a')].some(link => !link.hidden);
+    section.hidden = !!query && !matches;
+    if (query) section.open = matches;
+    else if (beforeSearch) section.open = beforeSearch[index];
+  });
+  if (!query) beforeSearch = null;
   document.querySelector('#hub-search-status').textContent = query ? `${count} matching pages` : '';
 });
 // Markdown headings use GitHub-style anchors, including links in migrated pages.

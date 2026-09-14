@@ -102,3 +102,9 @@ footer a { color: var(--muted); }
   article > h1 + p { font-size: 16px; } .hub-release { padding: 20px; } footer { margin-top: 38px; }
 }
 @media print { .hub-header, .sidebar, .page-outline, footer, .skip-link { display: none; } .layout { display: block; } main { padding: 0; } :root { --bg: #fff; --text: #000; } }
+
+/* Directory branches preserve the authored structure of design intent. */
+.sidebar .nav-branch { margin: 8px 0 0 8px; }
+.sidebar .nav-branch > summary { color: var(--text); font-weight: 600; }
+.nav-children { margin: 3px 0 6px 8px; padding-left: 7px; border-left: 1px solid var(--line); }
+.nav-children a { padding-left: 8px; }

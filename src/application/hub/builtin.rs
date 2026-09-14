@@ -30,6 +30,69 @@ fn title(name: &str, bytes: &[u8]) -> String {
         .unwrap_or(name)
         .to_string()
 }
+fn folder_label(value: &str) -> String {
+    value
+        .trim_start_matches(|c: char| c.is_ascii_digit() || c == '-')
+        .split('-')
+        .map(|word| {
+            let mut chars = word.chars();
+            chars
+                .next()
+                .map(|first| first.to_uppercase().to_string() + chars.as_str())
+                .unwrap_or_default()
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn navigation_branch(prefix: &str, current: &str) -> String {
+    let mut children = std::collections::BTreeSet::new();
+    for (path, _) in FILES
+        .iter()
+        .filter(|(path, _)| path.starts_with(prefix) && path.ends_with(".md"))
+    {
+        let rest = &path[prefix.len()..];
+        children.insert(
+            rest.split_once('/')
+                .map(|(folder, _)| format!("{folder}/"))
+                .unwrap_or_else(|| rest.into()),
+        );
+    }
+    let mut children: Vec<_> = children.into_iter().collect();
+    children.sort_by_key(|name| {
+        (
+            name != "README.md" && name != "00-overview.md",
+            name.clone(),
+        )
+    });
+    let mut html = String::new();
+    for child in children {
+        let path = format!("{prefix}{child}");
+        if child.ends_with('/') {
+            html.push_str(&format!("<details class=\"nav-branch\" {}><summary>{}</summary><div class=\"nav-children\">{}</div></details>",
+                if current.starts_with(&path) { "open" } else { "" },
+                escape(&folder_label(child.trim_end_matches('/'))), navigation_branch(&path, current)));
+        } else if let Ok(bytes) = raw(&path) {
+            let label = if child == "README.md" || child == "00-overview.md" {
+                "Overview".into()
+            } else {
+                title(&path, bytes)
+            };
+            html.push_str(&format!(
+                "<a {} href=\"/hub/sites/refine/{}\">{}</a>",
+                if path == current {
+                    "aria-current=\"page\""
+                } else {
+                    ""
+                },
+                escape(&path),
+                escape(&label)
+            ));
+        }
+    }
+    html
+}
+
 pub fn manifest() -> Value {
     let mut files = serde_json::Map::new();
     for (name, bytes) in FILES {
@@ -76,6 +139,11 @@ pub fn page(name: &str) -> RefineResult<Vec<u8>> {
                 ""
             }
         ));
+        if prefix == "docs/intent/" {
+            nav.push_str(&navigation_branch(prefix, name));
+            nav.push_str("</details>");
+            continue;
+        }
         for (path, bytes) in FILES.iter().filter(|(path, _)| {
             path.ends_with(".md")
                 && if prefix.is_empty() {
@@ -106,6 +174,22 @@ pub fn page(name: &str) -> RefineResult<Vec<u8>> {
         .find(|(_, prefix)| !prefix.is_empty() && name.starts_with(prefix))
         .map(|(label, _)| *label)
         .unwrap_or("Explore Refine");
+    let section = if let Some(relative) = name.strip_prefix("docs/intent/") {
+        let mut parts = vec!["Design intent".to_string()];
+        parts.extend(
+            relative
+                .split('/')
+                .rev()
+                .skip(1)
+                .collect::<Vec<_>>()
+                .into_iter()
+                .rev()
+                .map(folder_label),
+        );
+        parts.join(" / ")
+    } else {
+        section.to_string()
+    };
     let page_class = if name == "index.md" {
         "home-page"
     } else {
