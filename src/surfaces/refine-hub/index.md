@@ -15,7 +15,7 @@
 
 ## What you need to know
 
-<a class="hub-release" href="releases/4.3.1.md"><div><strong>Inside Refine 4.3.1</strong><p>Reusable Skills, editable prompts, clearer Goal rounds, and Hubs. See what changed and how to use it.</p></div><span class="release-arrow" aria-hidden="true">↗</span></a>
+<div><a class="hub-release" href="releases/4.3.1.md"><div><strong>Inside Refine 4.3.1</strong><p>Reusable Skills, editable prompts, clearer Goal rounds, and Hubs. See what changed and how to use it.</p></div><span class="release-arrow" aria-hidden="true">↗</span></a></div>
 
 ## Behind the product
 
