@@ -192,3 +192,28 @@ test('Existing Skills can be reused and assignment edits preserve other triggers
     assert.deepEqual(app.pageErrors, []);
   } finally { await app.close(); }
 });
+
+test('Run Skill uses selected-node eligibility while retaining all assignments for editing', {skip:SKIP}, async () => {
+  const data = fixture();
+  let eligible = true;
+  const app = await openApp({fixture(path,request) {
+    const result = data.fixture(path,request);
+    if(path === '/api/skills') {
+      const node = new URL(request.url()).searchParams.get('node_id');
+      return {...result, manual_skill_ids:node === 'node-a' && eligible ? ['custom'] : []};
+    }
+    return result;
+  }});
+  try {
+    const {page}=app;
+    await page.goto(`${app.origin}/#/settings/workflow`);
+    await page.locator('[data-workflow-view="custom"]').click();
+    assert.equal(await page.locator('[data-workflow-run="custom"]').isEnabled(),true);
+    // A different node can inspect the assignment but cannot launch it.
+    eligible = false;
+    await page.evaluate(()=>refreshSettings({force:true}));
+    assert.equal(await page.locator('[data-workflow-run="custom"]').isDisabled(),true);
+    assert.equal(await page.locator('[data-workflow-assignment="custom"] [data-workflow-skill]').isEnabled(),true);
+    assert.deepEqual(app.pageErrors,[]);
+  } finally {await app.close();}
+});

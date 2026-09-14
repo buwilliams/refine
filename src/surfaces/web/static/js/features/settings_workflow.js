@@ -11,11 +11,13 @@ const workflowViewLabels = {goals: "Goal steps", system: "System events", custom
 async function loadWorkflowSettings(detached = false) {
   if (detached) return {detached: true, skills: {items: []}, events: {items: []}, catalog: {sources: []}, templates: await api("GET", "/api/templates")};
   for (let attempt = 0; attempt < 2; attempt++) {
-    const [skills, events, catalog, templates] = await Promise.all([
+    const [skills, events, catalog, templates, nodeSkills] = await Promise.all([
       api("GET", "/api/skills"), api("GET", "/api/event-definitions"),
       api("GET", "/api/event-definitions/catalog"), api("GET", "/api/templates"),
+      api("GET", `/api/skills?node_id=${encodeURIComponent(nodeContextActiveNodeId())}`),
     ]);
-    if (skills.revision == null || events.revision == null || skills.revision === events.revision) return {skills, events, catalog, templates: {...templates, skills: skills.items}};
+    const revisions = [skills.revision, events.revision, nodeSkills.revision].filter(revision => revision != null);
+    if (revisions.every(revision => revision === revisions[0])) return {skills: {...skills, manual_skill_ids: nodeSkills.manual_skill_ids || []}, events, catalog, templates: {...templates, skills: skills.items}};
   }
   throw new Error("Workflow configuration changed while loading. Refresh to see the latest assignments.");
 }
