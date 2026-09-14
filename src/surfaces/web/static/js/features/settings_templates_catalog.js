@@ -65,7 +65,7 @@ function bindTemplatesCatalog(data) {
     const kind = section.querySelector("[data-resource-type]").value;
     const rows = [...section.querySelectorAll("[data-template-catalog-row]")];
     const matching = rows.filter(row => row.dataset.templateSearch.includes(query) && (!kind || row.dataset.resourceKind === kind));
-    const size = 12;
+    const size = 50;
     page = Math.min(page, Math.max(0, Math.ceil(matching.length / size) - 1));
     rows.forEach(row => { row.hidden = true; });
     matching.slice(page * size, (page + 1) * size).forEach(row => { row.hidden = false; });

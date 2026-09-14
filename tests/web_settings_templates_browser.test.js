@@ -105,14 +105,14 @@ test('Resource catalog explains uses, filters types, and follows edited referenc
 });
 
 test('Resource pagination stays bounded and search reaches entries on later pages', {skip: SKIP}, async () => {
-  const rows = Array.from({length:25}, (_,i) => ({item:{id:`entry-${i}`,prompt:'Instructions',revision:0},name:`Resource ${String(i).padStart(2,'0')}`,usage:{kind:'partial',description:'Shared guidance'}}));
+  const rows = Array.from({length:101}, (_,i) => ({item:{id:`entry-${i}`,prompt:'Instructions',revision:0},name:`Resource ${String(i).padStart(2,'0')}`,usage:{kind:'partial',description:'Shared guidance'}}));
   const app = await openApp({fixture(path) { return path === '/api/templates' ? {items:rows} : apiFixture(path); }});
   try {
     const {page} = app;
     await page.goto(`${app.origin}/#/settings/templates`);
     await page.locator('[data-resource-next]').click();
-    assert.equal(await page.locator('[data-template-catalog-row]:visible').count(),12);
-    assert.equal(await page.locator('[data-resource-range]').innerText(),'13–24 of 25 resources');
+    assert.equal(await page.locator('[data-template-catalog-row]:visible').count(),50);
+    assert.equal(await page.locator('[data-resource-range]').innerText(),'51–100 of 101 resources');
     await page.locator('[data-resource-next]').click();
     assert.equal(await page.locator('[data-template-catalog-row]:visible').count(),1);
     assert.equal(await page.locator('[data-resource-next]').isDisabled(),true);
