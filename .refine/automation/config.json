@@ -1,6 +1,6 @@
 {
   "schema_version": 3,
-  "revision": 80,
+  "revision": 81,
   "skills": {
     "default-governance": {
       "id": "default-governance",
@@ -104,6 +104,18 @@
       ],
       "provenance": null
     },
+    "update-metrics-hub": {
+      "id": "update-metrics-hub",
+      "name": "Update Metrics Hub",
+      "prompt": "# Update Metrics Hub\n\nYou are running a Skill in Refine, alongside Goals and agents that may be working in parallel. The Refine CLI is at {{refine_executable}}; use --help to discover commands.\n\nKeep Metrics Hub accurate and useful for understanding the target app's use of Refine.\n\n## Outcome\n\nRun `{{refine_executable}} hub refresh-metrics` to calculate and save the latest statistics. Read the result and open Metrics Hub to check its charts, time horizons, freshness, and data coverage. Report significant changes or missing evidence in plain language.\n\n## Guardrails\n\n- Use Refine's refresh command for the numbers. Do not invent completion dates, costs, or productivity claims, or change Goals to improve the statistics.\n- The views cover the last 24 hours, 7 days, 30 days, 90 days, and 365 days. Rounds per Goal use Goals created in that window. Delivery uses Done Goals with a recorded final-Round integration date.\n- The saved aggregate belongs to the target app's refine-state. It includes synced nodes; its freshness depends on state synchronization. It contains no Goal prompts, reports, or source code.\n- If refresh fails, retain the previous snapshot and explain the problem. Keep the business interpretation distinct from the measured data.\n",
+      "role": "task",
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [],
+      "provenance": "refine-builtin"
+    },
     "update-refine-hub": {
       "id": "update-refine-hub",
       "name": "Update Refine Hub",
@@ -184,6 +196,32 @@
           "order": 0,
           "scope": {
             "node_id": "default"
+          },
+          "overrides": null,
+          "inputs": {}
+        }
+      ],
+      "on_success": null
+    },
+    "update-metrics-hub": {
+      "id": "update-metrics-hub",
+      "name": "Update Metrics Hub",
+      "kind": "custom",
+      "source": null,
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [],
+      "bindings": [
+        {
+          "id": "update-metrics-hub",
+          "skill_id": "update-metrics-hub",
+          "enabled": true,
+          "mode": "blocking",
+          "order": 0,
+          "scope": {
+            "node_id": null
           },
           "overrides": null,
           "inputs": {}
