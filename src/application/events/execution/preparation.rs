@@ -157,6 +157,25 @@ impl FileEventService {
     ) -> RefineResult<Vec<PinnedBinding>> {
         let effective = config.bindings(event, &context.node_id);
         let mut data = context.data.as_object().cloned().unwrap_or_default();
+        let hub = crate::application::hub::Hub::new(&self.refine_dir, &self.refine_dir);
+        let mut hubs = serde_json::Map::new();
+        for (_, skill) in &effective {
+            let mut associated = hub.for_skill(&skill.id)?;
+            if let Some(selected) = context.data["hub_id"].as_str() {
+                associated.retain(|site| site["id"] == selected);
+                if associated.is_empty() {
+                    return Err(RefineError::InvalidInput(
+                        "This Hub is not associated with the selected Skill".into(),
+                    ));
+                }
+            }
+            if !associated.is_empty() {
+                hubs.insert(skill.id.clone(), json!(associated));
+            }
+        }
+        if !hubs.is_empty() {
+            data.insert("hubs".into(), Value::Object(hubs));
+        }
         let parameters = self.launch_parameters(config, event, context)?;
         let values = resolve_parameters(&parameters, inputs, &BTreeMap::new())?;
         data.insert("event".into(), json!(values));

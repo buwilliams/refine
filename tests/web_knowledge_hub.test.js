@@ -12,6 +12,7 @@ function hubFixture() {
     const method = request.method();
     const body = request.postDataJSON();
     if (method !== "GET" && pathname.startsWith("/api/hub")) writes.push({ pathname, method, body });
+    if (pathname === "/api/skills") return {revision:1,items:[{id:"maintain",name:"Maintain reports",enabled:true,scope:{}}],manual_skill_ids:["maintain"]};
     if (pathname === "/api/hub/sites") return { sites: [...sites.values()] };
     if (!pathname.startsWith("/api/hub/sites/")) return apiFixture(pathname);
     const [, , , site, ...rest] = pathname.split("/").filter(Boolean);
@@ -63,7 +64,11 @@ test("Knowledge Hub uses the existing origin and manages sites and paginated rec
     assert.equal(await page.locator('.modal-actions [data-submit]').count(), 1);
     await page.getByLabel('Name', {exact: true}).fill("Usage report");
     await page.locator('[data-description]').fill("Durable statistics");
+    await page.locator('[data-hub-skill]').selectOption("maintain");
     await page.locator('[data-submit]').click();
+    await page.locator('[data-run-hub-skill]').waitFor();
+    assert.equal(data.writes.find(write => write.method === 'PUT' && write.body.name === 'Usage report').body.skill_id, 'maintain');
+    assert.equal(await page.locator('[data-run-hub-skill]').isEnabled(), true);
     const binary = Buffer.from([0, 137, 255, 10, 42]);
     await page.locator('[data-files]').setInputFiles({ name: "sample.bin", mimeType: "application/octet-stream", buffer: binary });
     await page.waitForFunction(() => !document.querySelector('[data-testid="hub-modal"]')?._busy);
@@ -152,6 +157,7 @@ test("Hub modal rows open from cells and keyboards; Controls uses the shared men
     const tabs = await page.locator('.settings-tab').allTextContents();
     assert.equal(tabs[tabs.indexOf('Prompts') + 1], 'Knowledge Hub');
     await page.locator('[data-hub-new-site]').click();
+    await page.locator('[data-hub-skill]').waitFor();
     assert.equal(await page.locator('.form-row label[for="hub-site-name"]').count(), 1);
     assert.equal(await page.locator('.form-row label[for="hub-site-description"]').count(), 1);
     await page.locator('[data-close]').click();
@@ -221,4 +227,30 @@ test("Refine Hub opens documentation instead of the site editor", { skip: SKIP }
     assert.equal(data.writes.length,0);
     await popup.close();
   } finally { await app.close(); }
+});
+
+test('Refine Hub offers its protected Skill and passes the selected Hub into a manual run', {skip:SKIP}, async () => {
+  const data = hubFixture();
+  const skill = {id:'update-refine-hub',name:'Update Refine Hub',prompt:'Maintain product documentation',enabled:true,scope:{},parameters:[],removable:false};
+  data.sites.set('refine', {revision:'bundled',item:{id:'refine',name:'Refine Hub',builtin:true,skill_id:skill.id,publication:{version:'4.3.1'}}});
+  const app = await openApp({fixture:(path, request) => {
+    if (path === '/api/skills') return {revision:1,items:[skill],manual_skill_ids:[skill.id]};
+    if (path === `/api/skills/${skill.id}`) return {revision:1,item:skill};
+    if (path === `/api/skills/${skill.id}/inputs`) return {parameters:[{name:'request',kind:'text',required:true}]};
+    return data.fixture(path,request);
+  }});
+  try {
+    await app.page.goto(`${app.origin}/#/settings/knowledge-hub`);
+    await app.page.evaluate(() => {createToolbarTab = async (mode, options) => {window.testHubLaunch = {mode, options};};});
+    await app.page.locator('[data-hub-run="update-refine-hub"]').click();
+    await app.page.locator('#event-parameter-0').fill('Explain the new Hub workflow');
+    await app.page.locator('[data-save]').click();
+    await app.page.waitForFunction(() => window.testHubLaunch);
+    const launch = await app.page.evaluate(() => window.testHubLaunch);
+    assert.deepEqual(launch.options.skillLaunch, {id:skill.id,parameters:{request:'Explain the new Hub workflow'},hubId:'refine'});
+    assert.equal(launch.mode, 'skill');
+    assert.equal(data.writes.length, 0);
+    await app.page.evaluate(skill => openSkillEditor(skill), skill);
+    assert.equal(await app.page.locator('[data-delete]').isHidden(), true);
+  } finally {await app.close();}
 });

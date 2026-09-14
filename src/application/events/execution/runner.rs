@@ -220,6 +220,13 @@ impl FileEventService {
             .filter(|b| b.binding.mode == BindingMode::Context)
             .map(|b| {
                 let mut values = TemplateScope::literals(&[
+                    (
+                        "hubs",
+                        &invocation.context.data["hubs"][&b.skill.id]
+                            .as_array()
+                            .map(|v| json!(v).to_string())
+                            .unwrap_or_default(),
+                    ),
                     ("skill_name", &b.skill.name),
                     ("parameters", &json!(b.parameters).to_string()),
                 ]);
@@ -294,10 +301,21 @@ impl FileEventService {
                     .get("verification_only")
                     .and_then(Value::as_bool)
                     == Some(true);
+                let mut prompt_context = invocation.context.data.clone();
+                if let Some(object) = prompt_context.as_object_mut() {
+                    object.remove("hubs");
+                }
                 let mut values = TemplateScope::literals(&[
+                    (
+                        "hubs",
+                        &invocation.context.data["hubs"][&pinned.skill.id]
+                            .as_array()
+                            .map(|v| json!(v).to_string())
+                            .unwrap_or_default(),
+                    ),
                     ("attached_skills", &contexts),
                     ("parameters", &json!(pinned.parameters).to_string()),
-                    ("context", &invocation.context.data.to_string()),
+                    ("context", &prompt_context.to_string()),
                     (
                         "execution",
                         &json!({"binding_id": pinned.binding.id, "role": pinned.skill.role})

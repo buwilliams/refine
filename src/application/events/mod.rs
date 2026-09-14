@@ -5,6 +5,7 @@ mod context;
 pub(crate) mod dispatch;
 pub(crate) mod execution;
 pub(crate) mod gate_configuration;
+pub(crate) mod hub_skill;
 pub(crate) mod migration;
 pub(crate) mod outcomes;
 mod parameters;

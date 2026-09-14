@@ -781,7 +781,10 @@ fn hub_sites_records_publication_and_tombstones_sync_and_invalidate_warm_indexes
         refine_dir_for_target_root(&fixture.b).unwrap(),
         fixture.b.join("run"),
     );
-    let site = a.save_site("reports", &json!({"name":"Reports"})).unwrap();
+    let skills = crate::application::events::FileEventService::new(&a.root);
+    let revision = skills.config().unwrap().revision;
+    skills.save("skills", "maintain-reports", json!({"revision":revision,"item":{"name":"Maintain reports","prompt":"Build and maintain the report Hub"},"trigger":{"source":"custom"}})).unwrap();
+    let site = a.save_site("reports", &json!({"name":"Reports","skill_id":"maintain-reports"})).unwrap();
     a.save_collection(
         "reports",
         "events",
@@ -802,6 +805,8 @@ fn hub_sites_records_publication_and_tombstones_sync_and_invalidate_warm_indexes
     .unwrap();
     fixture.service(&fixture.a).sync().unwrap();
     fixture.service(&fixture.b).sync().unwrap();
+    assert_eq!(b.show("reports").unwrap()["item"]["skill_id"], "maintain-reports");
+    assert_eq!(crate::application::events::FileEventService::new(&b.root).show_skill("maintain-reports").unwrap()["item"]["prompt"], "Build and maintain the report Hub");
     assert_eq!(
         b.asset("reports", "index.html", true).unwrap().0,
         b"<h1>Reports</h1>"

@@ -31,6 +31,7 @@ struct SkillTrigger {
 fn skill_value(skill: &Skill) -> Value {
     let mut value = json!(skill);
     value.as_object_mut().unwrap().remove("role");
+    value["removable"] = json!(skill.id != super::hub_skill::ID);
     value
 }
 
@@ -113,6 +114,18 @@ impl FileEventService {
                 config.schema_version = SCHEMA_VERSION;
                 Ok(())
             })?
+        } else {
+            config
+        };
+        let config = if !config.skills.contains_key(super::hub_skill::ID) {
+            match store.update(config.revision, |config| {
+                super::hub_skill::install(config);
+                Ok(())
+            }) {
+                Ok(config) => config,
+                Err(RefineError::Conflict(_)) => return self.config(),
+                Err(error) => return Err(error),
+            }
         } else {
             config
         };
@@ -240,6 +253,7 @@ impl FileEventService {
             ));
         }
         object.insert("id".into(), json!(id));
+        object.remove("removable");
         object.remove("trigger_source");
         object.remove("trigger_sources");
         // The Skill editor owns its assignments. Apply the complete selection with
@@ -399,6 +413,19 @@ impl FileEventService {
         Ok(json!({"revision": config.revision, "item": saved}))
     }
     pub fn remove(&self, collection: &str, id: &str, revision: u64) -> RefineResult<Value> {
+        if collection == "skills" {
+            if id == super::hub_skill::ID {
+                return Err(RefineError::InvalidInput(
+                    "Update Refine Hub cannot be removed".into(),
+                ));
+            }
+            let hub = crate::application::hub::Hub::new(&self.refine_dir, &self.refine_dir);
+            if !hub.for_skill(id)?.is_empty() {
+                return Err(RefineError::InvalidInput(
+                    "Assign another Skill to the associated Hubs before removing this Skill".into(),
+                ));
+            }
+        }
         self.config()?;
         let config = AutomationStore::new(&self.refine_dir).update(revision, |config| {
             let prior = skill_assignment_ids(config, id);

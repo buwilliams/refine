@@ -162,6 +162,18 @@ impl Hub {
         rows.insert(0, envelope(builtin::site()));
         Ok(json!({"sites":rows}))
     }
+    pub fn for_skill(&self, skill: &str) -> RefineResult<Vec<Value>> {
+        Ok(self.sites()?["sites"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter(|row| row["item"]["skill_id"] == skill)
+            .map(|row| {
+                let site = &row["item"];
+                json!({"id":site["id"], "name":site["name"], "description":site["description"], "skill_id":site["skill_id"], "builtin":site["builtin"] == true, "published":!site["publication"].is_null()})
+            })
+            .collect())
+    }
     pub fn show(&self, site: &str) -> RefineResult<Value> {
         Ok(envelope(self.load_site(site)?))
     }
@@ -179,6 +191,28 @@ impl Hub {
             } else {
                 json!({"id":site,"created":chrono::Utc::now().to_rfc3339(),"publication":null})
             };
+            if let Some(skill) = body.get("skill_id") {
+                if !skill.is_null() {
+                    let skill_id = skill
+                        .as_str()
+                        .ok_or_else(|| invalid("skill_id must be a string or null"))?;
+                    let config =
+                        crate::application::events::FileEventService::new(&self.root).config()?;
+                    let definition = config
+                        .skills
+                        .get(skill_id)
+                        .ok_or_else(|| invalid("Choose an existing Skill"))?;
+                    if definition.scope.node_id.is_some() {
+                        return Err(invalid(
+                            "Choose a project Skill so the Hub can be maintained across nodes",
+                        ));
+                    }
+                    if skill_id == crate::application::events::hub_skill::ID {
+                        return Err(invalid("Update Refine Hub is reserved for Refine Hub"));
+                    }
+                }
+                v["skill_id"] = skill.clone();
+            }
             v["name"] = json!(name);
             v["description"] = body.get("description").cloned().unwrap_or(json!(""));
             v["deleted"] = json!(false);

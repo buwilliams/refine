@@ -20,6 +20,7 @@ pub(super) fn migrate(root: &Path) -> RefineResult<AutomationConfig> {
         .map_err(|e| RefineError::Serialization(e.to_string()))?;
     let mut config = build_config(&originals, &quality);
     single_trigger_skills(&mut config)?;
+    super::hub_skill::install(&mut config);
     // The source snapshot is written first. A crash retries deterministic conversion; once
     // config.json is installed the legacy files never regain configuration authority.
     let archive = root.join("automation/migration-v1.json");

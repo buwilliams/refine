@@ -75,7 +75,7 @@ impl FileEventService {
             round_idx,
             workflow_revision: None,
             candidate_commit,
-            data: json!({"goal": super::super::execution::goal_context(&goal), "system": {"node_id": node, "project_root": target_root, "workspace": cwd, "runtime_root": runtime, "refine_executable": std::env::current_exe().ok(), "refine_checkout": crate::infrastructure::runtime::checkout::active_refine_paths().ok().map(|(_, checkout)| checkout)}}),
+            data: json!({"hub_id":body.get("hub_id"), "goal": super::super::execution::goal_context(&goal), "system": {"node_id": node, "project_root": target_root, "workspace": cwd, "runtime_root": runtime, "refine_executable": std::env::current_exe().ok(), "refine_checkout": crate::infrastructure::runtime::checkout::active_refine_paths().ok().map(|(_, checkout)| checkout)}}),
             metadata: Default::default(),
         })
     }

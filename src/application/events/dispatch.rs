@@ -82,7 +82,16 @@ impl FileEventService {
         target: &Path,
         parameters: &Value,
     ) -> RefineResult<(String, Value)> {
-        let mut context = self.manual_context(target, &json!({}))?;
+        self.terminal_hub_skill_prompt(skill_id, target, parameters, None)
+    }
+    pub fn terminal_hub_skill_prompt(
+        &self,
+        skill_id: &str,
+        target: &Path,
+        parameters: &Value,
+        hub_id: Option<&str>,
+    ) -> RefineResult<(String, Value)> {
+        let mut context = self.manual_context(target, &json!({"hub_id":hub_id}))?;
         let config = self.config()?;
         let event = self.manual_skill_event(&config, skill_id, &context.node_id)?;
         let inputs = serde_json::from_value(parameters.clone())
@@ -95,6 +104,13 @@ impl FileEventService {
         let _templates = TemplateScope::pin(Some(&self.refine_dir), &mut context.metadata)?;
         TemplateScope::set_values(TemplateScope::context_values(&context.data));
         let mut values = TemplateScope::literals(&[
+            (
+                "hubs",
+                &context.data["hubs"][skill_id]
+                    .as_array()
+                    .map(|v| json!(v).to_string())
+                    .unwrap_or_default(),
+            ),
             ("skill_name", &pinned.skill.name),
             ("parameters", &json!(pinned.parameters).to_string()),
             ("context", &context.data["system"].to_string()),
@@ -124,11 +140,11 @@ impl FileEventService {
             .ok_or_else(|| RefineError::InvalidInput("Skill input must be an object".into()))?;
         if object
             .keys()
-            .any(|key| !["parameters", "node_id", "request_id"].contains(&key.as_str()))
+            .any(|key| !["parameters", "node_id", "request_id", "hub_id"].contains(&key.as_str()))
         {
-            return Err(RefineError::InvalidInput("Manual Skills take parameters, node_id, and request_id; they run independently of Goals".into()));
+            return Err(RefineError::InvalidInput("Manual Skills take parameters, node_id, hub_id, and request_id; they run independently of Goals".into()));
         }
-        for key in ["node_id", "request_id"] {
+        for key in ["node_id", "request_id", "hub_id"] {
             if body
                 .get(key)
                 .is_some_and(|v| !v.is_null() && !v.is_string())
@@ -159,6 +175,7 @@ impl FileEventService {
         if self.invocation_path(&id)?.exists() {
             let existing = self.invocation(&id)?;
             if existing.context.node_id != context.node_id
+                || existing.context.data["hub_id"] != context.data["hub_id"]
                 || existing.context.metadata.get("requested_parameters")
                     != context.metadata.get("requested_parameters")
             {

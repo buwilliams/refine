@@ -1304,7 +1304,7 @@ async function startTerminalSession(tab = currentToolbarTab()) {
       goal_id: tab.goalId || undefined,
       feature_id: tab.featureId || undefined,
       initial_prompt: tab.initialPrompt || undefined,
-      ...(tab.mode === "skill" ? {skill_id: tab.skillLaunch?.id, parameters: tab.skillLaunch?.parameters || {}} : {}),
+      ...(tab.mode === "skill" ? {skill_id: tab.skillLaunch?.id, parameters: tab.skillLaunch?.parameters || {}, hub_id: tab.skillLaunch?.hubId || null} : {}),
       worktree: tab.mode === "standalone" ? tab.worktree || undefined : undefined,
     });
     // Goal attachment is runtime-owned. Keep the tab in its loading state

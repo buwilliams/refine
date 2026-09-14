@@ -47,6 +47,9 @@ pub enum SkillAction {
     /// Run a Skill with a Custom trigger, prompting for missing required values in an interactive terminal.
     Trigger {
         id: String,
+        /// Limit this run to one Hub maintained by the Skill.
+        #[arg(long)]
+        hub_id: Option<String>,
         #[arg(long)]
         node_id: Option<String>,
         #[arg(long = "param", value_name = "NAME=VALUE")]

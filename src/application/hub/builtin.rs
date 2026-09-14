@@ -4,7 +4,7 @@ use pulldown_cmark::{Options, Parser, html};
 pub const ID: &str = "refine";
 const FILES: &[(&str, &[u8])] = include!(concat!(env!("OUT_DIR"), "/refine_hub.rs"));
 pub fn site() -> Value {
-    json!({"id":ID,"name":"Refine Hub","description":"Product documentation and what you need to know about each release.","builtin":true,"read_only":true,"publication":{"version":env!("CARGO_PKG_VERSION")}})
+    json!({"id":ID,"name":"Refine Hub","description":"Product documentation and what you need to know about each release.","skill_id":crate::application::events::hub_skill::ID,"builtin":true,"read_only":true,"publication":{"version":env!("CARGO_PKG_VERSION")}})
 }
 pub fn raw(name: &str) -> RefineResult<&'static [u8]> {
     FILES

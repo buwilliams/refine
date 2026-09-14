@@ -1,13 +1,17 @@
-# Update Refine Hub with your agent
+# Update Refine Hub
 
-Ask your agent to update Refine Hub. Tell it which page needs attention, what is missing or wrong, and what readers should understand afterward.
+Run **Update Refine Hub** from the New Goal menu, or choose **Run Skill** next to Refine Hub in Settings → Knowledge Hub. Describe what readers should understand after the update. For release notes, include the version and coverage dates.
 
-For example:
+The Skill contains the instructions for maintaining product documentation and release notes. You can edit those instructions in Settings → Prompts. This built-in Skill cannot be removed.
 
-> Update Refine Hub's getting-started guide to explain how to choose a Node. Check the current interface, use plain language, and include a screenshot. Verify the page and its links.
+Refine Hub ships with Refine. Its Skill updates the source documentation; users receive changes when they update Refine.
 
-For release notes, give your agent the version and coverage period:
+## Maintain your own Hub
 
-> Update the Refine 4.3.1 release notes to cover changes since September 2, 2026. Group the major changes under “What you need to know.” Describe the final shipped behavior, leave out superseded designs, and include screenshots where they help.
+When creating a Hub, choose a project Skill that knows how to build and maintain it, or create one. Creating the Hub saves the association without starting an agent.
 
-Your agent can handle the documentation, screenshots, and checks together. Refine Hub ships with Refine, so ask the agent to rebuild and update Refine when the changes are ready.
+Use **Run Skill** in the Hub to build it or refresh its content. For automatic updates, assign the same Skill to events in Settings → Prompts. Add a Custom action assignment to make it manually runnable.
+
+The `{{hubs}}` prompt variable contains the associated Hub details. A manual run from a Hub includes only that Hub; event runs include every Hub maintained by that Skill. These details are saved with the invocation and included through editable prompt templates.
+
+Write the Skill’s instructions to describe the desired pages or data, where to obtain it, and when to publish. User Hub content and its Skill association synchronize through the target app’s refine-state repository. Published content becomes available to others connected to that state; this does not publish it to the public internet.

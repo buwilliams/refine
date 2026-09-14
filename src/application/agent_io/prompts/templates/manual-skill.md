@@ -8,3 +8,5 @@ Parameters:
 
 System context:
 {{context}}
+
+{{hubs}}

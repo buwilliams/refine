@@ -68,6 +68,7 @@ pub(super) fn skills(action: SkillAction) -> RefineResult<()> {
         SkillAction::Triggers => daemon_json("GET", "/skills/catalog", None)?,
         SkillAction::Trigger {
             id,
+            hub_id,
             node_id,
             parameters,
             request_id,
@@ -138,7 +139,7 @@ pub(super) fn skills(action: SkillAction) -> RefineResult<()> {
                 "POST",
                 &format!("{path}/trigger"),
                 Some(
-                    json!({"node_id": node_id, "parameters": inputs, "request_id": request_id.unwrap_or_else(|| uuid::Uuid::new_v4().to_string())}),
+                    json!({"hub_id":hub_id, "node_id": node_id, "parameters": inputs, "request_id": request_id.unwrap_or_else(|| uuid::Uuid::new_v4().to_string())}),
                 ),
             )?
         }

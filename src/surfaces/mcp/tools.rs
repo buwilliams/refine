@@ -242,7 +242,7 @@ pub fn tool_catalog() -> Vec<McpTool> {
         McpTool {
             name: "refine_trigger_skill",
             description: "Run one Skill with a Custom trigger on the active node, independently of Goals. Discover required inputs at /skills/{skill_id}/inputs. Reuse request_id to retry transport without duplicating work.",
-            input_schema: || json!({"type":"object","properties":{"skill_id":{"type":"string"},"node_id":{"type":"string"},"request_id":{"type":"string"},"parameters":{"type":"object"}},"required":["skill_id"],"additionalProperties":false}),
+            input_schema: || json!({"type":"object","properties":{"skill_id":{"type":"string"},"hub_id":{"type":"string","description":"Limit the run to one associated Hub."},"node_id":{"type":"string"},"request_id":{"type":"string"},"parameters":{"type":"object"}},"required":["skill_id"],"additionalProperties":false}),
             binding: ToolBinding::SkillTrigger,
         },
         McpTool {

@@ -333,6 +333,7 @@ async function openSkillEditor(original = null, clone = false, defaults = {}) {
         await api("PUT", path, {revision, item: edited, ...(!editing ? {trigger: {id: trigger.id, source, mode: source === "custom" ? "blocking" : root.querySelector("[data-mode]").dataset.value, order: Number(root.querySelector("[data-order]").value), inputs: readInputs()}} : {})});
       }
       root._close(); await refreshSettings({force: true}); await refreshManualSkills();
+      if (!remove && defaults.onSaved) await defaults.onSaved(item.id);
     } catch (e) {
       error(e);
       if (e.status === 409) { await refreshSettings({force: true}); root.querySelector("[data-automation-error]").textContent = "Configuration changed. Your draft is retained here; close and reopen the Skill before saving."; }
@@ -341,7 +342,7 @@ async function openSkillEditor(original = null, clone = false, defaults = {}) {
   root.querySelector("[data-save]").onclick = () => save();
   root.querySelector("form").onsubmit = event => { event.preventDefault(); save(); };
   if (editing) {
-    root.querySelector("[data-delete]").hidden = false;
+    root.querySelector("[data-delete]").hidden = item.removable === false;
     root.querySelector("[data-delete]").onclick = () => save(true);
     const copy = document.createElement("button"); copy.type = "button"; copy.className = "secondary"; copy.dataset.cloneSkill = ""; copy.textContent = "Clone Skill";
     copy.onclick = () => { root._close(); openSkillEditor(original, true); };
@@ -371,7 +372,7 @@ async function refreshManualSkills() {
   }
 }
 
-async function triggerManualSkill(id) {
+async function triggerManualSkill(id, hubId = null) {
   if (manualSkillOpening || document.querySelector(".automation-modal")) return;
   manualSkillOpening = true;
   const generation = captureNodeContextGeneration();
@@ -380,7 +381,7 @@ async function triggerManualSkill(id) {
     if (!isNodeContextGenerationCurrent(generation)) return;
     const launch = async parameters => {
       if (!isNodeContextGenerationCurrent(generation)) throw new Error("Project or node changed; launch the Skill again from its new context.");
-      return createToolbarTab("skill", {label: definition.item.name, skillLaunch: {id, parameters}});
+      return createToolbarTab("skill", {label: definition.item.name, skillLaunch: {id, parameters, hubId}});
     };
     if (!schema.parameters.length) { await launch({}); return; }
     const root = automationModal(`Run ${definition.item.name}`, `<form data-event-inputs>${schema.parameters.map((p, index) => `<div class="form-row"><label for="event-parameter-${index}">${htmlEscape(p.name)}${p.required ? " *" : ""}</label>

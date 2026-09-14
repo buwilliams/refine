@@ -65,20 +65,41 @@ function renderKnowledgeHubSettings(data = {}) {
   return `<section class="settings-section" data-testid="settings-knowledge-hub">
     <div class="actions"><h3>Knowledge Hub</h3><span class="spacer"></span><button type="button" data-hub-new-site>Add site</button></div>
     <p class="muted">Refine Hub ships with Refine. Your own sites and saved data synchronize through this app’s state repository.</p>
-    <table class="table"><thead><tr><th>Name</th><th>Publication</th></tr></thead><tbody>${sites.map(({item}) => `<tr data-hub-site="${htmlEscape(item.id)}" tabindex="0" aria-label="Manage ${htmlEscape(item.name)}"><td>${htmlEscape(item.name)}</td><td>${item.builtin ? "Built-in · Read-only" : item.publication ? "Published" : "Private"}</td></tr>`).join("")}</tbody></table>
+    <table class="table"><thead><tr><th>Name</th><th>Publication</th><th>Maintenance</th></tr></thead><tbody>${sites.map(({item}) => `<tr data-hub-site="${htmlEscape(item.id)}" tabindex="0" aria-label="Manage ${htmlEscape(item.name)}"><td>${htmlEscape(item.name)}</td><td>${item.builtin ? "Built-in · Read-only" : item.publication ? "Published" : "Private"}</td><td>${item.skill_id ? `<button type="button" disabled title="Checking Skill availability…" data-hub-run="${htmlEscape(item.skill_id)}" data-hub-id="${htmlEscape(item.id)}">Run Skill</button>` : "No Skill assigned"}</td></tr>`).join("")}</tbody></table>
     ${sites.length ? "" : '<p class="muted">No sites yet.</p>'}</section>`;
 }
 function bindKnowledgeHubSettings() {
   const root = document.querySelector('[data-testid="settings-knowledge-hub"]');
   if (!root) return;
   root.querySelector('[data-hub-new-site]').onclick = () => editHubSite();
+  root.querySelectorAll('[data-hub-run]').forEach(button => button.onclick = event => { event.stopPropagation(); triggerManualSkill(button.dataset.hubRun, button.dataset.hubId); });
   bindAutomationRows(root, '[data-hub-site]', row => openHubSite(row.dataset.hubSite));
+  const generation = captureNodeContextGeneration();
+  api("GET", `/api/skills?node_id=${encodeURIComponent(nodeContextActiveNodeId())}`, undefined, {recordError:false}).then(data => {
+    if (!root.isConnected || !isNodeContextGenerationCurrent(generation)) return;
+    root.querySelectorAll('[data-hub-run]').forEach(button => {
+      button.disabled = !data.manual_skill_ids?.includes(button.dataset.hubRun);
+      button.title = button.disabled ? "Enable this Skill and its Custom action assignment on this node to run it." : "Run the Hub’s build and maintain Skill";
+    });
+  }).catch(() => { if(root.isConnected) root.querySelectorAll('[data-hub-run]').forEach(button => button.title = "Skill availability could not be checked; refresh to retry."); });
 }
-function editHubSite(existing) {
+async function editHubSite(existing, draft = {}) {
+  const generation = captureNodeContextGeneration();
+  let skills;
+  try { skills = await api("GET", "/api/skills"); } catch (error) { showActionError(error); return; }
+  if (!isNodeContextGenerationCurrent(generation)) return;
+  const selected = draft.skill_id || existing?.item.skill_id || "";
+  const choices = (skills.items || []).filter(skill => !skill.scope?.node_id && skill.id !== "update-refine-hub");
   const root = hubModal(existing ? "Edit site" : "Add site", `<form data-hub-site-form>
-    <div class="form-row"><label for="hub-site-name">Name</label><input type="text" id="hub-site-name" data-name required value="${htmlEscape(existing?.item.name || "")}"></div>
-    <div class="form-row"><label for="hub-site-description">Description</label><textarea id="hub-site-description" data-description rows="4">${htmlEscape(existing?.item.description || "")}</textarea></div>
+    <div class="form-row"><label for="hub-site-name">Name</label><input type="text" id="hub-site-name" data-name required value="${htmlEscape(draft.name ?? existing?.item.name ?? "")}"></div>
+    <div class="form-row"><label for="hub-site-description">Description</label><textarea id="hub-site-description" data-description rows="4">${htmlEscape(draft.description ?? existing?.item.description ?? "")}</textarea></div>
+    <div class="form-row"><label for="hub-site-skill">Build and maintain Skill</label><select id="hub-site-skill" data-hub-skill ${existing ? "" : "required"}><option value="">Choose a Skill…</option>${choices.map(skill => `<option value="${htmlEscape(skill.id)}" ${skill.id === selected ? "selected" : ""}>${htmlEscape(skill.name)}${skill.enabled ? "" : " (disabled)"}</option>`).join("")}</select></div>
+    <p class="muted">Creating a Hub saves this choice. Run the Skill when ready, or attach it to events in Settings → Prompts to keep the Hub up to date.</p><button type="button" data-create-hub-skill>Create Skill</button>
   </form>`);
+  root.querySelector('[data-create-hub-skill]').onclick = () => {
+    const draft = {name: root.querySelector('[data-name]').value, description: root.querySelector('[data-description]').value};
+    root._close(); openSkillEditor(null, false, {onSaved: skill_id => editHubSite(existing, {...draft, skill_id})});
+  };
   const save = root.querySelector('[data-save]');
   save.hidden = false;
   save.dataset.submit = "";
@@ -90,7 +111,7 @@ function editHubSite(existing) {
       save.disabled = true;
       try {
         const id = existing?.item.id || hubId();
-        await hubApi(root,"PUT", hubPath(id), {name,description:root.querySelector("[data-description]").value,revision:existing?.revision});
+        await hubApi(root,"PUT", hubPath(id), {name,description:root.querySelector("[data-description]").value,skill_id:root.querySelector("[data-hub-skill]").value || null,revision:existing?.revision});
         root._close(); await refreshKnowledgeHub();
         if (isSettingsRoute()) await refreshSettings({force: true});
         await openHubSite(id);
@@ -105,12 +126,18 @@ async function openHubSite(site) {
   if (site === "refine") { window.open("/hub/sites/refine/", "_blank", "noopener"); return; }
   const root = hubModal("Manage site", `<div data-detail></div>`);
   await hubAction(root, async () => {
-    const [data, collections, assets, status] = await Promise.all([hubApi(root,"GET",hubPath(site)),hubApi(root,"GET",`${hubPath(site)}/collections`),hubApi(root,"GET",`${hubPath(site)}/assets`),hubApi(root,"GET",`${hubPath(site)}/status`)]);
+    const [data, collections, assets, status, skills] = await Promise.all([hubApi(root,"GET",hubPath(site)),hubApi(root,"GET",`${hubPath(site)}/collections`),hubApi(root,"GET",`${hubPath(site)}/assets`),hubApi(root,"GET",`${hubPath(site)}/status`),hubApi(root,"GET",`/api/skills?node_id=${encodeURIComponent(nodeContextActiveNodeId())}`)]);
     if (!root.isConnected || !isNodeContextGenerationCurrent(root._nodeGeneration)) return;
+    const skill = skills.items?.find(skill => skill.id === data.item.skill_id);
+    const runnable = skill?.enabled && skills.manual_skill_ids?.includes(skill.id);
     root.querySelector("[data-detail]").innerHTML = `<h3>${htmlEscape(data.item.name)}</h3><p>${htmlEscape(data.item.description || "")}</p><p>${data.item.publication ? "Published" : "Private"}. Saved locally. State sync: ${htmlEscape(status.sync?.status || "unknown")}. Remote availability follows app state synchronization.</p><div class="actions"><button data-edit>Edit site</button><button data-preview>Open preview</button><button class="danger" data-delete-site>Delete site</button></div>
+    <h3>Build and maintain</h3><p>${htmlEscape(skill?.name || (data.item.skill_id ? "Assigned Skill unavailable" : "No Skill assigned"))}</p><div class="actions"><button data-run-hub-skill ${runnable ? "" : "disabled"}>Run Skill</button><button data-edit-hub-skill ${skill ? "" : "disabled"}>Edit Skill</button><a href="#/settings/workflow" data-hub-events>Manage event assignments</a></div><p class="muted">${runnable ? "Run manually, or use the Skill’s event assignments for automatic updates." : "Choose an enabled project Skill with a Custom action assignment to run it manually."}</p>
     <h3>Publication</h3><p>Publishing makes the selected collections readable through the site URL.</p>${collections.collections.map(({item})=>`<label><input type="checkbox" data-publish-collection value="${htmlEscape(item.id)}" ${data.item.publication?.collections?.includes(item.id)?"checked":""}>${htmlEscape(item.id)}</label>`).join("")}<div class="actions"><button data-publish>Publish</button><button data-unpublish ${data.item.publication?"":"disabled"}>Unpublish</button></div>
     <h3>Website files</h3><label>Upload files<input type="file" data-files multiple></label><label>Upload directory<input type="file" data-directory multiple webkitdirectory></label><button data-new-file>New text file</button><table class="table"><thead><tr><th>Path</th><th>Bytes</th></tr></thead><tbody>${Object.entries(assets.item).map(([path,v])=>`<tr data-asset="${htmlEscape(path)}" tabindex="0" aria-label="Open ${htmlEscape(path)}"><td>${htmlEscape(path)}</td><td>${v.bytes}</td></tr>`).join("")}</tbody></table>
     <h3>Collections</h3><button data-new-collection>Add collection</button><table class="table"><tbody>${collections.collections.map(c=>`<tr data-collection="${htmlEscape(c.item.id)}" tabindex="0" aria-label="Manage ${htmlEscape(c.item.id)}"><td>${htmlEscape(c.item.id)}</td></tr>`).join("")}</tbody></table>`;
+    root.querySelector("[data-run-hub-skill]").onclick = () => {root._close();triggerManualSkill(skill.id, site);};
+    root.querySelector("[data-edit-hub-skill]").onclick = () => {root._close();openSkillEditor(skill);};
+    root.querySelector("[data-hub-events]").onclick = () => root._close();
     const reload = async () => {root._close();await refreshKnowledgeHub();await openHubSite(site);};
     root.querySelector("[data-edit]").onclick=()=>{root._close();editHubSite(data);};
     root.querySelector("[data-preview]").onclick=()=>{const tab=window.open("about:blank","_blank");if(tab)tab.opener=null;hubAction(root,async()=>{try{const url=await hubSiteUrl(site,false);if(tab)tab.location.replace(url);}catch(e){tab?.close();throw e;}});};

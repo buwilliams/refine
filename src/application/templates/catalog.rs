@@ -69,6 +69,14 @@ pub fn variables() -> serde_json::Value {
 
 pub(crate) const COMMON: &[(&str, &str)] = &[
     (
+        "refine_checkout",
+        "Absolute path to the Refine source checkout when available.",
+    ),
+    (
+        "hubs",
+        "JSON for Hubs maintained by the executing Skill, pinned when the run starts; empty for unrelated Skills.",
+    ),
+    (
         "refine_executable",
         "Absolute path to Refine on the executing node.",
     ),

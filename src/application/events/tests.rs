@@ -56,7 +56,7 @@ fn migration_preserves_content_is_idempotent_and_stale_writes_cannot_erase_edits
     std::fs::create_dir_all(&service.refine_dir).unwrap();
     std::fs::write(service.refine_dir.join("guidance.json"), r#"[{"id":"context","name":"Accessibility","rule":"For interfaces","instructions":"Support keyboard navigation","enabled":false}]"#).unwrap();
     let config = service.config().unwrap();
-    assert_eq!(config.events.len(), 41);
+    assert_eq!(config.events.len(), 42);
     assert!(!system_catalog().iter().any(|s| s.contains("sync")));
     assert!(
         config.skills["guidance-context"]
@@ -1441,4 +1441,121 @@ fn reusable_skills_upgrade_preserves_existing_configuration() {
     assert_eq!(upgraded.skills, old.skills);
     assert_eq!(upgraded.events, old.events);
     assert_eq!(*service.config().unwrap(), *upgraded);
+}
+
+#[test]
+fn hub_skill_associations_pin_context_and_protect_product_skill() {
+    let fixture = Fixture::new();
+    let service = fixture.service();
+    let config = service.config().unwrap();
+    let builtin = service.show_skill(super::hub_skill::ID).unwrap();
+    assert_eq!(builtin["item"]["removable"], false);
+    assert!(
+        service
+            .remove("skills", super::hub_skill::ID, config.revision)
+            .is_err()
+    );
+    assert!(
+        service
+            .manual_skill_event(&config, super::hub_skill::ID, "default")
+            .is_ok()
+    );
+    let (prompt, _) = service
+        .terminal_hub_skill_prompt(
+            super::hub_skill::ID,
+            &fixture.0,
+            &json!({"request":"Explain the new Hub Skill"}),
+            Some("refine"),
+        )
+        .unwrap();
+    assert!(prompt.contains("src/surfaces/refine-hub"));
+    assert!(!prompt.contains("{{refine_checkout}}"));
+    assert!(prompt.contains("Explain the new Hub Skill"));
+    assert!(prompt.contains("\"builtin\":true"));
+    service.save("skills", "maintain", json!({"revision":config.revision,"item":{"name":"Maintain","prompt":"Maintain these Hubs: {{hubs}}"},"trigger":{"source":"custom"}})).unwrap();
+    let hub = crate::application::hub::Hub::new(&service.refine_dir, fixture.0.join("runtime"));
+    for id in ["metrics", "activity"] {
+        hub.save_site(id, &json!({"name":id,"skill_id":"maintain"}))
+            .unwrap();
+    }
+    assert!(
+        hub.save_site("bad", &json!({"name":"Bad","skill_id":"absent"}))
+            .is_err()
+    );
+    assert!(
+        hub.save_site(
+            "bad",
+            &json!({"name":"Bad","skill_id":super::hub_skill::ID})
+        )
+        .is_err()
+    );
+    assert_eq!(hub.for_skill("maintain").unwrap().len(), 2);
+    let revision = service.config().unwrap().revision;
+    assert!(service.remove("skills", "maintain", revision).is_err());
+    let run = service
+        .trigger_skill("maintain", &fixture.0, &json!({}))
+        .unwrap();
+    assert_eq!(
+        run.context.data["hubs"]["maintain"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+    let (prompt, _) = service
+        .terminal_hub_skill_prompt("maintain", &fixture.0, &json!({}), Some("metrics"))
+        .unwrap();
+    assert!(prompt.contains("metrics"));
+    assert!(!prompt.contains("activity"));
+    assert!(!prompt.contains("{{hubs}}"));
+    assert!(
+        service
+            .terminal_hub_skill_prompt("maintain", &fixture.0, &json!({}), Some("refine"))
+            .is_err()
+    );
+    let saved = hub.show("metrics").unwrap();
+    hub.save_site(
+        "metrics",
+        &json!({"name":"Renamed","revision":saved["revision"]}),
+    )
+    .unwrap();
+    assert_eq!(hub.show("metrics").unwrap()["item"]["skill_id"], "maintain");
+    // Associations and content are snapshots; later Hub edits do not rewrite a run.
+    assert!(
+        run.context.data["hubs"]["maintain"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|site| site["name"] == "metrics")
+    );
+    let store = crate::application::templates::TemplateStore::new(Some(&service.refine_dir));
+    store
+        .save("manual-skill", 0, "User controls the complete prompt")
+        .unwrap();
+    let (prompt, _) = service
+        .terminal_hub_skill_prompt("maintain", &fixture.0, &json!({}), Some("metrics"))
+        .unwrap();
+    assert_eq!(prompt, "User controls the complete prompt");
+}
+
+#[test]
+fn existing_installations_receive_product_skill_once_and_keep_edits() {
+    let fixture = Fixture::new();
+    let service = fixture.service();
+    let store = crate::infrastructure::storage::automation::AutomationStore::new(&service.refine_dir);
+    let first = service.config().unwrap();
+    store.update(first.revision, |config| {
+        config.skills.remove(super::hub_skill::ID);
+        config.events.remove(super::hub_skill::ID);
+        Ok(())
+    }).unwrap();
+    let installed = service.config().unwrap();
+    assert!(installed.skills.contains_key(super::hub_skill::ID));
+    assert_eq!(installed.revision, first.revision + 2);
+    let mut item = service.show_skill(super::hub_skill::ID).unwrap()["item"].clone();
+    item["prompt"] = json!("Our documentation style");
+    service.save("skills", super::hub_skill::ID, json!({"revision":installed.revision,"item":item})).unwrap();
+    let edited = service.config().unwrap();
+    assert_eq!(edited.skills[super::hub_skill::ID].prompt, "Our documentation style");
+    assert_eq!(service.config().unwrap().revision, edited.revision);
 }

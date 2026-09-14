@@ -228,10 +228,11 @@ impl InProcessWebServer {
                 &refine_dir,
                 &runtime_root,
             );
-            match service.terminal_skill_prompt(
+            match service.terminal_hub_skill_prompt(
                 skill_id,
                 &target_root,
                 body.get("parameters").unwrap_or(&json!({})),
+                body.get("hub_id").and_then(Value::as_str),
             ) {
                 Ok((prompt, details)) => {
                     metadata.extend(details.as_object().unwrap().clone());
