@@ -142,9 +142,11 @@ test('Agent map switches launch paths, follows saved includes, and opens resourc
     const type=map.locator('[data-resource-map-type]');
     await type.selectOption('planning');
     assert.equal(await map.locator('[data-map-template="planning-agent"]').isVisible(),true);
+    assert.match(await map.locator('[data-resource-map-launch]').innerText(), /Toolbar → Planning Agent opens this terminal path/);
     assert.equal(await map.locator('[data-map-template="goal-agent"]').count(),0);
     await map.locator('[data-resource-map-variant]').selectOption('chat-session');
     assert.equal(await map.locator('[data-map-template="chat-session"]').isVisible(),true);
+    assert.match(await map.locator('[data-resource-map-launch]').innerText(), /chat API.*Current toolbar actions use Terminal/);
     await map.locator('.resource-map-includes').nth(1).locator(':scope > summary').click();
     await map.locator('[data-map-template="purpose"]').click();
     const modal=page.getByTestId('automation-modal');

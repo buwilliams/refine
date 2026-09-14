@@ -7,7 +7,18 @@ function resourceMapVariants(data) {
   if (resourceMapType === 'workflow') return [['workflow','Goal workflow']];
   if (resourceMapType === 'skill') return [['manual-skill','Manual run'],['supervised-skill','Automatic run']];
   if (resourceMapType === 'system') return (data.items || []).filter(row => row.usage?.group === 'tasks' && row.usage?.kind === 'template').map(row => [row.item.id,row.name]);
-  return [['terminal-session','Terminal'], ...(resourceMapType === 'general' ? [] : [['chat-session','Managed chat']])];
+  return [['terminal-session','Terminal — toolbar / CLI'], ...(resourceMapType === 'general' ? [] : [['chat-session','Managed chat — API']])];
+}
+function resourceMapLaunchDescription(data) {
+  if (resourceMapVariant === 'chat-session') return "Started through Refine’s chat API by an integration or API client. Current toolbar actions use Terminal, not Managed chat.";
+  if (resourceMapVariant === 'terminal-session') {
+    const action = {planning:'Planning Agent', general:'Agent', goal:'Goal Agent'}[resourceMapType];
+    return `Toolbar → ${action} opens this terminal path. Agent terminals launched through the CLI also use Terminal Session. Refine supplies the initial prompt, then you interact with the agent’s CLI.`;
+  }
+  if (resourceMapType === 'workflow') return 'Used when Refine runs an assigned Skill at a Goal step or hook. These agents are started by the workflow.';
+  if (resourceMapVariant === 'manual-skill') return 'Used when you choose Run Skill in Workflow → Custom actions or select a Skill from the New Goal menu.';
+  if (resourceMapVariant === 'supervised-skill') return 'Used when a system event, such as Node startup, runs an assigned Skill automatically.';
+  return (data.items || []).find(row => row.item.id === resourceMapVariant)?.usage?.description || 'Started by the corresponding Refine system operation.';
 }
 function renderResourceMap(data) {
   const variants = resourceMapVariants(data);
@@ -54,8 +65,9 @@ function renderResourceMap(data) {
     return `<li><div class="resource-map-node"><button type="button" class="secondary" ${id.startsWith('skill:') ? 'data-map-skill' : 'data-map-template'}="${htmlEscape(id.replace(/^skill:/,''))}">${htmlEscape(row.name)}</button><span class="muted small">${row.usage?.kind === 'skill' ? 'Skill' : row.usage?.kind === 'partial' ? 'Partial' : 'Template'}${conditional ? ' · When applicable' : ''}${repeated ? ' · Circular reference' : ''}</span></div>${nested.length ? `<details class="resource-map-includes" ${path.length === 0 ? 'open' : ''}><summary>Includes ${nested.length} ${nested.length === 1 ? 'piece' : 'pieces'}</summary><ul>${nested.filter(child => !child.conditional).map(child => node(child.id,false,[...path,id])).join('')}${nested.some(child => child.conditional) ? `<li><details class="resource-map-includes"><summary>Context when applicable (${nested.filter(child => child.conditional).length})</summary><ul>${nested.filter(child => child.conditional).map(child => node(child.id,true,[...path,id])).join('')}</ul></details></li>` : ''}</ul></details>` : ''}</li>`;
   };
   return `<details class="resource-map-overview" ${resourceMapOpen ? 'open' : ''}><summary>How agent prompts are built</summary><div class="resource-map-body">
-    <div class="actions resource-map-controls"><label>Agent type<select data-resource-map-type>${Object.entries(resourceMapTypes).map(([id,label]) => `<option value="${id}" ${id === resourceMapType ? 'selected' : ''}>${label}</option>`).join('')}</select></label>${variants.length > 1 ? `<label>${resourceMapType === 'system' ? 'Task' : 'Run type'}<select data-resource-map-variant>${variants.map(([id,label]) => `<option value="${htmlEscape(id)}" ${id === resourceMapVariant ? 'selected' : ''}>${htmlEscape(label)}</option>`).join('')}</select></label>` : ''}</div>
-    <p class="muted small">${resourceMapType === 'workflow' ? 'Goal steps and hooks use Workflow inside the agent session.' : resourceMapType === 'skill' ? 'Manual runs open a Skill terminal; automatic runs use a supervised agent session.' : resourceMapType === 'system' ? 'Choose a task to see the prompt Refine uses for that operation.' : 'The session template combines the selected agent instructions with its context.'} Expand includes to follow saved references. Click a name to edit it. “When applicable” pieces depend on the launch.</p>
+    <div class="actions resource-map-controls"><label>Agent type<select data-resource-map-type>${Object.entries(resourceMapTypes).map(([id,label]) => `<option value="${id}" ${id === resourceMapType ? 'selected' : ''}>${label}</option>`).join('')}</select></label>${variants.length > 1 ? `<label>${resourceMapType === 'system' ? 'Task' : 'Launch path'}<select data-resource-map-variant>${variants.map(([id,label]) => `<option value="${htmlEscape(id)}" ${id === resourceMapVariant ? 'selected' : ''}>${htmlEscape(label)}</option>`).join('')}</select></label>` : ''}</div>
+    <p class="resource-map-launch" data-resource-map-launch><strong>Where this is used</strong><br>${htmlEscape(resourceMapLaunchDescription(data))}</p>
+    <p class="muted small">Viewing this map does not start an agent or change its configuration. ${resourceMapType === 'workflow' ? 'Goal steps and hooks use Workflow inside the agent session.' : resourceMapType === 'skill' ? 'Manual runs open a Skill terminal; automatic runs use a supervised agent session.' : resourceMapType === 'system' ? 'Choose a task to see the prompt Refine uses for that operation.' : 'The session template combines the selected agent instructions with its context.'} Expand includes to follow saved references. Click a name to edit it. “When applicable” pieces depend on the launch.</p>
     ${root && rows.has(root) ? `<div class="resource-map-flow"><ul class="resource-map-tree" aria-label="${htmlEscape(resourceMapTypes[resourceMapType])} prompt composition">${node(root)}${remaining < 0 ? '<li class="muted small">More references are available in the template editors.</li>' : ''}</ul><div class="resource-map-result"><span aria-hidden="true">→</span><div><strong>Prompt sent to agent</strong><p class="muted small">Included pieces and runtime values are filled in before launch.</p></div></div></div>` : '<p class="muted">No templates for this agent type are available.</p>'}
     </div></details>`;
 }
