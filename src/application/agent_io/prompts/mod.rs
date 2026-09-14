@@ -102,6 +102,22 @@ impl PromptEngine {
         template: PromptTemplate,
         variables: &[(&str, &str)],
     ) -> Result<String, PromptTemplateError> {
+        Self::render_source(Self::load(template), variables, true)
+    }
+
+    /// Render supported variables in authored text, preserving other template syntax.
+    pub fn render_available(
+        source: &str,
+        variables: &[(&str, &str)],
+    ) -> Result<String, PromptTemplateError> {
+        Self::render_source(source, variables, false)
+    }
+
+    fn render_source(
+        source: &str,
+        variables: &[(&str, &str)],
+        strict: bool,
+    ) -> Result<String, PromptTemplateError> {
         let mut values = BTreeMap::new();
         for (name, value) in variables {
             if values.insert(*name, *value).is_some() {
@@ -109,7 +125,6 @@ impl PromptEngine {
             }
         }
 
-        let source = Self::load(template);
         let mut output = String::with_capacity(source.len());
         let mut remaining = source;
         let mut used = BTreeSet::new();
@@ -117,26 +132,34 @@ impl PromptEngine {
             output.push_str(&remaining[..start]);
             let placeholder = &remaining[start + 2..];
             let Some(end) = placeholder.find("}}") else {
-                return Err(PromptTemplateError::UnclosedPlaceholder);
+                if strict {
+                    return Err(PromptTemplateError::UnclosedPlaceholder);
+                }
+                output.push_str(&remaining[start..]);
+                return Ok(output);
             };
             let name = placeholder[..end].trim();
-            if name.is_empty()
-                || !name
-                    .chars()
-                    .all(|character| character.is_ascii_alphanumeric() || character == '_')
+            if strict
+                && (name.is_empty()
+                    || !name
+                        .chars()
+                        .all(|character| character.is_ascii_alphanumeric() || character == '_'))
             {
                 return Err(PromptTemplateError::InvalidPlaceholder(name.to_string()));
             }
-            let value = values
-                .get(name)
-                .ok_or_else(|| PromptTemplateError::MissingVariable(name.to_string()))?;
-            output.push_str(value);
-            used.insert(name);
+            if let Some(value) = values.get(name) {
+                output.push_str(value);
+                used.insert(name);
+            } else if strict {
+                return Err(PromptTemplateError::MissingVariable(name.to_string()));
+            } else {
+                output.push_str(&remaining[start..start + 2 + end + 2]);
+            }
             remaining = &placeholder[end + 2..];
         }
         output.push_str(remaining);
 
-        if let Some(name) = values.keys().find(|name| !used.contains(**name)) {
+        if strict && let Some(name) = values.keys().find(|name| !used.contains(**name)) {
             return Err(PromptTemplateError::UnusedVariable((*name).to_string()));
         }
         Ok(output)
@@ -157,6 +180,21 @@ mod tests {
     use super::*;
     use std::fs;
     use std::path::{Path, PathBuf};
+
+    #[test]
+    fn authored_templates_render_once_and_preserve_unrelated_text() {
+        let source = "  {{refine_executable}} / {{ refine_executable }} {{user.name}} {{ other }} {{ unfinished\n";
+        let path = "/opt/Refine {{other}}/refine";
+        assert_eq!(
+            PromptEngine::render_available(source, &[("refine_executable", path)]).unwrap(),
+            format!("  {path} / {path} {{{{user.name}}}} {{{{ other }}}} {{{{ unfinished\n")
+        );
+        assert_eq!(
+            PromptEngine::render_available("ordinary skill\n", &[("refine_executable", path)])
+                .unwrap(),
+            "ordinary skill\n"
+        );
+    }
 
     #[test]
     fn renders_embedded_markdown_template_variables() {

@@ -211,14 +211,14 @@ impl FileEventService {
             .iter()
             .filter(|b| b.binding.mode == BindingMode::Context)
             .map(|b| {
-                format!(
+                Ok(format!(
                     "{}\n{}\nParameters: {}",
                     b.skill.name,
-                    b.skill.prompt,
+                    super::super::prompts::render(&b.skill.prompt)?,
                     json!(b.parameters)
-                )
+                ))
             })
-            .collect::<Vec<_>>()
+            .collect::<RefineResult<Vec<_>>>()?
             .join("\n\n");
         for pinned in invocation.bindings.clone() {
             if pinned.binding.mode == BindingMode::Context
@@ -287,7 +287,7 @@ impl FileEventService {
                 };
                 let prompt = format!(
                     "{}\n\nAttached Skills:\n{}\n\nParameters:\n{}\n\nPinned context:\n{}\n\nSkill execution:\n{}\n\nRefine completion contract (supplied by the system):\n{}\nReturn one JSON object matching this contract. {authority} {continuation} Refine attaches invocation, binding, and role identity to your response; do not include identity fields. Use your judgment to decide when to stop and which outcome to report. The summary, evidence, and artifacts fields are optional context; no checklist, test commands, supporting evidence, or recovery proposal is required by Refine. {}",
-                    pinned.skill.prompt,
+                    super::super::prompts::render(&pinned.skill.prompt)?,
                     contexts,
                     json!(pinned.parameters),
                     invocation.context.data,

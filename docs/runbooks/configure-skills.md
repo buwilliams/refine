@@ -65,6 +65,8 @@ The example files in [skills](skills/) provide **Release**, **Fetch Goals from E
 
 System context supplies `project_root`, `workspace`, `node_id`, `runtime_root`, `refine_executable`, and, when discoverable, `refine_checkout`. Use these values to keep maintenance commands tied to the intended app and running installation.
 
+Skill instructions can use `{{refine_executable}}` to insert the absolute path of the Refine executable on the executing node. For example: `Run {{refine_executable}} --help to discover commands.` Refine renders this variable before launching supervised or interactive Skill agents, including attached context Skills. Saved instructions retain the variable so they work across nodes. Other `{{...}}` text is preserved, and inserted values are not rendered again.
+
 ## Migration and recovery
 
 Initial migration converts Governance and Quality policy into default Skill prompts and Guidance into context Skills. Original configuration is archived in `automation/migration-v1.json`. Conversion from the multiple-trigger model archives `automation/migration-v2.json`, then creates an independent Skill for each assignment while preserving prompts, parameters, ordering, effective scope, enabled state, and legacy node overrides. Binding identities and historical invocation snapshots remain intact. Conversion is deterministic, revision-fenced, and safe to retry.

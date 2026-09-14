@@ -87,7 +87,7 @@ fn run_checked(
         round_idx: Some(ctx.round_idx),
         workflow_revision: Some(ctx.attempt_authority.workflow_revision),
         candidate_commit: ctx.commit.clone(),
-        data: json!({"goal": super::execution::goal_context(&goal), "system": {"node_id": ctx.node_id, "project_root": ctx.target_root, "workspace": cwd, "workflow_step": status.as_str(), "candidate_commit": ctx.commit}, "context": data}),
+        data: json!({"goal": super::execution::goal_context(&goal), "system": {"node_id": ctx.node_id, "project_root": ctx.target_root, "workspace": cwd, "workflow_step": status.as_str(), "candidate_commit": ctx.commit, "refine_executable": std::env::current_exe().ok()}, "context": data}),
         metadata: ctx.workflow_process_metadata(status.as_str(), "EventSkill"),
     };
     // Todo has no implementation checkout yet. Entry reuses the durable occurrence

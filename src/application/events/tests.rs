@@ -187,6 +187,7 @@ contract['outcome'] = 'failure' if prompt.startswith('FAIL') else 'success'
 contract['summary'] = 'Observed ' + contract['outcome']
 path = pathlib.Path('launches.txt')
 with path.open('a') as f: f.write(('first' if prompt.startswith('FAIL') else 'second') + '\n')
+pathlib.Path('received-' + ('first' if prompt.startswith('FAIL') else 'second') + '.txt').write_text(prompt)
 print(json.dumps(contract))
 "#).unwrap();
     std::fs::set_permissions(&provider, std::fs::Permissions::from_mode(0o755)).unwrap();
@@ -196,8 +197,12 @@ print(json.dumps(contract))
     }
     let mut config = (*service.config().unwrap()).clone();
     for (id, prompt) in [
-        ("first", "FAIL: inspect first"),
-        ("second", "Inspect independently"),
+        ("first", "FAIL: inspect first using {{refine_executable}}"),
+        (
+            "second",
+            "Inspect independently using {{ refine_executable }}",
+        ),
+        ("context", "Context CLI: {{refine_executable}}"),
     ] {
         config.skills.insert(
             id.into(),
@@ -222,14 +227,18 @@ print(json.dumps(contract))
         scope: Scope::default(),
         parameters: Vec::new(),
         on_success: None,
-        bindings: ["first", "second"]
+        bindings: ["first", "second", "context"]
             .iter()
             .enumerate()
             .map(|(order, id)| Binding {
                 id: (*id).into(),
                 skill_id: (*id).into(),
                 enabled: true,
-                mode: BindingMode::Blocking,
+                mode: if *id == "context" {
+                    BindingMode::Context
+                } else {
+                    BindingMode::Blocking
+                },
                 order: order as i32,
                 scope: Scope::default(),
                 overrides: None,
@@ -264,6 +273,21 @@ print(json.dumps(contract))
     let result = result.unwrap();
     assert_eq!(result.state, InvocationState::Failed, "{result:?}");
     assert_eq!(result.results.len(), 2);
+    let executable = std::env::current_exe().unwrap();
+    for id in ["first", "second"] {
+        let received =
+            std::fs::read_to_string(fixture.0.join(format!("received-{id}.txt"))).unwrap();
+        assert!(received.contains(&format!("using {}", executable.display())));
+        assert!(received.contains(&format!("Context CLI: {}", executable.display())));
+        assert!(!received.contains("{{refine_executable}}"));
+        assert!(!received.contains("{{ refine_executable }}"));
+    }
+    assert!(
+        invocation.bindings[0]
+            .skill
+            .prompt
+            .contains("{{refine_executable}}")
+    );
     assert_eq!(
         std::fs::read_to_string(fixture.0.join("launches.txt")).unwrap(),
         "first\nsecond\n"
@@ -1094,7 +1118,7 @@ fn manual_skills_select_one_skill_validate_inputs_and_pin_replay_without_a_goal(
     let service = fixture.service();
     for id in ["one", "two"] {
         let revision = service.config().unwrap().revision;
-        service.save("skills", id, json!({"revision":revision,"item":{"name":id,"prompt":format!("Run only {id}"),"role":"governance","parameters":[{"name":"count","kind":"number","required":true,"default":3}]},"trigger":{"source":"custom"}})).unwrap();
+        service.save("skills", id, json!({"revision":revision,"item":{"name":id,"prompt":format!("Run only {id}; CLI: {{{{refine_executable}}}}"),"role":"governance","parameters":[{"name":"count","kind":"number","required":true,"default":3}]},"trigger":{"source":"custom"}})).unwrap();
     }
     let inputs = service.skill_inputs("one", &fixture.0).unwrap();
     assert_eq!(inputs["parameters"][0]["default"], 3);
@@ -1131,6 +1155,17 @@ fn manual_skills_select_one_skill_validate_inputs_and_pin_replay_without_a_goal(
         .terminal_skill_prompt("one", &fixture.0, &json!({"count":9}))
         .unwrap();
     assert!(prompt.contains("Run only one"));
+    assert!(prompt.contains(&format!(
+        "CLI: {}",
+        std::env::current_exe().unwrap().display()
+    )));
+    assert!(!prompt.contains("{{refine_executable}}"));
+    assert!(
+        run.bindings[0]
+            .skill
+            .prompt
+            .contains("{{refine_executable}}")
+    );
     assert!(!prompt.contains("Run only two"));
     assert_eq!(metadata["skill_parameters"]["count"], 9);
     let config = service.config().unwrap();
