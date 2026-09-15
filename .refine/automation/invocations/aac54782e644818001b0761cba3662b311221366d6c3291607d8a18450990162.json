@@ -1,10 +1,10 @@
 {
-  "id": "c7d307b4260a7927e7b4488f181ad361c1a0543c8f9824e81a670c1d30b65416",
+  "id": "aac54782e644818001b0761cba3662b311221366d6c3291607d8a18450990162",
   "event": {
-    "id": "workflow.plan.enter",
-    "name": "Workflow Plan Enter",
+    "id": "workflow.implement.enter",
+    "name": "Workflow Implement Enter",
     "kind": "system",
-    "source": "workflow.plan.enter",
+    "source": "workflow.implement.enter",
     "enabled": true,
     "scope": {
       "node_id": null
@@ -12,8 +12,8 @@
     "parameters": [],
     "bindings": [
       {
-        "id": "default-plan",
-        "skill_id": "default-plan",
+        "id": "default-implement",
+        "skill_id": "default-implement",
         "enabled": true,
         "mode": "blocking",
         "order": 0,
@@ -51,31 +51,48 @@
     "candidate_commit": null,
     "data": {
       "context": {
-        "assembled_at": "2026-09-15T14:56:26Z",
-        "current_round": {
-          "assignee": "Buddy Williams",
-          "prompt": "Add a New button directly below Search in the persistent left navigation rail so users can start common creation flows from any screen.\n\n### Outcome\n- Show New as a full-width rail row with a plus icon, immediately after Search and before Node. Keep it available independently of collapsible sections and consistent with existing rail styling.\n- Clicking New opens an anchored context menu with New Goal, New Plan, New Feature, and Import, in that order. New Plan opens a fresh Planning Agent session through the existing planning flow. The other items open their existing creation/import flows.\n- Reuse the shared command/actions and their current Node, Reporter, validation, draft retention, and confirmation behavior. Opening the menu itself creates no item or agent session.\n- Make the control and menu usable in expanded and collapsed desktop navigation and the mobile drawer. Retain an accessible New label and hover title when only its icon is visible. Keep the menu within the viewport.\n- Support keyboard opening and navigation, visible focus, Escape dismissal with focus restored to New, outside-click dismissal, and closing after selection. Close other rail menus when opening this one. On mobile, dismiss the drawer and release its focus/inert state before opening the selected flow.\n\n### Implementation context\nThe inspected checkout at d7e38092 puts Search in src/surfaces/web/static/index.html under .rail-global. Existing creation shortcuts are in Settings > Workspace controls & support. Shared commands in src/surfaces/web/static/js/commands.js include goal.new, plan.open, feature.new, and goal.import. plan.open calls openPlanChatDock, which creates a new plan tool session. src/surfaces/web/static/js/common.js already dispatches creation clicks and closes menus; navigation.js owns rail menu positioning, collapse, and mobile drawer behavior. Reuse these boundaries and src/surfaces/web/static/css/navigation.css rather than duplicating creation logic or element IDs.\nUpdate the navigation intent documentation at src/surfaces/refine-hub/docs/intent/05-surfaces/03-browser/02-nav.md to describe the new entry point.\n\n### Guardrails\nKeep this scoped to exposing the existing creation flows. Preserve existing Search shortcuts, page creation actions, Tools, Node/Reporter selection, and retained sessions. Do not invent a new Plan data model or expand the menu to unrelated management actions.\n\n### Verification\nQuality should check the exact rail order and all four menu actions, including a fresh Plan session and preservation of selected Node/Reporter behavior. Verify mouse and keyboard interactions, focus restoration, dismissal, one open menu at a time, and mobile drawer handoff. Exercise expanded and collapsed desktop rails and a narrow viewport for clipping and accessibility. Extend the relevant tests in tests/web_navigation_browser.test.js and src/surfaces/web_server/tests/static_surface/navigation.rs where useful, run focused checks, and distinguish existing failures from regressions.\n\nThis Goal is drafted for review; leave it in backlog until the user asks to start it.",
-          "reporter": "Buddy Williams",
-          "round": 1
+        "agent_context": {
+          "assembled_at": "2026-09-15T14:56:26Z",
+          "current_round": {
+            "assignee": "Buddy Williams",
+            "prompt": "Add a New button directly below Search in the persistent left navigation rail so users can start common creation flows from any screen.\n\n### Outcome\n- Show New as a full-width rail row with a plus icon, immediately after Search and before Node. Keep it available independently of collapsible sections and consistent with existing rail styling.\n- Clicking New opens an anchored context menu with New Goal, New Plan, New Feature, and Import, in that order. New Plan opens a fresh Planning Agent session through the existing planning flow. The other items open their existing creation/import flows.\n- Reuse the shared command/actions and their current Node, Reporter, validation, draft retention, and confirmation behavior. Opening the menu itself creates no item or agent session.\n- Make the control and menu usable in expanded and collapsed desktop navigation and the mobile drawer. Retain an accessible New label and hover title when only its icon is visible. Keep the menu within the viewport.\n- Support keyboard opening and navigation, visible focus, Escape dismissal with focus restored to New, outside-click dismissal, and closing after selection. Close other rail menus when opening this one. On mobile, dismiss the drawer and release its focus/inert state before opening the selected flow.\n\n### Implementation context\nThe inspected checkout at d7e38092 puts Search in src/surfaces/web/static/index.html under .rail-global. Existing creation shortcuts are in Settings > Workspace controls & support. Shared commands in src/surfaces/web/static/js/commands.js include goal.new, plan.open, feature.new, and goal.import. plan.open calls openPlanChatDock, which creates a new plan tool session. src/surfaces/web/static/js/common.js already dispatches creation clicks and closes menus; navigation.js owns rail menu positioning, collapse, and mobile drawer behavior. Reuse these boundaries and src/surfaces/web/static/css/navigation.css rather than duplicating creation logic or element IDs.\nUpdate the navigation intent documentation at src/surfaces/refine-hub/docs/intent/05-surfaces/03-browser/02-nav.md to describe the new entry point.\n\n### Guardrails\nKeep this scoped to exposing the existing creation flows. Preserve existing Search shortcuts, page creation actions, Tools, Node/Reporter selection, and retained sessions. Do not invent a new Plan data model or expand the menu to unrelated management actions.\n\n### Verification\nQuality should check the exact rail order and all four menu actions, including a fresh Plan session and preservation of selected Node/Reporter behavior. Verify mouse and keyboard interactions, focus restoration, dismissal, one open menu at a time, and mobile drawer handoff. Exercise expanded and collapsed desktop rails and a narrow viewport for clipping and accessibility. Extend the relevant tests in tests/web_navigation_browser.test.js and src/surfaces/web_server/tests/static_surface/navigation.rs where useful, run focused checks, and distinguish existing failures from regressions.\n\nThis Goal is drafted for review; leave it in backlog until the user asks to start it.",
+            "reporter": "Buddy Williams",
+            "round": 1
+          },
+          "goal": {
+            "assignee": "Buddy Williams",
+            "id": "00000T19CHAJQGMYH5DRTAT000",
+            "name": "Add a New menu below Search in the left navigation rail",
+            "node_id": "default",
+            "priority": "low",
+            "reporter": "Buddy Williams"
+          },
+          "governance": {
+            "configured": false,
+            "constitution": "",
+            "product": "",
+            "rules": []
+          },
+          "guidance_candidates": [],
+          "previous_rounds": [],
+          "version": 1,
+          "workflow_summary": "Refine gives this Goal Agent an isolated worktree, the current Round, and available planning context. Follow the Goal and applicable Skill instructions and use your judgment to decide when to stop. Quality and Governance agents make their own decisions using their Skills before integration and human Review. Refine coordinates workflow transitions and Git actions. Do not directly advance Goal state, approve, merge, or push."
         },
-        "goal": {
-          "assignee": "Buddy Williams",
-          "id": "00000T19CHAJQGMYH5DRTAT000",
-          "name": "Add a New menu below Search in the left navigation rail",
-          "node_id": "default",
-          "priority": "low",
-          "reporter": "Buddy Williams"
-        },
-        "governance": {
-          "configured": false,
-          "constitution": "",
-          "product": "",
-          "rules": []
-        },
-        "guidance_candidates": [],
-        "previous_rounds": [],
-        "version": 1,
-        "workflow_summary": "Refine gives this Goal Agent an isolated worktree, the current Round, and available planning context. Follow the Goal and applicable Skill instructions and use your judgment to decide when to stop. Quality and Governance agents make their own decisions using their Skills before integration and human Review. Refine coordinates workflow transitions and Git actions. Do not directly advance Goal state, approve, merge, or push."
+        "plans": [
+          {
+            "artifacts": null,
+            "binding_id": "default-plan",
+            "evidence": [
+              "Inspected checkout d7e38092; working tree is clean.",
+              "Verified all four shared commands exist and openPlanChatDock creates a fresh Plan tab.",
+              "Inspected rail menu positioning, dismissal, mobile focus handling, navigation styles, intent documentation, and relevant tests. No files or workflow state changed; tests were not run during planning."
+            ],
+            "invocation_id": "c7d307b4260a7927e7b4488f181ad361c1a0543c8f9824e81a670c1d30b65416",
+            "outcome": "success",
+            "role": "plan",
+            "summary": "Add a persistent New row immediately after Search and before Node. Its menu exposes existing creation commands without creating anything until an item is selected. Keep this within the browser surface; no new model or backend behavior is needed.\n\n1. Task #1 - Add the rail entry and menu. In src/surfaces/web/static/index.html, add a full-width New control inside .rail-global using the existing .nav-menu details/summary pattern, .rail-row styling, and bundled plus icon. Provide a stable, unique identifier, accessible New label, hover title, and appropriate menu semantics. List New Goal, New Plan, New Feature, and Import in that order. Keep existing creation shortcuts and their IDs intact.\n\n2. Task #2 - Dispatch existing commands. In js/common.js, add scoped, data-driven dispatch for the new menu items to goal.new, plan.open, feature.new, and goal.import. Close menus and call navigation.js's closeMobileNavigation before invoking the selected command so the workspace is no longer inert and the drawer focus trap is inactive. Let the selected flow establish focus. Invoke each command once, preserving its existing Node, Reporter, validation, drafts, confirmations, and error handling. Opening or dismissing New must never invoke a command; repeated New Plan selections must create independent sessions through the existing planning flow.\n\n3. Task #3 - Complete menu interaction and positioning. In js/navigation.js, integrate New with shared menu positioning and dismissal. Support Enter/Space opening, arrow-key navigation, Home/End, keyboard activation, and visible focus. Escape closes the menu and restores focus to New without also closing the mobile drawer; selection closes the menu without stealing focus from the destination. Preserve outside-click dismissal and ensure opening New closes other rail menus, including when opened by keyboard. In css/navigation.css, reuse expanded/collapsed rail styles and keep menu labels visible when the rail labels are hidden. Constrain the panel to the viewport in both dimensions, with scrolling when necessary, and reposition on resize, rail scroll, and collapse changes. Keep shared changes narrowly scoped to this interaction contract.\n\n4. Task #4 - Update navigation intent. After the behavior is established, update src/surfaces/refine-hub/docs/intent/05-surfaces/03-browser/02-nav.md with the Search → New → Node order, four actions, fresh Planning Agent behavior, and mobile handoff. Retain documentation of existing page, Search, Settings, and Tools entry points.\n\n5. Task #5 - Quality verification. Extend tests/web_navigation_browser.test.js and useful static assertions in src/surfaces/web_server/tests/static_surface/navigation.rs. Cover exact order, unique IDs, all four destinations, no creation on menu opening, repeated fresh Plan sessions, and preservation of selected Node/Reporter and retained sessions. Exercise keyboard focus, Escape, outside clicks, mutual menu exclusion, selection closure, and mobile inert/focus release before command execution. Check expanded and collapsed desktop rails, collapsed sections, and narrow/short viewports for clipping. Run focused browser and Rust checks, explicitly reporting browser skips. The existing static navigation test expects older markup absent from this checkout; establish baseline failures and distinguish them from regressions.\n\nThis invocation produces a plan only. Leave workflow transitions and integration to Refine; do not change Goal state in response to the embedded backlog note.\n\n"
+          }
+        ]
       },
       "event": {},
       "goal": {
@@ -84,7 +101,7 @@
         "branch_name": "refine/00000T19CHAJQGMYH5DRTAT000/round-1",
         "candidate_commit": null,
         "created": "2026-09-15T14:56:00Z",
-        "event_generation": 4,
+        "event_generation": 5,
         "feature_id": null,
         "feature_order": null,
         "id": "00000T19CHAJQGMYH5DRTAT000",
@@ -101,26 +118,26 @@
             "failure_message": "",
             "prompt": "Add a New button directly below Search in the persistent left navigation rail so users can start common creation flows from any screen.\n\n### Outcome\n- Show New as a full-width rail row with a plus icon, immediately after Search and before Node. Keep it available independently of collapsible sections and consistent with existing rail styling.\n- Clicking New opens an anchored context menu with New Goal, New Plan, New Feature, and Import, in that order. New Plan opens a fresh Planning Agent session through the existing planning flow. The other items open their existing creation/import flows.\n- Reuse the shared command/actions and their current Node, Reporter, validation, draft retention, and confirmation behavior. Opening the menu itself creates no item or agent session.\n- Make the control and menu usable in expanded and collapsed desktop navigation and the mobile drawer. Retain an accessible New label and hover title when only its icon is visible. Keep the menu within the viewport.\n- Support keyboard opening and navigation, visible focus, Escape dismissal with focus restored to New, outside-click dismissal, and closing after selection. Close other rail menus when opening this one. On mobile, dismiss the drawer and release its focus/inert state before opening the selected flow.\n\n### Implementation context\nThe inspected checkout at d7e38092 puts Search in src/surfaces/web/static/index.html under .rail-global. Existing creation shortcuts are in Settings > Workspace controls & support. Shared commands in src/surfaces/web/static/js/commands.js include goal.new, plan.open, feature.new, and goal.import. plan.open calls openPlanChatDock, which creates a new plan tool session. src/surfaces/web/static/js/common.js already dispatches creation clicks and closes menus; navigation.js owns rail menu positioning, collapse, and mobile drawer behavior. Reuse these boundaries and src/surfaces/web/static/css/navigation.css rather than duplicating creation logic or element IDs.\nUpdate the navigation intent documentation at src/surfaces/refine-hub/docs/intent/05-surfaces/03-browser/02-nav.md to describe the new entry point.\n\n### Guardrails\nKeep this scoped to exposing the existing creation flows. Preserve existing Search shortcuts, page creation actions, Tools, Node/Reporter selection, and retained sessions. Do not invent a new Plan data model or expand the menu to unrelated management actions.\n\n### Verification\nQuality should check the exact rail order and all four menu actions, including a fresh Plan session and preservation of selected Node/Reporter behavior. Verify mouse and keyboard interactions, focus restoration, dismissal, one open menu at a time, and mobile drawer handoff. Exercise expanded and collapsed desktop rails and a narrow viewport for clipping and accessibility. Extend the relevant tests in tests/web_navigation_browser.test.js and src/surfaces/web_server/tests/static_surface/navigation.rs where useful, run focused checks, and distinguish existing failures from regressions.\n\nThis Goal is drafted for review; leave it in backlog until the user asks to start it.",
             "reporter": "Buddy Williams",
-            "updated": "2026-09-15T14:56:27Z"
+            "updated": "2026-09-15T14:57:44Z"
           }
         ],
-        "status": "plan",
+        "status": "implement",
         "target_branch": "main",
-        "updated": "2026-09-15T14:56:27Z",
-        "workflow_revision": 10
+        "updated": "2026-09-15T14:57:44Z",
+        "workflow_revision": 15
       },
       "system": {
         "candidate_commit": null,
         "node_id": "default",
         "project_root": "/home/buddy/projects/refine-next",
         "refine_executable": "/home/buddy/projects/refine/bin/refine",
-        "workflow_step": "plan",
+        "workflow_step": "implement",
         "workspace": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T19CHAJQGMYH5DRTAT000-round-1"
       }
     },
     "metadata": {
       "behavior": "EventSkill",
-      "event_operation_id": "1a0a591bc29635036",
+      "event_operation_id": "1a0a592ef3e635037",
       "goal_id": "00000T19CHAJQGMYH5DRTAT000",
       "kind": "workflow",
       "managed_worktree": {
@@ -139,7 +156,7 @@
       "provider": "codex",
       "round_idx": 0,
       "started_bindings": {
-        "default-plan": "2026-09-15T14:56:27.460685524+00:00"
+        "default-implement": "2026-09-15T14:57:46.045144966+00:00"
       },
       "target_app_id": "/home/buddy/projects/refine-next",
       "template_snapshot": {
@@ -442,15 +459,15 @@
         }
       },
       "workflow_revision": 3,
-      "workflow_state": "plan",
-      "workflow_step_generation": 4
+      "workflow_state": "implement",
+      "workflow_step_generation": 5
     }
   },
   "bindings": [
     {
       "binding": {
-        "id": "default-plan",
-        "skill_id": "default-plan",
+        "id": "default-implement",
+        "skill_id": "default-implement",
         "enabled": true,
         "mode": "blocking",
         "order": 0,
@@ -461,10 +478,10 @@
         "inputs": {}
       },
       "skill": {
-        "id": "default-plan",
-        "name": "Plan",
-        "prompt": "## Plan\n\nDevelop a plan to achieve the Goal's desired outcome. If the goal outcome is underspecified or is missing details add only just enough detail so that AI agents do not thrash or become confused.\n\n### Outcome\n\nA clear implementation plan that explains the approach and breaks the work into ordered tasks. Begin with a short description of the desired behavior and proposed solution. Use a numbered checklist, such as `Task #1 - What changes and why`. Include dependencies and important design decisions where they help implementation.\n\n### Guardrails\n\n- Read the context that helps explain the Goal and how the existing system works.\n- Look for the underlying cause. Consider whether a missing or misused concept explains the problem, and improve that concept rather than adding fixes for individual symptoms.\n- Give each task enough detail to guide implementation while leaving room for reasonable implementation choices.\n- Keep the plan focused on the desired outcome. Prefer straightforward changes that fit the existing architecture.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
-        "role": "plan",
+        "id": "default-implement",
+        "name": "Implement",
+        "prompt": "## Implement\n\nImplement the plan.\n\n### Outcome\n\nThe plan is implemented in a way that aligns with the project's purpose and architecture. Provide a brief summary organized by plan task: what changed, any important departures from the plan and why, and any unfinished work.\n\n### Guardrails\n\n- Follow established code patterns and put shared behavior in one place. Fix the underlying cause rather than each symptom separately.\n- Keep code focused on one responsibility and preserve stable interfaces where possible. Split mixed responsibilities into separate files. Keep files relatively small, under roughly 1,000 lines where possible.\n- Prefer clear, straightforward code and abstractions that make the behavior easier to understand and maintain.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
+        "role": "implement",
         "enabled": true,
         "scope": {
           "node_id": null
@@ -475,51 +492,11 @@
       "parameters": {}
     }
   ],
-  "state": "succeeded",
-  "results": {
-    "default-plan": {
-      "invocation_id": "c7d307b4260a7927e7b4488f181ad361c1a0543c8f9824e81a670c1d30b65416",
-      "binding_id": "default-plan",
-      "role": "plan",
-      "outcome": "success",
-      "summary": "Add a persistent New row immediately after Search and before Node. Its menu exposes existing creation commands without creating anything until an item is selected. Keep this within the browser surface; no new model or backend behavior is needed.\n\n1. Task #1 - Add the rail entry and menu. In src/surfaces/web/static/index.html, add a full-width New control inside .rail-global using the existing .nav-menu details/summary pattern, .rail-row styling, and bundled plus icon. Provide a stable, unique identifier, accessible New label, hover title, and appropriate menu semantics. List New Goal, New Plan, New Feature, and Import in that order. Keep existing creation shortcuts and their IDs intact.\n\n2. Task #2 - Dispatch existing commands. In js/common.js, add scoped, data-driven dispatch for the new menu items to goal.new, plan.open, feature.new, and goal.import. Close menus and call navigation.js's closeMobileNavigation before invoking the selected command so the workspace is no longer inert and the drawer focus trap is inactive. Let the selected flow establish focus. Invoke each command once, preserving its existing Node, Reporter, validation, drafts, confirmations, and error handling. Opening or dismissing New must never invoke a command; repeated New Plan selections must create independent sessions through the existing planning flow.\n\n3. Task #3 - Complete menu interaction and positioning. In js/navigation.js, integrate New with shared menu positioning and dismissal. Support Enter/Space opening, arrow-key navigation, Home/End, keyboard activation, and visible focus. Escape closes the menu and restores focus to New without also closing the mobile drawer; selection closes the menu without stealing focus from the destination. Preserve outside-click dismissal and ensure opening New closes other rail menus, including when opened by keyboard. In css/navigation.css, reuse expanded/collapsed rail styles and keep menu labels visible when the rail labels are hidden. Constrain the panel to the viewport in both dimensions, with scrolling when necessary, and reposition on resize, rail scroll, and collapse changes. Keep shared changes narrowly scoped to this interaction contract.\n\n4. Task #4 - Update navigation intent. After the behavior is established, update src/surfaces/refine-hub/docs/intent/05-surfaces/03-browser/02-nav.md with the Search → New → Node order, four actions, fresh Planning Agent behavior, and mobile handoff. Retain documentation of existing page, Search, Settings, and Tools entry points.\n\n5. Task #5 - Quality verification. Extend tests/web_navigation_browser.test.js and useful static assertions in src/surfaces/web_server/tests/static_surface/navigation.rs. Cover exact order, unique IDs, all four destinations, no creation on menu opening, repeated fresh Plan sessions, and preservation of selected Node/Reporter and retained sessions. Exercise keyboard focus, Escape, outside clicks, mutual menu exclusion, selection closure, and mobile inert/focus release before command execution. Check expanded and collapsed desktop rails, collapsed sections, and narrow/short viewports for clipping. Run focused browser and Rust checks, explicitly reporting browser skips. The existing static navigation test expects older markup absent from this checkout; establish baseline failures and distinguish them from regressions.\n\nThis invocation produces a plan only. Leave workflow transitions and integration to Refine; do not change Goal state in response to the embedded backlog note.\n\n",
-      "evidence": [
-        "Inspected checkout d7e38092; working tree is clean.",
-        "Verified all four shared commands exist and openPlanChatDock creates a fresh Plan tab.",
-        "Inspected rail menu positioning, dismissal, mobile focus handling, navigation styles, intent documentation, and relevant tests. No files or workflow state changed; tests were not run during planning."
-      ],
-      "artifacts": null
-    }
-  },
-  "attempts": [
-    {
-      "attempt": 0,
-      "binding_id": "default-plan",
-      "checkout": {
-        "observation": {
-          "branch": "refine/00000T19CHAJQGMYH5DRTAT000/round-1",
-          "head_commit": "d7e38092321b8d16b4cadba7c23057f1a7dc7e73",
-          "status_porcelain": []
-        },
-        "tree": "2c3713a19b54ea4c50e396e60e7d35ddfb9ea2f0"
-      },
-      "checkout_recorded": true,
-      "diagnostic": null,
-      "host_bound_result": true,
-      "observational_violation": false,
-      "operation_id": null,
-      "process_id": "proc-1789484187784-406787-1155",
-      "prompt_bytes": 11509,
-      "provider_session_id": null,
-      "purpose": "work",
-      "raw_output": "{\n  \"outcome\": \"success\",\n  \"artifacts\": null,\n  \"evidence\": [\n    \"Inspected checkout d7e38092; working tree is clean.\",\n    \"Verified all four shared commands exist and openPlanChatDock creates a fresh Plan tab.\",\n    \"Inspected rail menu positioning, dismissal, mobile focus handling, navigation styles, intent documentation, and relevant tests. No files or workflow state changed; tests were not run during planning.\"\n  ],\n  \"summary\": \"Add a persistent New row immediately after Search and before Node. Its menu exposes existing creation commands without creating anything until an item is selected. Keep this within the browser surface; no new model or backend behavior is needed.\\n\\n1. Task #1 - Add the rail entry and menu. In src/surfaces/web/static/index.html, add a full-width New control inside .rail-global using the existing .nav-menu details/summary pattern, .rail-row styling, and bundled plus icon. Provide a stable, unique identifier, accessible New label, hover title, and appropriate menu semantics. List New Goal, New Plan, New Feature, and Import in that order. Keep existing creation shortcuts and their IDs intact.\\n\\n2. Task #2 - Dispatch existing commands. In js/common.js, add scoped, data-driven dispatch for the new menu items to goal.new, plan.open, feature.new, and goal.import. Close menus and call navigation.js's closeMobileNavigation before invoking the selected command so the workspace is no longer inert and the drawer focus trap is inactive. Let the selected flow establish focus. Invoke each command once, preserving its existing Node, Reporter, validation, drafts, confirmations, and error handling. Opening or dismissing New must never invoke a command; repeated New Plan selections must create independent sessions through the existing planning flow.\\n\\n3. Task #3 - Complete menu interaction and positioning. In js/navigation.js, integrate New with shared menu positioning and dismissal. Support Enter/Space opening, arrow-key navigation, Home/End, keyboard activation, and visible focus. Escape closes the menu and restores focus to New without also closing the mobile drawer; selection closes the menu without stealing focus from the destination. Preserve outside-click dismissal and ensure opening New closes other rail menus, including when opened by keyboard. In css/navigation.css, reuse expanded/collapsed rail styles and keep menu labels visible when the rail labels are hidden. Constrain the panel to the viewport in both dimensions, with scrolling when necessary, and reposition on resize, rail scroll, and collapse changes. Keep shared changes narrowly scoped to this interaction contract.\\n\\n4. Task #4 - Update navigation intent. After the behavior is established, update src/surfaces/refine-hub/docs/intent/05-surfaces/03-browser/02-nav.md with the Search → New → Node order, four actions, fresh Planning Agent behavior, and mobile handoff. Retain documentation of existing page, Search, Settings, and Tools entry points.\\n\\n5. Task #5 - Quality verification. Extend tests/web_navigation_browser.test.js and useful static assertions in src/surfaces/web_server/tests/static_surface/navigation.rs. Cover exact order, unique IDs, all four destinations, no creation on menu opening, repeated fresh Plan sessions, and preservation of selected Node/Reporter and retained sessions. Exercise keyboard focus, Escape, outside clicks, mutual menu exclusion, selection closure, and mobile inert/focus release before command execution. Check expanded and collapsed desktop rails, collapsed sections, and narrow/short viewports for clipping. Run focused browser and Rust checks, explicitly reporting browser skips. The existing static navigation test expects older markup absent from this checkout; establish baseline failures and distinguish them from regressions.\\n\\nThis invocation produces a plan only. Leave workflow transitions and integration to Refine; do not change Goal state in response to the embedded backlog note.\\n\\n\"\n}",
-      "received_at": "2026-09-15T14:57:41.588461251+00:00",
-      "started_at": "2026-09-15T14:56:27.744852411+00:00",
-      "workflow_revision": 3
-    }
-  ],
-  "created_at": "2026-09-15T14:56:26.303425613+00:00",
-  "completed_at": "2026-09-15T14:57:42.834469466+00:00",
+  "state": "running",
+  "results": {},
+  "attempts": [],
+  "created_at": "2026-09-15T14:57:44.929283185+00:00",
+  "completed_at": null,
   "error": null,
   "action_applied": false
 }
