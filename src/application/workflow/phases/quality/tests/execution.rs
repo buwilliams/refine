@@ -16,7 +16,7 @@ fn quality_operation_settles_parsing_failure_and_persists_the_same_goal_evidence
     assert!(
         error
             .to_string()
-            .contains("invalid structured Skill completion result"),
+            .contains("invalid structured Skill completion report"),
         "error: {error}"
     );
     let operation = FileOperationRegistry::new(&fixture.runtime_root)
@@ -39,7 +39,7 @@ fn quality_operation_settles_parsing_failure_and_persists_the_same_goal_evidence
         operation.error.unwrap()["message"]
             .as_str()
             .unwrap()
-            .contains("invalid structured Skill completion result")
+            .contains("invalid structured Skill completion report")
     );
     let detail = FileWorkItemService::new(&fixture.refine_dir)
         .show_goal_detail("GOAL1")
@@ -52,7 +52,7 @@ fn quality_operation_settles_parsing_failure_and_persists_the_same_goal_evidence
         detail["rounds"][0]["quality_message"]
             .as_str()
             .unwrap()
-            .contains("invalid structured Skill completion result")
+            .contains("invalid structured Skill completion report")
     );
     restore_smoke_ai(previous);
     fs::remove_dir_all(fixture.temp_root).unwrap();

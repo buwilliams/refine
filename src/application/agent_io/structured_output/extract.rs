@@ -183,22 +183,19 @@ fn select_json_candidate(
     };
 
     let fenced = fenced_contents(output);
-    let spans = balanced_json_spans(output);
+    let spans = standalone_json_spans(output);
     let likely_suffix = likely_json_suffix(output);
     let mut candidates: Vec<(&str, Value)> = Vec::new();
     for candidate in fenced.iter().chain(spans.iter()) {
         let candidate = candidate.trim();
-        if let Ok(value) = serde_json::from_str::<Value>(candidate)
-            && !candidates.iter().any(|(_, seen)| *seen == value)
-        {
-            candidates.push((candidate, value));
-        }
-    }
-    if candidates.is_empty() {
-        for candidate in stringified_json_spans(output) {
-            if let Ok(value) = serde_json::from_str::<Value>(candidate)
-                && !candidates.iter().any(|(_, seen)| *seen == value)
-            {
+        if let Ok(mut value) = serde_json::from_str::<Value>(candidate) {
+            if matches!(options.selection, Selection::Single) {
+                // Each span is valid whole JSON, so this uses the direct parse
+                // path and bounded transport unwrapping, without scanning again.
+                // Equivalent direct and stringified responses are one candidate.
+                value = select_value(candidate, options)?;
+            }
+            if !candidates.iter().any(|(_, seen)| *seen == value) {
                 candidates.push((candidate, value));
             }
         }
@@ -253,7 +250,7 @@ fn select_json_candidate(
 }
 
 /// Every parseable JSON candidate in the output, in document order: the whole
-/// value when it parses, else fenced and balanced spans, else stringified
+/// value when it parses, else fenced and standalone object, array, or string
 /// spans. For lenient sites that probe each candidate with their own
 /// shape-specific derivation instead of one schema.
 pub fn json_candidates(output: &str, options: &DecodeOptions<'_>) -> Vec<Value> {
@@ -267,21 +264,12 @@ pub fn json_candidates(output: &str, options: &DecodeOptions<'_>) -> Vec<Value> 
     let mut candidates = Vec::new();
     for candidate in fenced_contents(output)
         .iter()
-        .chain(balanced_json_spans(output).iter())
+        .chain(standalone_json_spans(output).iter())
     {
         if let Ok(value) = serde_json::from_str::<Value>(candidate.trim())
             && !candidates.contains(&value)
         {
             candidates.push(value);
-        }
-    }
-    if candidates.is_empty() {
-        for candidate in stringified_json_spans(output) {
-            if let Ok(value) = serde_json::from_str::<Value>(candidate)
-                && !candidates.contains(&value)
-            {
-                candidates.push(value);
-            }
         }
     }
     candidates
@@ -336,16 +324,32 @@ fn fenced_contents(output: &str) -> Vec<&str> {
     contents
 }
 
-/// Every parseable balanced JSON span in `output`, in document order. An
+/// Standalone objects, arrays, and stringified JSON in document order. A valid
+/// span owns its nested content, including JSON-like strings. An
 /// opener that never balances, closes mismatched, or spans text that is not
 /// actually JSON only costs the scan that opener: it resumes right after it
 /// instead of swallowing the rest of the text, so values nested in prose
 /// braces are still found.
-fn balanced_json_spans(output: &str) -> Vec<&str> {
+fn standalone_json_spans(output: &str) -> Vec<&str> {
     let mut spans = Vec::new();
     let mut search_from = 0usize;
-    while let Some(relative) = output[search_from..].find(['{', '[']) {
+    while let Some(relative) = output[search_from..].find(['{', '[', '"']) {
         let start = search_from + relative;
+        if output.as_bytes()[start] == b'"' {
+            if let Some(end) = quoted_span_end(output, start) {
+                let span = &output[start..end];
+                if let Ok(Value::String(encoded)) = serde_json::from_str(span) {
+                    if serde_json::from_str::<Value>(&encoded).is_ok() {
+                        spans.push(span);
+                    }
+                    // A complete quoted string owns every brace within it.
+                    search_from = end;
+                    continue;
+                }
+            }
+            search_from = start + 1;
+            continue;
+        }
         match balanced_span_end(output, start) {
             Some(end) => {
                 let span = &output[start..=end];
@@ -396,35 +400,19 @@ fn balanced_span_end(output: &str, start: usize) -> Option<usize> {
     None
 }
 
-fn stringified_json_spans(output: &str) -> Vec<&str> {
-    let mut spans = Vec::new();
-    let mut offset = 0;
-    while let Some(relative_start) = output[offset..].find('"') {
-        let start = offset + relative_start;
-        let mut escaped = false;
-        let mut end = None;
-        for (relative_index, ch) in output[start + 1..].char_indices() {
-            if escaped {
-                escaped = false;
-            } else if ch == '\\' {
-                escaped = true;
-            } else if ch == '"' {
-                end = Some(start + 1 + relative_index + ch.len_utf8());
-                break;
-            }
+/// Exclusive end of a quoted span, respecting escaped quotes.
+fn quoted_span_end(output: &str, start: usize) -> Option<usize> {
+    let mut escaped = false;
+    for (relative_index, ch) in output[start + 1..].char_indices() {
+        if escaped {
+            escaped = false;
+        } else if ch == '\\' {
+            escaped = true;
+        } else if ch == '"' {
+            return Some(start + 1 + relative_index + ch.len_utf8());
         }
-        let Some(end) = end else {
-            break;
-        };
-        let candidate = &output[start..end];
-        if let Ok(Value::String(encoded)) = serde_json::from_str(candidate)
-            && serde_json::from_str::<Value>(&encoded).is_ok()
-        {
-            spans.push(candidate);
-        }
-        offset = end;
     }
-    spans
+    None
 }
 
 fn likely_json_suffix(output: &str) -> Option<&str> {
@@ -533,6 +521,30 @@ mod tests {
                 .to_string()
                 .contains("2 distinct JSON candidates")
         );
+    }
+
+    #[test]
+    fn mixed_direct_and_stringified_candidates_keep_top_level_ownership() {
+        for output in [
+            r#"first "{\"name\":\"one\",\"count\":1}" then {"name":"two","count":2}"#,
+            r#"first {"name":"two","count":2} then "{\"name\":\"one\",\"count\":1}""#,
+        ] {
+            let error = decode(output).unwrap_err().to_string();
+            assert!(error.contains("2 distinct JSON candidates"), "{error}");
+        }
+        let raw = r#"{"name":"ready","count":2,"details":{"quoted":"{}","result":{"name":"nested","count":3}}}"#;
+        for candidate in [raw.to_string(), serde_json::to_string(raw).unwrap()] {
+            let output = format!("Review complete. {candidate} Done.");
+            assert_eq!(decode(&output).unwrap().name, "ready");
+        }
+        let repeated = format!(
+            "Review: {raw} Repeated: {}",
+            serde_json::to_string(raw).unwrap()
+        );
+        assert_eq!(decode(&repeated).unwrap().name, "ready");
+        let options = DecodeOptions::new("fixture JSON");
+        let output = r#"first "{\"name\":\"one\",\"count\":1}" then {"name":"two","count":2}"#;
+        assert_eq!(json_candidates(output, &options).len(), 2);
     }
 
     #[test]

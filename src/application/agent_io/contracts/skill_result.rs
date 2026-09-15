@@ -28,6 +28,8 @@ impl crate::application::agent_io::structured_output::Contract for SkillResult {
 
 /// Provider-authored content. Routing identity belongs to the host invocation,
 /// not to text the model must transcribe from its prompt.
+/// This is the advertised schema; `decode_result` normalizes provider extensions
+/// before decoding the strict persisted result.
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct SkillReport {
@@ -65,26 +67,46 @@ pub(crate) fn decode_result(
     role: &str,
     host_bound: bool,
 ) -> crate::error::RefineResult<SkillResult> {
-    use crate::application::agent_io::structured_output::Contract;
-    use crate::error::RefineError;
-    let result = if let Some(report) = host_bound
-        .then(|| SkillReport::decode(output).ok())
-        .flatten()
-    {
-        SkillResult {
-            invocation_id: invocation_id.into(),
-            binding_id: binding_id.into(),
-            role: role.into(),
-            outcome: report.outcome,
-            summary: report.summary,
-            evidence: report.evidence,
-            artifacts: report.artifacts,
-        }
-    } else {
-        // Retained receipts from the old contract must still match exactly.
-        // Never silently correct a supplied identity, including partial IDs.
-        SkillResult::decode(output).map_err(|e| RefineError::Serialization(e.to_string()))?
+    use crate::application::agent_io::structured_output::{
+        Contract, DecodeOptions, decode_structured,
     };
+    use crate::error::RefineError;
+    let identity = [
+        ("invocation_id", invocation_id),
+        ("binding_id", binding_id),
+        ("role", role),
+    ];
+    let result: SkillResult = decode_structured(
+        output,
+        &DecodeOptions::with_envelopes(SkillReport::LABEL, SkillReport::ENVELOPE_FIELDS),
+        |value| {
+            if let Some(object) = value.as_object_mut() {
+                // Ignore provider extensions only at this boundary; persisted
+                // SkillResult records keep their strict schema.
+                object.retain(|key, _| {
+                    matches!(
+                        key.as_str(),
+                        "invocation_id"
+                            | "binding_id"
+                            | "role"
+                            | "outcome"
+                            | "summary"
+                            | "evidence"
+                            | "artifacts"
+                    )
+                });
+                // Any supplied identity selects the legacy path: all three
+                // fields must deserialize and match, even for new receipts.
+                if host_bound && !identity.iter().any(|(key, _)| object.contains_key(*key)) {
+                    for (key, expected) in identity {
+                        object.insert(key.into(), Value::String(expected.into()));
+                    }
+                }
+            }
+            Ok(())
+        },
+    )
+    .map_err(|e| RefineError::Serialization(e.to_string()))?;
     result
         .validate(invocation_id, binding_id, role)
         .map_err(RefineError::Serialization)?;
@@ -121,7 +143,8 @@ mod tests {
 
     #[test]
     fn explicit_legacy_identity_is_never_rebound_or_partially_accepted() {
-        let original = result_contract("host-invocation", "host-binding", "quality");
+        let mut original = result_contract("host-invocation", "host-binding", "quality");
+        original["checklist"] = json!([{"id":"P1"}]);
         for host_bound in [false, true] {
             assert!(
                 decode_result(
@@ -160,5 +183,152 @@ mod tests {
             }
         }
         assert!(decode_result(r#"{"outcome":"maybe"}"#, "i", "b", "quality", true).is_err());
+    }
+    #[test]
+    fn provider_extensions_are_tolerated_across_completion_transports() {
+        for host_bound in [false, true] {
+            let mut value = json!({"outcome":"failure","summary":"Found a defect",
+                "evidence":["check failed"],"artifacts":{"checklist":[{"id":"P1"}],
+                    "result":{"outcome":"success"},"quoted":r#"{"outcome":"error"}"#},
+                "checklist":[{"id":"ignored"}],"extra":{"nested":true}});
+            if !host_bound {
+                value["invocation_id"] = json!("i");
+                value["binding_id"] = json!("b");
+                value["role"] = json!("quality");
+            }
+            let raw = value.to_string();
+            for output in [
+                raw.clone(),
+                format!("```json\n{raw}\n```"),
+                format!("Review complete. {raw} Done."),
+                json!({"result":value}).to_string(),
+                json!({"skill_result":raw}).to_string(),
+                serde_json::to_string(&raw).unwrap(),
+                format!(
+                    "Review complete. {} Done.",
+                    serde_json::to_string(&raw).unwrap()
+                ),
+                format!("Review complete. ```json\n{raw}\n``` Done."),
+                format!("Repeated response: {raw} then {raw}"),
+            ] {
+                let result = decode_result(&output, "i", "b", "quality", host_bound).unwrap();
+                result.validate("i", "b", "quality").unwrap();
+                assert_eq!(result.outcome, "failure");
+                assert_eq!(result.summary, "Found a defect");
+                assert_eq!(result.evidence, ["check failed"]);
+                assert_eq!(result.artifacts, value["artifacts"]);
+            }
+            // Tolerance belongs to provider ingestion, not persisted records.
+            assert!(serde_json::from_value::<SkillResult>(value).is_err());
+        }
+    }
+
+    #[test]
+    fn malformed_content_keeps_actionable_diagnostics() {
+        for (field, value, diagnostic) in [
+            ("outcome", json!(42), "outcome"),
+            (
+                "outcome",
+                json!("maybe"),
+                "requires success, failure, or error",
+            ),
+            ("summary", json!([]), "summary"),
+            ("evidence", json!("check passed"), "evidence"),
+            ("evidence", json!([42]), "evidence[0]"),
+        ] {
+            for host_bound in [false, true] {
+                let mut report = json!({"outcome":"success","checklist":[]});
+                if !host_bound {
+                    report["invocation_id"] = json!("i");
+                    report["binding_id"] = json!("b");
+                    report["role"] = json!("quality");
+                }
+                report[field] = value.clone();
+                let error = decode_result(&report.to_string(), "i", "b", "quality", host_bound)
+                    .unwrap_err()
+                    .to_string();
+                assert!(error.contains(diagnostic), "{error}");
+            }
+        }
+        let error = decode_result(r#"{"checklist":[]}"#, "i", "b", "quality", true)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("missing field `outcome`"), "{error}");
+        for field in ["invocation_id", "binding_id", "role"] {
+            for value in [json!(null), json!(42), json!("i")] {
+                let mut report = json!({"outcome":"success","checklist":[]});
+                report[field] = value;
+                assert!(decode_result(&report.to_string(), "i", "b", "quality", true).is_err());
+            }
+        }
+    }
+
+    #[test]
+    fn distinct_completions_and_conflicting_envelopes_remain_ambiguous() {
+        for (raw, diagnostic) in [
+            (
+                r#"Review: {"outcome":"failure"} Final: {"outcome":"success"}"#,
+                "2 distinct JSON candidates",
+            ),
+            (
+                r#"{"result":{"outcome":"success"},"skill_result":{"outcome":"failure"}}"#,
+                "ambiguous completion envelope fields",
+            ),
+            (
+                r#"Review: "{\"outcome\":\"failure\"}" Final: {"outcome":"success"}"#,
+                "2 distinct JSON candidates",
+            ),
+            (
+                r#"Review: {"outcome":"success"} Earlier: "{\"outcome\":\"failure\"}""#,
+                "2 distinct JSON candidates",
+            ),
+            (
+                r#"Review: {"outcome":"success","checklist":[1]} Final: {"outcome":"success","checklist":[2]}"#,
+                "2 distinct JSON candidates",
+            ),
+        ] {
+            let error = decode_result(raw, "i", "b", "quality", true)
+                .unwrap_err()
+                .to_string();
+            assert!(error.contains(diagnostic), "{error}");
+        }
+    }
+
+    #[test]
+    fn provider_extensions_do_not_bypass_transport_bounds() {
+        use crate::application::agent_io::structured_output::DecodeOptions;
+        let options = DecodeOptions::new("Skill completion report");
+        let oversized = json!({"outcome":"success", "extra":"x".repeat(options.max_bytes)});
+        let mut nested = Value::Null;
+        for _ in 0..=options.max_depth {
+            nested = json!([nested]);
+        }
+        let deep = json!({"outcome":"success", "extra":nested});
+        let mut wrapped = json!({"outcome":"success", "checklist":[]});
+        for _ in 0..options.max_layers {
+            wrapped = json!({"result":wrapped});
+        }
+        assert!(decode_result(&wrapped.to_string(), "i", "b", "quality", true).is_ok());
+        let wrapped = json!({"result":wrapped});
+        let mut stringified = r#"{"outcome":"success","checklist":[]}"#.to_string();
+        for _ in 0..=options.max_layers {
+            stringified = serde_json::to_string(&stringified).unwrap();
+        }
+        for (output, diagnostic) in [
+            (oversized.to_string(), "maximum payload size"),
+            (deep.to_string(), "maximum JSON nesting depth"),
+            (
+                wrapped.to_string(),
+                "completion-envelope or stringification layers",
+            ),
+            (stringified, "completion-envelope or stringification layers"),
+        ] {
+            for transported in [output.clone(), format!("Review complete. {output} Done.")] {
+                let error = decode_result(&transported, "i", "b", "quality", true)
+                    .unwrap_err()
+                    .to_string();
+                assert!(error.contains(diagnostic), "{error}");
+            }
+        }
     }
 }

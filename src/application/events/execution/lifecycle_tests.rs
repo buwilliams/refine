@@ -284,7 +284,7 @@ fn malformed_lifecycle_completion_fails_once_without_repairing() {
         &script,
         source.replace(
             "print(json.dumps(result))\n",
-            "result['extra_field'] = 'invalid completion'\nprint(json.dumps(result))\n",
+            "result['outcome'] = 42\nprint(json.dumps(result))\n",
         ),
     )
     .unwrap();

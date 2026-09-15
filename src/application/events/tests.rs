@@ -182,7 +182,7 @@ fn ordered_independent_runs_collect_failure_preserve_evidence_and_do_not_replay(
     std::fs::write(&provider, r#"#!/usr/bin/env python3
 import json, sys, pathlib
 prompt = sys.argv[1]
-contract = json.loads(prompt.split('Refine completion contract (supplied by the system):\n', 1)[1].split('\nReturn one JSON', 1)[0])
+contract = json.JSONDecoder().raw_decode(prompt.split('Refine completion contract (supplied by the system):\n', 1)[1].lstrip())[0]
 contract['outcome'] = 'failure' if prompt.startswith('FAIL') else 'success'
 contract['summary'] = 'Observed ' + contract['outcome']
 path = pathlib.Path('launches.txt')
