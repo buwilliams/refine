@@ -481,11 +481,47 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "succeeded",
+  "results": {
+    "default-governance": {
+      "invocation_id": "a68af203187923bf0a4ff8cbcb68b079f5233dc349a0af0943c36d551eaebd84",
+      "binding_id": "default-governance",
+      "role": "governance",
+      "outcome": "success",
+      "summary": "Pass. Candidate 89b7397 meets the Goal, fits the architecture, and supports Refine’s purpose. New now uses the shared chevron from Node, Reporter, and Tools; all four menu actions use the existing Lucide sprite and icon styling. Labels, command bindings, accessibility semantics, and shared creation flows are preserved. The presentation-only change keeps responsibilities within the web surface and makes navigation more consistent and discoverable. Quality recorded 16 passing browser tests, a passing focused Rust test, and visual checks across three layouts and both themes. Reviewed screenshots and logs support those results. Two broader Rust failures also reproduce on the base commit; Quality reports formatting failures in unchanged files. No necessary corrections or optional improvements identified.",
+      "evidence": [],
+      "artifacts": null
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "default-governance",
+      "checkout": {
+        "observation": {
+          "branch": "refine/00000T19EKCJS2DHKCV3DXE001/round-1",
+          "head_commit": "89b7397010673c051fc4a153bb07ba3525b6c529",
+          "status_porcelain": []
+        },
+        "tree": "f362e9c6691b2bf39b674ab6b42111fab0cf0912"
+      },
+      "checkout_recorded": true,
+      "diagnostic": null,
+      "host_bound_result": true,
+      "observational_violation": false,
+      "operation_id": null,
+      "process_id": "proc-1789489081168-908613-2281",
+      "prompt_bytes": 7220,
+      "provider_session_id": null,
+      "purpose": "work",
+      "raw_output": "{\"outcome\":\"success\",\"summary\":\"Pass. Candidate 89b7397 meets the Goal, fits the architecture, and supports Refine’s purpose. New now uses the shared chevron from Node, Reporter, and Tools; all four menu actions use the existing Lucide sprite and icon styling. Labels, command bindings, accessibility semantics, and shared creation flows are preserved. The presentation-only change keeps responsibilities within the web surface and makes navigation more consistent and discoverable. Quality recorded 16 passing browser tests, a passing focused Rust test, and visual checks across three layouts and both themes. Reviewed screenshots and logs support those results. Two broader Rust failures also reproduce on the base commit; Quality reports formatting failures in unchanged files. No necessary corrections or optional improvements identified.\"}",
+      "received_at": "2026-09-15T16:19:04.446923771+00:00",
+      "started_at": "2026-09-15T16:18:01.138316158+00:00",
+      "workflow_revision": 2
+    }
+  ],
   "created_at": "2026-09-15T16:17:59.742993192+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-15T16:19:05.786220626+00:00",
   "error": null,
   "action_applied": false
 }

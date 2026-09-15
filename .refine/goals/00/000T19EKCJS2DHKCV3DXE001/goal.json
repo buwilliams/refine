@@ -3,10 +3,30 @@
   "branch_name": "refine/00000T19EKCJS2DHKCV3DXE001/round-1",
   "candidate_commit": "89b7397010673c051fc4a153bb07ba3525b6c529",
   "created": "2026-09-15T16:08:09Z",
-  "event_generation": 6,
+  "event_generation": 7,
   "feature_id": null,
   "feature_order": null,
   "id": "00000T19EKCJS2DHKCV3DXE001",
+  "integration_history": [
+    {
+      "complete": true,
+      "generation": 6,
+      "integration": {
+        "candidate_commit": "89b7397010673c051fc4a153bb07ba3525b6c529",
+        "integrated_at": "2026-09-15T16:19:11.798528528+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n src/surfaces/web/static/index.html                 |  9 +--\n .../web_server/tests/static_surface/navigation.rs  | 22 +++---\n tests/web_navigation_browser.test.js               | 84 +++++++++++++++++++++-\n 3 files changed, 102 insertions(+), 13 deletions(-)",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "168a3ee441505c98ae37cf584db2613575b1c206"
+      },
+      "round_idx": 0
+    }
+  ],
   "name": "The new menu item is missing a chevron indicating it is a drop-down. Add the che",
   "node_id": "default",
   "notes": [],
@@ -46,51 +66,43 @@
       "created": "2026-09-15T16:08:09Z",
       "event_configuration": {
         "events": {
-          "workflow.governance.enter": {
-            "bindings": [
-              {
-                "enabled": true,
-                "id": "default-governance",
-                "inputs": {},
-                "mode": "blocking",
-                "order": 0,
-                "overrides": null,
-                "scope": {
-                  "node_id": null
-                },
-                "skill_id": "default-governance"
-              }
-            ],
+          "workflow.governance.exit": {
+            "bindings": [],
             "enabled": true,
-            "id": "workflow.governance.enter",
+            "id": "workflow.governance.exit",
             "kind": "system",
-            "name": "Workflow Governance Enter",
+            "name": "Workflow Governance Exit",
             "on_success": null,
             "parameters": [],
             "scope": {
               "node_id": null
             },
-            "source": "workflow.governance.enter"
+            "source": "workflow.governance.exit"
           }
         },
         "revision": 82,
         "schema_version": 3,
-        "skills": {
-          "default-governance": {
-            "enabled": true,
-            "id": "default-governance",
-            "name": "Governance",
-            "parameters": [],
-            "prompt": "## Governance\n\nVerify that the implementation meets the user-defined Goal, fits the system architecture, and serves the project's purpose.\n\n### Outcome\n\nA clear assessment of whether the implementation satisfies all three. Begin with the verdict, then briefly explain how the work meets the Goal, fits the architecture, and supports the project's purpose, using concrete evidence from the implementation and Quality results. For each gap, describe what falls short, why it matters, and the recommended correction. Separate necessary corrections from optional improvements.\n\n### Guardrails\n\n- Read the context that helps explain the user's Goal, the system architecture, and the project's purpose.\n- Compare the implementation with the user's desired outcome as well as the plan. Completing the plan and passing tests alone do not establish that the Goal is met.\n- Look for clear responsibilities, shared behavior implemented in one place, and interfaces that remain easy to use and maintain.\n- Judge design choices by how they serve the project. Allow sound approaches that differ from personal preference.\n- Group related issues by their underlying cause so the next step can address them together.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
-            "provenance": "refine-default-v1",
-            "role": "task",
-            "scope": {
-              "node_id": null
-            }
-          }
-        }
+        "skills": {}
       },
       "event_results": {
+        "a68af203187923bf0a4ff8cbcb68b079f5233dc349a0af0943c36d551eaebd84": {
+          "candidate_commit": "89b7397010673c051fc4a153bb07ba3525b6c529",
+          "generation": 6,
+          "results": {
+            "default-governance": {
+              "artifacts": null,
+              "binding_id": "default-governance",
+              "evidence": [],
+              "invocation_id": "a68af203187923bf0a4ff8cbcb68b079f5233dc349a0af0943c36d551eaebd84",
+              "outcome": "success",
+              "role": "governance",
+              "summary": "Pass. Candidate 89b7397 meets the Goal, fits the architecture, and supports Refine’s purpose. New now uses the shared chevron from Node, Reporter, and Tools; all four menu actions use the existing Lucide sprite and icon styling. Labels, command bindings, accessibility semantics, and shared creation flows are preserved. The presentation-only change keeps responsibilities within the web surface and makes navigation more consistent and discoverable. Quality recorded 16 passing browser tests, a passing focused Rust test, and visual checks across three layouts and both themes. Reviewed screenshots and logs support those results. Two broader Rust failures also reproduce on the base commit; Quality reports formatting failures in unchanged files. No necessary corrections or optional improvements identified."
+            }
+          },
+          "round_idx": 0,
+          "source": "workflow.governance.enter",
+          "state": "succeeded"
+        },
         "b874ee377febd78cbcd653999d3408cfc9449e5ef0905c247cdad2595c1795f2": {
           "candidate_commit": null,
           "generation": 3,
@@ -472,8 +484,78 @@
               }
             }
           }
+        },
+        "6:default:workflow.governance.exit": {
+          "events": {
+            "workflow.governance.exit": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.governance.exit",
+              "kind": "system",
+              "name": "Workflow Governance Exit",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.governance.exit"
+            }
+          },
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {}
+        },
+        "6:default:workflow.governance.success": {
+          "events": {},
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {}
+        },
+        "7:default:workflow.review.enter": {
+          "events": {
+            "workflow.review.enter": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.review.enter",
+              "kind": "system",
+              "name": "Workflow Review Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.review.enter"
+            }
+          },
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {}
         }
       },
+      "governance_candidate_commit": "89b7397010673c051fc4a153bb07ba3525b6c529",
+      "governance_checked_at": "2026-09-15T16:19:06Z",
+      "governance_details": {
+        "candidate_commit": "89b7397010673c051fc4a153bb07ba3525b6c529",
+        "configured": true,
+        "failed_actions": [],
+        "phase": "post_implementation",
+        "skill_results": [
+          {
+            "artifacts": null,
+            "binding_id": "workflow.governance.enter:default-governance",
+            "evidence": [],
+            "invocation_id": "a68af203187923bf0a4ff8cbcb68b079f5233dc349a0af0943c36d551eaebd84",
+            "outcome": "success",
+            "role": "governance",
+            "summary": "Pass. Candidate 89b7397 meets the Goal, fits the architecture, and supports Refine’s purpose. New now uses the shared chevron from Node, Reporter, and Tools; all four menu actions use the existing Lucide sprite and icon styling. Labels, command bindings, accessibility semantics, and shared creation flows are preserved. The presentation-only change keeps responsibilities within the web surface and makes navigation more consistent and discoverable. Quality recorded 16 passing browser tests, a passing focused Rust test, and visual checks across three layouts and both themes. Reviewed screenshots and logs support those results. Two broader Rust failures also reproduce on the base commit; Quality reports formatting failures in unchanged files. No necessary corrections or optional improvements identified."
+          }
+        ],
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T19EKCJS2DHKCV3DXE001-round-1"
+      },
+      "governance_message": "Governance checks passed.",
+      "governance_recovery_analysis": null,
+      "governance_recovery_round_prompt": null,
+      "governance_rule_actions": [],
       "implementation_report": "workflow.implement.enter:default-implement: Task 1: Added New’s shared dropdown chevron. Task 2: Added the planned Lucide icons to all four actions, preserving labels, ordering, semantics, and command bindings. Existing CSS handles spacing and collapsed navigation. Task 3: Updated the static test; it and all four existing New-menu browser tests pass. Formatting and whitespace checks pass. No plan departures or unfinished implementation. Quality still needs the planned visual comparison across layouts and themes.",
       "implementation_reported_at": "2026-09-15T16:12:42Z",
       "logs": [],
@@ -650,19 +732,34 @@
       ],
       "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "updated": "2026-09-15T16:17:59Z",
+      "rule_state": "passed",
+      "updated": "2026-09-15T16:19:07Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-15T16:08:11Z",
         "generation": 2,
         "round_idx": 0,
         "workflow_revision": 2
       },
+      "workflow_git_remote": "origin",
+      "workflow_integration": {
+        "candidate_commit": "89b7397010673c051fc4a153bb07ba3525b6c529",
+        "integrated_at": "2026-09-15T16:19:11.798528528+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n src/surfaces/web/static/index.html                 |  9 +--\n .../web_server/tests/static_surface/navigation.rs  | 22 +++---\n tests/web_navigation_browser.test.js               | 84 +++++++++++++++++++++-\n 3 files changed, 102 insertions(+), 13 deletions(-)",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "168a3ee441505c98ae37cf584db2613575b1c206"
+      },
       "workspace_branch": "refine/00000T19EKCJS2DHKCV3DXE001/round-1"
     }
   ],
-  "status": "governance",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-09-15T16:17:59Z",
+  "updated": "2026-09-15T16:19:14Z",
   "workflow_controls": [
     {
       "actor": "operator",
@@ -736,7 +833,17 @@
       "round_idx": 0,
       "to": "governance",
       "workflow_revision": 30
+    },
+    {
+      "at": "2026-09-15T16:19:14.368543530+00:00",
+      "forced": false,
+      "from": "governance",
+      "generation": 7,
+      "node_id": "default",
+      "round_idx": 0,
+      "to": "review",
+      "workflow_revision": 39
     }
   ],
-  "workflow_revision": 31
+  "workflow_revision": 39
 }
