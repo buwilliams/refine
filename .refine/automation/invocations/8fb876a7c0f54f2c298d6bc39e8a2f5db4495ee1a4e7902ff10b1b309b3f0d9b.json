@@ -1,10 +1,10 @@
 {
-  "id": "7afa1101f09f97417b1978f7de35233093a76ab29beefd04deda588f931595eb",
+  "id": "8fb876a7c0f54f2c298d6bc39e8a2f5db4495ee1a4e7902ff10b1b309b3f0d9b",
   "event": {
-    "id": "workflow.quality.enter",
-    "name": "Workflow Quality Enter",
+    "id": "workflow.governance.enter",
+    "name": "Workflow Governance Enter",
     "kind": "system",
-    "source": "workflow.quality.enter",
+    "source": "workflow.governance.enter",
     "enabled": true,
     "scope": {
       "node_id": null
@@ -12,8 +12,8 @@
     "parameters": [],
     "bindings": [
       {
-        "id": "default-quality",
-        "skill_id": "default-quality",
+        "id": "default-governance",
+        "skill_id": "default-governance",
         "enabled": true,
         "mode": "blocking",
         "order": 0,
@@ -35,7 +35,7 @@
       "repository": "/home/buddy/projects/refine-next",
       "path": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T19PJVMBGJ0Y33NWRJ002-round-1",
       "branch": "refine/00000T19PJVMBGJ0Y33NWRJ002/round-1",
-      "commit": "8205e5dff5f6baef48fe5d110802d5b3a24b879d",
+      "commit": null,
       "allow_rebase": false,
       "registration": {
         "common_dir": "/home/buddy/projects/refine-next/.git",
@@ -50,6 +50,33 @@
     "workflow_revision": 12,
     "candidate_commit": "8205e5dff5f6baef48fe5d110802d5b3a24b879d",
     "data": {
+      "context": {
+        "assembled_at": "2026-09-15T20:50:13Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "Add the ability to configure the AI Providers. Today the Settings > Runtime has a dropdown for AI Provider. Users should be able to modify this configuration, supplying the path and parameters. They should be able to add new CLI agents too. The CLI will need {{context}} variable that Refine will use to send context into the CLI call. This feature will provide the users much more flexibility over the AI Provider. This will be saved at the refine-state system level, but the selected AI Provider at the refine-state node level, if absent will default to system defaults (where we convert what we have to this format). The goal here is that no code change is needed to support a new AI Provider.",
+          "reporter": "Buddy Williams",
+          "round": 1
+        },
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000T19PJVMBGJ0Y33NWRJ002",
+          "name": "Add the ability to configure the AI Providers. Today the Settings > Runtime has",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": false,
+          "constitution": "",
+          "product": "",
+          "rules": []
+        },
+        "guidance_candidates": [],
+        "previous_rounds": [],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree, the current Round, and available planning context. Follow the Goal and applicable Skill instructions and use your judgment to decide when to stop. Quality and Governance agents make their own decisions using their Skills before integration and human Review. Refine coordinates workflow transitions and Git actions. Do not directly advance Goal state, approve, merge, or push."
+      },
       "event": {},
       "goal": {
         "assignee": "Buddy Williams",
@@ -75,35 +102,37 @@
             "implementation_report": "workflow.implement.enter:default-implement: Implemented all seven plan tasks. Changes are retained for Quality; no Goal transitions, commits, merges, or pushes were performed.",
             "implementation_reported_at": "2026-09-15T21:28:02Z",
             "prompt": "Add the ability to configure the AI Providers. Today the Settings > Runtime has a dropdown for AI Provider. Users should be able to modify this configuration, supplying the path and parameters. They should be able to add new CLI agents too. The CLI will need {{context}} variable that Refine will use to send context into the CLI call. This feature will provide the users much more flexibility over the AI Provider. This will be saved at the refine-state system level, but the selected AI Provider at the refine-state node level, if absent will default to system defaults (where we convert what we have to this format). The goal here is that no code change is needed to support a new AI Provider.",
+            "quality_candidate_commit": "8205e5dff5f6baef48fe5d110802d5b3a24b879d",
+            "quality_message": "Quality Skills reported success.",
+            "quality_state": "passed",
             "reporter": "Buddy Williams",
-            "updated": "2026-09-15T21:45:52Z"
+            "updated": "2026-09-15T22:01:15Z"
           }
         ],
         "status": "governance",
         "target_branch": "main",
-        "updated": "2026-09-15T21:45:52Z",
+        "updated": "2026-09-15T22:01:15Z",
         "workflow_context": "",
-        "workflow_revision": 41
+        "workflow_revision": 45
       },
       "system": {
         "candidate_commit": "8205e5dff5f6baef48fe5d110802d5b3a24b879d",
         "node_id": "default",
         "project_root": "/home/buddy/projects/refine-next",
-        "workflow_step": "quality",
+        "refine_executable": "/home/buddy/projects/refine/bin/refine",
+        "workflow_step": "governance",
         "workspace": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T19PJVMBGJ0Y33NWRJ002-round-1"
-      },
-      "verification_only": true
+      }
     },
     "metadata": {
-      "behavior": "WorkflowQuality",
-      "candidate_commit": "8205e5dff5f6baef48fe5d110802d5b3a24b879d",
-      "event_operation_id": "1a0a708a530f7ad128",
+      "behavior": "EventSkill",
+      "event_operation_id": "1a0a716afa1f7ad129",
       "goal_id": "00000T19PJVMBGJ0Y33NWRJ002",
-      "kind": "quality",
+      "kind": "workflow",
       "managed_worktree": {
         "allow_rebase": false,
         "branch": "refine/00000T19PJVMBGJ0Y33NWRJ002/round-1",
-        "commit": "8205e5dff5f6baef48fe5d110802d5b3a24b879d",
+        "commit": null,
         "path": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T19PJVMBGJ0Y33NWRJ002-round-1",
         "registration": {
           "common_dir": "/home/buddy/projects/refine-next/.git",
@@ -113,12 +142,10 @@
         "repository": "/home/buddy/projects/refine-next"
       },
       "node_id": "default",
-      "operation_id": "1a0a7089a1ff7ad127",
       "provider": "codex",
       "round_idx": 0,
-      "runtime_root": "/home/buddy/projects/refine/run/8082",
       "started_bindings": {
-        "default-quality": "2026-09-15T21:45:59.115602541+00:00"
+        "default-governance": "2026-09-15T22:01:17.784928085+00:00"
       },
       "target_app_id": "/home/buddy/projects/refine-next",
       "template_snapshot": {
@@ -428,8 +455,8 @@
   "bindings": [
     {
       "binding": {
-        "id": "default-quality",
-        "skill_id": "default-quality",
+        "id": "default-governance",
+        "skill_id": "default-governance",
         "enabled": true,
         "mode": "blocking",
         "order": 0,
@@ -440,10 +467,10 @@
         "inputs": {}
       },
       "skill": {
-        "id": "default-quality",
-        "name": "Quality",
-        "prompt": "## Quality\n\nTest the implementation. Create and groom tests to cover the behavior described in the plan.\n\n### Outcome\n\nMeaningful tests cover the changed behavior and pass. Provide a brief report of the behavior tested, tests added or updated, commands run and their results, and any remaining failures or gaps. Include runtime or browser test results where useful. These results support Governance's verification of the work.\n\n### Guardrails\n\n- Test observable behavior, including relevant failure cases and effects on existing functionality. Tests should catch defects rather than mirror the implementation.\n- Keep useful tests, update tests for changed behavior, and remove obsolete or meaningless tests.\n- Investigate failures, correct problems in the implementation or tests, and rerun affected tests.\n- Choose tests suited to the change. Expand coverage when failures or affected behavior call for it.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
-        "role": "quality",
+        "id": "default-governance",
+        "name": "Governance",
+        "prompt": "## Governance\n\nVerify that the implementation meets the user-defined Goal, fits the system architecture, and serves the project's purpose.\n\n### Outcome\n\nA clear assessment of whether the implementation satisfies all three. Begin with the verdict, then briefly explain how the work meets the Goal, fits the architecture, and supports the project's purpose, using concrete evidence from the implementation and Quality results. For each gap, describe what falls short, why it matters, and the recommended correction. Separate necessary corrections from optional improvements.\n\n### Guardrails\n\n- Read the context that helps explain the user's Goal, the system architecture, and the project's purpose.\n- Compare the implementation with the user's desired outcome as well as the plan. Completing the plan and passing tests alone do not establish that the Goal is met.\n- Look for clear responsibilities, shared behavior implemented in one place, and interfaces that remain easy to use and maintain.\n- Judge design choices by how they serve the project. Allow sound approaches that differ from personal preference.\n- Group related issues by their underlying cause so the next step can address them together.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
+        "role": "governance",
         "enabled": true,
         "scope": {
           "node_id": null
@@ -454,77 +481,11 @@
       "parameters": {}
     }
   ],
-  "state": "succeeded",
-  "results": {
-    "default-quality": {
-      "invocation_id": "7afa1101f09f97417b1978f7de35233093a76ab29beefd04deda588f931595eb",
-      "binding_id": "default-quality",
-      "role": "quality",
-      "outcome": "success",
-      "summary": "Provider-scoped Quality passes for candidate 8205e5df. Meaningful tests cover the planned behavior, with no provider-specific failure found. Broader failures and the cleanup flake remain documented for Governance. No source, tests, Git state, or workflow transitions were changed.\n\n",
-      "evidence": [
-        "Verified clean worktree at candidate 8205e5dff5f6baef48fe5d110802d5b3a24b879d.",
-        "Focused Rust provider, invocation, synchronization, API, and CLI configuration checks: 31 passed.",
-        "NODE_PATH=/home/buddy/projects/refine/node_modules node --test --test-concurrency=2 tests/web_settings*.test.js: 26 passed, none skipped.",
-        "NODE_PATH=/home/buddy/projects/refine/node_modules node --test --test-concurrency=2 tests/*.test.js: 383 passed, one failed, none skipped.",
-        "cargo test --locked --lib --bins -- --test-threads=1: 1411 passed, 11 failed, seven ignored.",
-        "Isolated rerun of system_start_recovers_jira_export_and_public_retry_launches_supervised_worker: passed.",
-        "cargo check --locked --all-targets, cargo fmt --all -- --check, and candidate-versus-base git diff --check: passed."
-      ],
-      "artifacts": {
-        "coverage": [
-          "Catalog validation, migration, node inheritance, clearing overrides, concurrent edits, reference protection, and synchronization.",
-          "Configuration-only custom executables, paths containing spaces, exact argv/stdin, literal context substitution, updated parameters, built-in modes, and large-context transport.",
-          "Configured provider execution through real workflow Skills.",
-          "Runtime provider creation, editing, defaults, selection, deletion, reload, and draft retention after validation errors or conflicts."
-        ],
-        "failure_assessment": "These ten Rust failures and the browser failure match previously recorded diagnostics. Earlier baseline evidence was inspected; no fresh baseline suite was run. The additional Rust failure was DirectoryNotEmpty during Jira test cleanup and passed on isolated rerun.",
-        "limitations": [
-          "The complete suites are not green.",
-          "Browser tests use Chromium with fixture API responses; provider execution uses controlled executables.",
-          "Commercial provider authentication, external services, and the opt-in daemon-backed CLI integration suite were not exercised in this invocation."
-        ],
-        "remaining_failures": [
-          "Two synchronization assertions concerning default configuration and legacy-state cleanup.",
-          "Two subprocess assertions concerning launch-scope metadata and redacted process details.",
-          "Jira retry recovery remaining Interrupted.",
-          "Release preview expecting version 4.2.0 instead of 4.3.2.",
-          "Four static UI assertions concerning navigation, Guide targets, toolbar labels, and Goal reports.",
-          "Browser topbar border assertion: expected 1px, received 0px."
-        ],
-        "tests_changed": "None during this observational invocation. Reviewed and exercised the candidate's existing tests."
-      }
-    }
-  },
-  "attempts": [
-    {
-      "attempt": 0,
-      "binding_id": "default-quality",
-      "checkout": {
-        "observation": {
-          "branch": "refine/00000T19PJVMBGJ0Y33NWRJ002/round-1",
-          "head_commit": "8205e5dff5f6baef48fe5d110802d5b3a24b879d",
-          "status_porcelain": []
-        },
-        "tree": "8ac8f8b020c54d5fa8a8cffbd20a57886e98832c"
-      },
-      "checkout_recorded": true,
-      "diagnostic": null,
-      "host_bound_result": true,
-      "observational_violation": false,
-      "operation_id": "1a0a7089a1ff7ad127",
-      "process_id": "proc-1789508759441-1014481-41332",
-      "prompt_bytes": 5354,
-      "provider_session_id": null,
-      "purpose": "work",
-      "raw_output": "{\n  \"outcome\": \"success\",\n  \"evidence\": [\n    \"Verified clean worktree at candidate 8205e5dff5f6baef48fe5d110802d5b3a24b879d.\",\n    \"Focused Rust provider, invocation, synchronization, API, and CLI configuration checks: 31 passed.\",\n    \"NODE_PATH=/home/buddy/projects/refine/node_modules node --test --test-concurrency=2 tests/web_settings*.test.js: 26 passed, none skipped.\",\n    \"NODE_PATH=/home/buddy/projects/refine/node_modules node --test --test-concurrency=2 tests/*.test.js: 383 passed, one failed, none skipped.\",\n    \"cargo test --locked --lib --bins -- --test-threads=1: 1411 passed, 11 failed, seven ignored.\",\n    \"Isolated rerun of system_start_recovers_jira_export_and_public_retry_launches_supervised_worker: passed.\",\n    \"cargo check --locked --all-targets, cargo fmt --all -- --check, and candidate-versus-base git diff --check: passed.\"\n  ],\n  \"artifacts\": {\n    \"coverage\": [\n      \"Catalog validation, migration, node inheritance, clearing overrides, concurrent edits, reference protection, and synchronization.\",\n      \"Configuration-only custom executables, paths containing spaces, exact argv/stdin, literal context substitution, updated parameters, built-in modes, and large-context transport.\",\n      \"Configured provider execution through real workflow Skills.\",\n      \"Runtime provider creation, editing, defaults, selection, deletion, reload, and draft retention after validation errors or conflicts.\"\n    ],\n    \"tests_changed\": \"None during this observational invocation. Reviewed and exercised the candidate's existing tests.\",\n    \"remaining_failures\": [\n      \"Two synchronization assertions concerning default configuration and legacy-state cleanup.\",\n      \"Two subprocess assertions concerning launch-scope metadata and redacted process details.\",\n      \"Jira retry recovery remaining Interrupted.\",\n      \"Release preview expecting version 4.2.0 instead of 4.3.2.\",\n      \"Four static UI assertions concerning navigation, Guide targets, toolbar labels, and Goal reports.\",\n      \"Browser topbar border assertion: expected 1px, received 0px.\"\n    ],\n    \"failure_assessment\": \"These ten Rust failures and the browser failure match previously recorded diagnostics. Earlier baseline evidence was inspected; no fresh baseline suite was run. The additional Rust failure was DirectoryNotEmpty during Jira test cleanup and passed on isolated rerun.\",\n    \"limitations\": [\n      \"The complete suites are not green.\",\n      \"Browser tests use Chromium with fixture API responses; provider execution uses controlled executables.\",\n      \"Commercial provider authentication, external services, and the opt-in daemon-backed CLI integration suite were not exercised in this invocation.\"\n    ]\n  },\n  \"summary\": \"Provider-scoped Quality passes for candidate 8205e5df. Meaningful tests cover the planned behavior, with no provider-specific failure found. Broader failures and the cleanup flake remain documented for Governance. No source, tests, Git state, or workflow transitions were changed.\\n\\n\"\n}",
-      "received_at": "2026-09-15T22:01:10.628765022+00:00",
-      "started_at": "2026-09-15T21:45:59.405077229+00:00",
-      "workflow_revision": 12
-    }
-  ],
-  "created_at": "2026-09-15T21:45:55.890766417+00:00",
-  "completed_at": "2026-09-15T22:01:13.443838273+00:00",
+  "state": "running",
+  "results": {},
+  "attempts": [],
+  "created_at": "2026-09-15T22:01:16.491188819+00:00",
+  "completed_at": null,
   "error": null,
   "action_applied": false
 }

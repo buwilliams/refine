@@ -46,11 +46,11 @@
       "created": "2026-09-15T20:47:12Z",
       "event_configuration": {
         "events": {
-          "workflow.quality.enter": {
+          "workflow.governance.enter": {
             "bindings": [
               {
                 "enabled": true,
-                "id": "default-quality",
+                "id": "default-governance",
                 "inputs": {},
                 "mode": "blocking",
                 "order": 0,
@@ -58,30 +58,30 @@
                 "scope": {
                   "node_id": null
                 },
-                "skill_id": "default-quality"
+                "skill_id": "default-governance"
               }
             ],
             "enabled": true,
-            "id": "workflow.quality.enter",
+            "id": "workflow.governance.enter",
             "kind": "system",
-            "name": "Workflow Quality Enter",
+            "name": "Workflow Governance Enter",
             "on_success": null,
             "parameters": [],
             "scope": {
               "node_id": null
             },
-            "source": "workflow.quality.enter"
+            "source": "workflow.governance.enter"
           }
         },
         "revision": 82,
         "schema_version": 3,
         "skills": {
-          "default-quality": {
+          "default-governance": {
             "enabled": true,
-            "id": "default-quality",
-            "name": "Quality",
+            "id": "default-governance",
+            "name": "Governance",
             "parameters": [],
-            "prompt": "## Quality\n\nTest the implementation. Create and groom tests to cover the behavior described in the plan.\n\n### Outcome\n\nMeaningful tests cover the changed behavior and pass. Provide a brief report of the behavior tested, tests added or updated, commands run and their results, and any remaining failures or gaps. Include runtime or browser test results where useful. These results support Governance's verification of the work.\n\n### Guardrails\n\n- Test observable behavior, including relevant failure cases and effects on existing functionality. Tests should catch defects rather than mirror the implementation.\n- Keep useful tests, update tests for changed behavior, and remove obsolete or meaningless tests.\n- Investigate failures, correct problems in the implementation or tests, and rerun affected tests.\n- Choose tests suited to the change. Expand coverage when failures or affected behavior call for it.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
+            "prompt": "## Governance\n\nVerify that the implementation meets the user-defined Goal, fits the system architecture, and serves the project's purpose.\n\n### Outcome\n\nA clear assessment of whether the implementation satisfies all three. Begin with the verdict, then briefly explain how the work meets the Goal, fits the architecture, and supports the project's purpose, using concrete evidence from the implementation and Quality results. For each gap, describe what falls short, why it matters, and the recommended correction. Separate necessary corrections from optional improvements.\n\n### Guardrails\n\n- Read the context that helps explain the user's Goal, the system architecture, and the project's purpose.\n- Compare the implementation with the user's desired outcome as well as the plan. Completing the plan and passing tests alone do not establish that the Goal is met.\n- Look for clear responsibilities, shared behavior implemented in one place, and interfaces that remain easy to use and maintain.\n- Judge design choices by how they serve the project. Allow sound approaches that differ from personal preference.\n- Group related issues by their underlying cause so the next step can address them together.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
             "provenance": "refine-default-v1",
             "role": "task",
             "scope": {
@@ -94,6 +94,52 @@
       "failure_category": "",
       "failure_message": "",
       "gate_configurations": {
+        "10:default:workflow.governance.enter": {
+          "events": {
+            "workflow.governance.enter": {
+              "bindings": [
+                {
+                  "enabled": true,
+                  "id": "default-governance",
+                  "inputs": {},
+                  "mode": "blocking",
+                  "order": 0,
+                  "overrides": null,
+                  "scope": {
+                    "node_id": null
+                  },
+                  "skill_id": "default-governance"
+                }
+              ],
+              "enabled": true,
+              "id": "workflow.governance.enter",
+              "kind": "system",
+              "name": "Workflow Governance Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.governance.enter"
+            }
+          },
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {
+            "default-governance": {
+              "enabled": true,
+              "id": "default-governance",
+              "name": "Governance",
+              "parameters": [],
+              "prompt": "## Governance\n\nVerify that the implementation meets the user-defined Goal, fits the system architecture, and serves the project's purpose.\n\n### Outcome\n\nA clear assessment of whether the implementation satisfies all three. Begin with the verdict, then briefly explain how the work meets the Goal, fits the architecture, and supports the project's purpose, using concrete evidence from the implementation and Quality results. For each gap, describe what falls short, why it matters, and the recommended correction. Separate necessary corrections from optional improvements.\n\n### Guardrails\n\n- Read the context that helps explain the user's Goal, the system architecture, and the project's purpose.\n- Compare the implementation with the user's desired outcome as well as the plan. Completing the plan and passing tests alone do not establish that the Goal is met.\n- Look for clear responsibilities, shared behavior implemented in one place, and interfaces that remain easy to use and maintain.\n- Judge design choices by how they serve the project. Allow sound approaches that differ from personal preference.\n- Group related issues by their underlying cause so the next step can address them together.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
+              "provenance": "refine-default-v1",
+              "role": "task",
+              "scope": {
+                "node_id": null
+              }
+            }
+          }
+        },
         "10:default:workflow.quality.enter": {
           "events": {
             "workflow.quality.enter": {
@@ -685,6 +731,56 @@
         }
       ],
       "prompt": "Add the ability to configure the AI Providers. Today the Settings > Runtime has a dropdown for AI Provider. Users should be able to modify this configuration, supplying the path and parameters. They should be able to add new CLI agents too. The CLI will need {{context}} variable that Refine will use to send context into the CLI call. This feature will provide the users much more flexibility over the AI Provider. This will be saved at the refine-state system level, but the selected AI Provider at the refine-state node level, if absent will default to system defaults (where we convert what we have to this format). The goal here is that no code change is needed to support a new AI Provider.",
+      "quality_candidate_commit": "8205e5dff5f6baef48fe5d110802d5b3a24b879d",
+      "quality_checked_at": "2026-09-15T22:01:14Z",
+      "quality_details": {
+        "candidate_commit": "8205e5dff5f6baef48fe5d110802d5b3a24b879d",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T19PJVMBGJ0Y33NWRJ002-round-1",
+        "diagnostics": [
+          "Event invocation 7afa1101f09f97417b1978f7de35233093a76ab29beefd04deda588f931595eb: automation/invocations/7afa1101f09f97417b1978f7de35233093a76ab29beefd04deda588f931595eb.json"
+        ],
+        "evaluation_scope": "isolated_candidate",
+        "operation_id": "1a0a7089a1ff7ad127",
+        "provider_attempts": [],
+        "quality_proof": {
+          "checked_at": "2026-09-15T22:01:14Z",
+          "checked_candidate_commit": "8205e5dff5f6baef48fe5d110802d5b3a24b879d",
+          "evaluation_scope": "isolated_candidate",
+          "goal_id": "00000T19PJVMBGJ0Y33NWRJ002",
+          "operation_id": "1a0a7089a1ff7ad127",
+          "results": [
+            {
+              "command": "",
+              "evidence": "Provider-scoped Quality passes for candidate 8205e5df. Meaningful tests cover the planned behavior, with no provider-specific failure found. Broader failures and the cleanup flake remain documented for Governance. No source, tests, Git state, or workflow transitions were changed.\n\n",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality"
+            }
+          ],
+          "round_idx": 0,
+          "schema_version": 1,
+          "skills": {
+            "invocations": {
+              "workflow.quality.enter:default-quality": "7afa1101f09f97417b1978f7de35233093a76ab29beefd04deda588f931595eb"
+            },
+            "required_bindings": [
+              "workflow.quality.enter:default-quality"
+            ],
+            "requirements_id": "9fe971f6b60ac378d8ecd9e7e448b3fcb1ac096baf3723270caa2a43e20aec88"
+          },
+          "source_candidate_commit": "8205e5dff5f6baef48fe5d110802d5b3a24b879d",
+          "state": "passed"
+        },
+        "results": [
+          {
+            "command": "",
+            "evidence": "Provider-scoped Quality passes for candidate 8205e5df. Meaningful tests cover the planned behavior, with no provider-specific failure found. Broader failures and the cleanup flake remain documented for Governance. No source, tests, Git state, or workflow transitions were changed.\n\n",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality"
+          }
+        ],
+        "source_candidate_commit": "8205e5dff5f6baef48fe5d110802d5b3a24b879d"
+      },
+      "quality_message": "Quality Skills reported success.",
       "quality_requirements": {
         "candidate_commit": "8205e5dff5f6baef48fe5d110802d5b3a24b879d",
         "id": "9fe971f6b60ac378d8ecd9e7e448b3fcb1ac096baf3723270caa2a43e20aec88",
@@ -727,8 +823,9 @@
           }
         ]
       },
+      "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "updated": "2026-09-15T21:45:55Z",
+      "updated": "2026-09-15T22:01:15Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-15T20:50:12Z",
         "generation": 6,
@@ -930,7 +1027,7 @@
   ],
   "status": "governance",
   "target_branch": "main",
-  "updated": "2026-09-15T21:45:55Z",
+  "updated": "2026-09-15T22:01:15Z",
   "workflow_context": "",
   "workflow_controls": [
     {
@@ -1126,5 +1223,5 @@
       "workflow_revision": 40
     }
   ],
-  "workflow_revision": 43
+  "workflow_revision": 45
 }
