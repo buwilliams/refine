@@ -376,7 +376,8 @@ h1 {
 
 .compare-table {
   width: 100%;
-  min-width: 860px;
+  min-width: 1040px;
+  table-layout: fixed;
   border-collapse: collapse;
   font-size: 0.98rem;
 }
@@ -394,7 +395,7 @@ h1 {
   font-size: 0.86rem;
   font-weight: 750;
   letter-spacing: 0.04em;
-  text-transform: uppercase;
+  text-transform: none;
   color: var(--muted);
 }
 
@@ -416,15 +417,21 @@ h1 {
   color: var(--blue);
 }
 
-.compare-table .mark {
-  font-weight: 750;
+.compare-section a {
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
-.compare-table .mark.yes {
-  color: var(--blue);
+.compare-scroll:focus-visible,
+.compare-section a:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 3px;
 }
 
-.compare-table .mark.no {
+.compare-sources {
+  margin: 16px 0 0;
+  font-size: 0.88rem;
+  line-height: 1.6;
   color: var(--muted);
 }
 
