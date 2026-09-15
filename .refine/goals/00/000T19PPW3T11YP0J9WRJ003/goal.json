@@ -1,9 +1,9 @@
 {
   "base_commit": "9c7363164d582fac14e5076b24efdc47ec5f9461",
   "branch_name": "refine/00000T19PPW3T11YP0J9WRJ003/round-1",
-  "candidate_commit": null,
+  "candidate_commit": "0d59c513ee7f24e1d943046ac12f8a69e0d7692c",
   "created": "2026-09-15T20:51:35Z",
-  "event_generation": 4,
+  "event_generation": 5,
   "feature_id": null,
   "feature_order": null,
   "id": "00000T19PPW3T11YP0J9WRJ003",
@@ -46,11 +46,11 @@
       "created": "2026-09-15T20:51:35Z",
       "event_configuration": {
         "events": {
-          "workflow.implement.enter": {
+          "workflow.quality.enter": {
             "bindings": [
               {
                 "enabled": true,
-                "id": "default-implement",
+                "id": "default-quality",
                 "inputs": {},
                 "mode": "blocking",
                 "order": 0,
@@ -58,30 +58,30 @@
                 "scope": {
                   "node_id": null
                 },
-                "skill_id": "default-implement"
+                "skill_id": "default-quality"
               }
             ],
             "enabled": true,
-            "id": "workflow.implement.enter",
+            "id": "workflow.quality.enter",
             "kind": "system",
-            "name": "Workflow Implement Enter",
+            "name": "Workflow Quality Enter",
             "on_success": null,
             "parameters": [],
             "scope": {
               "node_id": null
             },
-            "source": "workflow.implement.enter"
+            "source": "workflow.quality.enter"
           }
         },
         "revision": 82,
         "schema_version": 3,
         "skills": {
-          "default-implement": {
+          "default-quality": {
             "enabled": true,
-            "id": "default-implement",
-            "name": "Implement",
+            "id": "default-quality",
+            "name": "Quality",
             "parameters": [],
-            "prompt": "## Implement\n\nImplement the plan.\n\n### Outcome\n\nThe plan is implemented in a way that aligns with the project's purpose and architecture. Provide a brief summary organized by plan task: what changed, any important departures from the plan and why, and any unfinished work.\n\n### Guardrails\n\n- Follow established code patterns and put shared behavior in one place. Fix the underlying cause rather than each symptom separately.\n- Keep code focused on one responsibility and preserve stable interfaces where possible. Split mixed responsibilities into separate files. Keep files relatively small, under roughly 1,000 lines where possible.\n- Prefer clear, straightforward code and abstractions that make the behavior easier to understand and maintain.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
+            "prompt": "## Quality\n\nTest the implementation. Create and groom tests to cover the behavior described in the plan.\n\n### Outcome\n\nMeaningful tests cover the changed behavior and pass. Provide a brief report of the behavior tested, tests added or updated, commands run and their results, and any remaining failures or gaps. Include runtime or browser test results where useful. These results support Governance's verification of the work.\n\n### Guardrails\n\n- Test observable behavior, including relevant failure cases and effects on existing functionality. Tests should catch defects rather than mirror the implementation.\n- Keep useful tests, update tests for changed behavior, and remove obsolete or meaningless tests.\n- Investigate failures, correct problems in the implementation or tests, and rerun affected tests.\n- Choose tests suited to the change. Expand coverage when failures or affected behavior call for it.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
             "provenance": "refine-default-v1",
             "role": "task",
             "scope": {
@@ -91,6 +91,29 @@
         }
       },
       "event_results": {
+        "417ec4da795780c4ea5d7ba15747bdaba066d93d00d58e30e0e3cff0865c4fa4": {
+          "candidate_commit": null,
+          "generation": 4,
+          "results": {
+            "default-implement": {
+              "artifacts": {
+                "memory_context": ""
+              },
+              "binding_id": "default-implement",
+              "evidence": [
+                "NODE_PATH=/home/buddy/projects/refine/node_modules node --test tests/web_goal_human_controls.test.js — passed.",
+                "git diff --check — passed."
+              ],
+              "invocation_id": "417ec4da795780c4ea5d7ba15747bdaba066d93d00d58e30e0e3cff0865c4fa4",
+              "outcome": "success",
+              "role": "implement",
+              "summary": "Task #1: Primary action now derives its label and target from current status: Backlog → Todo, Review → Done, Failed → Todo, Cancelled → Failed; other statuses default to Todo.\nTask #2: Updated the Goal surface intent document.\nTask #3: Browser verification passed for all mappings, fallback statuses, refreshed revisions, dropdown availability, and Review → Done using the move endpoint.\nNo implementation departures or unfinished work. Tests used the existing Playwright installation via NODE_PATH."
+            }
+          },
+          "round_idx": 0,
+          "source": "workflow.implement.enter",
+          "state": "succeeded"
+        },
         "604b87bebdcf5aa5b9b5ce1e1d6f9348256f4ba0f4baf85262b0b591d5549df8": {
           "candidate_commit": null,
           "generation": 3,
@@ -283,8 +306,82 @@
               }
             }
           }
+        },
+        "4:default:workflow.implement.exit": {
+          "events": {
+            "workflow.implement.exit": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.implement.exit",
+              "kind": "system",
+              "name": "Workflow Implement Exit",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.implement.exit"
+            }
+          },
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {}
+        },
+        "4:default:workflow.implement.success": {
+          "events": {},
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {}
+        },
+        "5:default:workflow.quality.enter": {
+          "events": {
+            "workflow.quality.enter": {
+              "bindings": [
+                {
+                  "enabled": true,
+                  "id": "default-quality",
+                  "inputs": {},
+                  "mode": "blocking",
+                  "order": 0,
+                  "overrides": null,
+                  "scope": {
+                    "node_id": null
+                  },
+                  "skill_id": "default-quality"
+                }
+              ],
+              "enabled": true,
+              "id": "workflow.quality.enter",
+              "kind": "system",
+              "name": "Workflow Quality Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.quality.enter"
+            }
+          },
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {
+            "default-quality": {
+              "enabled": true,
+              "id": "default-quality",
+              "name": "Quality",
+              "parameters": [],
+              "prompt": "## Quality\n\nTest the implementation. Create and groom tests to cover the behavior described in the plan.\n\n### Outcome\n\nMeaningful tests cover the changed behavior and pass. Provide a brief report of the behavior tested, tests added or updated, commands run and their results, and any remaining failures or gaps. Include runtime or browser test results where useful. These results support Governance's verification of the work.\n\n### Guardrails\n\n- Test observable behavior, including relevant failure cases and effects on existing functionality. Tests should catch defects rather than mirror the implementation.\n- Keep useful tests, update tests for changed behavior, and remove obsolete or meaningless tests.\n- Investigate failures, correct problems in the implementation or tests, and rerun affected tests.\n- Choose tests suited to the change. Expand coverage when failures or affected behavior call for it.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
+              "provenance": "refine-default-v1",
+              "role": "task",
+              "scope": {
+                "node_id": null
+              }
+            }
+          }
         }
       },
+      "implementation_report": "workflow.implement.enter:default-implement: Task #1: Primary action now derives its label and target from current status: Backlog → Todo, Review → Done, Failed → Todo, Cancelled → Failed; other statuses default to Todo.\nTask #2: Updated the Goal surface intent document.\nTask #3: Browser verification passed for all mappings, fallback statuses, refreshed revisions, dropdown availability, and Review → Done using the move endpoint.\nNo implementation departures or unfinished work. Tests used the existing Playwright installation via NODE_PATH.",
+      "implementation_reported_at": "2026-09-15T20:54:35Z",
       "logs": [],
       "prior_attempts": [
         {
@@ -341,7 +438,7 @@
       ],
       "prompt": "The Goal Modal for the Workflow Step Action currently shows the Todo as the default option, but it really should show the next logical action based on the current workflow step:\nBacklog > Todo\nReview > Done\nFailed > Todo\nCancelled > Failed",
       "reporter": "Buddy Williams",
-      "updated": "2026-09-15T20:52:47Z",
+      "updated": "2026-09-15T20:54:37Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-15T20:51:37Z",
         "generation": 2,
@@ -351,9 +448,9 @@
       "workspace_branch": "refine/00000T19PPW3T11YP0J9WRJ003/round-1"
     }
   ],
-  "status": "implement",
+  "status": "quality",
   "target_branch": "main",
-  "updated": "2026-09-15T20:52:47Z",
+  "updated": "2026-09-15T20:54:37Z",
   "workflow_controls": [
     {
       "actor": "operator",
@@ -407,7 +504,17 @@
       "round_idx": 0,
       "to": "implement",
       "workflow_revision": 13
+    },
+    {
+      "at": "2026-09-15T20:54:37.206056956+00:00",
+      "forced": false,
+      "from": "implement",
+      "generation": 5,
+      "node_id": "default",
+      "round_idx": 0,
+      "to": "quality",
+      "workflow_revision": 20
     }
   ],
-  "workflow_revision": 14
+  "workflow_revision": 21
 }
