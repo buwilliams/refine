@@ -570,11 +570,157 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "failed",
+  "results": {
+    "default-implement": {
+      "invocation_id": "f27731f1015fbc035daf3b076d50036d3b62a3119f0af33a786b3bc09f25e73e",
+      "binding_id": "default-implement",
+      "role": "implement",
+      "outcome": "failure",
+      "summary": "Partial implementation is retained for follow-up. The complete plan is not implemented or validated. The main outstanding work is paid admission integration, automatic provider handoff and recovery, complete surface integration, and resolution of required test failures.\n\n",
+      "evidence": [
+        "Passed cargo check, 38 focused Rust tests, 3 browser settings tests, and git diff --check.",
+        "Initial cargo test: 1,385 passed, 38 failed, 7 ignored; this run preceded subsequent fixes.",
+        "cargo test -- --full: 1,395 passed, 29 failed, 7 ignored. The harness stopped during unit testing; later stages did not run.",
+        "Eight diagnostic tests passed after removing inherited Refine execution variables from child commands. Overlapping diagnostic compilation also affected the full run. These findings do not establish that the remaining failures are baseline failures.",
+        "The validation report records exact failures, logs, qualifications, and outstanding work. No real paid requests or live Goal state mutations were performed."
+      ],
+      "artifacts": {
+        "tasks": [
+          {
+            "id": "P1",
+            "status": "implemented",
+            "summary": "Added provider definitions, command templates, credential references, policies, availability, decisions, attempts, integer budgets, and validation."
+          },
+          {
+            "id": "P2",
+            "status": "partial",
+            "summary": "Added revision-checked shared catalogs, legacy configuration migration, node inheritance, and synchronization support. Fleet migration and reconciliation coverage remain incomplete."
+          },
+          {
+            "id": "P3",
+            "status": "partial",
+            "summary": "Added configurable commands, prompt transports, local credentials, streaming secret redaction, and structured output adapters. Interactive and detached launches with credential references remain unsupported."
+          },
+          {
+            "id": "P4",
+            "status": "partial",
+            "summary": "Added selection precedence, subscription ordering, bounded probes, capacity caching, and cooldowns. Automatic switching and recoverable capacity scheduling remain unfinished."
+          },
+          {
+            "id": "P5",
+            "status": "partial",
+            "summary": "Implemented a Git compare-and-swap budget ledger and concurrent admission tests. Launch admission and settlement are not connected; configured paid launches remain blocked to prevent unreserved spending."
+          },
+          {
+            "id": "P6",
+            "status": "partial",
+            "summary": "Captured launches retain pinned provider decisions, attempt records, and process receipts. Cross-provider handoff, restart recovery, session compatibility, and integration across every entry point remain unfinished."
+          },
+          {
+            "id": "P7",
+            "status": "partial",
+            "summary": "Added catalog CLI/API operations, browser editing, catalog-backed selection, and inheritance controls. Complete attempt-history and spending views remain unfinished."
+          },
+          {
+            "id": "P8",
+            "status": "partial",
+            "summary": "Added focused tests and operational documentation. Required suites failed; the complete subscription-to-paid-to-subscription restart demonstration remains unfinished."
+          }
+        ],
+        "validation_report": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T19EJ0CNGHM85RBDXE000-round-1/target/provider-checks/validation.json"
+      }
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "default-implement",
+      "checkout": {
+        "observation": {
+          "branch": "refine/00000T19EJ0CNGHM85RBDXE000/round-1",
+          "head_commit": "9c7363164d582fac14e5076b24efdc47ec5f9461",
+          "status_porcelain": [
+            " M src/application/agent_io/prompt_transport/mod.rs",
+            " M src/application/agents/provider_selection/mod.rs",
+            " M src/application/agents/sessions/session_runtime.rs",
+            " M src/application/persistence_sync/state/state_codec.rs",
+            " M src/application/persistence_sync/state/tests/remote.rs",
+            " M src/application/persistence_sync/state/tests/synchronization.rs",
+            " M src/application/persistence_sync/state_merge/mod.rs",
+            " M src/infrastructure/agents/discovery/mod.rs",
+            " M src/infrastructure/agents/invocation/mod.rs",
+            " M src/infrastructure/agents/invocation/service.rs",
+            " M src/infrastructure/agents/invocation/service/resume.rs",
+            " M src/infrastructure/agents/invocation/tests.rs",
+            " M src/infrastructure/agents/mod.rs",
+            " M src/infrastructure/agents/output_parser/mod.rs",
+            " M src/infrastructure/git/mod.rs",
+            " M src/infrastructure/git/repository/mod.rs",
+            " M src/infrastructure/process/launch_environment/mod.rs",
+            " M src/infrastructure/process/subprocess/capture.rs",
+            " M src/infrastructure/process/subprocess/execution.rs",
+            " M src/infrastructure/process/subprocess/mod.rs",
+            " M src/infrastructure/process/subprocess/tests/capture.rs",
+            " M src/infrastructure/process/supervisor/config/settings.rs",
+            " M src/infrastructure/process/supervisor/config/settings_codec.rs",
+            " M src/infrastructure/process/supervisor/config/settings_sections.rs",
+            " M src/model/mod.rs",
+            " M src/surfaces/cli/actions.rs",
+            " M src/surfaces/cli/actions/agents.rs",
+            " M src/surfaces/cli/dispatch/agents.rs",
+            " M src/surfaces/refine-hub/docs/intent/03-application/01-agents/00-overview.md",
+            " M src/surfaces/refine-hub/docs/intent/03-application/04-persistence-sync.md",
+            " M src/surfaces/refine-hub/docs/intent/05-surfaces/03-browser/12-settings.md",
+            " M src/surfaces/refine-hub/docs/runbooks/README.md",
+            " M src/surfaces/web/static/js/features/settings.js",
+            " M src/surfaces/web/static/js/features/settings_runtime.js",
+            " M src/surfaces/web_server/operation_routes.rs",
+            " M src/surfaces/web_server/operation_routes/agents.rs",
+            " M src/surfaces/web_server/server.rs",
+            " M src/surfaces/web_server/tests/agents_chat/agents.rs",
+            " M tests/web_settings_runtime.test.js",
+            "?? src/application/agents/provider_selection/attempts.rs",
+            "?? src/application/agents/provider_selection/availability.rs",
+            "?? src/application/agents/provider_selection/catalog.rs",
+            "?? src/application/agents/provider_selection/defaults.rs",
+            "?? src/application/agents/provider_selection/model_tests.rs",
+            "?? src/application/agents/provider_selection/selection.rs",
+            "?? src/application/agents/provider_selection/tests.rs",
+            "?? src/infrastructure/agents/credentials.rs",
+            "?? src/infrastructure/agents/invocation/service/configuration.rs",
+            "?? src/infrastructure/agents/invocation/service/probe.rs",
+            "?? src/infrastructure/agents/invocation/tests/configured.rs",
+            "?? src/infrastructure/agents/output_parser/configured.rs",
+            "?? src/infrastructure/git/budgets.rs",
+            "?? src/infrastructure/git/budgets/tests.rs",
+            "?? src/infrastructure/process/subprocess/redaction.rs",
+            "?? src/model/providers/budget.rs",
+            "?? src/model/providers/mod.rs",
+            "?? src/model/providers/validation.rs",
+            "?? src/surfaces/refine-hub/docs/runbooks/provider-configuration.md",
+            "?? src/surfaces/web_server/operation_routes/provider_catalog.rs"
+          ]
+        },
+        "tree": "72b2fcbae3f5021c8aa64f1f737aae7af3fe73df"
+      },
+      "checkout_recorded": true,
+      "diagnostic": null,
+      "host_bound_result": true,
+      "observational_violation": false,
+      "operation_id": null,
+      "process_id": "proc-1789505568150-1014481-26892",
+      "prompt_bytes": 19256,
+      "provider_session_id": null,
+      "purpose": "work",
+      "raw_output": "{\n  \"outcome\": \"failure\",\n  \"artifacts\": {\n    \"tasks\": [\n      {\n        \"id\": \"P1\",\n        \"status\": \"implemented\",\n        \"summary\": \"Added provider definitions, command templates, credential references, policies, availability, decisions, attempts, integer budgets, and validation.\"\n      },\n      {\n        \"id\": \"P2\",\n        \"status\": \"partial\",\n        \"summary\": \"Added revision-checked shared catalogs, legacy configuration migration, node inheritance, and synchronization support. Fleet migration and reconciliation coverage remain incomplete.\"\n      },\n      {\n        \"id\": \"P3\",\n        \"status\": \"partial\",\n        \"summary\": \"Added configurable commands, prompt transports, local credentials, streaming secret redaction, and structured output adapters. Interactive and detached launches with credential references remain unsupported.\"\n      },\n      {\n        \"id\": \"P4\",\n        \"status\": \"partial\",\n        \"summary\": \"Added selection precedence, subscription ordering, bounded probes, capacity caching, and cooldowns. Automatic switching and recoverable capacity scheduling remain unfinished.\"\n      },\n      {\n        \"id\": \"P5\",\n        \"status\": \"partial\",\n        \"summary\": \"Implemented a Git compare-and-swap budget ledger and concurrent admission tests. Launch admission and settlement are not connected; configured paid launches remain blocked to prevent unreserved spending.\"\n      },\n      {\n        \"id\": \"P6\",\n        \"status\": \"partial\",\n        \"summary\": \"Captured launches retain pinned provider decisions, attempt records, and process receipts. Cross-provider handoff, restart recovery, session compatibility, and integration across every entry point remain unfinished.\"\n      },\n      {\n        \"id\": \"P7\",\n        \"status\": \"partial\",\n        \"summary\": \"Added catalog CLI/API operations, browser editing, catalog-backed selection, and inheritance controls. Complete attempt-history and spending views remain unfinished.\"\n      },\n      {\n        \"id\": \"P8\",\n        \"status\": \"partial\",\n        \"summary\": \"Added focused tests and operational documentation. Required suites failed; the complete subscription-to-paid-to-subscription restart demonstration remains unfinished.\"\n      }\n    ],\n    \"validation_report\": \"/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T19EJ0CNGHM85RBDXE000-round-1/target/provider-checks/validation.json\"\n  },\n  \"evidence\": [\n    \"Passed cargo check, 38 focused Rust tests, 3 browser settings tests, and git diff --check.\",\n    \"Initial cargo test: 1,385 passed, 38 failed, 7 ignored; this run preceded subsequent fixes.\",\n    \"cargo test -- --full: 1,395 passed, 29 failed, 7 ignored. The harness stopped during unit testing; later stages did not run.\",\n    \"Eight diagnostic tests passed after removing inherited Refine execution variables from child commands. Overlapping diagnostic compilation also affected the full run. These findings do not establish that the remaining failures are baseline failures.\",\n    \"The validation report records exact failures, logs, qualifications, and outstanding work. No real paid requests or live Goal state mutations were performed.\"\n  ],\n  \"summary\": \"Partial implementation is retained for follow-up. The complete plan is not implemented or validated. The main outstanding work is paid admission integration, automatic provider handoff and recovery, complete surface integration, and resolution of required test failures.\\n\\n\"\n}",
+      "received_at": "2026-09-15T21:58:18.196820008+00:00",
+      "started_at": "2026-09-15T20:52:48.091388087+00:00",
+      "workflow_revision": 15
+    }
+  ],
   "created_at": "2026-09-15T20:52:45.993572924+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-15T21:58:20.275678409+00:00",
   "error": null,
   "action_applied": false
 }
