@@ -5,7 +5,7 @@ const { chromium } = require("playwright");
 
 // Real DOM clicks exercise the production renderer and handlers. Only unrelated
 // modal services and HTTP transport are stubbed; no live Goals are mutated.
-test("every Goal step is selectable and Round deletion uses its inspected revision", async () => {
+test("Goal actions follow current status, retain every step, and recover from rejected moves", async () => {
   const browser = await chromium.launch({ headless: true });
   try {
     const page = await browser.newPage();
@@ -29,10 +29,16 @@ test("every Goal step is selectable and Round deletion uses its inspected revisi
       for (const name of ["computeFailureBanner", "computeGovernanceBanner", "computeFeatureBlockingNotice"]) window[name] = () => null;
       window.renderWorkflowOutcome = () => "";
       window.hubId = () => "test-request";
-      window.toast = () => {};
+      window.toasts = [];
+      window.toast = message => toasts.push(message);
       window.errors = [];
       window.requests = [];
-      window.api = async (method, path, body) => { requests.push({ method, path, body }); return {}; };
+      window.apiError = null;
+      window.api = async (method, path, body) => {
+        requests.push({ method, path, body });
+        if (apiError) throw new Error(apiError);
+        return {};
+      };
       window.showActionError = e => errors.push(e.message);
       window.confirmDeletion = true;
       window.modalConfirm = async () => confirmDeletion;
@@ -44,7 +50,8 @@ test("every Goal step is selectable and Round deletion uses its inspected revisi
       window.realComputeFailureBanner = computeFailureBanner;
       for (const name of ["computeFailureBanner", "computeGovernanceBanner", "computeFeatureBlockingNotice"]) window[name] = () => null;
       goalDetailContainer = () => document.querySelector("#body");
-      loadGoalDetail = async () => {};
+      window.reloads = [];
+      loadGoalDetail = async id => { reloads.push(id); };
       window.realBindRoundFormSubmit = bindRoundFormSubmit;
       bindRoundFormSubmit = () => {};
       window.goal = { id: "GOAL1", name: "Repair", status: "failed", workflow_revision: 42, workflow_controls: [{ source_round: 2, at: "today", from: "failed", to: "todo", request: { reason: "Retry after repair" } }],
@@ -156,6 +163,40 @@ test("every Goal step is selectable and Round deletion uses its inspected revisi
       assert.deepEqual(await page.locator(".goal-step-menu [data-goal-step]").evaluateAll(buttons => buttons.map(button => button.dataset.goalStep)),
         ["backlog", "todo", "plan", "implement", "quality", "governance", "review", "done", "failed", "cancelled"]);
     }
+    // A rejected move must surface its error without claiming success. A later
+    // refresh must let the same modal submit the new action and revision.
+    await page.evaluate(() => {
+      goal = { ...goal, status: "review", workflow_revision: 60 };
+      drawGoalDetail(goal);
+      apiError = "Workflow revision changed; refresh and retry";
+      requests.length = 0;
+      toasts.length = 0;
+      reloads.length = 0;
+    });
+    await page.getByTestId("goal-step-primary").click();
+    await page.waitForFunction(() => errors.length === 1);
+    assert.deepEqual(await page.evaluate(() => errors), ["Workflow revision changed; refresh and retry"]);
+    assert.deepEqual(await page.evaluate(() => toasts), []);
+    assert.deepEqual(await page.evaluate(() => reloads), []);
+    assert.equal(await page.getByTestId("goal-step-primary").textContent(), "Done");
+    await page.evaluate(() => {
+      apiError = null;
+      errors.length = 0;
+      goal = { ...goal, status: "cancelled", workflow_revision: 61 };
+      drawGoalDetail(goal);
+    });
+    assert.equal(await page.getByTestId("goal-step-primary").textContent(), "Failed");
+    await page.getByTestId("goal-step-primary").click();
+    await page.waitForFunction(() => reloads.length === 1);
+    assert.deepEqual(await page.evaluate(() => requests.map(request => ({
+      method: request.method, path: request.path,
+      to: request.body.to, revision: request.body.expected_revision,
+    }))), [
+      { method: "POST", path: "/api/workflow/goals/GOAL1/move", to: "done", revision: 60 },
+      { method: "POST", path: "/api/workflow/goals/GOAL1/move", to: "failed", revision: 61 },
+    ]);
+    assert.deepEqual(await page.evaluate(() => toasts), ["Moved to Failed"]);
+    assert.deepEqual(await page.evaluate(() => reloads), ["GOAL1"]);
     await page.evaluate(() => {
       bindRoundFormSubmit = realBindRoundFormSubmit;
       computeFailureBanner = realComputeFailureBanner;
