@@ -481,11 +481,55 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "succeeded",
+  "results": {
+    "default-governance": {
+      "invocation_id": "5263e7d169a2f9a75c378f0fb28ff2c4ff5039299cd2331fd5dc926ea346d8de",
+      "binding_id": "default-governance",
+      "role": "governance",
+      "outcome": "success",
+      "summary": "Pass. Candidate 095848579c7b922ea088b96588b99729a74a84f9 meets the Goal, fits Refine’s architecture, and supports reliable agent workflows. Provider extensions are tolerated at the shared application boundary while identity, outcomes, persisted records, and transport bounds remain validated. Bundled prompts place prose in summary and plans/checklists in artifacts. Necessary corrections: none.",
+      "evidence": [
+        "Reviewed the candidate diff, accepted plan, design documentation, completion execution, and exact-candidate Quality results.",
+        "Quality reported 29 agent_io, 13 template, 15 import, and 35 Quality-phase tests passing; all-target compilation passed.",
+        "Regression coverage verifies fresh gate decisions and interrupted receipt replay without another provider launch.",
+        "Single prose-wrapped reports and equivalent repeated results are accepted; distinct competing results remain rejected.",
+        "Broader validation is not fully green: earlier failures reproduced on the original base; two event-suite failures passed isolated reruns, with the intermittent cause unresolved. No live Claude reproduction was performed."
+      ],
+      "artifacts": {
+        "optional_follow_up": "Investigate the intermittent workspace-test failure and validate captured affected-node output when available."
+      }
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "default-governance",
+      "checkout": {
+        "observation": {
+          "branch": "refine/DR545471066EDAC30DDBD3C63E/round-1",
+          "head_commit": "095848579c7b922ea088b96588b99729a74a84f9",
+          "status_porcelain": []
+        },
+        "tree": "b429afd9ca3d0875d2cd4bd6e0513c2a2c0b0450"
+      },
+      "checkout_recorded": true,
+      "diagnostic": null,
+      "host_bound_result": true,
+      "observational_violation": false,
+      "operation_id": null,
+      "process_id": "proc-1789486164688-406787-9333",
+      "prompt_bytes": 21317,
+      "provider_session_id": null,
+      "purpose": "work",
+      "raw_output": "{\n  \"outcome\": \"success\",\n  \"summary\": \"Pass. Candidate 095848579c7b922ea088b96588b99729a74a84f9 meets the Goal, fits Refine’s architecture, and supports reliable agent workflows. Provider extensions are tolerated at the shared application boundary while identity, outcomes, persisted records, and transport bounds remain validated. Bundled prompts place prose in summary and plans/checklists in artifacts. Necessary corrections: none.\",\n  \"evidence\": [\n    \"Reviewed the candidate diff, accepted plan, design documentation, completion execution, and exact-candidate Quality results.\",\n    \"Quality reported 29 agent_io, 13 template, 15 import, and 35 Quality-phase tests passing; all-target compilation passed.\",\n    \"Regression coverage verifies fresh gate decisions and interrupted receipt replay without another provider launch.\",\n    \"Single prose-wrapped reports and equivalent repeated results are accepted; distinct competing results remain rejected.\",\n    \"Broader validation is not fully green: earlier failures reproduced on the original base; two event-suite failures passed isolated reruns, with the intermittent cause unresolved. No live Claude reproduction was performed.\"\n  ],\n  \"artifacts\": {\n    \"optional_follow_up\": \"Investigate the intermittent workspace-test failure and validate captured affected-node output when available.\"\n  }\n}\n",
+      "received_at": "2026-09-15T15:31:03.945033431+00:00",
+      "started_at": "2026-09-15T15:29:24.503923753+00:00",
+      "workflow_revision": 16
+    }
+  ],
   "created_at": "2026-09-15T15:29:24.181770874+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-15T15:31:05.456740469+00:00",
   "error": null,
   "action_applied": false
 }

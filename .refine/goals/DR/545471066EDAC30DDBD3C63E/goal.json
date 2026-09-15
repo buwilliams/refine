@@ -3,10 +3,30 @@
   "branch_name": "refine/DR545471066EDAC30DDBD3C63E/round-1",
   "candidate_commit": "095848579c7b922ea088b96588b99729a74a84f9",
   "created": "2026-09-15T12:41:51Z",
-  "event_generation": 10,
+  "event_generation": 11,
   "feature_id": null,
   "feature_order": null,
   "id": "DR545471066EDAC30DDBD3C63E",
+  "integration_history": [
+    {
+      "complete": true,
+      "generation": 10,
+      "integration": {
+        "candidate_commit": "095848579c7b922ea088b96588b99729a74a84f9",
+        "integrated_at": "2026-09-15T15:31:11.438443930+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n src/application/agent_io/contracts/skill_result.rs | 210 +++++++++++++++++++--\n .../agent_io/prompts/templates/skill-repair.md     |   4 +-\n .../agent_io/prompts/templates/supervised-skill.md |   2 +-\n .../agent_io/structured_output/extract.rs          | 118 ++++++------\n .../events/execution/lifecycle_tests.rs            |   2 +-\n .../events/execution/lifecycle_tests/completion.rs | 129 +++++++++++++\n src/application/events/tests.rs                    |   2 +-\n src/application/templates/tests.rs                 |   2 +\n src/application/templates/tests/completion.rs      |  62 ++++++\n .../workflow/phases/quality/tests/execution.rs     |   6 +-\n xtask/Cargo.lock                                   |   3 +-\n 11 files changed, 458 insertions(+), 82 deletions(-)\n create mode 100644 src/application/templates/tests/completion.rs",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "d5a74a62db1e0dcabc124c55c8a78da5c73f8efb"
+      },
+      "round_idx": 0
+    }
+  ],
   "name": "Bug Report from Kevin",
   "node_id": "default",
   "notes": [],
@@ -46,48 +66,50 @@
       "created": "2026-09-15T12:41:51Z",
       "event_configuration": {
         "events": {
-          "workflow.governance.enter": {
-            "bindings": [
-              {
-                "enabled": true,
-                "id": "default-governance",
-                "inputs": {},
-                "mode": "blocking",
-                "order": 0,
-                "overrides": null,
-                "scope": {
-                  "node_id": null
-                },
-                "skill_id": "default-governance"
-              }
-            ],
+          "workflow.governance.exit": {
+            "bindings": [],
             "enabled": true,
-            "id": "workflow.governance.enter",
+            "id": "workflow.governance.exit",
             "kind": "system",
-            "name": "Workflow Governance Enter",
+            "name": "Workflow Governance Exit",
             "on_success": null,
             "parameters": [],
             "scope": {
               "node_id": null
             },
-            "source": "workflow.governance.enter"
+            "source": "workflow.governance.exit"
           }
         },
         "revision": 82,
         "schema_version": 3,
-        "skills": {
-          "default-governance": {
-            "enabled": true,
-            "id": "default-governance",
-            "name": "Governance",
-            "parameters": [],
-            "prompt": "## Governance\n\nVerify that the implementation meets the user-defined Goal, fits the system architecture, and serves the project's purpose.\n\n### Outcome\n\nA clear assessment of whether the implementation satisfies all three. Begin with the verdict, then briefly explain how the work meets the Goal, fits the architecture, and supports the project's purpose, using concrete evidence from the implementation and Quality results. For each gap, describe what falls short, why it matters, and the recommended correction. Separate necessary corrections from optional improvements.\n\n### Guardrails\n\n- Read the context that helps explain the user's Goal, the system architecture, and the project's purpose.\n- Compare the implementation with the user's desired outcome as well as the plan. Completing the plan and passing tests alone do not establish that the Goal is met.\n- Look for clear responsibilities, shared behavior implemented in one place, and interfaces that remain easy to use and maintain.\n- Judge design choices by how they serve the project. Allow sound approaches that differ from personal preference.\n- Group related issues by their underlying cause so the next step can address them together.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
-            "provenance": "refine-default-v1",
-            "role": "task",
-            "scope": {
-              "node_id": null
+        "skills": {}
+      },
+      "event_results": {
+        "5263e7d169a2f9a75c378f0fb28ff2c4ff5039299cd2331fd5dc926ea346d8de": {
+          "candidate_commit": "095848579c7b922ea088b96588b99729a74a84f9",
+          "generation": 10,
+          "results": {
+            "default-governance": {
+              "artifacts": {
+                "optional_follow_up": "Investigate the intermittent workspace-test failure and validate captured affected-node output when available."
+              },
+              "binding_id": "default-governance",
+              "evidence": [
+                "Reviewed the candidate diff, accepted plan, design documentation, completion execution, and exact-candidate Quality results.",
+                "Quality reported 29 agent_io, 13 template, 15 import, and 35 Quality-phase tests passing; all-target compilation passed.",
+                "Regression coverage verifies fresh gate decisions and interrupted receipt replay without another provider launch.",
+                "Single prose-wrapped reports and equivalent repeated results are accepted; distinct competing results remain rejected.",
+                "Broader validation is not fully green: earlier failures reproduced on the original base; two event-suite failures passed isolated reruns, with the intermittent cause unresolved. No live Claude reproduction was performed."
+              ],
+              "invocation_id": "5263e7d169a2f9a75c378f0fb28ff2c4ff5039299cd2331fd5dc926ea346d8de",
+              "outcome": "success",
+              "role": "governance",
+              "summary": "Pass. Candidate 095848579c7b922ea088b96588b99729a74a84f9 meets the Goal, fits Refine’s architecture, and supports reliable agent workflows. Provider extensions are tolerated at the shared application boundary while identity, outcomes, persisted records, and transport bounds remain validated. Bundled prompts place prose in summary and plans/checklists in artifacts. Necessary corrections: none."
             }
-          }
+          },
+          "round_idx": 0,
+          "source": "workflow.governance.enter",
+          "state": "succeeded"
         }
       },
       "failure_at": "",
@@ -140,6 +162,32 @@
             }
           }
         },
+        "10:default:workflow.governance.exit": {
+          "events": {
+            "workflow.governance.exit": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.governance.exit",
+              "kind": "system",
+              "name": "Workflow Governance Exit",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.governance.exit"
+            }
+          },
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {}
+        },
+        "10:default:workflow.governance.success": {
+          "events": {},
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {}
+        },
         "10:default:workflow.quality.enter": {
           "events": {
             "workflow.quality.enter": {
@@ -185,6 +233,26 @@
               }
             }
           }
+        },
+        "11:default:workflow.review.enter": {
+          "events": {
+            "workflow.review.enter": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.review.enter",
+              "kind": "system",
+              "name": "Workflow Review Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.review.enter"
+            }
+          },
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {}
         },
         "6:default:workflow.todo.enter": {
           "events": {
@@ -449,6 +517,38 @@
           "skills": {}
         }
       },
+      "governance_candidate_commit": "095848579c7b922ea088b96588b99729a74a84f9",
+      "governance_checked_at": "2026-09-15T15:31:06Z",
+      "governance_details": {
+        "candidate_commit": "095848579c7b922ea088b96588b99729a74a84f9",
+        "configured": true,
+        "failed_actions": [],
+        "phase": "post_implementation",
+        "skill_results": [
+          {
+            "artifacts": {
+              "optional_follow_up": "Investigate the intermittent workspace-test failure and validate captured affected-node output when available."
+            },
+            "binding_id": "workflow.governance.enter:default-governance",
+            "evidence": [
+              "Reviewed the candidate diff, accepted plan, design documentation, completion execution, and exact-candidate Quality results.",
+              "Quality reported 29 agent_io, 13 template, 15 import, and 35 Quality-phase tests passing; all-target compilation passed.",
+              "Regression coverage verifies fresh gate decisions and interrupted receipt replay without another provider launch.",
+              "Single prose-wrapped reports and equivalent repeated results are accepted; distinct competing results remain rejected.",
+              "Broader validation is not fully green: earlier failures reproduced on the original base; two event-suite failures passed isolated reruns, with the intermittent cause unresolved. No live Claude reproduction was performed."
+            ],
+            "invocation_id": "5263e7d169a2f9a75c378f0fb28ff2c4ff5039299cd2331fd5dc926ea346d8de",
+            "outcome": "success",
+            "role": "governance",
+            "summary": "Pass. Candidate 095848579c7b922ea088b96588b99729a74a84f9 meets the Goal, fits Refine’s architecture, and supports reliable agent workflows. Provider extensions are tolerated at the shared application boundary while identity, outcomes, persisted records, and transport bounds remain validated. Bundled prompts place prose in summary and plans/checklists in artifacts. Necessary corrections: none."
+          }
+        ],
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR545471066EDAC30DDBD3C63E-round-1"
+      },
+      "governance_message": "Governance checks passed.",
+      "governance_recovery_analysis": null,
+      "governance_recovery_round_prompt": null,
+      "governance_rule_actions": [],
       "implementation_report": "workflow.implement.enter:default-implement: Task #1: Completed boundary normalization. Extra provider fields are ignored; host identity, supplied identity validation, outcomes, diagnostics, and persisted-record strictness are preserved.\nTask #2: Preserved supported transports and fixed a demonstrated extractor bug that missed competing stringified results. Equivalent repeated results remain accepted.\nTask #3: Clarified bundled completion guidance and verified rendered prompts, optional context, and authored overrides.\nTask #4: Completed regression coverage, including interrupted receipt replay without another provider launch. No implementation work remains; broader validation belongs to Quality.",
       "implementation_reported_at": "2026-09-15T15:03:15Z",
       "logs": [],
@@ -902,7 +1002,8 @@
       },
       "quality_state": "passed",
       "reporter": "buddy.williams@insurity.com",
-      "updated": "2026-09-15T15:29:23Z",
+      "rule_state": "passed",
+      "updated": "2026-09-15T15:31:07Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-15T14:52:55Z",
         "generation": 6,
@@ -1097,12 +1198,26 @@
           "workflow_revision": 2
         }
       ],
+      "workflow_git_remote": "origin",
+      "workflow_integration": {
+        "candidate_commit": "095848579c7b922ea088b96588b99729a74a84f9",
+        "integrated_at": "2026-09-15T15:31:11.438443930+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n src/application/agent_io/contracts/skill_result.rs | 210 +++++++++++++++++++--\n .../agent_io/prompts/templates/skill-repair.md     |   4 +-\n .../agent_io/prompts/templates/supervised-skill.md |   2 +-\n .../agent_io/structured_output/extract.rs          | 118 ++++++------\n .../events/execution/lifecycle_tests.rs            |   2 +-\n .../events/execution/lifecycle_tests/completion.rs | 129 +++++++++++++\n src/application/events/tests.rs                    |   2 +-\n src/application/templates/tests.rs                 |   2 +\n src/application/templates/tests/completion.rs      |  62 ++++++\n .../workflow/phases/quality/tests/execution.rs     |   6 +-\n xtask/Cargo.lock                                   |   3 +-\n 11 files changed, 458 insertions(+), 82 deletions(-)\n create mode 100644 src/application/templates/tests/completion.rs",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "d5a74a62db1e0dcabc124c55c8a78da5c73f8efb"
+      },
       "workspace_branch": "refine/DR545471066EDAC30DDBD3C63E/round-1"
     }
   ],
-  "status": "governance",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-09-15T15:29:23Z",
+  "updated": "2026-09-15T15:31:14Z",
   "workflow_context": "",
   "workflow_controls": [
     {
@@ -1251,7 +1366,17 @@
       "round_idx": 0,
       "to": "governance",
       "workflow_revision": 44
+    },
+    {
+      "at": "2026-09-15T15:31:14.494865969+00:00",
+      "forced": false,
+      "from": "governance",
+      "generation": 11,
+      "node_id": "default",
+      "round_idx": 0,
+      "to": "review",
+      "workflow_revision": 57
     }
   ],
-  "workflow_revision": 49
+  "workflow_revision": 57
 }
