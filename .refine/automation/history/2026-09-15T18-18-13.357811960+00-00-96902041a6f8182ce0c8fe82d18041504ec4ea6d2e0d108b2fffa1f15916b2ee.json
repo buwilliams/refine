@@ -1,5 +1,5 @@
 {
-  "completed_at": null,
+  "completed_at": "2026-09-15T18:19:31.184174844+00:00",
   "config_revision": 82,
   "created_at": "2026-09-15T18:18:13.357811960+00:00",
   "error": null,
@@ -9,11 +9,11 @@
     "name": "Workflow Governance Enter",
     "source": "workflow.governance.enter"
   },
-  "execution_state": "running",
-  "gate": "missing",
+  "execution_state": "succeeded",
+  "gate": "satisfied",
   "goal_id": "00000T19G1926GC2MSDXWRJ000",
   "id": "96902041a6f8182ce0c8fe82d18041504ec4ea6d2e0d108b2fffa1f15916b2ee",
   "node_id": "default",
-  "result_count": 0,
-  "state": "running"
+  "result_count": 1,
+  "state": "succeeded"
 }

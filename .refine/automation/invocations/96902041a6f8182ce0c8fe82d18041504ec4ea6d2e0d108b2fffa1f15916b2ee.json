@@ -585,11 +585,61 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "succeeded",
+  "results": {
+    "default-governance": {
+      "invocation_id": "96902041a6f8182ce0c8fe82d18041504ec4ea6d2e0d108b2fffa1f15916b2ee",
+      "binding_id": "default-governance",
+      "role": "governance",
+      "outcome": "success",
+      "summary": "Pass. The candidate meets the Goal: content-derived asset URLs address stale styling, and screenshots confirm the reported content renders in a coherent desktop and mobile layout. The implementation follows the plan without unnecessary layout changes. It fits the architecture through scoped website changes, one reusable versioning helper, and the existing Rust server. The readable comparison supports Refine’s purpose by presenting agent coordination, user ownership, and recoverable work clearly. No necessary corrections identified. Historical cache guidance informed review but does not establish the original production cause.\n\n",
+      "evidence": [
+        "Reviewed candidate 819217ceebfa97a70304e651b24ef0609e749e49 against the Round 2 plan and project architecture.",
+        "Quality recorded 8 passing tests, with no failures or skips: asset versioning, actual-server delivery, layout at four widths, disclosures, and keyboard access.",
+        "Inspected Quality’s 1440px and 320px screenshots: benefits are arranged clearly, icons accompany headings, and the legend and guidance remain grouped above the table.",
+        "Asset-version and candidate whitespace checks passed."
+      ],
+      "artifacts": {
+        "limitations": [
+          "The user's original cached response remains unconfirmed.",
+          "Browser validation covered Chromium only."
+        ],
+        "necessary_corrections": [],
+        "optional_improvements": [
+          "After deployment, verify the versioned asset responses and comparison layout on the public website."
+        ]
+      }
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "default-governance",
+      "checkout": {
+        "observation": {
+          "branch": "refine/00000T19G1926GC2MSDXWRJ000/round-2-execution-d89993e6-c257-4c78-9a2b-efce50e21d4d",
+          "head_commit": "819217ceebfa97a70304e651b24ef0609e749e49",
+          "status_porcelain": []
+        },
+        "tree": "e4fff4cb2d40f6792062243140856e31496ba904"
+      },
+      "checkout_recorded": true,
+      "diagnostic": null,
+      "host_bound_result": true,
+      "observational_violation": false,
+      "operation_id": null,
+      "process_id": "proc-1789496294702-1014481-11570",
+      "prompt_bytes": 15897,
+      "provider_session_id": null,
+      "purpose": "work",
+      "raw_output": "{\n  \"outcome\": \"success\",\n  \"evidence\": [\n    \"Reviewed candidate 819217ceebfa97a70304e651b24ef0609e749e49 against the Round 2 plan and project architecture.\",\n    \"Quality recorded 8 passing tests, with no failures or skips: asset versioning, actual-server delivery, layout at four widths, disclosures, and keyboard access.\",\n    \"Inspected Quality’s 1440px and 320px screenshots: benefits are arranged clearly, icons accompany headings, and the legend and guidance remain grouped above the table.\",\n    \"Asset-version and candidate whitespace checks passed.\"\n  ],\n  \"artifacts\": {\n    \"necessary_corrections\": [],\n    \"optional_improvements\": [\n      \"After deployment, verify the versioned asset responses and comparison layout on the public website.\"\n    ],\n    \"limitations\": [\n      \"The user's original cached response remains unconfirmed.\",\n      \"Browser validation covered Chromium only.\"\n    ]\n  },\n  \"summary\": \"Pass. The candidate meets the Goal: content-derived asset URLs address stale styling, and screenshots confirm the reported content renders in a coherent desktop and mobile layout. The implementation follows the plan without unnecessary layout changes. It fits the architecture through scoped website changes, one reusable versioning helper, and the existing Rust server. The readable comparison supports Refine’s purpose by presenting agent coordination, user ownership, and recoverable work clearly. No necessary corrections identified. Historical cache guidance informed review but does not establish the original production cause.\\n\\n\"\n}",
+      "received_at": "2026-09-15T18:19:29.855714923+00:00",
+      "started_at": "2026-09-15T18:18:14.670095478+00:00",
+      "workflow_revision": 40
+    }
+  ],
   "created_at": "2026-09-15T18:18:13.357811960+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-15T18:19:31.184174844+00:00",
   "error": null,
   "action_applied": false
 }
