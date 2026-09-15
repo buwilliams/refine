@@ -1,5 +1,5 @@
 {
-  "completed_at": null,
+  "completed_at": "2026-09-15T15:29:20.744565487+00:00",
   "config_revision": 82,
   "created_at": "2026-09-15T15:23:33.139195259+00:00",
   "error": null,
@@ -9,11 +9,11 @@
     "name": "Workflow Quality Enter",
     "source": "workflow.quality.enter"
   },
-  "execution_state": "running",
-  "gate": "missing",
+  "execution_state": "succeeded",
+  "gate": "satisfied",
   "goal_id": "DR545471066EDAC30DDBD3C63E",
   "id": "207a8c207c965479a43c768bb7ac440648af421f1785039e0a5b68f98c375110",
   "node_id": "default",
-  "result_count": 0,
-  "state": "running"
+  "result_count": 1,
+  "state": "succeeded"
 }
