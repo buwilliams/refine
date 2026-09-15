@@ -18,6 +18,16 @@ async function openWebsite() {
   return app;
 }
 
+async function assertFocusedProductVisible(region, name, width) {
+  assert.equal(await region.evaluate((el, name) => {
+    const link = document.activeElement;
+    const bounds = el.getBoundingClientRect();
+    const pinned = el.querySelector("thead th").getBoundingClientRect();
+    const rect = link.closest("th").getBoundingClientRect();
+    return link.textContent === name && rect.left >= pinned.right && rect.right <= bounds.right;
+  }, name), true, `focused ${name} column is fully visible beside pinned labels at ${width}`);
+}
+
 test("website comparison presents benefits, labeled capabilities, and qualified sources", { skip: SKIP }, async () => {
   const app = await openWebsite();
   try {
@@ -154,9 +164,13 @@ test("comparison keeps Refine initially visible and other products reachable at 
       }
       await page.keyboard.press("Tab");
       assert.equal(await page.evaluate(() => document.activeElement.textContent), "Blitzy");
+      await assertFocusedProductVisible(region, "Blitzy", width);
       assert.equal(await page.evaluate(() => getComputedStyle(document.activeElement).outlineStyle), "solid");
       await page.keyboard.press("Tab");
       assert.equal(await page.evaluate(() => document.activeElement.textContent), "n8n");
+      await assertFocusedProductVisible(region, "n8n", width);
+      await page.keyboard.press("Shift+Tab");
+      await assertFocusedProductVisible(region, "Blitzy", width);
       for (const details of await page.locator(".compare-details details").all()) await details.locator("summary").click();
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `expanded details overflow at ${width}`);
     }
