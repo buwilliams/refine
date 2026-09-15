@@ -481,11 +481,59 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "succeeded",
+  "results": {
+    "default-governance": {
+      "invocation_id": "fec36582ae6a46fc501c2412155cceb481bceec4ba409bf6447ab6524fe2a6c7",
+      "binding_id": "default-governance",
+      "role": "governance",
+      "outcome": "success",
+      "summary": "Pass. Candidate 4a30beb267631fb6ee0115822dea491050bf9422 satisfies the Goal, fits Refine’s architecture, and supports the project’s purpose. The comparison replaces the old categories with Direct agents, Blitzy, n8n, and Refine, and covers open source, local-first operation, BYOT, BYOA, and agent-first surfaces. It follows the plan with descriptive, sourced comparisons that distinguish model selection, external agent access, and installed-agent supervision. Changes remain within website HTML/CSS and browser tests, keeping presentation responsibilities clear. The result helps visitors understand Refine’s coordination of user-owned software, agents, workflows, and recovery. No necessary corrections identified.",
+      "evidence": [
+        "Reviewed the recorded plan, complete candidate diff, LICENSE, Hub overview, agent-first architecture documentation, MCP adapter, provider invocation code, and workflow recovery code.",
+        "Blitzy’s published capabilities support the modernization, feature development, specialized-agent, validation, and deployment descriptions. [Blitzy](https://blitzy.com/).",
+        "n8n’s published capabilities support general-purpose automation, self-hosting, approvals, development integrations, and MCP access. Its repository confirms source-available/fair-code licensing. [Product](https://n8n.io/), [GitHub integrations](https://n8n.io/integrations/github/), [MCP documentation](https://docs.n8n.io/connect/connect-to-n8n-mcp-server), [License description](https://github.com/n8n-io/n8n/blob/master/README.md#license).",
+        "Recorded Quality proof covers this candidate: two Chromium browser tests passed with zero failures or skips, covering semantic headers, content, focus, horizontal scrolling, and layouts at 1440, 1024, 390, and 320 pixels. Live preview checks passed. Governance inspected the mobile screenshot and independently confirmed git diff --check passes."
+      ],
+      "artifacts": {
+        "necessary_corrections": [],
+        "optional_improvements": [],
+        "validation_limits": [
+          "Browser validation covered Chromium; Firefox and Safari were not tested.",
+          "Competitor descriptions were checked against published sources, not hands-on product testing."
+        ]
+      }
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "default-governance",
+      "checkout": {
+        "observation": {
+          "branch": "refine/00000T19F2G97H0BEDPKDXE002/round-1",
+          "head_commit": "4a30beb267631fb6ee0115822dea491050bf9422",
+          "status_porcelain": []
+        },
+        "tree": "bc767c34093e9f4d3a201bdea3c2fc318b371f0c"
+      },
+      "checkout_recorded": true,
+      "diagnostic": null,
+      "host_bound_result": true,
+      "observational_violation": false,
+      "operation_id": null,
+      "process_id": "proc-1789490029128-908613-4794",
+      "prompt_bytes": 8299,
+      "provider_session_id": null,
+      "purpose": "work",
+      "raw_output": "{\n  \"outcome\": \"success\",\n  \"summary\": \"Pass. Candidate 4a30beb267631fb6ee0115822dea491050bf9422 satisfies the Goal, fits Refine’s architecture, and supports the project’s purpose. The comparison replaces the old categories with Direct agents, Blitzy, n8n, and Refine, and covers open source, local-first operation, BYOT, BYOA, and agent-first surfaces. It follows the plan with descriptive, sourced comparisons that distinguish model selection, external agent access, and installed-agent supervision. Changes remain within website HTML/CSS and browser tests, keeping presentation responsibilities clear. The result helps visitors understand Refine’s coordination of user-owned software, agents, workflows, and recovery. No necessary corrections identified.\",\n  \"evidence\": [\n    \"Reviewed the recorded plan, complete candidate diff, LICENSE, Hub overview, agent-first architecture documentation, MCP adapter, provider invocation code, and workflow recovery code.\",\n    \"Blitzy’s published capabilities support the modernization, feature development, specialized-agent, validation, and deployment descriptions. [Blitzy](https://blitzy.com/).\",\n    \"n8n’s published capabilities support general-purpose automation, self-hosting, approvals, development integrations, and MCP access. Its repository confirms source-available/fair-code licensing. [Product](https://n8n.io/), [GitHub integrations](https://n8n.io/integrations/github/), [MCP documentation](https://docs.n8n.io/connect/connect-to-n8n-mcp-server), [License description](https://github.com/n8n-io/n8n/blob/master/README.md#license).\",\n    \"Recorded Quality proof covers this candidate: two Chromium browser tests passed with zero failures or skips, covering semantic headers, content, focus, horizontal scrolling, and layouts at 1440, 1024, 390, and 320 pixels. Live preview checks passed. Governance inspected the mobile screenshot and independently confirmed git diff --check passes.\"\n  ],\n  \"artifacts\": {\n    \"necessary_corrections\": [],\n    \"optional_improvements\": [],\n    \"validation_limits\": [\n      \"Browser validation covered Chromium; Firefox and Safari were not tested.\",\n      \"Competitor descriptions were checked against published sources, not hands-on product testing.\"\n    ]\n  }\n}",
+      "received_at": "2026-09-15T16:35:15.063390266+00:00",
+      "started_at": "2026-09-15T16:33:49.099154838+00:00",
+      "workflow_revision": 2
+    }
+  ],
   "created_at": "2026-09-15T16:33:49.088604924+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-15T16:35:16.356585584+00:00",
   "error": null,
   "action_applied": false
 }
