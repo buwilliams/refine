@@ -113,3 +113,7 @@ Workflow inspection and control use `workflow show`, `workflow move`, and `workf
 The CLI should become increasingly useful to agents. Future agents may prefer structured CLI calls for discoverability, reproducibility, and low visual overhead.
 
 As AI systems improve, the CLI should expose high-signal operations and machine-readable output without requiring a human to click through the browser. It should remain conservative in surface area: add commands when they express real capabilities, not when they duplicate a page.
+
+## AI provider configuration
+
+`refine config providers show` reads the shared catalog and effective node selection. `refine config providers save --file providers.json` replaces the catalog with revision checking. `refine config providers select ID` sets the node override; omit ID to inherit the system default. See [Configure AI providers](../../ai-providers.md) for argument templates, stdin transport, session capabilities, and a custom CLI example.

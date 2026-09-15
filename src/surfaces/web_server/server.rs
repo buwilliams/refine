@@ -555,6 +555,13 @@ impl InProcessWebServer {
             return self.handle_project_worktree_cleanup(request);
         }
 
+        if request.method == "GET" && request.path == "/providers" {
+            return self.handle_providers_get();
+        }
+        if request.method == "PUT" && request.path == "/providers" {
+            return self.handle_providers_save(request);
+        }
+
         if request.method == "GET" && request.path == "/settings" {
             return self.handle_settings_get();
         }
@@ -849,7 +856,10 @@ impl InProcessWebServer {
             return self.handle_goal_round_log_append(request);
         }
 
-        if request.method == "GET" && request.path.starts_with("/work/goals/") && request.path.ends_with("/prompts") {
+        if request.method == "GET"
+            && request.path.starts_with("/work/goals/")
+            && request.path.ends_with("/prompts")
+        {
             return self.handle_goal_prompts(request);
         }
 

@@ -24,7 +24,9 @@ mod workflow;
 pub use hub::HubAction;
 
 pub use agents::{AgentAction, CliAgentProfile};
-pub use config::{ConfigAction, ConfigDomain, ConfigPayload, ConfigSettingsAction};
+pub use config::{
+    ConfigAction, ConfigDomain, ConfigPayload, ConfigProvidersAction, ConfigSettingsAction,
+};
 pub use features::FeatureAction;
 pub use fleet::FleetAction;
 pub use goals::GoalAction;

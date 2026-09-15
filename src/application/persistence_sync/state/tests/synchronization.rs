@@ -784,7 +784,12 @@ fn hub_sites_records_publication_and_tombstones_sync_and_invalidate_warm_indexes
     let skills = crate::application::events::FileEventService::new(&a.root);
     let revision = skills.config().unwrap().revision;
     skills.save("skills", "maintain-reports", json!({"revision":revision,"item":{"name":"Maintain reports","prompt":"Build and maintain the report Hub"},"trigger":{"source":"custom"}})).unwrap();
-    let site = a.save_site("reports", &json!({"name":"Reports","skill_id":"maintain-reports"})).unwrap();
+    let site = a
+        .save_site(
+            "reports",
+            &json!({"name":"Reports","skill_id":"maintain-reports"}),
+        )
+        .unwrap();
     a.save_collection(
         "reports",
         "events",
@@ -807,8 +812,16 @@ fn hub_sites_records_publication_and_tombstones_sync_and_invalidate_warm_indexes
     fixture.service(&fixture.a).sync().unwrap();
     fixture.service(&fixture.b).sync().unwrap();
     assert_eq!(b.metrics_snapshot().unwrap(), saved_metrics);
-    assert_eq!(b.show("reports").unwrap()["item"]["skill_id"], "maintain-reports");
-    assert_eq!(crate::application::events::FileEventService::new(&b.root).show_skill("maintain-reports").unwrap()["item"]["prompt"], "Build and maintain the report Hub");
+    assert_eq!(
+        b.show("reports").unwrap()["item"]["skill_id"],
+        "maintain-reports"
+    );
+    assert_eq!(
+        crate::application::events::FileEventService::new(&b.root)
+            .show_skill("maintain-reports")
+            .unwrap()["item"]["prompt"],
+        "Build and maintain the report Hub"
+    );
     assert_eq!(
         b.asset("reports", "index.html", true).unwrap().0,
         b"<h1>Reports</h1>"
@@ -876,4 +889,36 @@ fn template_edits_are_committed_and_converge_across_nodes() {
         assert_eq!(store.read("agent").unwrap().prompt, "Agent A");
         assert_eq!(store.read("planning-agent").unwrap().prompt, "Planner B");
     }
+}
+
+#[test]
+fn provider_catalog_adopts_remote_edits_and_preserves_node_inheritance() {
+    use crate::infrastructure::process::supervisor::config::{ConfigService, FileSettingsService};
+    use crate::infrastructure::storage::providers::ProviderStore;
+    let fixture = SyncFixture::new("provider-catalog");
+    let a = refine_dir_for_target_root(&fixture.a).unwrap();
+    let b = refine_dir_for_target_root(&fixture.b).unwrap();
+    assert_eq!(ProviderStore::new(&b).load().unwrap().revision, 0);
+    assert!(!b.join("providers.json").exists());
+    let mut catalog = ProviderStore::new(&a).load().unwrap();
+    catalog.default_provider = "codex".into();
+    catalog.providers[0].executable = "/custom/Claude".into();
+    ProviderStore::new(&a).save(catalog).unwrap();
+    fixture.service(&fixture.a).sync().unwrap();
+    fixture.service(&fixture.b).sync().unwrap();
+    assert_eq!(
+        ProviderStore::new(&b)
+            .load()
+            .unwrap()
+            .provider("claude")
+            .unwrap()
+            .executable,
+        "/custom/Claude"
+    );
+    let inheriting = FileSettingsService::for_node(&b, "default");
+    inheriting
+        .update(&serde_json::json!({"parallel_run_cap":"2"}))
+        .unwrap();
+    assert_eq!(inheriting.provider_override().unwrap(), None);
+    assert_eq!(inheriting.load().unwrap()["agent_cli"], "codex");
 }

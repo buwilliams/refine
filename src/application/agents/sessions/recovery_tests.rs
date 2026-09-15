@@ -237,6 +237,7 @@ fn run_test_provider(
 
     let result = run_goal_agent(
         GoalAgentLaunch {
+            refine_dir: None,
             provider_session: None,
             runtime_root: runtime_root.clone(),
             cwd: app_root,

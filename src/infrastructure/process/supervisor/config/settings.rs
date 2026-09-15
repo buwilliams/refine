@@ -40,17 +40,35 @@ impl FileSettingsService {
     }
 
     pub fn list_response(&self) -> RefineResult<serde_json::Value> {
-        Ok(serde_json::json!({"settings": self.load()?}))
+        Ok(serde_json::json!({"settings": self.load()?, "providers":
+            crate::application::agents::providers::response(&self.refine_dir, self.provider_override()?.as_deref())?}))
     }
 
     pub fn update(&self, body: &serde_json::Value) -> RefineResult<serde_json::Value> {
         let updates = normalize_settings_patch(body)?;
         self.node_registry_service().with_registry_lock(|| {
             let mut current = self.load()?;
+            let selection = updates
+                .get("agent_cli")
+                .and_then(Value::as_str)
+                .map(str::to_string)
+                .or(self.provider_override()?);
+            if let Some(id) = selection.as_deref().filter(|s| !s.is_empty()) {
+                crate::infrastructure::storage::providers::ProviderStore::new(&self.refine_dir)
+                    .load()?
+                    .provider(id)?;
+                current.insert("agent_cli".into(), Value::String(id.into()));
+            } else {
+                current.remove("agent_cli");
+            }
             let mut updated_test_command = false;
             let mut updated_test_commands = false;
             for (key, value) in updates {
-                current.insert(key.clone(), value);
+                if key == "agent_cli" && value.as_str() == Some("") {
+                    current.remove(&key);
+                } else {
+                    current.insert(key.clone(), value);
+                }
                 if key == "target_app_test_command" {
                     updated_test_command = true;
                 } else if key == "target_app_test_commands" {
@@ -62,7 +80,9 @@ impl FileSettingsService {
             }
             self.validate(&current)?;
             self.write(&current)?;
-            Ok(serde_json::json!({"ok": true, "settings": current}))
+            let mut response = self.list_response()?;
+            response["ok"] = Value::Bool(true);
+            Ok(response)
         })
     }
 
@@ -109,8 +129,15 @@ impl FileSettingsService {
 
             // Loading through the supported codec makes malformed stored source
             // values visible instead of copying them into another node.
-            let source = FileSettingsService::for_node(&self.refine_dir, source_node_id).load()?;
+            let source_service = FileSettingsService::for_node(&self.refine_dir, source_node_id);
+            let mut source = source_service.load()?;
+            if source_service.provider_override()?.is_none() {
+                source.remove("agent_cli");
+            }
             let mut destination = self.load()?;
+            if self.provider_override()?.is_none() {
+                destination.remove("agent_cli");
+            }
             let mut copied_count = 0usize;
             for key in keys {
                 if let Some(value) = source.get(*key) {
@@ -138,6 +165,20 @@ impl FileSettingsService {
 
     pub fn validate_update(body: &serde_json::Value) -> RefineResult<()> {
         normalize_settings_patch(body).map(|_| ())
+    }
+
+    pub fn provider_override(&self) -> RefineResult<Option<String>> {
+        let id = self.active_node_id()?;
+        Ok(self
+            .node_registry_service()
+            .load_registry()?
+            .nodes
+            .iter()
+            .find(|n| n.id == id)
+            .and_then(|n| n.settings.get("agent_cli"))
+            .and_then(Value::as_str)
+            .filter(|s| !s.is_empty())
+            .map(str::to_string))
     }
 
     fn write(&self, settings: &JsonObject) -> RefineResult<()> {
@@ -207,6 +248,7 @@ impl FileSettingsService {
             .map(|node| node.settings.clone())
             .unwrap_or_default();
         let mut settings = default_settings();
+        settings.remove("agent_cli");
         let mut migrated = false;
         self.remove_legacy_settings()?;
         for (key, value) in stored {
@@ -236,6 +278,18 @@ impl FileSettingsService {
         if migrated {
             self.write(&settings)?;
         }
+        let catalog =
+            crate::infrastructure::storage::providers::ProviderStore::new(&self.refine_dir)
+                .load()?;
+        // Keep an invalid retained ID visible and repairable through settings. Launch
+        // resolution validates it and never substitutes another installed provider.
+        let provider = crate::application::agents::providers::selection_id(
+            &catalog,
+            None,
+            settings.get("agent_cli").and_then(Value::as_str),
+        )
+        .to_string();
+        settings.insert("agent_cli".into(), Value::String(provider));
         Ok(settings)
     }
 }

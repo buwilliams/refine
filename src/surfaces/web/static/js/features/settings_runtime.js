@@ -1,8 +1,8 @@
 // ---- System / Runtime -------------------------------------------------------
 
-function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
+function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli, providers = {}) {
   const cliOption = (value, label) =>
-    `<option value="${value}" ${cli === value ? "selected" : ""}>${htmlEscape(label)}</option>`;
+    `<option value="${htmlEscape(value)}" ${cli === value ? "selected" : ""}>${htmlEscape(label)}</option>`;
   const optionLabel = (options, value) => {
     const match = options.find(([v]) => String(v) === String(value));
     return match?.[1] || String(value || "none");
@@ -62,11 +62,9 @@ function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
     ["off", "Off — contested merges fail closed immediately"],
   ];
   const providerOptions = [
-    ["claude", "Claude Code (default)"],
-    ["codex", "OpenAI Codex"],
-    ["gemini", "Gemini"],
-    ["copilot", "GitHub Copilot"],
-    ["smoke-ai", "Smoke AI (deterministic testing)"],
+    ["", `Use system default (${providers.catalog?.providers?.find(p => p.id === providers.catalog.default_provider)?.name || s.agent_cli || ""})`],
+    ...(providers.catalog?.providers || []).map(p => [p.id, p.name]),
+    ...(cli && !(providers.catalog?.providers || []).some(p => p.id === cli) ? [[cli, `${cli} (not configured)`]] : []),
   ];
   const workerCpuPriority = String(s.worker_cpu_priority ?? "low");
   const resourceIsolation = String(s.resource_isolation_mode ?? "auto");
@@ -262,9 +260,10 @@ function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
 
     <section class="settings-section">
       <h3>AI Provider</h3>
+      ${providers.selection_error ? `<p role="alert">${htmlEscape(providers.selection_error)}</p>` : ""}
       ${renderSettingsEditableField({
         id: "s-cli",
-        label: "Which AI provider refine drives",
+        label: "AI provider for this node",
         guideItemId: "runtime-ai-provider",
         description: "used for Goal agent runs, conflict resolution, chat, import extraction, target-app actions, and pre-flight.",
         valueLabel: optionLabel(providerOptions, cli),
@@ -280,7 +279,7 @@ function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
       </p>
       <p class="muted" style="margin-top:14px">The selected provider's auth lives on the host. Use Re-check to re-run the pre-flight after running the relevant login command (<code>claude login</code> / <code>codex login</code> / <code>gemini auth login</code> / <code>copilot login</code>), or after setting <code>REFINE_SMOKE_AI_PATH</code> for Smoke AI.</p>
       <button id="s-recheck" data-testid="runtime-recheck-auth">Re-check auth</button>
-    </section>`;
+    </section>${renderProviderCatalog(providers)}`;
 }
 
 function renderRuntimeUpgradeBanner(upgrade) {
@@ -395,7 +394,7 @@ async function refreshRuntimeUpgradeBanner() {
 }
 
 async function autosaveSettingsRuntime(options = {}) {
-  const chosen = $("#s-cli").value;
+
   await api("PATCH", "/api/settings", {
     parallel_run_cap: $("#s-cap").value,
     automatic_agent_resource_budget_percent: $("#s-automatic-resource-budget-percent").value,
@@ -416,14 +415,14 @@ async function autosaveSettingsRuntime(options = {}) {
     state_sync_auto_recovery: $("#s-state-sync-auto-recovery").value,
     state_sync_agent_resolution: $("#s-state-sync-agent-resolution").value,
     file_browser_ignore_patterns: $("#s-file-browser-ignore").value,
-    agent_cli: chosen,
   });
   if (options.refresh) {
     await refreshSettingsTab(options.refreshTab || readSettingsTab(), { force: true });
   }
 }
 
-function bindNodeRuntimeConfigControls() {
+function bindNodeRuntimeConfigControls(providers = {}) {
+  bindProviderCatalog(providers);
   bindCommand("#s-runtime-copy-node", "settings.runtime.copy_node");
   const root = document.querySelector('[data-tab-pane="runtime"]');
   const autosaveRuntime = bindSettingsAutosave(
@@ -435,7 +434,10 @@ function bindNodeRuntimeConfigControls() {
   bindSettingsAutosave(
     root,
     "#s-cli",
-    () => autosaveSettingsRuntime({ refresh: true, refreshTab: "runtime" }),
+    async () => {
+      await api("PATCH", "/api/settings", {agent_cli: $("#s-cli").value || null});
+      await refreshSettingsTab("runtime", {force: true});
+    },
     { event: "settings-editable-commit" },
   );
   bindCommand("#s-recheck", "runtime.recheck_auth");

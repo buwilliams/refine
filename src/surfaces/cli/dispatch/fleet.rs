@@ -291,10 +291,12 @@ pub(super) fn dispatch_manage(
     let root = status.refine_dir.map(PathBuf::from);
     let _templates =
         crate::application::templates::TemplateScope::inherit_or_root(root.as_deref())?;
-    let provider = resolve_agent_provider(&runtime_root, provider)?;
+    let provider = resolve_agent_provider(&runtime_root.join(port.to_string()), provider)?;
     let prompt = fleet_manage_prompt(&checkout, &request)?;
-    let launch = HostAgentProviderService::with_runtime_root(runtime_root.join(port.to_string()))
-        .interactive_command(&provider, &prompt)?;
+    let mut service =
+        HostAgentProviderService::with_runtime_root(runtime_root.join(port.to_string()));
+    service.refine_dir = root;
+    let launch = service.interactive_command(&provider, &prompt)?;
     launch.validate_prompt_artifact()?;
     eprintln!(
         "refine: opening {} to manage the fleet (guided by {FLEET_RUNBOOK_PATH})",

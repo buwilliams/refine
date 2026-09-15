@@ -4,6 +4,7 @@ use super::*;
 pub enum ConfigDomain {
     Settings,
     Skills,
+    Providers,
 }
 
 #[derive(Debug, clap::Args)]
@@ -34,6 +35,11 @@ pub enum ConfigAction {
         #[command(subcommand)]
         action: ConfigSettingsAction,
     },
+    /// Read or replace the shared AI provider catalog; revisions fence edits.
+    Providers {
+        #[command(subcommand)]
+        action: ConfigProvidersAction,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -54,5 +60,19 @@ pub enum ConfigSettingsAction {
         #[cfg_attr(test, arg(long, hide = true))]
         #[cfg_attr(not(test), arg(skip = None))]
         target_root: Option<PathBuf>,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum ConfigProvidersAction {
+    Show,
+    /// Save a complete catalog containing the revision returned by show.
+    Save {
+        #[command(flatten)]
+        payload: ConfigPayload,
+    },
+    /// Set the node provider override; omit ID to inherit the system default.
+    Select {
+        provider: Option<String>,
     },
 }

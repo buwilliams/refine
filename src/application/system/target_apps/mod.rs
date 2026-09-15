@@ -387,20 +387,6 @@ fn fill_if_empty(value: &mut String, fallback: &str) {
     }
 }
 
-trait EmptyStringFallback {
-    fn if_empty(self, fallback: &str) -> String;
-}
-
-impl EmptyStringFallback for String {
-    fn if_empty(self, fallback: &str) -> String {
-        if self.trim().is_empty() {
-            fallback.to_string()
-        } else {
-            self
-        }
-    }
-}
-
 fn convert_lifecycle_commands_to_instructions(
     config: &mut TargetAppGeneratedConfig,
 ) -> RefineResult<()> {

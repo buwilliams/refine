@@ -36,7 +36,6 @@ pub(super) fn default_settings() -> JsonObject {
         ("merge_target_branch", "main"),
         ("quality_enabled", "0"),
         ("allowed_commands", ""),
-        ("agent_cli", "claude"),
         ("target_app_start_instructions", ""),
         ("target_app_stop_instructions", ""),
         ("target_app_build_instructions", ""),
@@ -175,28 +174,16 @@ pub(super) fn is_retired_development_request_setting(key: &str) -> bool {
 pub(super) fn normalize_setting(key: &str, value: &Value) -> RefineResult<String> {
     match key {
         "agent_cli" => {
-            let raw = as_string(value);
-            let choice = raw.trim();
-            let known = choice.to_ascii_lowercase();
-            if matches!(
-                known.as_str(),
-                "claude" | "codex" | "gemini" | "copilot" | "smoke-ai"
-            ) {
-                Ok(known)
-            } else if !choice.is_empty()
-                && !choice.as_bytes().contains(&0)
-                && !choice.chars().any(char::is_whitespace)
-            {
-                // A configured generic provider is one executable path/name.
-                // Provider-specific prompt semantics still remain centralized
-                // in HostAgentProviderService's generic capability contract.
-                Ok(choice.to_string())
-            } else {
-                Err(RefineError::InvalidInput(
-                    "agent_cli must be a known provider or one generic CLI executable without whitespace"
-                        .to_string(),
-                ))
+            if value.is_null() {
+                return Ok(String::new());
             }
+            let choice = value.as_str().ok_or_else(|| {
+                RefineError::InvalidInput("agent_cli must be a provider ID or null".into())
+            })?;
+            if choice.contains('\0') || choice != choice.trim() {
+                return Err(RefineError::InvalidInput("invalid provider ID".into()));
+            }
+            Ok(choice.to_string())
         }
         "quality_enabled" => Ok(if value_is_truthy(value) { "1" } else { "0" }.to_string()),
         "target_app_env_json" => {

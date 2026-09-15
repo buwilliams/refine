@@ -30,7 +30,7 @@ function runtimeSettings() {
     },
     modalAlert: async (message) => alerts.push(message),
   });
-  for (const filename of ["settings.js", "settings_runtime.js"]) {
+  for (const filename of ["settings.js", "settings_providers.js", "settings_runtime.js"]) {
     vm.runInContext(fs.readFileSync(path.join(__dirname,
       "../src/surfaces/web/static/js/features", filename), "utf8"), context);
   }

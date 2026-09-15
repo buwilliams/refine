@@ -12,7 +12,7 @@ use crate::infrastructure::process::supervisor::operations::{
     FileOperationRegistry, OperationRegistry, OperationState,
 };
 
-use super::{ApiResponse, body_text, provider_status_value};
+use super::{ApiResponse, body_text};
 
 pub(super) fn import_extraction_text(
     refine_dir: &Path,
@@ -63,17 +63,7 @@ pub(super) fn import_provider_from_settings(
                     .map(str::to_string)
             })
         })
-        .or_else(|| {
-            provider_status_value().ok().and_then(|status| {
-                status
-                    .get("selected_provider")
-                    .and_then(Value::as_str)
-                    .map(str::trim)
-                    .filter(|provider| !provider.is_empty())
-                    .map(str::to_string)
-            })
-        })
-        .unwrap_or_else(|| "claude".to_string())
+        .unwrap_or_default()
 }
 
 pub(super) fn import_extraction_response(

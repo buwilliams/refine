@@ -34,7 +34,9 @@ fn payload(p: &Path) -> RefineResult<Value> {
 }
 pub(super) fn dispatch(action: HubAction) -> RefineResult<()> {
     let result = match action {
-        HubAction::RefreshMetrics => daemon_json("POST", "/api/hub/metrics/refresh", Some(json!({})))?,
+        HubAction::RefreshMetrics => {
+            daemon_json("POST", "/api/hub/metrics/refresh", Some(json!({})))?
+        }
         HubAction::Metrics => daemon_json("GET", "/api/hub/metrics", None)?,
         HubAction::List => daemon_json("GET", "/api/hub/sites", None)?,
         HubAction::Show { site: s } => daemon_json("GET", &site(&s)?, None)?,

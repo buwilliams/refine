@@ -66,3 +66,70 @@ fn web_server_force_provider_plan_extraction_skips_structured_input_parse() {
     }
     remove_temp_dir(&temp_root);
 }
+
+#[test]
+fn provider_catalog_api_round_trip_selection_and_stale_edits() {
+    let target = unique_temp_dir("provider-catalog-api");
+    init_git_app(&target);
+    let mut server = server_with_projection();
+    server.target_root = Some(target.clone());
+    server.runtime_root = Some(target.join("run/8082"));
+    let call = |method: &str, path: &str, body| {
+        server.handle(ApiRequest {
+            method: method.into(),
+            path: path.into(),
+            body,
+        })
+    };
+    let initial = call("GET", "/api/providers", None);
+    assert_eq!(initial.status, 200, "{:?}", initial.body);
+    assert!(initial.body["node_override"].is_null());
+    let mut catalog = initial.body["catalog"].clone();
+    catalog["providers"].as_array_mut().unwrap().push(json!({
+        "id":"CustomAgent", "name":"Custom Agent", "executable":"/Some Path/MyAgent",
+        "automated":{"args":["--prompt","{{context}}"]},
+        "interactive":{"args":["{{context}}"]}
+    }));
+    catalog["default_provider"] = json!("CustomAgent");
+    let saved = call("PUT", "/api/providers", Some(catalog.clone()));
+    assert_eq!(saved.status, 200, "{:?}", saved.body);
+    assert_eq!(saved.body["effective_provider"], "CustomAgent");
+    let diagnostics = call("GET", "/api/agents/CustomAgent/diagnostics", None);
+    assert_eq!(diagnostics.status, 200, "{:?}", diagnostics.body);
+    assert!(
+        diagnostics.body["diagnostics"][0]
+            .as_str()
+            .unwrap()
+            .contains("Custom Agent")
+    );
+    assert_eq!(
+        saved.body["catalog"]["providers"]
+            .as_array()
+            .unwrap()
+            .last()
+            .unwrap()["automated"]["args"],
+        json!(["--prompt", "{{context}}"])
+    );
+    assert_eq!(call("PUT", "/api/providers", Some(catalog)).status, 409);
+    let selected = call(
+        "PATCH",
+        "/api/settings",
+        Some(json!({"agent_cli":"gemini"})),
+    );
+    assert_eq!(selected.status, 200, "{:?}", selected.body);
+    assert_eq!(selected.body["providers"]["node_override"], "gemini");
+    let clear = call("PATCH", "/api/settings", Some(json!({"agent_cli":null})));
+    assert_eq!(clear.status, 200, "{:?}", clear.body);
+    assert_eq!(clear.body["providers"]["selection_source"], "system");
+    assert_eq!(clear.body["settings"]["agent_cli"], "CustomAgent");
+    assert_eq!(
+        call(
+            "PATCH",
+            "/api/settings",
+            Some(json!({"agent_cli":"missing"}))
+        )
+        .status,
+        400
+    );
+    fs::remove_dir_all(target).unwrap();
+}

@@ -1,0 +1,171 @@
+{
+  "version": 1,
+  "revision": 0,
+  "default_provider": "claude",
+  "providers": [
+    {
+      "id": "claude",
+      "name": "Claude Code",
+      "executable": "claude",
+      "automated": {
+        "args": [
+          "--print",
+          "--output-format=stream-json",
+          "--verbose",
+          "--dangerously-skip-permissions"
+        ],
+        "context_args": [
+          "{{context}}"
+        ],
+        "resume_args": [
+          "--print",
+          "--output-format=stream-json",
+          "--verbose",
+          "--dangerously-skip-permissions",
+          "--resume",
+          "{{session_id}}"
+        ]
+      },
+      "interactive": {
+        "args": [
+          "--dangerously-skip-permissions"
+        ],
+        "context_args": [
+          "{{context}}"
+        ],
+        "resume_args": [
+          "--resume",
+          "{{session_id}}",
+          "--dangerously-skip-permissions"
+        ],
+        "pin_args": [
+          "--session-id",
+          "{{session_id}}"
+        ]
+      },
+      "output_format": "claude_json"
+    },
+    {
+      "id": "codex",
+      "name": "OpenAI Codex",
+      "executable": "codex",
+      "automated": {
+        "args": [
+          "exec",
+          "--dangerously-bypass-approvals-and-sandbox",
+          "--color",
+          "never",
+          "--json"
+        ],
+        "context_args": [
+          "-"
+        ],
+        "cwd_args": [
+          "-C",
+          "{{cwd}}"
+        ],
+        "transport": "native_stdin",
+        "stdin": "{{context}}",
+        "resume_args": [
+          "exec",
+          "resume",
+          "--dangerously-bypass-approvals-and-sandbox",
+          "--json",
+          "{{session_id}}"
+        ],
+        "cwd_on_resume": false
+      },
+      "interactive": {
+        "args": [
+          "--dangerously-bypass-approvals-and-sandbox"
+        ],
+        "context_args": [
+          "{{context}}"
+        ]
+      },
+      "output_format": "codex_json"
+    },
+    {
+      "id": "gemini",
+      "name": "Gemini",
+      "executable": "gemini",
+      "automated": {
+        "args": [
+          "--yolo"
+        ],
+        "context_args": [
+          "-p",
+          "{{context}}"
+        ]
+      },
+      "interactive": {
+        "args": [
+          "--yolo"
+        ],
+        "context_args": [
+          "-i",
+          "{{context}}"
+        ]
+      },
+      "output_format": "plain"
+    },
+    {
+      "id": "copilot",
+      "name": "GitHub Copilot",
+      "executable": "copilot",
+      "automated": {
+        "args": [
+          "--allow-all",
+          "--output-format",
+          "json",
+          "--no-color",
+          "--no-auto-update"
+        ],
+        "context_args": [
+          "-p",
+          "{{context}}"
+        ],
+        "cwd_args": [
+          "-C",
+          "{{cwd}}"
+        ],
+        "resume_args": [
+          "--allow-all",
+          "--output-format",
+          "json",
+          "--no-color",
+          "--no-auto-update",
+          "--resume={{session_id}}"
+        ]
+      },
+      "interactive": {
+        "args": [
+          "--allow-all"
+        ],
+        "context_args": [
+          "-i",
+          "{{context}}"
+        ]
+      },
+      "output_format": "copilot_json"
+    },
+    {
+      "id": "smoke-ai",
+      "name": "Smoke AI",
+      "executable": "smoke-ai",
+      "automated": {
+        "args": [],
+        "context_args": [
+          "{{context}}"
+        ]
+      },
+      "interactive": {
+        "args": [],
+        "context_args": [
+          "{{context}}"
+        ]
+      },
+      "output_format": "plain"
+    }
+  ]
+}

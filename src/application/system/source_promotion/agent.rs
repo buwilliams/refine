@@ -183,15 +183,17 @@ impl FileSourcePromotionService {
         );
         metadata.insert("operation_id".to_string(), json!(&operation.id));
         metadata.insert("provider".to_string(), json!(provider));
-        let process = match HostAgentProviderService::with_runtime_root(&self.port_runtime_root)
-            .launch_managed(ProviderInvocation {
-                stall_timeout_seconds: None,
-                provider: provider.to_string(),
-                prompt,
-                session_id: None,
-                cwd: Some(snapshot.checkout_path.clone()),
-                process_metadata: metadata,
-            }) {
+        let mut provider_service =
+            HostAgentProviderService::with_runtime_root(&self.port_runtime_root);
+        provider_service.refine_dir = template_root;
+        let process = match provider_service.launch_managed(ProviderInvocation {
+            stall_timeout_seconds: None,
+            provider: provider.to_string(),
+            prompt,
+            session_id: None,
+            cwd: Some(snapshot.checkout_path.clone()),
+            process_metadata: metadata,
+        }) {
             Ok(process) => process,
             Err(error) => {
                 self.fail_agent_operation(

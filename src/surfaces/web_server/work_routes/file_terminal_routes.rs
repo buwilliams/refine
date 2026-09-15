@@ -1,13 +1,12 @@
 use super::{
-    ApiRequest, ApiResponse, ConfigService, HostAgentProviderService, InProcessWebServer, PathBuf,
-    RefineError, TerminalLaunchSpec, TerminalSessionLaunchSurface, Value,
-    cleanup_failed_terminal_worktree, create_terminal_standalone_worktree,
-    default_interactive_shell, error_response, files_read_response, files_search_response,
-    files_tree_response, find_goal_agent_session, json, query_param,
-    resume_terminal_standalone_worktree, runtime_root_unavailable, target_root_unavailable,
-    terminal_events_range, terminal_input_response, terminal_profile_prompt,
-    terminal_resize_response, terminal_session_start_response, terminal_status_response,
-    terminal_stop_response,
+    ApiRequest, ApiResponse, ConfigService, InProcessWebServer, PathBuf, RefineError,
+    TerminalLaunchSpec, TerminalSessionLaunchSurface, Value, cleanup_failed_terminal_worktree,
+    create_terminal_standalone_worktree, default_interactive_shell, error_response,
+    files_read_response, files_search_response, files_tree_response, find_goal_agent_session, json,
+    query_param, resume_terminal_standalone_worktree, runtime_root_unavailable,
+    target_root_unavailable, terminal_events_range, terminal_input_response,
+    terminal_profile_prompt, terminal_resize_response, terminal_session_start_response,
+    terminal_status_response, terminal_stop_response,
 };
 use crate::application::work_items::FileWorkItemService;
 
@@ -289,7 +288,7 @@ impl InProcessWebServer {
                         .and_then(Value::as_str)
                         .map(str::to_string)
                 })
-                .unwrap_or_else(|| "claude".to_string());
+                .unwrap_or_default();
             let prompt = match skill_prompt.map(Ok).unwrap_or_else(|| {
                 terminal_profile_prompt(
                     self,
@@ -315,7 +314,10 @@ impl InProcessWebServer {
                 ("REFINE_TERMINAL".to_string(), "1".to_string()),
                 ("REFINE_SESSION_ROLE".to_string(), profile.clone()),
             ];
-            let provider_service = HostAgentProviderService::with_runtime_root(&runtime_root);
+            let provider_service = match self.agent_provider_service() {
+                Ok(service) => service,
+                Err(error) => return error_response(error),
+            };
             let command = match provider_service.interactive_command_with_environment(
                 &provider,
                 &prompt,

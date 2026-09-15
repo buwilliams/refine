@@ -17,28 +17,28 @@ pub enum AgentAction {
     Detect,
     /// Configure an agent provider so workflows can invoke it.
     Configure {
-        /// Agent provider name (e.g. "claude").
-        #[arg(long, default_value = "claude")]
+        /// Provider ID; omitted uses this node selection or the system default.
+        #[arg(long, default_value = "")]
         provider: String,
     },
     /// Check or initiate authentication for an agent provider.
     Auth {
-        /// Agent provider name (e.g. "claude").
-        #[arg(long, default_value = "claude")]
+        /// Provider ID; omitted uses this node selection or the system default.
+        #[arg(long, default_value = "")]
         provider: String,
     },
     /// Run diagnostics for an agent provider and report configuration or auth problems.
     Diagnose {
-        /// Agent provider name (e.g. "claude").
-        #[arg(long, default_value = "claude")]
+        /// Provider ID; omitted uses this node selection or the system default.
+        #[arg(long, default_value = "")]
         provider: String,
     },
     /// Invoke an agent once with a prompt and print the result. Useful for testing provider setup.
     Invoke {
         /// Prompt text to send to the agent.
         prompt: String,
-        /// Agent provider name (e.g. "claude").
-        #[arg(long, default_value = "claude")]
+        /// Provider ID; omitted uses this node selection or the system default.
+        #[arg(long, default_value = "")]
         provider: String,
         /// Working directory for the agent run.
         #[arg(long)]
@@ -48,8 +48,8 @@ pub enum AgentAction {
     Resume {
         /// Agent session id to resume.
         session_id: String,
-        /// Agent provider name (e.g. "claude").
-        #[arg(long, default_value = "claude")]
+        /// Provider ID; omitted uses this node selection or the system default.
+        #[arg(long, default_value = "")]
         provider: String,
     },
 }

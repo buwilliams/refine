@@ -34,6 +34,7 @@ const MAX_TOOLBAR_ATTACHMENT_ACKS: usize = 32;
 
 #[derive(Clone, Debug)]
 pub struct GoalAgentLaunch {
+    pub refine_dir: Option<PathBuf>,
     pub runtime_root: PathBuf,
     pub cwd: PathBuf,
     pub provider: String,

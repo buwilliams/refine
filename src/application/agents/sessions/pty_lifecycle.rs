@@ -247,7 +247,8 @@ pub(super) fn launch_session(launch: GoalAgentLaunch) -> RefineResult<StartedSes
         )));
     }
 
-    let provider_service = HostAgentProviderService::with_runtime_root(&launch.runtime_root);
+    let mut provider_service = HostAgentProviderService::with_runtime_root(&launch.runtime_root);
+    provider_service.refine_dir = launch.refine_dir.clone();
     let implementation_phase = launch
         .metadata
         .get("implementation_phase")

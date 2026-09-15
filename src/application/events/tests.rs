@@ -398,8 +398,13 @@ print(json.dumps(result))
     }
     let root = crate::infrastructure::storage::project_layout::refine_dir_for_target_root(&target)
         .unwrap();
+    let mut catalog = crate::model::providers::defaults();
+    let mut configured = crate::model::providers::ProviderDefinition::generic("WorkflowFixture");
+    configured.executable = provider.to_string_lossy().into_owned();
+    catalog.providers.push(configured);
+    crate::application::agents::providers::save(&root, &json!(catalog)).unwrap();
     FileSettingsService::new(&root)
-        .update(&json!({"agent_cli":"smoke-ai","parallel_run_cap":2}))
+        .update(&json!({"agent_cli":"WorkflowFixture","parallel_run_cap":2}))
         .unwrap();
     let service = FileEventService::with_runtime_root(&root, fixture.0.join("runtime"));
     service.config().unwrap();
@@ -1221,18 +1226,52 @@ fn reusable_skill_assignments_preserve_shared_edits_and_derive_the_workflow_resu
     assert_eq!(shown["triggers"].as_array().unwrap().len(), 2);
     let shared = service.config().unwrap();
     for (source, expected_role) in [("custom", "task"), ("workflow.quality.enter", "quality")] {
-        let prepared = service.prepare_pinned(&shared, &shared.events[source], service.manual_context(&fixture.0, &json!({})).unwrap(), BTreeMap::new(), &format!("shared-{expected_role}")).unwrap();
-        let binding = prepared.bindings.iter().find(|binding| binding.skill.id == "review").unwrap();
+        let prepared = service
+            .prepare_pinned(
+                &shared,
+                &shared.events[source],
+                service.manual_context(&fixture.0, &json!({})).unwrap(),
+                BTreeMap::new(),
+                &format!("shared-{expected_role}"),
+            )
+            .unwrap();
+        let binding = prepared
+            .bindings
+            .iter()
+            .find(|binding| binding.skill.id == "review")
+            .unwrap();
         assert_eq!(binding.skill.role, expected_role);
     }
     let edited = service.save("skills", "review", json!({"revision":saved["revision"],"item":{"name":"Review", "prompt":"Updated shared instructions"}})).unwrap();
-    assert_eq!(service.show_skill("review").unwrap()["triggers"], shown["triggers"]);
-    assert!(service.save("skills", "review", json!({"revision":edited["revision"], "item":item,"trigger":{"source":"custom"}})).is_err());
+    assert_eq!(
+        service.show_skill("review").unwrap()["triggers"],
+        shown["triggers"]
+    );
+    assert!(
+        service
+            .save(
+                "skills",
+                "review",
+                json!({"revision":edited["revision"], "item":item,"trigger":{"source":"custom"}})
+            )
+            .is_err()
+    );
     // Removing one assignment retains the shared Skill and its other assignment.
     let detached = service.save("skills", "review", json!({"revision":edited["revision"],"item":edited["item"],"event_bindings":[{"event_id":"workflow.quality.enter","binding":{"id":"two","skill_id":"review"}}]})).unwrap();
-    assert_eq!(service.show_skill("review").unwrap()["triggers"].as_array().unwrap().len(), 1);
-    assert_eq!(service.show_skill("review").unwrap()["item"]["prompt"], "Updated shared instructions");
-    service.remove("skills", "review", detached["revision"].as_u64().unwrap()).unwrap();
+    assert_eq!(
+        service.show_skill("review").unwrap()["triggers"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    assert_eq!(
+        service.show_skill("review").unwrap()["item"]["prompt"],
+        "Updated shared instructions"
+    );
+    service
+        .remove("skills", "review", detached["revision"].as_u64().unwrap())
+        .unwrap();
     assert_eq!(
         service.config().unwrap().events["workflow.quality.enter"]
             .bindings
@@ -1434,7 +1473,11 @@ fn reusable_skills_upgrade_preserves_existing_configuration() {
     let service = fixture.service();
     let mut old = (*service.config().unwrap()).clone();
     old.schema_version = 2;
-    crate::infrastructure::storage::automation::write_json(&service.refine_dir.join("automation/config.json"), &old).unwrap();
+    crate::infrastructure::storage::automation::write_json(
+        &service.refine_dir.join("automation/config.json"),
+        &old,
+    )
+    .unwrap();
     let upgraded = service.config().unwrap();
     assert_eq!(upgraded.schema_version, SCHEMA_VERSION);
     assert_eq!(upgraded.revision, old.revision + 1);
@@ -1542,20 +1585,32 @@ fn hub_skill_associations_pin_context_and_protect_product_skill() {
 fn existing_installations_receive_product_skill_once_and_keep_edits() {
     let fixture = Fixture::new();
     let service = fixture.service();
-    let store = crate::infrastructure::storage::automation::AutomationStore::new(&service.refine_dir);
+    let store =
+        crate::infrastructure::storage::automation::AutomationStore::new(&service.refine_dir);
     let first = service.config().unwrap();
-    store.update(first.revision, |config| {
-        config.skills.remove(super::hub_skill::ID);
-        config.events.remove(super::hub_skill::ID);
-        Ok(())
-    }).unwrap();
+    store
+        .update(first.revision, |config| {
+            config.skills.remove(super::hub_skill::ID);
+            config.events.remove(super::hub_skill::ID);
+            Ok(())
+        })
+        .unwrap();
     let installed = service.config().unwrap();
     assert!(installed.skills.contains_key(super::hub_skill::ID));
     assert_eq!(installed.revision, first.revision + 2);
     let mut item = service.show_skill(super::hub_skill::ID).unwrap()["item"].clone();
     item["prompt"] = json!("Our documentation style");
-    service.save("skills", super::hub_skill::ID, json!({"revision":installed.revision,"item":item})).unwrap();
+    service
+        .save(
+            "skills",
+            super::hub_skill::ID,
+            json!({"revision":installed.revision,"item":item}),
+        )
+        .unwrap();
     let edited = service.config().unwrap();
-    assert_eq!(edited.skills[super::hub_skill::ID].prompt, "Our documentation style");
+    assert_eq!(
+        edited.skills[super::hub_skill::ID].prompt,
+        "Our documentation style"
+    );
     assert_eq!(service.config().unwrap().revision, edited.revision);
 }

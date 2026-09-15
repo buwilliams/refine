@@ -9,6 +9,17 @@ fn events_skills_and_runtime_command_trees_parse_and_retired_editors_are_rejecte
     for args in [
         vec!["refine", "config", "show"],
         vec!["refine", "config", "show", "skills"],
+        vec!["refine", "config", "providers", "show"],
+        vec!["refine", "config", "providers", "select"],
+        vec!["refine", "config", "providers", "select", "CustomAgent"],
+        vec![
+            "refine",
+            "config",
+            "providers",
+            "save",
+            "--file",
+            "providers.json",
+        ],
         vec![
             "refine",
             "config",
@@ -97,7 +108,7 @@ fn config_help_documents_scope_boundary_and_catalogs_every_family() {
         .iter()
         .map(|command| command["name"].as_str().unwrap())
         .collect::<Vec<_>>();
-    assert_eq!(names, ["show", "settings"]);
+    assert_eq!(names, ["show", "settings", "providers"]);
 }
 
 #[test]

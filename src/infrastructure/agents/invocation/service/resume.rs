@@ -65,24 +65,32 @@ impl HostAgentProviderService {
                 spec.display_name
             )));
         }
-        let args = spec.chat_args(&binary, "", Some(session_id), cwd);
         let launch_environment = EffectiveLaunchEnvironment::assemble(&ProcessOwner::Agent, &[])?;
-        let Some((launch_binary, launch_args)) = args.split_first() else {
-            return Err(RefineError::InvalidInput(
-                "provider command cannot be empty".to_string(),
-            ));
-        };
-        launch_environment.validate_launch(launch_binary, launch_args)?;
+        let prepared = self.prepare_provider_launch(
+            &spec,
+            binary,
+            ProviderLaunchRequest {
+                prompt: "",
+                session_id: Some(session_id),
+                interactive_session: None,
+                cwd,
+                interactive: false,
+                environment: launch_environment,
+            },
+        )?;
+        let args = std::iter::once(prepared.binary.clone())
+            .chain(prepared.args.clone())
+            .collect::<Vec<_>>();
         self.run_provider_command_result_with_output(
             ProviderCommandExecution {
                 args: &args,
-                stdin: None,
+                stdin: prepared.stdin,
                 cwd,
-                launch_environment: &launch_environment,
+                launch_environment: &prepared.launch_environment,
                 environment_overrides: &[],
                 output_format: &spec.output_format,
                 process_metadata,
-                authorization_command: None,
+                authorization_command: Some(prepared.authorization_command),
                 stall_timeout_seconds: None,
             },
             on_output,

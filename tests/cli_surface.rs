@@ -53,6 +53,7 @@ fn cli_surface_suite() {
     system_status_reports_healthy_daemon(&fixture);
     project_status_is_attached_to_test_app(&fixture);
     config_commands_route_through_the_active_daemon(&fixture);
+    provider_configuration_commands(&fixture);
     daemon_backed_project_status_suppresses_ambiguous_default_label(&fixture);
     project_doctor_runs(&fixture);
     project_registry_lifecycle_commands(&fixture);
@@ -70,4 +71,11 @@ fn cli_surface_suite() {
     fleet_local_registry_commands(&fixture);
     log_commands_query_public_activity(&fixture);
     agent_commands_use_smoke_ai(&fixture);
+}
+
+#[test]
+#[ignore = "daemon-backed provider configuration; run through the xtask CLI fixture"]
+fn provider_configuration_surface_suite() {
+    let fixture = IntegrationFixture::start("provider-configuration");
+    provider_configuration_commands(&fixture);
 }

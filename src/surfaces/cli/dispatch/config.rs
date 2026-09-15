@@ -26,6 +26,16 @@ pub(crate) fn dispatch_config(action: ConfigAction) -> RefineResult<Value> {
             None => read_all(target_root),
         },
         ConfigAction::Settings { action } => dispatch_settings(action),
+        ConfigAction::Providers { action } => match action {
+            ConfigProvidersAction::Show => daemon_json("GET", "/providers", None),
+            ConfigProvidersAction::Save { payload } => {
+                let body = decode_config_input(payload, Default::default(), "AI provider catalog")?;
+                daemon_json("PUT", "/providers", Some(body))
+            }
+            ConfigProvidersAction::Select { provider } => {
+                daemon_json("PATCH", "/settings", Some(json!({"agent_cli":provider})))
+            }
+        },
     }
 }
 
@@ -72,20 +82,30 @@ fn dispatch_settings(action: ConfigSettingsAction) -> RefineResult<Value> {
 
 fn read_all(target_root: Option<PathBuf>) -> RefineResult<Value> {
     let settings = read_domain(ConfigDomain::Settings, target_root.clone())?;
-    let skills = read_domain(ConfigDomain::Skills, target_root)?;
-    Ok(json!({"settings": settings.get("settings").unwrap_or(&settings), "skills": skills}))
+    let skills = read_domain(ConfigDomain::Skills, target_root.clone())?;
+    let providers = read_domain(ConfigDomain::Providers, target_root)?;
+    Ok(
+        json!({"settings": settings.get("settings").unwrap_or(&settings), "skills": skills, "providers": providers}),
+    )
 }
 
 fn read_domain(domain: ConfigDomain, target_root: Option<PathBuf>) -> RefineResult<Value> {
     let path = match domain {
         ConfigDomain::Settings => "/settings",
         ConfigDomain::Skills => "/skills",
+        ConfigDomain::Providers => "/providers",
     };
     match target_root {
         None => daemon_json("GET", path, None),
         Some(target_root) => {
             let refine_dir = refine_dir_for_target_root(&target_root)?;
             match domain {
+                ConfigDomain::Providers => crate::application::agents::providers::response(
+                    &refine_dir,
+                    FileSettingsService::new(&refine_dir)
+                        .provider_override()?
+                        .as_deref(),
+                ),
                 ConfigDomain::Settings => FileSettingsService::new(refine_dir).list_response(),
                 ConfigDomain::Skills => {
                     crate::application::events::FileEventService::new(refine_dir)

@@ -73,7 +73,9 @@ impl DiagnosticsService for FileDiagnosticsService {
             FileProjectRegistryService::new(project_registry_root, self.target_root.clone())
                 .status()?;
         let process_summary = FileProcessSupervisor::new(&self.runtime_root).list()?;
-        let providers = HostAgentProviderService::new().detect().unwrap_or_default();
+        let mut provider_service = HostAgentProviderService::with_runtime_root(&self.runtime_root);
+        provider_service.refine_dir = project_status.refine_dir.as_ref().map(PathBuf::from);
+        let providers = provider_service.detect()?;
         let installed_providers = providers
             .iter()
             .filter(|provider| provider.installed)

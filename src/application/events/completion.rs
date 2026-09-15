@@ -93,7 +93,8 @@ pub(crate) fn run(
 ) -> RefineResult<SkillResult> {
     let context = invocation.context.clone();
     let id = invocation.id.clone();
-    let provider = HostAgentProviderService::with_runtime_root(service.runtime()?);
+    let provider = HostAgentProviderService::with_runtime_root(service.runtime()?)
+        .with_refine_dir(&service.refine_dir);
     let git = FileGitWorktreeService::with_runtime_root(&context.cwd, service.runtime()?);
     let git = if let Some(workspace) = &context.workspace {
         git.with_managed_worktree(workspace.clone())?

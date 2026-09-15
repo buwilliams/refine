@@ -188,6 +188,7 @@ fn planning_session_returns_the_structured_result_from_its_completion_signal() {
     metadata.insert("implementation_phase".to_string(), json!("plan"));
     let result = run_goal_agent(
         GoalAgentLaunch {
+            refine_dir: None,
             provider_session: None,
             runtime_root,
             cwd: app_root,
@@ -247,6 +248,7 @@ fn goal_agent_hard_cap_terminates_a_session_without_a_completion_signal() {
     let started_at = std::time::Instant::now();
     let error = run_goal_agent(
         GoalAgentLaunch {
+            refine_dir: None,
             provider_session: None,
             runtime_root: runtime_root.clone(),
             cwd: app_root,
@@ -308,6 +310,7 @@ fn goal_agent_idle_timeout_fails_fast_and_preserves_the_transcript() {
     let started_at = std::time::Instant::now();
     let error = run_goal_agent(
         GoalAgentLaunch {
+            refine_dir: None,
             provider_session: None,
             runtime_root: runtime_root.clone(),
             cwd: app_root,
@@ -388,6 +391,7 @@ fn goal_agent_survives_a_deleted_command_channel() {
 
     let result = run_goal_agent(
         GoalAgentLaunch {
+            refine_dir: None,
             provider_session: None,
             runtime_root: runtime_root.clone(),
             cwd: app_root,
@@ -432,7 +436,18 @@ fn workflow_goal_agent_providers_receive_the_same_composed_specification() {
         permissions.set_mode(0o755);
         fs::set_permissions(&path, permissions).unwrap();
     }
+    let state_root = root.join("state");
+    let mut catalog = crate::model::providers::defaults();
+    catalog
+        .providers
+        .push(crate::model::providers::ProviderDefinition::generic(
+            "custom-agent",
+        ));
+    crate::infrastructure::storage::providers::ProviderStore::new(&state_root)
+        .save(catalog)
+        .unwrap();
     let service = HostAgentProviderService {
+        refine_dir: Some(state_root),
         path_override: Some(bin_dir.display().to_string()),
         runtime_root: Some(root.join("run/8082/agents")),
     };
@@ -499,6 +514,7 @@ fn workflow_goal_agent_is_discoverable_and_attachable_while_running() {
         metadata.insert("goal_id".to_string(), json!("GOAL1"));
         run_goal_agent(
             GoalAgentLaunch {
+                refine_dir: None,
                 provider_session: None,
                 runtime_root: runtime_for_thread,
                 cwd: app_for_thread,
@@ -551,6 +567,7 @@ fn workflow_goal_agent_is_discoverable_and_attachable_while_running() {
     duplicate_metadata.insert("goal_id".to_string(), json!("GOAL1"));
     let duplicate = run_goal_agent(
         GoalAgentLaunch {
+            refine_dir: None,
             provider_session: None,
             runtime_root: runtime_root.clone(),
             cwd: app_root.clone(),
@@ -617,6 +634,7 @@ fn workflow_goal_agent_surfaces_needs_input_and_continues_same_session() {
         metadata.insert("goal_id".to_string(), json!("GOAL2"));
         run_goal_agent(
             GoalAgentLaunch {
+                refine_dir: None,
                 provider_session: None,
                 runtime_root: runtime_for_thread,
                 cwd: app_for_thread,
@@ -687,6 +705,7 @@ fn workflow_goal_agent_handoff_survives_dead_process_recovery() {
     metadata.insert("goal_id".to_string(), json!("GOAL-RECOVERY"));
     let result = run_goal_agent_session(
         GoalAgentLaunch {
+            refine_dir: None,
             provider_session: None,
             runtime_root: runtime_root.clone(),
             cwd: app_root,
@@ -807,6 +826,7 @@ fn workflow_goal_agent_pty_delivers_oversized_prompts_by_file_with_final_environ
     let prompt = format!("{secret}{}", "p".repeat(80_000 - secret.len()));
     let result = run_goal_agent(
         GoalAgentLaunch {
+            refine_dir: None,
             provider_session: None,
             runtime_root,
             cwd: app_root,
@@ -856,6 +876,7 @@ fn workflow_goal_agent_early_exec_failure_preserves_errno_and_cleans_channels() 
 
     let error = run_goal_agent(
         GoalAgentLaunch {
+            refine_dir: None,
             provider_session: None,
             runtime_root: runtime_root.clone(),
             cwd: app_root,
@@ -1077,6 +1098,7 @@ fn goal_agent_survives_transient_pty_eio_while_writing_its_signal_slowly() {
 
     let result = run_goal_agent(
         GoalAgentLaunch {
+            refine_dir: None,
             provider_session: None,
             runtime_root,
             cwd: app_root,
@@ -1141,6 +1163,7 @@ fn goal_agent_ansi_only_output_keeps_the_session_alive() {
 
     let result = run_goal_agent(
         GoalAgentLaunch {
+            refine_dir: None,
             provider_session: None,
             runtime_root,
             cwd: app_root,
@@ -1192,6 +1215,7 @@ fn goal_agent_idle_kill_takes_the_whole_process_group_down() {
     let started_at = std::time::Instant::now();
     let error = run_goal_agent(
         GoalAgentLaunch {
+            refine_dir: None,
             provider_session: None,
             runtime_root,
             cwd: app_root,
@@ -1254,6 +1278,7 @@ fn silent_goal_agent_remains_autonomous_without_requesting_input() {
     let mut attention = Vec::new();
     let result = run_goal_agent(
         GoalAgentLaunch {
+            refine_dir: None,
             provider_session: None,
             runtime_root,
             cwd: app_root,

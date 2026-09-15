@@ -197,7 +197,11 @@ impl InProcessWebServer {
                     Ok(prompt) => prompt,
                     Err(error) => return error_response(error),
                 };
-                match self.agent_provider_service().invoke(ProviderInvocation {
+                match (match self.agent_provider_service() {
+                    Ok(service) => service,
+                    Err(error) => return error_response(error),
+                })
+                .invoke(ProviderInvocation {
                     stall_timeout_seconds: None,
                     provider: provider.clone(),
                     prompt,

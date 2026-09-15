@@ -26,9 +26,7 @@ use crate::application::work_items::{
 use crate::application::workers::FileRunnerWorkerService;
 use crate::application::workflow::governance::integration::FileGovernanceIntegrationService;
 use crate::error::RefineError;
-use crate::infrastructure::agents::invocation::{
-    AgentProviderService, HostAgentProviderService, ProviderInvocation,
-};
+use crate::infrastructure::agents::invocation::{AgentProviderService, ProviderInvocation};
 use crate::infrastructure::git::with_repository_git_lock;
 use crate::infrastructure::git::worktrees::{FileGitWorktreeService, GitWorktreeService};
 use crate::infrastructure::observability::activity::{ActivityService, FileActivityService};

@@ -60,6 +60,7 @@ fn toolbar_attachment_wins_a_deadline_race_then_completes() {
     let run = thread::spawn(move || {
         run_goal_agent(
             GoalAgentLaunch {
+                refine_dir: None,
                 provider_session: None,
                 runtime_root: runtime_for_thread,
                 cwd: app_for_thread,
@@ -165,6 +166,7 @@ fn ordinary_commands_stay_unprotected_and_cannot_attach_after_the_deadline() {
     let run = thread::spawn(move || {
         run_goal_agent(
             GoalAgentLaunch {
+                refine_dir: None,
                 provider_session: None,
                 runtime_root: runtime_for_thread,
                 cwd: app_for_thread,
