@@ -481,11 +481,60 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "succeeded",
+  "results": {
+    "default-governance": {
+      "invocation_id": "8fb876a7c0f54f2c298d6bc39e8a2f5db4495ee1a4e7902ff10b1b309b3f0d9b",
+      "binding_id": "default-governance",
+      "role": "governance",
+      "outcome": "success",
+      "summary": "PASS — the implementation satisfies the Goal, fits the architecture, and supports Refine’s purpose. Users can add and edit executable paths and argument templates in Settings > Runtime, including literal {{context}} substitution. Shared state stores the catalog and system default; node selections remain optional and preserve inheritance through unrelated saves. Tests demonstrate an unfamiliar provider launching with context and using edited parameters without rebuilding.\n\nResponsibilities are clear: Model defines configuration and validation, Application shares selection behavior, Infrastructure persists definitions and constructs supervised launches, and surfaces expose those operations. Existing provider modes and prompt transport are retained. User-owned, synchronized configuration expands agent choice while preserving inspectable state and recovery. No necessary corrections were found. The candidate remains unchanged and in Governance.\n\n",
+      "evidence": [
+        "Reviewed clean candidate 8205e5dff5f6baef48fe5d110802d5b3a24b879d against the Goal and all seven plan tasks.",
+        "Provider model, catalog storage, shared resolver, launch rendering, API/CLI operations, and Runtime editor implement configuration-only provider support.",
+        "Independent Governance rerun: cargo test --locked --lib application::agents::providers::tests -- --test-threads=1 — 7 passed.",
+        "Exact-candidate Quality reported 31 focused Rust checks and 26 Settings browser tests passed; compilation and formatting checks passed.",
+        "Full Quality suites retained 10 previously baseline-reproduced Rust failures, one cleanup failure that passed on rerun, and one baseline browser failure."
+      ],
+      "artifacts": {
+        "limitations": [
+          "Full suites are not green; baseline comparisons came from the earlier Quality invocation.",
+          "Execution tests use controlled executables; commercial-provider authentication was not exercised."
+        ],
+        "necessary_corrections": [],
+        "optional_improvements": []
+      }
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "default-governance",
+      "checkout": {
+        "observation": {
+          "branch": "refine/00000T19PJVMBGJ0Y33NWRJ002/round-1",
+          "head_commit": "8205e5dff5f6baef48fe5d110802d5b3a24b879d",
+          "status_porcelain": []
+        },
+        "tree": "8ac8f8b020c54d5fa8a8cffbd20a57886e98832c"
+      },
+      "checkout_recorded": true,
+      "diagnostic": null,
+      "host_bound_result": true,
+      "observational_violation": false,
+      "operation_id": null,
+      "process_id": "proc-1789509678049-1014481-45404",
+      "prompt_bytes": 7379,
+      "provider_session_id": null,
+      "purpose": "work",
+      "raw_output": "{\n  \"outcome\": \"success\",\n  \"evidence\": [\n    \"Reviewed clean candidate 8205e5dff5f6baef48fe5d110802d5b3a24b879d against the Goal and all seven plan tasks.\",\n    \"Provider model, catalog storage, shared resolver, launch rendering, API/CLI operations, and Runtime editor implement configuration-only provider support.\",\n    \"Independent Governance rerun: cargo test --locked --lib application::agents::providers::tests -- --test-threads=1 — 7 passed.\",\n    \"Exact-candidate Quality reported 31 focused Rust checks and 26 Settings browser tests passed; compilation and formatting checks passed.\",\n    \"Full Quality suites retained 10 previously baseline-reproduced Rust failures, one cleanup failure that passed on rerun, and one baseline browser failure.\"\n  ],\n  \"artifacts\": {\n    \"necessary_corrections\": [],\n    \"optional_improvements\": [],\n    \"limitations\": [\n      \"Full suites are not green; baseline comparisons came from the earlier Quality invocation.\",\n      \"Execution tests use controlled executables; commercial-provider authentication was not exercised.\"\n    ]\n  },\n  \"summary\": \"PASS — the implementation satisfies the Goal, fits the architecture, and supports Refine’s purpose. Users can add and edit executable paths and argument templates in Settings > Runtime, including literal {{context}} substitution. Shared state stores the catalog and system default; node selections remain optional and preserve inheritance through unrelated saves. Tests demonstrate an unfamiliar provider launching with context and using edited parameters without rebuilding.\\n\\nResponsibilities are clear: Model defines configuration and validation, Application shares selection behavior, Infrastructure persists definitions and constructs supervised launches, and surfaces expose those operations. Existing provider modes and prompt transport are retained. User-owned, synchronized configuration expands agent choice while preserving inspectable state and recovery. No necessary corrections were found. The candidate remains unchanged and in Governance.\\n\\n\"\n}",
+      "received_at": "2026-09-15T22:03:31.090270295+00:00",
+      "started_at": "2026-09-15T22:01:18.016537597+00:00",
+      "workflow_revision": 12
+    }
+  ],
   "created_at": "2026-09-15T22:01:16.491188819+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-15T22:03:32.456658602+00:00",
   "error": null,
   "action_applied": false
 }
