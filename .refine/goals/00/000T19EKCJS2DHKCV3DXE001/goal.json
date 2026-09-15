@@ -1,9 +1,9 @@
 {
   "base_commit": "d5a74a62db1e0dcabc124c55c8a78da5c73f8efb",
   "branch_name": "refine/00000T19EKCJS2DHKCV3DXE001/round-1",
-  "candidate_commit": "796a2d96c448319323aa2155b2f3317f49e83942",
+  "candidate_commit": "89b7397010673c051fc4a153bb07ba3525b6c529",
   "created": "2026-09-15T16:08:09Z",
-  "event_generation": 5,
+  "event_generation": 6,
   "feature_id": null,
   "feature_order": null,
   "id": "00000T19EKCJS2DHKCV3DXE001",
@@ -46,11 +46,11 @@
       "created": "2026-09-15T16:08:09Z",
       "event_configuration": {
         "events": {
-          "workflow.quality.enter": {
+          "workflow.governance.enter": {
             "bindings": [
               {
                 "enabled": true,
-                "id": "default-quality",
+                "id": "default-governance",
                 "inputs": {},
                 "mode": "blocking",
                 "order": 0,
@@ -58,30 +58,30 @@
                 "scope": {
                   "node_id": null
                 },
-                "skill_id": "default-quality"
+                "skill_id": "default-governance"
               }
             ],
             "enabled": true,
-            "id": "workflow.quality.enter",
+            "id": "workflow.governance.enter",
             "kind": "system",
-            "name": "Workflow Quality Enter",
+            "name": "Workflow Governance Enter",
             "on_success": null,
             "parameters": [],
             "scope": {
               "node_id": null
             },
-            "source": "workflow.quality.enter"
+            "source": "workflow.governance.enter"
           }
         },
         "revision": 82,
         "schema_version": 3,
         "skills": {
-          "default-quality": {
+          "default-governance": {
             "enabled": true,
-            "id": "default-quality",
-            "name": "Quality",
+            "id": "default-governance",
+            "name": "Governance",
             "parameters": [],
-            "prompt": "## Quality\n\nTest the implementation. Create and groom tests to cover the behavior described in the plan.\n\n### Outcome\n\nMeaningful tests cover the changed behavior and pass. Provide a brief report of the behavior tested, tests added or updated, commands run and their results, and any remaining failures or gaps. Include runtime or browser test results where useful. These results support Governance's verification of the work.\n\n### Guardrails\n\n- Test observable behavior, including relevant failure cases and effects on existing functionality. Tests should catch defects rather than mirror the implementation.\n- Keep useful tests, update tests for changed behavior, and remove obsolete or meaningless tests.\n- Investigate failures, correct problems in the implementation or tests, and rerun affected tests.\n- Choose tests suited to the change. Expand coverage when failures or affected behavior call for it.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
+            "prompt": "## Governance\n\nVerify that the implementation meets the user-defined Goal, fits the system architecture, and serves the project's purpose.\n\n### Outcome\n\nA clear assessment of whether the implementation satisfies all three. Begin with the verdict, then briefly explain how the work meets the Goal, fits the architecture, and supports the project's purpose, using concrete evidence from the implementation and Quality results. For each gap, describe what falls short, why it matters, and the recommended correction. Separate necessary corrections from optional improvements.\n\n### Guardrails\n\n- Read the context that helps explain the user's Goal, the system architecture, and the project's purpose.\n- Compare the implementation with the user's desired outcome as well as the plan. Completing the plan and passing tests alone do not establish that the Goal is met.\n- Look for clear responsibilities, shared behavior implemented in one place, and interfaces that remain easy to use and maintain.\n- Judge design choices by how they serve the project. Allow sound approaches that differ from personal preference.\n- Group related issues by their underlying cause so the next step can address them together.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
             "provenance": "refine-default-v1",
             "role": "task",
             "scope": {
@@ -127,6 +127,37 @@
           },
           "round_idx": 0,
           "source": "workflow.implement.enter",
+          "state": "succeeded"
+        },
+        "dc6126dbaf39a333d2843ca569686d320c22ed4a475ad7b85868f10b7a6b33f4": {
+          "candidate_commit": "796a2d96c448319323aa2155b2f3317f49e83942",
+          "generation": 5,
+          "results": {
+            "default-quality": {
+              "artifacts": {
+                "evidence_directory": "/tmp/refine-new-chevron-quality",
+                "limitations": "Browser tests use Chromium with fixture APIs; no live daemon mutation was tested.",
+                "remaining_failures": "Broader Rust navigation suite: 7 passed, 2 failed. Both failures reproduce on the base commit: obsolete Controls-menu expectations and missing Guide targets. Repository-wide formatting also fails in 10 files byte-identical to the base.",
+                "tests_updated": "Added six layout/theme cases in tests/web_navigation_browser.test.js and extended creation-flow tests to click icons and labels directly.",
+                "verification": [
+                  "Browser navigation suite: 16 passed, zero failures or skips.",
+                  "Focused Rust New-menu test: passed.",
+                  "Visual review: expanded desktop, collapsed desktop, and mobile in light and dark themes passed.",
+                  "Verified rendered icons, alignment, readable labels, viewport fit, keyboard dismissal, and creation failure handling.",
+                  "New regression test correctly fails against the base commit's missing chevron.",
+                  "Changed-file formatting, JavaScript syntax, and git diff --check passed."
+                ]
+              },
+              "binding_id": "default-quality",
+              "evidence": [],
+              "invocation_id": "dc6126dbaf39a333d2843ca569686d320c22ed4a475ad7b85868f10b7a6b33f4",
+              "outcome": "success",
+              "role": "quality",
+              "summary": "The planned behavior passes Quality. Six browser regressions were added, and icon/label activation coverage was strengthened. No implementation corrections were needed. Remaining broader failures are confirmed baseline issues.\n\n"
+            }
+          },
+          "round_idx": 0,
+          "source": "workflow.quality.enter",
           "state": "succeeded"
         }
       },
@@ -369,6 +400,78 @@
               }
             }
           }
+        },
+        "5:default:workflow.quality.exit": {
+          "events": {
+            "workflow.quality.exit": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.quality.exit",
+              "kind": "system",
+              "name": "Workflow Quality Exit",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.quality.exit"
+            }
+          },
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {}
+        },
+        "5:default:workflow.quality.success": {
+          "events": {},
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {}
+        },
+        "6:default:workflow.governance.enter": {
+          "events": {
+            "workflow.governance.enter": {
+              "bindings": [
+                {
+                  "enabled": true,
+                  "id": "default-governance",
+                  "inputs": {},
+                  "mode": "blocking",
+                  "order": 0,
+                  "overrides": null,
+                  "scope": {
+                    "node_id": null
+                  },
+                  "skill_id": "default-governance"
+                }
+              ],
+              "enabled": true,
+              "id": "workflow.governance.enter",
+              "kind": "system",
+              "name": "Workflow Governance Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.governance.enter"
+            }
+          },
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {
+            "default-governance": {
+              "enabled": true,
+              "id": "default-governance",
+              "name": "Governance",
+              "parameters": [],
+              "prompt": "## Governance\n\nVerify that the implementation meets the user-defined Goal, fits the system architecture, and serves the project's purpose.\n\n### Outcome\n\nA clear assessment of whether the implementation satisfies all three. Begin with the verdict, then briefly explain how the work meets the Goal, fits the architecture, and supports the project's purpose, using concrete evidence from the implementation and Quality results. For each gap, describe what falls short, why it matters, and the recommended correction. Separate necessary corrections from optional improvements.\n\n### Guardrails\n\n- Read the context that helps explain the user's Goal, the system architecture, and the project's purpose.\n- Compare the implementation with the user's desired outcome as well as the plan. Completing the plan and passing tests alone do not establish that the Goal is met.\n- Look for clear responsibilities, shared behavior implemented in one place, and interfaces that remain easy to use and maintain.\n- Judge design choices by how they serve the project. Allow sound approaches that differ from personal preference.\n- Group related issues by their underlying cause so the next step can address them together.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
+              "provenance": "refine-default-v1",
+              "role": "task",
+              "scope": {
+                "node_id": null
+              }
+            }
+          }
         }
       },
       "implementation_report": "workflow.implement.enter:default-implement: Task 1: Added New’s shared dropdown chevron. Task 2: Added the planned Lucide icons to all four actions, preserving labels, ordering, semantics, and command bindings. Existing CSS handles spacing and collapsed navigation. Task 3: Updated the static test; it and all four existing New-menu browser tests pass. Formatting and whitespace checks pass. No plan departures or unfinished implementation. Quality still needs the planned visual comparison across layouts and themes.",
@@ -428,8 +531,126 @@
         }
       ],
       "prompt": "The new menu item is missing a chevron indicating it is a drop-down. Add the chevron so that it matches the style of the other menu items, including the node, reporter, and tools contexts. Also, add icons (use the same icon pack we use for the other menu items) to the context menu. The goal is consistency.",
+      "quality_agent_report": "workflow.quality.enter:default-quality: The planned behavior passes Quality. Six browser regressions were added, and icon/label activation coverage was strengthened. No implementation corrections were needed. Remaining broader failures are confirmed baseline issues.\n\n",
+      "quality_candidate_commit": "89b7397010673c051fc4a153bb07ba3525b6c529",
+      "quality_checked_at": "2026-09-15T16:17:57Z",
+      "quality_details": {
+        "candidate_commit": "89b7397010673c051fc4a153bb07ba3525b6c529",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T19EKCJS2DHKCV3DXE001-round-1",
+        "diagnostics": [
+          "Reused Skill review workflow.quality.enter:default-quality for final candidate content: automation/invocations/dc6126dbaf39a333d2843ca569686d320c22ed4a475ad7b85868f10b7a6b33f4.json"
+        ],
+        "evaluation_scope": "isolated_candidate",
+        "operation_id": "1a0a5dc4f56ddd458",
+        "provider_attempts": [],
+        "quality_proof": {
+          "checked_at": "2026-09-15T16:17:57Z",
+          "checked_candidate_commit": "89b7397010673c051fc4a153bb07ba3525b6c529",
+          "evaluation_scope": "isolated_candidate",
+          "goal_id": "00000T19EKCJS2DHKCV3DXE001",
+          "operation_id": "1a0a5dc4f56ddd458",
+          "results": [
+            {
+              "command": "",
+              "evidence": "The planned behavior passes Quality. Six browser regressions were added, and icon/label activation coverage was strengthened. No implementation corrections were needed. Remaining broader failures are confirmed baseline issues.\n\n",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality"
+            }
+          ],
+          "round_idx": 0,
+          "schema_version": 1,
+          "skills": {
+            "invocations": {
+              "workflow.quality.enter:default-quality": "dc6126dbaf39a333d2843ca569686d320c22ed4a475ad7b85868f10b7a6b33f4"
+            },
+            "required_bindings": [
+              "workflow.quality.enter:default-quality"
+            ],
+            "requirements_id": "9fe971f6b60ac378d8ecd9e7e448b3fcb1ac096baf3723270caa2a43e20aec88"
+          },
+          "source_candidate_commit": "89b7397010673c051fc4a153bb07ba3525b6c529",
+          "state": "passed"
+        },
+        "results": [
+          {
+            "command": "",
+            "evidence": "The planned behavior passes Quality. Six browser regressions were added, and icon/label activation coverage was strengthened. No implementation corrections were needed. Remaining broader failures are confirmed baseline issues.\n\n",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality"
+          }
+        ],
+        "source_candidate_commit": "89b7397010673c051fc4a153bb07ba3525b6c529"
+      },
+      "quality_message": "Quality Skills reported success.",
+      "quality_requirements": {
+        "candidate_commit": "89b7397010673c051fc4a153bb07ba3525b6c529",
+        "id": "9fe971f6b60ac378d8ecd9e7e448b3fcb1ac096baf3723270caa2a43e20aec88",
+        "node_id": "default",
+        "required_bindings": [
+          "workflow.quality.enter:default-quality"
+        ],
+        "selected": [
+          {
+            "attachments": [],
+            "binding": {
+              "binding": {
+                "enabled": true,
+                "id": "default-quality",
+                "inputs": {},
+                "mode": "blocking",
+                "order": 0,
+                "overrides": null,
+                "scope": {
+                  "node_id": null
+                },
+                "skill_id": "default-quality"
+              },
+              "parameters": {},
+              "skill": {
+                "enabled": true,
+                "id": "default-quality",
+                "name": "Quality",
+                "parameters": [],
+                "prompt": "## Quality\n\nTest the implementation. Create and groom tests to cover the behavior described in the plan.\n\n### Outcome\n\nMeaningful tests cover the changed behavior and pass. Provide a brief report of the behavior tested, tests added or updated, commands run and their results, and any remaining failures or gaps. Include runtime or browser test results where useful. These results support Governance's verification of the work.\n\n### Guardrails\n\n- Test observable behavior, including relevant failure cases and effects on existing functionality. Tests should catch defects rather than mirror the implementation.\n- Keep useful tests, update tests for changed behavior, and remove obsolete or meaningless tests.\n- Investigate failures, correct problems in the implementation or tests, and rerun affected tests.\n- Choose tests suited to the change. Expand coverage when failures or affected behavior call for it.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
+                "provenance": "refine-default-v1",
+                "role": "quality",
+                "scope": {
+                  "node_id": null
+                }
+              }
+            },
+            "contract_version": 1,
+            "key": "workflow.quality.enter:default-quality"
+          }
+        ]
+      },
+      "quality_skill_results": [
+        {
+          "artifacts": {
+            "evidence_directory": "/tmp/refine-new-chevron-quality",
+            "limitations": "Browser tests use Chromium with fixture APIs; no live daemon mutation was tested.",
+            "remaining_failures": "Broader Rust navigation suite: 7 passed, 2 failed. Both failures reproduce on the base commit: obsolete Controls-menu expectations and missing Guide targets. Repository-wide formatting also fails in 10 files byte-identical to the base.",
+            "tests_updated": "Added six layout/theme cases in tests/web_navigation_browser.test.js and extended creation-flow tests to click icons and labels directly.",
+            "verification": [
+              "Browser navigation suite: 16 passed, zero failures or skips.",
+              "Focused Rust New-menu test: passed.",
+              "Visual review: expanded desktop, collapsed desktop, and mobile in light and dark themes passed.",
+              "Verified rendered icons, alignment, readable labels, viewport fit, keyboard dismissal, and creation failure handling.",
+              "New regression test correctly fails against the base commit's missing chevron.",
+              "Changed-file formatting, JavaScript syntax, and git diff --check passed."
+            ]
+          },
+          "binding_id": "workflow.quality.enter:default-quality",
+          "evidence": [],
+          "invocation_id": "dc6126dbaf39a333d2843ca569686d320c22ed4a475ad7b85868f10b7a6b33f4",
+          "outcome": "success",
+          "role": "quality",
+          "summary": "The planned behavior passes Quality. Six browser regressions were added, and icon/label activation coverage was strengthened. No implementation corrections were needed. Remaining broader failures are confirmed baseline issues.\n\n"
+        }
+      ],
+      "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "updated": "2026-09-15T16:12:45Z",
+      "updated": "2026-09-15T16:17:59Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-15T16:08:11Z",
         "generation": 2,
@@ -439,9 +660,9 @@
       "workspace_branch": "refine/00000T19EKCJS2DHKCV3DXE001/round-1"
     }
   ],
-  "status": "quality",
+  "status": "governance",
   "target_branch": "main",
-  "updated": "2026-09-15T16:12:45Z",
+  "updated": "2026-09-15T16:17:59Z",
   "workflow_controls": [
     {
       "actor": "operator",
@@ -505,7 +726,17 @@
       "round_idx": 0,
       "to": "quality",
       "workflow_revision": 20
+    },
+    {
+      "at": "2026-09-15T16:17:58.665431803+00:00",
+      "forced": false,
+      "from": "quality",
+      "generation": 6,
+      "node_id": "default",
+      "round_idx": 0,
+      "to": "governance",
+      "workflow_revision": 30
     }
   ],
-  "workflow_revision": 21
+  "workflow_revision": 31
 }

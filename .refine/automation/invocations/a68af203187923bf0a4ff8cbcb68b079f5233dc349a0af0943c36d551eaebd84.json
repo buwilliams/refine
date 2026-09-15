@@ -1,10 +1,10 @@
 {
-  "id": "dc6126dbaf39a333d2843ca569686d320c22ed4a475ad7b85868f10b7a6b33f4",
+  "id": "a68af203187923bf0a4ff8cbcb68b079f5233dc349a0af0943c36d551eaebd84",
   "event": {
-    "id": "workflow.quality.enter",
-    "name": "Workflow Quality Enter",
+    "id": "workflow.governance.enter",
+    "name": "Workflow Governance Enter",
     "kind": "system",
-    "source": "workflow.quality.enter",
+    "source": "workflow.governance.enter",
     "enabled": true,
     "scope": {
       "node_id": null
@@ -12,8 +12,8 @@
     "parameters": [],
     "bindings": [
       {
-        "id": "default-quality",
-        "skill_id": "default-quality",
+        "id": "default-governance",
+        "skill_id": "default-governance",
         "enabled": true,
         "mode": "blocking",
         "order": 0,
@@ -48,59 +48,43 @@
     "goal_id": "00000T19EKCJS2DHKCV3DXE001",
     "round_idx": 0,
     "workflow_revision": 2,
-    "candidate_commit": "796a2d96c448319323aa2155b2f3317f49e83942",
+    "candidate_commit": "89b7397010673c051fc4a153bb07ba3525b6c529",
     "data": {
       "context": {
-        "agent_context": {
-          "assembled_at": "2026-09-15T16:08:13Z",
-          "current_round": {
-            "assignee": "Buddy Williams",
-            "prompt": "The new menu item is missing a chevron indicating it is a drop-down. Add the chevron so that it matches the style of the other menu items, including the node, reporter, and tools contexts. Also, add icons (use the same icon pack we use for the other menu items) to the context menu. The goal is consistency.",
-            "reporter": "Buddy Williams",
-            "round": 1
-          },
-          "goal": {
-            "assignee": "Buddy Williams",
-            "id": "00000T19EKCJS2DHKCV3DXE001",
-            "name": "The new menu item is missing a chevron indicating it is a drop-down. Add the che",
-            "node_id": "default",
-            "priority": "low",
-            "reporter": "Buddy Williams"
-          },
-          "governance": {
-            "configured": false,
-            "constitution": "",
-            "product": "",
-            "rules": []
-          },
-          "guidance_candidates": [],
-          "previous_rounds": [],
-          "version": 1,
-          "workflow_summary": "Refine gives this Goal Agent an isolated worktree, the current Round, and available planning context. Follow the Goal and applicable Skill instructions and use your judgment to decide when to stop. Quality and Governance agents make their own decisions using their Skills before integration and human Review. Refine coordinates workflow transitions and Git actions. Do not directly advance Goal state, approve, merge, or push."
+        "assembled_at": "2026-09-15T16:08:13Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "The new menu item is missing a chevron indicating it is a drop-down. Add the chevron so that it matches the style of the other menu items, including the node, reporter, and tools contexts. Also, add icons (use the same icon pack we use for the other menu items) to the context menu. The goal is consistency.",
+          "reporter": "Buddy Williams",
+          "round": 1
         },
-        "implementation_report": "workflow.implement.enter:default-implement: Task 1: Added New’s shared dropdown chevron. Task 2: Added the planned Lucide icons to all four actions, preserving labels, ordering, semantics, and command bindings. Existing CSS handles spacing and collapsed navigation. Task 3: Updated the static test; it and all four existing New-menu browser tests pass. Formatting and whitespace checks pass. No plan departures or unfinished implementation. Quality still needs the planned visual comparison across layouts and themes.",
-        "plans": [
-          {
-            "artifacts": {
-              "plan": "Desired behavior: New displays the same dropdown chevron as Node, Reporter, and Tools, and its context menu displays consistent Lucide icons beside all four actions.\n\n1. Task #1 - Reuse the shared dropdown indicator. In src/surfaces/web/static/index.html, add an aria-hidden nav-context-more span after New's label in #rail-new-toggle. Reuse the existing rules in css/base.css and css/navigation.css, including right alignment and hiding the indicator in collapsed desktop navigation. Keep the existing menu semantics and keyboard behavior.\n\n2. Task #2 - Add icons to the New context menu. Use the bundled vendor/lucide/navigation.svg sprite and rail-icon styling: target for New Goal, notebook-pen for New Plan, layers for New Feature, and download for Import. These symbols already exist. Mark SVGs aria-hidden and focusable=false. Preserve labels, order, roles, and data-rail-command bindings. Use existing flex spacing; make only necessary navigation CSS adjustments. Keep popup labels visible when the rail is collapsed.\n\n3. Task #3 - Prepare focused verification for Quality. Update static_rail_new_menu_exposes_shared_creation_commands in src/surfaces/web_server/tests/static_surface/navigation.rs because its current assertions require labels immediately after button opening tags. Preserve its command, label, and ordering checks while allowing icon markup. Quality should run that focused test and the existing New-menu cases in tests/web_navigation_browser.test.js, then visually compare New with Node, Reporter, and Tools in expanded desktop, collapsed desktop, and mobile navigation, across light and dark themes. Confirm icon alignment, readable labels, viewport fit, keyboard dismissal, and activation through both icons and labels."
-            },
-            "binding_id": "default-plan",
-            "evidence": [],
-            "invocation_id": "b874ee377febd78cbcd653999d3408cfc9449e5ef0905c247cdad2595c1795f2",
-            "outcome": "success",
-            "role": "plan",
-            "summary": "The New menu omits the shared chevron markup used by Node, Reporter, and Tools. Its four actions also lack icons. Reuse the existing navigation styles and bundled Lucide sprite for a focused presentation change."
-          }
-        ]
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000T19EKCJS2DHKCV3DXE001",
+          "name": "The new menu item is missing a chevron indicating it is a drop-down. Add the che",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": false,
+          "constitution": "",
+          "product": "",
+          "rules": []
+        },
+        "guidance_candidates": [],
+        "previous_rounds": [],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree, the current Round, and available planning context. Follow the Goal and applicable Skill instructions and use your judgment to decide when to stop. Quality and Governance agents make their own decisions using their Skills before integration and human Review. Refine coordinates workflow transitions and Git actions. Do not directly advance Goal state, approve, merge, or push."
       },
       "event": {},
       "goal": {
         "assignee": "Buddy Williams",
         "base_commit": "d5a74a62db1e0dcabc124c55c8a78da5c73f8efb",
         "branch_name": "refine/00000T19EKCJS2DHKCV3DXE001/round-1",
-        "candidate_commit": "796a2d96c448319323aa2155b2f3317f49e83942",
+        "candidate_commit": "89b7397010673c051fc4a153bb07ba3525b6c529",
         "created": "2026-09-15T16:08:09Z",
-        "event_generation": 5,
+        "event_generation": 6,
         "feature_id": null,
         "feature_order": null,
         "id": "00000T19EKCJS2DHKCV3DXE001",
@@ -118,27 +102,31 @@
             "implementation_report": "workflow.implement.enter:default-implement: Task 1: Added New’s shared dropdown chevron. Task 2: Added the planned Lucide icons to all four actions, preserving labels, ordering, semantics, and command bindings. Existing CSS handles spacing and collapsed navigation. Task 3: Updated the static test; it and all four existing New-menu browser tests pass. Formatting and whitespace checks pass. No plan departures or unfinished implementation. Quality still needs the planned visual comparison across layouts and themes.",
             "implementation_reported_at": "2026-09-15T16:12:42Z",
             "prompt": "The new menu item is missing a chevron indicating it is a drop-down. Add the chevron so that it matches the style of the other menu items, including the node, reporter, and tools contexts. Also, add icons (use the same icon pack we use for the other menu items) to the context menu. The goal is consistency.",
+            "quality_agent_report": "workflow.quality.enter:default-quality: The planned behavior passes Quality. Six browser regressions were added, and icon/label activation coverage was strengthened. No implementation corrections were needed. Remaining broader failures are confirmed baseline issues.\n\n",
+            "quality_candidate_commit": "89b7397010673c051fc4a153bb07ba3525b6c529",
+            "quality_message": "Quality Skills reported success.",
+            "quality_state": "passed",
             "reporter": "Buddy Williams",
-            "updated": "2026-09-15T16:12:45Z"
+            "updated": "2026-09-15T16:17:59Z"
           }
         ],
-        "status": "quality",
+        "status": "governance",
         "target_branch": "main",
-        "updated": "2026-09-15T16:12:45Z",
-        "workflow_revision": 21
+        "updated": "2026-09-15T16:17:59Z",
+        "workflow_revision": 31
       },
       "system": {
-        "candidate_commit": "796a2d96c448319323aa2155b2f3317f49e83942",
+        "candidate_commit": "89b7397010673c051fc4a153bb07ba3525b6c529",
         "node_id": "default",
         "project_root": "/home/buddy/projects/refine-next",
         "refine_executable": "/home/buddy/projects/refine/bin/refine",
-        "workflow_step": "quality",
+        "workflow_step": "governance",
         "workspace": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T19EKCJS2DHKCV3DXE001-round-1"
       }
     },
     "metadata": {
       "behavior": "EventSkill",
-      "event_operation_id": "1a0a5d79c40ddd457",
+      "event_operation_id": "1a0a5dc672bddd459",
       "goal_id": "00000T19EKCJS2DHKCV3DXE001",
       "kind": "workflow",
       "managed_worktree": {
@@ -157,7 +145,7 @@
       "provider": "codex",
       "round_idx": 0,
       "started_bindings": {
-        "default-quality": "2026-09-15T16:12:46.782109518+00:00"
+        "default-governance": "2026-09-15T16:18:00.895753041+00:00"
       },
       "target_app_id": "/home/buddy/projects/refine-next",
       "template_snapshot": {
@@ -460,15 +448,15 @@
         }
       },
       "workflow_revision": 2,
-      "workflow_state": "quality",
-      "workflow_step_generation": 5
+      "workflow_state": "governance",
+      "workflow_step_generation": 6
     }
   },
   "bindings": [
     {
       "binding": {
-        "id": "default-quality",
-        "skill_id": "default-quality",
+        "id": "default-governance",
+        "skill_id": "default-governance",
         "enabled": true,
         "mode": "blocking",
         "order": 0,
@@ -479,10 +467,10 @@
         "inputs": {}
       },
       "skill": {
-        "id": "default-quality",
-        "name": "Quality",
-        "prompt": "## Quality\n\nTest the implementation. Create and groom tests to cover the behavior described in the plan.\n\n### Outcome\n\nMeaningful tests cover the changed behavior and pass. Provide a brief report of the behavior tested, tests added or updated, commands run and their results, and any remaining failures or gaps. Include runtime or browser test results where useful. These results support Governance's verification of the work.\n\n### Guardrails\n\n- Test observable behavior, including relevant failure cases and effects on existing functionality. Tests should catch defects rather than mirror the implementation.\n- Keep useful tests, update tests for changed behavior, and remove obsolete or meaningless tests.\n- Investigate failures, correct problems in the implementation or tests, and rerun affected tests.\n- Choose tests suited to the change. Expand coverage when failures or affected behavior call for it.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
-        "role": "quality",
+        "id": "default-governance",
+        "name": "Governance",
+        "prompt": "## Governance\n\nVerify that the implementation meets the user-defined Goal, fits the system architecture, and serves the project's purpose.\n\n### Outcome\n\nA clear assessment of whether the implementation satisfies all three. Begin with the verdict, then briefly explain how the work meets the Goal, fits the architecture, and supports the project's purpose, using concrete evidence from the implementation and Quality results. For each gap, describe what falls short, why it matters, and the recommended correction. Separate necessary corrections from optional improvements.\n\n### Guardrails\n\n- Read the context that helps explain the user's Goal, the system architecture, and the project's purpose.\n- Compare the implementation with the user's desired outcome as well as the plan. Completing the plan and passing tests alone do not establish that the Goal is met.\n- Look for clear responsibilities, shared behavior implemented in one place, and interfaces that remain easy to use and maintain.\n- Judge design choices by how they serve the project. Allow sound approaches that differ from personal preference.\n- Group related issues by their underlying cause so the next step can address them together.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
+        "role": "governance",
         "enabled": true,
         "scope": {
           "node_id": null
@@ -493,62 +481,11 @@
       "parameters": {}
     }
   ],
-  "state": "succeeded",
-  "results": {
-    "default-quality": {
-      "invocation_id": "dc6126dbaf39a333d2843ca569686d320c22ed4a475ad7b85868f10b7a6b33f4",
-      "binding_id": "default-quality",
-      "role": "quality",
-      "outcome": "success",
-      "summary": "The planned behavior passes Quality. Six browser regressions were added, and icon/label activation coverage was strengthened. No implementation corrections were needed. Remaining broader failures are confirmed baseline issues.\n\n",
-      "evidence": [],
-      "artifacts": {
-        "evidence_directory": "/tmp/refine-new-chevron-quality",
-        "limitations": "Browser tests use Chromium with fixture APIs; no live daemon mutation was tested.",
-        "remaining_failures": "Broader Rust navigation suite: 7 passed, 2 failed. Both failures reproduce on the base commit: obsolete Controls-menu expectations and missing Guide targets. Repository-wide formatting also fails in 10 files byte-identical to the base.",
-        "tests_updated": "Added six layout/theme cases in tests/web_navigation_browser.test.js and extended creation-flow tests to click icons and labels directly.",
-        "verification": [
-          "Browser navigation suite: 16 passed, zero failures or skips.",
-          "Focused Rust New-menu test: passed.",
-          "Visual review: expanded desktop, collapsed desktop, and mobile in light and dark themes passed.",
-          "Verified rendered icons, alignment, readable labels, viewport fit, keyboard dismissal, and creation failure handling.",
-          "New regression test correctly fails against the base commit's missing chevron.",
-          "Changed-file formatting, JavaScript syntax, and git diff --check passed."
-        ]
-      }
-    }
-  },
-  "attempts": [
-    {
-      "attempt": 0,
-      "binding_id": "default-quality",
-      "checkout": {
-        "observation": {
-          "branch": "refine/00000T19EKCJS2DHKCV3DXE001/round-1",
-          "head_commit": "796a2d96c448319323aa2155b2f3317f49e83942",
-          "status_porcelain": [
-            " M tests/web_navigation_browser.test.js"
-          ]
-        },
-        "tree": "f362e9c6691b2bf39b674ab6b42111fab0cf0912"
-      },
-      "checkout_recorded": true,
-      "diagnostic": null,
-      "host_bound_result": true,
-      "observational_violation": false,
-      "operation_id": null,
-      "process_id": "proc-1789488767040-908613-1310",
-      "prompt_bytes": 9205,
-      "provider_session_id": null,
-      "purpose": "work",
-      "raw_output": "{\n  \"outcome\": \"success\",\n  \"artifacts\": {\n    \"tests_updated\": \"Added six layout/theme cases in tests/web_navigation_browser.test.js and extended creation-flow tests to click icons and labels directly.\",\n    \"verification\": [\n      \"Browser navigation suite: 16 passed, zero failures or skips.\",\n      \"Focused Rust New-menu test: passed.\",\n      \"Visual review: expanded desktop, collapsed desktop, and mobile in light and dark themes passed.\",\n      \"Verified rendered icons, alignment, readable labels, viewport fit, keyboard dismissal, and creation failure handling.\",\n      \"New regression test correctly fails against the base commit's missing chevron.\",\n      \"Changed-file formatting, JavaScript syntax, and git diff --check passed.\"\n    ],\n    \"remaining_failures\": \"Broader Rust navigation suite: 7 passed, 2 failed. Both failures reproduce on the base commit: obsolete Controls-menu expectations and missing Guide targets. Repository-wide formatting also fails in 10 files byte-identical to the base.\",\n    \"evidence_directory\": \"/tmp/refine-new-chevron-quality\",\n    \"limitations\": \"Browser tests use Chromium with fixture APIs; no live daemon mutation was tested.\"\n  },\n  \"summary\": \"The planned behavior passes Quality. Six browser regressions were added, and icon/label activation coverage was strengthened. No implementation corrections were needed. Remaining broader failures are confirmed baseline issues.\\n\\n\"\n}",
-      "received_at": "2026-09-15T16:17:50.378985664+00:00",
-      "started_at": "2026-09-15T16:12:47.010967054+00:00",
-      "workflow_revision": 2
-    }
-  ],
-  "created_at": "2026-09-15T16:12:45.651182406+00:00",
-  "completed_at": "2026-09-15T16:17:51.911287759+00:00",
+  "state": "running",
+  "results": {},
+  "attempts": [],
+  "created_at": "2026-09-15T16:17:59.742993192+00:00",
+  "completed_at": null,
   "error": null,
   "action_applied": false
 }
