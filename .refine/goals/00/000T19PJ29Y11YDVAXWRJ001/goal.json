@@ -1,9 +1,9 @@
 {
-  "base_commit": "9c7363164d582fac14e5076b24efdc47ec5f9461",
+  "base_commit": "34635cd62aa9f45feec2d2adb92913dab0daac09",
   "branch_name": "refine/00000T19PJ29Y11YDVAXWRJ001/round-1",
-  "candidate_commit": null,
+  "candidate_commit": "895be0c5e7527f5afda70523122a9fa7f961b75a",
   "created": "2026-09-15T20:46:20Z",
-  "event_generation": 4,
+  "event_generation": 5,
   "feature_id": null,
   "feature_order": null,
   "id": "00000T19PJ29Y11YDVAXWRJ001",
@@ -46,11 +46,11 @@
       "created": "2026-09-15T20:46:20Z",
       "event_configuration": {
         "events": {
-          "workflow.implement.enter": {
+          "workflow.quality.enter": {
             "bindings": [
               {
                 "enabled": true,
-                "id": "default-implement",
+                "id": "default-quality",
                 "inputs": {},
                 "mode": "blocking",
                 "order": 0,
@@ -58,75 +58,36 @@
                 "scope": {
                   "node_id": null
                 },
-                "skill_id": "default-implement"
+                "skill_id": "default-quality"
               }
             ],
             "enabled": true,
-            "id": "workflow.implement.enter",
+            "id": "workflow.quality.enter",
             "kind": "system",
-            "name": "Workflow Implement Enter",
+            "name": "Workflow Quality Enter",
             "on_success": null,
             "parameters": [],
             "scope": {
               "node_id": null
             },
-            "source": "workflow.implement.enter"
+            "source": "workflow.quality.enter"
           }
         },
         "revision": 82,
         "schema_version": 3,
         "skills": {
-          "default-implement": {
+          "default-quality": {
             "enabled": true,
-            "id": "default-implement",
-            "name": "Implement",
+            "id": "default-quality",
+            "name": "Quality",
             "parameters": [],
-            "prompt": "## Implement\n\nImplement the plan.\n\n### Outcome\n\nThe plan is implemented in a way that aligns with the project's purpose and architecture. Provide a brief summary organized by plan task: what changed, any important departures from the plan and why, and any unfinished work.\n\n### Guardrails\n\n- Follow established code patterns and put shared behavior in one place. Fix the underlying cause rather than each symptom separately.\n- Keep code focused on one responsibility and preserve stable interfaces where possible. Split mixed responsibilities into separate files. Keep files relatively small, under roughly 1,000 lines where possible.\n- Prefer clear, straightforward code and abstractions that make the behavior easier to understand and maintain.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
+            "prompt": "## Quality\n\nTest the implementation. Create and groom tests to cover the behavior described in the plan.\n\n### Outcome\n\nMeaningful tests cover the changed behavior and pass. Provide a brief report of the behavior tested, tests added or updated, commands run and their results, and any remaining failures or gaps. Include runtime or browser test results where useful. These results support Governance's verification of the work.\n\n### Guardrails\n\n- Test observable behavior, including relevant failure cases and effects on existing functionality. Tests should catch defects rather than mirror the implementation.\n- Keep useful tests, update tests for changed behavior, and remove obsolete or meaningless tests.\n- Investigate failures, correct problems in the implementation or tests, and rerun affected tests.\n- Choose tests suited to the change. Expand coverage when failures or affected behavior call for it.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
             "provenance": "refine-default-v1",
             "role": "task",
             "scope": {
               "node_id": null
             }
           }
-        }
-      },
-      "event_results": {
-        "99bdfbe3c8bd51ec9c249c6fffb6bdf52b0de6219f01efd20643a18ac98b0033": {
-          "candidate_commit": null,
-          "generation": 3,
-          "results": {
-            "default-plan": {
-              "artifacts": {
-                "design_decisions": [
-                  "Skills choose when work is ready; the existing application lifecycle remains responsible for validated Backlog-to-Todo transitions.",
-                  "Existing Goals retain their current statuses. Removing this policy does not move Todo Goals back to Backlog or alter explicit creation/status requests.",
-                  "Use normal configuration migration rather than editing live state or rewriting every node eagerly."
-                ],
-                "memory_context": "",
-                "plan": [
-                  "Task #1 - Retire backlog_promote_after_seconds. Remove it from defaults, accepted settings, numeric normalization, and runtime settings copying. Follow the existing retired-setting migration pattern: discard persisted values without validating them, remove them through the normal locked settings write, and reject new configuration attempts. Preserve unrelated node settings.",
-                  "Task #2 - Remove automatic promotion from application behavior. Delete BacklogPromotionService and its unused module, imports, age calculation, and engine wrappers. Remove promotion from scheduler discovery and simplify its promotion accounting. Preserve Skill servicing, admission, Feature ordering, and explicit start_goal_workflow behavior, including authored-Round validation.",
-                  "Task #3 - Remove promotion side effects from surfaces. Remove promotion calls from Goal creation, Feature Goal creation, import completion, and settings updates, including wrappers used only for promotion. Preserve required projection refreshes and existing creation defaults. Keep the import response's promoted count at zero for compatibility; remove internal workflow promotion bookkeeping where unused. Settings changes and imports must not start unrelated backlog Goals.",
-                  "Task #4 - Remove the Runtime control and update guidance. Delete the auto-promote selector, default value, save payload field, event binding, and obsolete reference section. Update backlog guidance and stale code comments to describe explicit starts and user-configured Skills using refine goal start ID. Link to existing Skills configuration guidance. Do not install a replacement Skill, recreate a timer setting, or add scheduling infrastructure.",
-                  "Task #5 - Verify the behavior after Tasks #1–4. Replace existing automatic-promotion tests with regression coverage showing that aged backlog Goals remain unchanged during scheduler passes, settings updates, creation, and imports. Cover stored legacy values of zero, positive delays, disabled values, and malformed values; verify migration removes the key and new writes reject it. Preserve coverage that explicit starts queue valid Goals without creating worktrees and reject Goals without authored Rounds. Check that the browser neither renders nor submits the removed setting. Run focused Rust tests and tests/web_settings_runtime.test.js, then cargo test --lib --bins -- --test-threads=1, cargo fmt --check, and git diff --check."
-                ]
-              },
-              "binding_id": "default-plan",
-              "evidence": [
-                "engine/scheduling/mod.rs reads backlog_promote_after_seconds with a 3600-second fallback; scheduler discovery and multiple web mutation routes invoke promotion.",
-                "config/settings.rs already migrates retired settings under the registry lock; settings_codec/tests.rs provides an analogous retirement test.",
-                "CLI help confirms refine goal start ID queues Backlog work as Todo. Existing Skills support custom and lifecycle triggers.",
-                "Planning inspection only; no source edits, tests, or Goal state changes were performed."
-              ],
-              "invocation_id": "99bdfbe3c8bd51ec9c249c6fffb6bdf52b0de6219f01efd20643a18ac98b0033",
-              "outcome": "success",
-              "role": "plan",
-              "summary": "Remove the built-in backlog auto-promotion policy and its configuration. Backlog Goals remain waiting until a user or Skill explicitly starts them through the existing lifecycle interface. Removing only the setting would leave the scheduler's one-hour fallback active."
-            }
-          },
-          "round_idx": 0,
-          "source": "workflow.plan.enter",
-          "state": "succeeded"
         }
       },
       "failure_at": "",
@@ -296,8 +257,82 @@
               }
             }
           }
+        },
+        "4:default:workflow.implement.exit": {
+          "events": {
+            "workflow.implement.exit": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.implement.exit",
+              "kind": "system",
+              "name": "Workflow Implement Exit",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.implement.exit"
+            }
+          },
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {}
+        },
+        "4:default:workflow.implement.success": {
+          "events": {},
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {}
+        },
+        "5:default:workflow.quality.enter": {
+          "events": {
+            "workflow.quality.enter": {
+              "bindings": [
+                {
+                  "enabled": true,
+                  "id": "default-quality",
+                  "inputs": {},
+                  "mode": "blocking",
+                  "order": 0,
+                  "overrides": null,
+                  "scope": {
+                    "node_id": null
+                  },
+                  "skill_id": "default-quality"
+                }
+              ],
+              "enabled": true,
+              "id": "workflow.quality.enter",
+              "kind": "system",
+              "name": "Workflow Quality Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.quality.enter"
+            }
+          },
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {
+            "default-quality": {
+              "enabled": true,
+              "id": "default-quality",
+              "name": "Quality",
+              "parameters": [],
+              "prompt": "## Quality\n\nTest the implementation. Create and groom tests to cover the behavior described in the plan.\n\n### Outcome\n\nMeaningful tests cover the changed behavior and pass. Provide a brief report of the behavior tested, tests added or updated, commands run and their results, and any remaining failures or gaps. Include runtime or browser test results where useful. These results support Governance's verification of the work.\n\n### Guardrails\n\n- Test observable behavior, including relevant failure cases and effects on existing functionality. Tests should catch defects rather than mirror the implementation.\n- Keep useful tests, update tests for changed behavior, and remove obsolete or meaningless tests.\n- Investigate failures, correct problems in the implementation or tests, and rerun affected tests.\n- Choose tests suited to the change. Expand coverage when failures or affected behavior call for it.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
+              "provenance": "refine-default-v1",
+              "role": "task",
+              "scope": {
+                "node_id": null
+              }
+            }
+          }
         }
       },
+      "implementation_report": "workflow.implement.enter:default-implement: Implemented all five tasks. Backlog Goals now wait for explicit user or Skill starts. Changes remain in the Goal worktree for Quality and Governance.",
+      "implementation_reported_at": "2026-09-15T21:19:00Z",
       "logs": [],
       "prior_attempts": [
         {
@@ -354,19 +389,116 @@
       ],
       "prompt": "Remove the auto-promote configuration from Refine since this can now be handled by Skills.",
       "reporter": "Buddy Williams",
-      "updated": "2026-09-15T20:48:03Z",
+      "updated": "2026-09-15T21:19:04Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-15T20:46:22Z",
         "generation": 2,
         "round_idx": 0,
         "workflow_revision": 2
       },
+      "workflow_candidate_refresh": {
+        "authorizing_status": "quality",
+        "branch": "refine/00000T19PJ29Y11YDVAXWRJ001/round-1",
+        "node_id": "default",
+        "original_base_commit": "9c7363164d582fac14e5076b24efdc47ec5f9461",
+        "original_candidate_commit": "fb08c40f743d530ada9989235e00b2de6b752586",
+        "previous_gate_evidence": {
+          "event_results": {
+            "99bdfbe3c8bd51ec9c249c6fffb6bdf52b0de6219f01efd20643a18ac98b0033": {
+              "candidate_commit": null,
+              "generation": 3,
+              "results": {
+                "default-plan": {
+                  "artifacts": {
+                    "design_decisions": [
+                      "Skills choose when work is ready; the existing application lifecycle remains responsible for validated Backlog-to-Todo transitions.",
+                      "Existing Goals retain their current statuses. Removing this policy does not move Todo Goals back to Backlog or alter explicit creation/status requests.",
+                      "Use normal configuration migration rather than editing live state or rewriting every node eagerly."
+                    ],
+                    "memory_context": "",
+                    "plan": [
+                      "Task #1 - Retire backlog_promote_after_seconds. Remove it from defaults, accepted settings, numeric normalization, and runtime settings copying. Follow the existing retired-setting migration pattern: discard persisted values without validating them, remove them through the normal locked settings write, and reject new configuration attempts. Preserve unrelated node settings.",
+                      "Task #2 - Remove automatic promotion from application behavior. Delete BacklogPromotionService and its unused module, imports, age calculation, and engine wrappers. Remove promotion from scheduler discovery and simplify its promotion accounting. Preserve Skill servicing, admission, Feature ordering, and explicit start_goal_workflow behavior, including authored-Round validation.",
+                      "Task #3 - Remove promotion side effects from surfaces. Remove promotion calls from Goal creation, Feature Goal creation, import completion, and settings updates, including wrappers used only for promotion. Preserve required projection refreshes and existing creation defaults. Keep the import response's promoted count at zero for compatibility; remove internal workflow promotion bookkeeping where unused. Settings changes and imports must not start unrelated backlog Goals.",
+                      "Task #4 - Remove the Runtime control and update guidance. Delete the auto-promote selector, default value, save payload field, event binding, and obsolete reference section. Update backlog guidance and stale code comments to describe explicit starts and user-configured Skills using refine goal start ID. Link to existing Skills configuration guidance. Do not install a replacement Skill, recreate a timer setting, or add scheduling infrastructure.",
+                      "Task #5 - Verify the behavior after Tasks #1–4. Replace existing automatic-promotion tests with regression coverage showing that aged backlog Goals remain unchanged during scheduler passes, settings updates, creation, and imports. Cover stored legacy values of zero, positive delays, disabled values, and malformed values; verify migration removes the key and new writes reject it. Preserve coverage that explicit starts queue valid Goals without creating worktrees and reject Goals without authored Rounds. Check that the browser neither renders nor submits the removed setting. Run focused Rust tests and tests/web_settings_runtime.test.js, then cargo test --lib --bins -- --test-threads=1, cargo fmt --check, and git diff --check."
+                    ]
+                  },
+                  "binding_id": "default-plan",
+                  "evidence": [
+                    "engine/scheduling/mod.rs reads backlog_promote_after_seconds with a 3600-second fallback; scheduler discovery and multiple web mutation routes invoke promotion.",
+                    "config/settings.rs already migrates retired settings under the registry lock; settings_codec/tests.rs provides an analogous retirement test.",
+                    "CLI help confirms refine goal start ID queues Backlog work as Todo. Existing Skills support custom and lifecycle triggers.",
+                    "Planning inspection only; no source edits, tests, or Goal state changes were performed."
+                  ],
+                  "invocation_id": "99bdfbe3c8bd51ec9c249c6fffb6bdf52b0de6219f01efd20643a18ac98b0033",
+                  "outcome": "success",
+                  "role": "plan",
+                  "summary": "Remove the built-in backlog auto-promotion policy and its configuration. Backlog Goals remain waiting until a user or Skill explicitly starts them through the existing lifecycle interface. Removing only the setting would leave the scheduler's one-hour fallback active."
+                }
+              },
+              "round_idx": 0,
+              "source": "workflow.plan.enter",
+              "state": "succeeded"
+            },
+            "a2c9b5097240d2360de041e0e84e84a7f3854afce80db94e200ac5c32a1caffc": {
+              "candidate_commit": null,
+              "generation": 4,
+              "results": {
+                "default-implement": {
+                  "artifacts": {
+                    "departures": [
+                      "Explicit starts lacked the authored-Round validation assumed by the plan. Added the existing shared validator under the Goal lock and updated two legacy test fixtures."
+                    ],
+                    "tasks": [
+                      "Task #1: Retired the setting from defaults, accepted writes, normalization, and runtime copying. Locked migration discards legacy values without validating them.",
+                      "Task #2: Removed the promotion service, scheduler calls, wrappers, and accounting. Preserved Skill servicing and admission.",
+                      "Task #3: Removed promotion side effects from creation, imports, and settings updates. Preserved projection refreshes and import promoted: 0 compatibility.",
+                      "Task #4: Removed the Runtime control and updated guidance for explicit user or Skill starts.",
+                      "Task #5: Added regression coverage for aged Backlog preservation, migration, browser payloads, and explicit starts."
+                    ],
+                    "unfinished": "No implementation work remains. Pre-existing test and formatting failures remain outside this change.",
+                    "validation_logs": [
+                      "/tmp/refine-auto-promote-full.log",
+                      "/tmp/refine-auto-promote-baseline-tests.log",
+                      "/tmp/refine-auto-promote-final-focused.log"
+                    ]
+                  },
+                  "binding_id": "default-implement",
+                  "evidence": [
+                    "Final focused Rust run: 11 passed; binary target passed. Browser runtime tests: 2 passed.",
+                    "Full suite: 1394 passed, 18 failed, 7 ignored. Two affected fixtures were corrected and pass. Of the remaining 16 failures, three passed on rerun; all 13 persistent failures also failed on a clean base-commit build.",
+                    "Changed Rust files pass formatting; git diff --check passes. Repository-wide cargo fmt --check fails in the same 10 untouched files on the base commit."
+                  ],
+                  "invocation_id": "a2c9b5097240d2360de041e0e84e84a7f3854afce80db94e200ac5c32a1caffc",
+                  "outcome": "success",
+                  "role": "implement",
+                  "summary": "Implemented all five tasks. Backlog Goals now wait for explicit user or Skill starts. Changes remain in the Goal worktree for Quality and Governance.\n\n"
+                }
+              },
+              "round_idx": 0,
+              "source": "workflow.implement.enter",
+              "state": "succeeded"
+            }
+          },
+          "failure_at": "",
+          "failure_category": "",
+          "failure_message": ""
+        },
+        "refreshed_at": "2026-09-15T21:19:03Z",
+        "replacement_base_commit": "34635cd62aa9f45feec2d2adb92913dab0daac09",
+        "replacement_candidate_commit": "895be0c5e7527f5afda70523122a9fa7f961b75a",
+        "round_idx": 0,
+        "state": "refreshed",
+        "workflow_revision": 2,
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T19PJ29Y11YDVAXWRJ001-round-1"
+      },
       "workspace_branch": "refine/00000T19PJ29Y11YDVAXWRJ001/round-1"
     }
   ],
-  "status": "implement",
+  "status": "quality",
   "target_branch": "main",
-  "updated": "2026-09-15T20:48:03Z",
+  "updated": "2026-09-15T21:19:04Z",
   "workflow_controls": [
     {
       "actor": "operator",
@@ -420,7 +552,17 @@
       "round_idx": 0,
       "to": "implement",
       "workflow_revision": 13
+    },
+    {
+      "at": "2026-09-15T21:19:03.363643187+00:00",
+      "forced": false,
+      "from": "implement",
+      "generation": 5,
+      "node_id": "default",
+      "round_idx": 0,
+      "to": "quality",
+      "workflow_revision": 20
     }
   ],
-  "workflow_revision": 14
+  "workflow_revision": 22
 }
