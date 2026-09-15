@@ -1,10 +1,10 @@
 {
-  "id": "e47d2c9389f89caf6d550a2b4a65e76848122a3cc47fb81ee128b6cc8dbb550e",
+  "id": "11c03d2cb50ae791a818368f54f4aeb25290bbddaf12e23f37700902ce2012b3",
   "event": {
-    "id": "workflow.implement.enter",
-    "name": "Workflow Implement Enter",
+    "id": "workflow.quality.enter",
+    "name": "Workflow Quality Enter",
     "kind": "system",
-    "source": "workflow.implement.enter",
+    "source": "workflow.quality.enter",
     "enabled": true,
     "scope": {
       "node_id": null
@@ -12,8 +12,8 @@
     "parameters": [],
     "bindings": [
       {
-        "id": "default-implement",
-        "skill_id": "default-implement",
+        "id": "default-quality",
+        "skill_id": "default-quality",
         "enabled": true,
         "mode": "blocking",
         "order": 0,
@@ -48,7 +48,7 @@
     "goal_id": "00000T19PJVMBGJ0Y33NWRJ002",
     "round_idx": 0,
     "workflow_revision": 12,
-    "candidate_commit": null,
+    "candidate_commit": "40308ac23e4746db9359b9331083b80a924f5fcd",
     "data": {
       "context": {
         "agent_context": {
@@ -78,102 +78,17 @@
           "version": 1,
           "workflow_summary": "Refine gives this Goal Agent an isolated worktree, the current Round, and available planning context. Follow the Goal and applicable Skill instructions and use your judgment to decide when to stop. Quality and Governance agents make their own decisions using their Skills before integration and human Review. Refine coordinates workflow transitions and Git actions. Do not directly advance Goal state, approve, merge, or push."
         },
-        "plans": [
-          {
-            "artifacts": {
-              "plan": {
-                "checklist": [
-                  {
-                    "description": "Task #1 - Define the provider configuration model. Add a typed, versioned catalog with stable provider IDs, display names, executable paths or PATH names, and ordered argument templates. Include a system default provider ID. Represent interactive and automated launch modes explicitly, with optional resume/session templates and existing output-format and prompt-transport capabilities. Custom providers default to plain output and no session continuity. Keep shared concepts and validation in Model, resolution in Application, and executable discovery and launching in Infrastructure.",
-                    "id": "P1",
-                    "verification": [
-                      "Validate unique IDs, nonempty executable paths, argument types, supported template variables, and valid default references.",
-                      "A provider with an unfamiliar ID can be defined without adding a provider-name branch."
-                    ]
-                  },
-                  {
-                    "description": "Task #2 - Persist the shared catalog and preserve node inheritance. After P1, add a dedicated configuration document under the existing shared Refine state root, using established locking, atomic writes, revision checks, and state synchronization. Seed Claude, Codex, Gemini, Copilot, and Smoke AI from current behavior, with Claude as the initial system default. Preserve existing node agent_cli selections; convert legacy generic executable selections into catalog entries without changing their executable or case. Keep an absent node selection absent: FileSettingsService currently loads defaults and writes the merged object, so unrelated settings saves and migrations must stop materializing the inherited provider. Support explicitly clearing the node override. Initialization must be idempotent and must not overwrite an existing or remotely adopted catalog.",
-                    "id": "P2",
-                    "verification": [
-                      "Legacy built-in and generic selections survive migration and restart.",
-                      "Changing the system default affects inheriting nodes while explicit node selections remain unchanged.",
-                      "Unrelated settings saves and copy-from-node preserve inheritance.",
-                      "Catalog synchronization and pristine-state adoption preserve user edits and independent node selections."
-                    ]
-                  },
-                  {
-                    "description": "Task #3 - Build launches from configuration. After P1–P2, replace provider-name argument construction in infrastructure/agents/discovery and invocation with resolved configuration. Define {{context}} as Refine's assembled launch context, delivered through the existing prompt transport: substitute the prepared context into argument templates, or a configured stdin template for native stdin providers. Substitute once, preserve argument boundaries and literal context content, and execute the binary directly without shell evaluation. Retain large-context file fallback, artifact lifetime, launch-size checks, explicit worktree cwd, environment handling, supervision, cancellation, and process receipts. Preserve existing built-in output parsing and interactive/resume behavior through declared capabilities. Only introduce additional placeholders needed for those existing modes, such as session ID and cwd, and document their availability.",
-                    "id": "P3",
-                    "verification": [
-                      "Fake executables capture exact argv and stdin for context containing spaces, quotes, newlines, Unicode, shell syntax, and literal template syntax.",
-                      "Large prompts retain existing stdin/file delivery and cleanup behavior.",
-                      "Built-in launch modes retain their current flags and session behavior.",
-                      "An executable path containing spaces works; invalid configuration fails before spawning."
-                    ]
-                  },
-                  {
-                    "description": "Task #4 - Use one resolver across provider consumers. After P2–P3, resolve explicit invocation or retained-session selection first, then the node override, then the system default. Pass the correct target-state context into HostAgentProviderService rather than guessing from the process cwd or a Goal worktree. Update workflow/Skill execution, terminal sessions, chat, direct agent commands, diagnostics, and delegated maintenance callers to use the catalog. Replace fixed discovery lists and provider-name capability checks; scope or invalidate provider status caches when configuration changes. Unknown configured IDs and missing executables must produce actionable errors rather than silently selecting another provider. Resolve a definition consistently for each launch; edits apply to subsequent launches.",
-                    "id": "P4",
-                    "verification": [
-                      "An unfamiliar configured provider launches through both a workflow/Skill path and an interactive terminal path.",
-                      "Direct invocation, diagnostics, and provider discovery use the configured executable.",
-                      "Explicit selections, inherited selections, and retained sessions resolve consistently across targets and nodes."
-                    ]
-                  },
-                  {
-                    "description": "Task #5 - Expose configuration through shared API and CLI operations. After P2, add application operations to read and edit the catalog, set the system default, and set or clear the node selection. Expose them through daemon API routes and the existing config/agent CLI surfaces, reusing structured payload decoding and error handling. Return catalog revision, raw node override, effective provider, and selection source so clients can preserve inheritance. Reject stale catalog edits and prevent deletion of a provider referenced by the system default or a node unless the same supported operation supplies valid replacements. Keep configuration separate from host installation and authentication; a shared definition may be saved when its executable is unavailable on the editing node.",
-                    "id": "P5",
-                    "verification": [
-                      "CLI/API round trips preserve argument arrays and {{context}} exactly.",
-                      "Stale edits, invalid references, and clearing overrides return consistent results.",
-                      "Concurrent edits cannot silently overwrite another catalog revision."
-                    ]
-                  },
-                  {
-                    "description": "Task #6 - Add provider editing to Settings > Runtime. After P5, replace the fixed providerOptions list with catalog data. Offer an explicit Use system default selection showing the effective provider, plus controls to add and edit provider names, executable paths, and ordered arguments. Expose launch-mode and transport options where needed, with a concise {{context}} example and advanced session/output settings. Clearly label the shared catalog/default and the current node selection. Preserve unsaved edits during refresh and show validation or revision conflicts. Remove provider-value lowercasing in settings.js and ensure autosaving unrelated runtime fields does not create a node override.",
-                    "id": "P6",
-                    "verification": [
-                      "Browser tests cover adding a provider, editing a built-in, changing the default, selecting a node override, clearing it, and reloading.",
-                      "Custom IDs and case-sensitive paths render and save correctly.",
-                      "Validation and stale-save failures retain the user's draft."
-                    ]
-                  },
-                  {
-                    "description": "Task #7 - Verify the complete configuration-only workflow and document it. After P3–P6, add an end-to-end fixture that registers an unfamiliar CLI provider through a supported surface, selects it, launches it with Refine context, edits its parameters, and confirms the next launch uses the update without rebuilding Refine. Extend provider invocation, settings, CLI/API, browser, and state-sync tests for the behaviors above. Use the repository's xtask-backed test harness and relevant browser suites, then formatting and diff checks. Update Runtime help and CLI documentation with a working custom-provider example, system/node precedence, template semantics, supported output modes, and host executable requirements.",
-                    "id": "P7",
-                    "verification": [
-                      "The end-to-end fixture demonstrates that supporting a new CLI provider requires configuration only.",
-                      "Existing built-in invocation and prompt-transport regressions pass.",
-                      "Record actual check results and any unresolved failures for Quality."
-                    ]
-                  }
-                ],
-                "summary": "Users can add and edit CLI providers in Settings > Runtime, including executable paths and argument templates containing {{context}}. Store the provider catalog and default selection in shared Refine state; store only an optional provider selection on each node. Replace hard-coded launch definitions with configuration while preserving existing providers, prompt delivery, process supervision, and session behavior."
-              }
-            },
-            "binding_id": "default-plan",
-            "evidence": [
-              "Inspected clean Goal worktree at commit 9c736316 and confirmed the live Node targets /home/buddy/projects/refine-next.",
-              "Provider definitions and launch arguments are hard-coded in src/infrastructure/agents/invocation/service.rs and src/infrastructure/agents/discovery/mod.rs.",
-              "src/infrastructure/process/supervisor/config/settings.rs merges compiled defaults and writes resolved settings into node.settings; provider inheritance needs explicit preservation.",
-              "Settings UI contains a fixed provider list, lowercases the selected provider, and includes agent_cli in every runtime autosave.",
-              "Inspected provider selection, prompt transport integration, session resume, state synchronization/bootstrap handling, config CLI dispatch, and the test harness. No implementation changes or tests were performed during planning."
-            ],
-            "invocation_id": "b8b366a13b5bcb269b5ad5cbe67883359bb095305bc038289631daa36a5e2ced",
-            "outcome": "success",
-            "role": "plan",
-            "summary": "Plan ready for Implement. The underlying change is a shared provider catalog used by both configuration surfaces and execution. Key compatibility requirements are preserving node inheritance, migrating existing selections, and retaining interactive, automated, resume, and large-context launch behavior. No Goal transitions or Git mutations were performed.\n\n"
-          }
-        ]
+        "implementation_report": "workflow.implement.enter:default-implement: Implemented all seven plan tasks. Changes are retained for Quality; no Goal transitions, commits, merges, or pushes were performed.",
+        "plans": null
       },
       "event": {},
       "goal": {
         "assignee": "Buddy Williams",
-        "base_commit": "9c7363164d582fac14e5076b24efdc47ec5f9461",
+        "base_commit": "34635cd62aa9f45feec2d2adb92913dab0daac09",
         "branch_name": "refine/00000T19PJVMBGJ0Y33NWRJ002/round-1",
-        "candidate_commit": null,
+        "candidate_commit": "40308ac23e4746db9359b9331083b80a924f5fcd",
         "created": "2026-09-15T20:47:12Z",
-        "event_generation": 8,
+        "event_generation": 9,
         "feature_id": null,
         "feature_order": null,
         "id": "00000T19PJVMBGJ0Y33NWRJ002",
@@ -188,29 +103,31 @@
             "created": "2026-09-15T20:47:12Z",
             "failure_category": "",
             "failure_message": "",
+            "implementation_report": "workflow.implement.enter:default-implement: Implemented all seven plan tasks. Changes are retained for Quality; no Goal transitions, commits, merges, or pushes were performed.",
+            "implementation_reported_at": "2026-09-15T21:28:02Z",
             "prompt": "Add the ability to configure the AI Providers. Today the Settings > Runtime has a dropdown for AI Provider. Users should be able to modify this configuration, supplying the path and parameters. They should be able to add new CLI agents too. The CLI will need {{context}} variable that Refine will use to send context into the CLI call. This feature will provide the users much more flexibility over the AI Provider. This will be saved at the refine-state system level, but the selected AI Provider at the refine-state node level, if absent will default to system defaults (where we convert what we have to this format). The goal here is that no code change is needed to support a new AI Provider.",
             "reporter": "Buddy Williams",
-            "updated": "2026-09-15T20:52:40Z"
+            "updated": "2026-09-15T21:28:06Z"
           }
         ],
-        "status": "implement",
+        "status": "quality",
         "target_branch": "main",
-        "updated": "2026-09-15T20:52:40Z",
+        "updated": "2026-09-15T21:28:06Z",
         "workflow_context": "",
-        "workflow_revision": 23
+        "workflow_revision": 31
       },
       "system": {
-        "candidate_commit": null,
+        "candidate_commit": "40308ac23e4746db9359b9331083b80a924f5fcd",
         "node_id": "default",
         "project_root": "/home/buddy/projects/refine-next",
         "refine_executable": "/home/buddy/projects/refine/bin/refine",
-        "workflow_step": "implement",
+        "workflow_step": "quality",
         "workspace": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T19PJVMBGJ0Y33NWRJ002-round-1"
       }
     },
     "metadata": {
       "behavior": "EventSkill",
-      "event_operation_id": "1a0a6d7e5d0f7ad11a",
+      "event_operation_id": "1a0a6f85529f7ad122",
       "goal_id": "00000T19PJVMBGJ0Y33NWRJ002",
       "kind": "workflow",
       "managed_worktree": {
@@ -229,7 +146,7 @@
       "provider": "codex",
       "round_idx": 0,
       "started_bindings": {
-        "default-implement": "2026-09-15T20:52:43.460276019+00:00"
+        "default-quality": "2026-09-15T21:28:08.824971413+00:00"
       },
       "target_app_id": "/home/buddy/projects/refine-next",
       "template_snapshot": {
@@ -532,15 +449,15 @@
         }
       },
       "workflow_revision": 12,
-      "workflow_state": "implement",
-      "workflow_step_generation": 8
+      "workflow_state": "quality",
+      "workflow_step_generation": 9
     }
   },
   "bindings": [
     {
       "binding": {
-        "id": "default-implement",
-        "skill_id": "default-implement",
+        "id": "default-quality",
+        "skill_id": "default-quality",
         "enabled": true,
         "mode": "blocking",
         "order": 0,
@@ -551,10 +468,10 @@
         "inputs": {}
       },
       "skill": {
-        "id": "default-implement",
-        "name": "Implement",
-        "prompt": "## Implement\n\nImplement the plan.\n\n### Outcome\n\nThe plan is implemented in a way that aligns with the project's purpose and architecture. Provide a brief summary organized by plan task: what changed, any important departures from the plan and why, and any unfinished work.\n\n### Guardrails\n\n- Follow established code patterns and put shared behavior in one place. Fix the underlying cause rather than each symptom separately.\n- Keep code focused on one responsibility and preserve stable interfaces where possible. Split mixed responsibilities into separate files. Keep files relatively small, under roughly 1,000 lines where possible.\n- Prefer clear, straightforward code and abstractions that make the behavior easier to understand and maintain.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
-        "role": "implement",
+        "id": "default-quality",
+        "name": "Quality",
+        "prompt": "## Quality\n\nTest the implementation. Create and groom tests to cover the behavior described in the plan.\n\n### Outcome\n\nMeaningful tests cover the changed behavior and pass. Provide a brief report of the behavior tested, tests added or updated, commands run and their results, and any remaining failures or gaps. Include runtime or browser test results where useful. These results support Governance's verification of the work.\n\n### Guardrails\n\n- Test observable behavior, including relevant failure cases and effects on existing functionality. Tests should catch defects rather than mirror the implementation.\n- Keep useful tests, update tests for changed behavior, and remove obsolete or meaningless tests.\n- Investigate failures, correct problems in the implementation or tests, and rerun affected tests.\n- Choose tests suited to the change. Expand coverage when failures or affected behavior call for it.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
+        "role": "quality",
         "enabled": true,
         "scope": {
           "node_id": null
@@ -565,185 +482,11 @@
       "parameters": {}
     }
   ],
-  "state": "succeeded",
-  "results": {
-    "default-implement": {
-      "invocation_id": "e47d2c9389f89caf6d550a2b4a65e76848122a3cc47fb81ee128b6cc8dbb550e",
-      "binding_id": "default-implement",
-      "role": "implement",
-      "outcome": "success",
-      "summary": "Implemented all seven plan tasks. Changes are retained for Quality; no Goal transitions, commits, merges, or pushes were performed.\n\n",
-      "evidence": [
-        "Cargo check, formatting, diff checks, and xtask static-asset checks passed.",
-        "Provider-focused Rust run: 49 passed, 1 ignored. Final resolver/API tests: 7 passed.",
-        "Configuration-only workflow, queued Skill execution, settings, large-prompt PTY, synchronization, and isolated daemon CLI checks passed.",
-        "Final Runtime/browser checks: 5 passed.",
-        "Broad xtask unit run, started before final fixes: 1380 passed, 36 failed, 7 ignored. Relevant corrected tests passed on rerun; broader lifecycle, synchronization, and surface failures remain documented."
-      ],
-      "artifacts": {
-        "tasks": [
-          {
-            "id": "P1",
-            "summary": "Added a versioned provider model with validated argument templates, launch modes, transports, output formats, and session capabilities."
-          },
-          {
-            "id": "P2",
-            "summary": "Added atomic, revision-checked shared persistence, legacy migration, node inheritance, and catalog-first synchronization. Built-in defaults remain virtual until edited."
-          },
-          {
-            "id": "P3",
-            "summary": "Launches now use configuration with single-pass context substitution, preserved argument boundaries, supervision, and large-prompt handling. Missing-interpreter diagnostics now reach callers."
-          },
-          {
-            "id": "P4",
-            "summary": "Connected workflow, terminal, chat, diagnostics, maintenance, and direct commands to target-aware provider resolution; removed silent provider fallback."
-          },
-          {
-            "id": "P5",
-            "summary": "Added provider API and CLI operations, selection readback, conflict detection, and deletion guards. Node references must be changed before deleting their provider."
-          },
-          {
-            "id": "P6",
-            "summary": "Added Runtime provider editing, system-default controls, explicit node inheritance, and retained drafts on refresh or save failure."
-          },
-          {
-            "id": "P7",
-            "summary": "Added configuration-only workflow, PTY, API, CLI, migration, concurrency, and browser coverage plus documentation."
-          }
-        ],
-        "unfinished": [
-          "Broader suite failures remain for Quality; no known unfinished provider functionality.",
-          "The final CLI configuration group retains an existing assertion expecting four Skills while six are returned."
-        ],
-        "validation_logs": [
-          "/tmp/refine-provider-validation.log",
-          "/tmp/refine-provider-final-cli.log",
-          "/tmp/refine-provider-terminal-final.log",
-          "/tmp/refine-provider-sync-final.log",
-          "/tmp/refine-provider-ui-final.log",
-          "/tmp/refine-provider-suite-summary.json"
-        ]
-      }
-    }
-  },
-  "attempts": [
-    {
-      "attempt": 0,
-      "binding_id": "default-implement",
-      "checkout": {
-        "observation": {
-          "branch": "refine/00000T19PJVMBGJ0Y33NWRJ002/round-1",
-          "head_commit": "9c7363164d582fac14e5076b24efdc47ec5f9461",
-          "status_porcelain": [
-            " M src/application/agents/mod.rs",
-            " M src/application/agents/prompt_history.rs",
-            " M src/application/agents/provider_selection/mod.rs",
-            " M src/application/agents/sessions/attachment_tests.rs",
-            " M src/application/agents/sessions/mod.rs",
-            " M src/application/agents/sessions/ownership_tests.rs",
-            " M src/application/agents/sessions/pty_lifecycle.rs",
-            " M src/application/agents/sessions/recovery_tests.rs",
-            " M src/application/agents/sessions/session_runtime.rs",
-            " M src/application/agents/sessions/tests.rs",
-            " M src/application/chat/provider_turns.rs",
-            " M src/application/chat/queue.rs",
-            " M src/application/chat/sessions.rs",
-            " M src/application/diagnostics/mod.rs",
-            " M src/application/events/completion.rs",
-            " M src/application/events/dispatch/context.rs",
-            " M src/application/events/execution/runner.rs",
-            " M src/application/events/tests.rs",
-            " M src/application/fleet/node_init/mod.rs",
-            " M src/application/persistence_sync/resolution/installed_agent.rs",
-            " M src/application/persistence_sync/state/service.rs",
-            " M src/application/persistence_sync/state/tests/synchronization.rs",
-            " M src/application/system/source_promotion/agent.rs",
-            " M src/application/system/target_apps/commands.rs",
-            " M src/application/system/target_apps/mod.rs",
-            " M src/application/templates/tests.rs",
-            " M src/application/workflow/tests/worker_liveness/pty.rs",
-            " M src/infrastructure/agents/discovery/mod.rs",
-            " M src/infrastructure/agents/invocation/mod.rs",
-            " M src/infrastructure/agents/invocation/service.rs",
-            " M src/infrastructure/agents/invocation/service/resume.rs",
-            " M src/infrastructure/agents/invocation/tests.rs",
-            " M src/infrastructure/git/worktrees/tests/admission.rs",
-            " M src/infrastructure/process/supervisor/config/settings.rs",
-            " M src/infrastructure/process/supervisor/config/settings_codec.rs",
-            " M src/infrastructure/process/supervisor/config/tests.rs",
-            " M src/infrastructure/storage/mod.rs",
-            " M src/model/mod.rs",
-            " M src/surfaces/cli/actions.rs",
-            " M src/surfaces/cli/actions/agents.rs",
-            " M src/surfaces/cli/actions/config.rs",
-            " M src/surfaces/cli/dispatch.rs",
-            " M src/surfaces/cli/dispatch/agents.rs",
-            " M src/surfaces/cli/dispatch/config.rs",
-            " M src/surfaces/cli/dispatch/fleet.rs",
-            " M src/surfaces/cli/dispatch/hub.rs",
-            " M src/surfaces/cli/tests/agents_processes.rs",
-            " M src/surfaces/cli/tests/config.rs",
-            " M src/surfaces/mcp/tests.rs",
-            " M src/surfaces/mcp/tools.rs",
-            " M src/surfaces/refine-hub/docs/intent/05-surfaces/02-cli.md",
-            " M src/surfaces/refine-hub/docs/intent/05-surfaces/03-browser/12-settings.md",
-            " M src/surfaces/web/static/index.html",
-            " M src/surfaces/web/static/js/features/settings.js",
-            " M src/surfaces/web/static/js/features/settings_runtime.js",
-            " M src/surfaces/web_server/mod.rs",
-            " M src/surfaces/web_server/operation_routes.rs",
-            " M src/surfaces/web_server/operation_routes/agents.rs",
-            " M src/surfaces/web_server/project_routes.rs",
-            " M src/surfaces/web_server/project_routes/settings.rs",
-            " M src/surfaces/web_server/project_routes/target_app.rs",
-            " M src/surfaces/web_server/quality_chat_routes.rs",
-            " M src/surfaces/web_server/runtime.rs",
-            " M src/surfaces/web_server/server.rs",
-            " M src/surfaces/web_server/support/http_state.rs",
-            " M src/surfaces/web_server/support/status.rs",
-            " M src/surfaces/web_server/support/terminal.rs",
-            " M src/surfaces/web_server/tests/agents_chat/agents.rs",
-            " M src/surfaces/web_server/tests/agents_chat/providers.rs",
-            " M src/surfaces/web_server/tests/goals/lifecycle.rs",
-            " M src/surfaces/web_server/tests/http_transport/hub.rs",
-            " M src/surfaces/web_server/tests/templates.rs",
-            " M src/surfaces/web_server/work_routes.rs",
-            " M src/surfaces/web_server/work_routes/file_terminal_routes.rs",
-            " M src/surfaces/web_server/work_routes/import_contract.rs",
-            " M src/surfaces/web_server/work_routes/import_routes/extraction.rs",
-            " M tests/cli_surface.rs",
-            " M tests/cli_surface/config.rs",
-            " M tests/web_settings_runtime.test.js",
-            " M xtask/Cargo.lock",
-            "?? src/application/agents/providers.rs",
-            "?? src/application/agents/providers/tests.rs",
-            "?? src/infrastructure/storage/providers.rs",
-            "?? src/model/providers.rs",
-            "?? src/model/providers_defaults.json",
-            "?? src/surfaces/refine-hub/docs/ai-providers.md",
-            "?? src/surfaces/web/static/js/features/settings_providers.js",
-            "?? tests/web_settings_providers_browser.test.js"
-          ]
-        },
-        "tree": "73d78c892b1db1f78c1ebf26164bab1521d3e1f5"
-      },
-      "checkout_recorded": true,
-      "diagnostic": null,
-      "host_bound_result": true,
-      "observational_violation": false,
-      "operation_id": null,
-      "process_id": "proc-1789505563975-1014481-26867",
-      "prompt_bytes": 16030,
-      "provider_session_id": null,
-      "purpose": "work",
-      "raw_output": "{\n  \"outcome\": \"success\",\n  \"artifacts\": {\n    \"tasks\": [\n      {\"id\": \"P1\", \"summary\": \"Added a versioned provider model with validated argument templates, launch modes, transports, output formats, and session capabilities.\"},\n      {\"id\": \"P2\", \"summary\": \"Added atomic, revision-checked shared persistence, legacy migration, node inheritance, and catalog-first synchronization. Built-in defaults remain virtual until edited.\"},\n      {\"id\": \"P3\", \"summary\": \"Launches now use configuration with single-pass context substitution, preserved argument boundaries, supervision, and large-prompt handling. Missing-interpreter diagnostics now reach callers.\"},\n      {\"id\": \"P4\", \"summary\": \"Connected workflow, terminal, chat, diagnostics, maintenance, and direct commands to target-aware provider resolution; removed silent provider fallback.\"},\n      {\"id\": \"P5\", \"summary\": \"Added provider API and CLI operations, selection readback, conflict detection, and deletion guards. Node references must be changed before deleting their provider.\"},\n      {\"id\": \"P6\", \"summary\": \"Added Runtime provider editing, system-default controls, explicit node inheritance, and retained drafts on refresh or save failure.\"},\n      {\"id\": \"P7\", \"summary\": \"Added configuration-only workflow, PTY, API, CLI, migration, concurrency, and browser coverage plus documentation.\"}\n    ],\n    \"unfinished\": [\n      \"Broader suite failures remain for Quality; no known unfinished provider functionality.\",\n      \"The final CLI configuration group retains an existing assertion expecting four Skills while six are returned.\"\n    ],\n    \"validation_logs\": [\n      \"/tmp/refine-provider-validation.log\",\n      \"/tmp/refine-provider-final-cli.log\",\n      \"/tmp/refine-provider-terminal-final.log\",\n      \"/tmp/refine-provider-sync-final.log\",\n      \"/tmp/refine-provider-ui-final.log\",\n      \"/tmp/refine-provider-suite-summary.json\"\n    ]\n  },\n  \"evidence\": [\n    \"Cargo check, formatting, diff checks, and xtask static-asset checks passed.\",\n    \"Provider-focused Rust run: 49 passed, 1 ignored. Final resolver/API tests: 7 passed.\",\n    \"Configuration-only workflow, queued Skill execution, settings, large-prompt PTY, synchronization, and isolated daemon CLI checks passed.\",\n    \"Final Runtime/browser checks: 5 passed.\",\n    \"Broad xtask unit run, started before final fixes: 1380 passed, 36 failed, 7 ignored. Relevant corrected tests passed on rerun; broader lifecycle, synchronization, and surface failures remain documented.\"\n  ],\n  \"summary\": \"Implemented all seven plan tasks. Changes are retained for Quality; no Goal transitions, commits, merges, or pushes were performed.\\n\\n\"\n}",
-      "received_at": "2026-09-15T21:27:57.543823904+00:00",
-      "started_at": "2026-09-15T20:52:43.891845487+00:00",
-      "workflow_revision": 12
-    }
-  ],
-  "created_at": "2026-09-15T20:52:41.170200754+00:00",
-  "completed_at": "2026-09-15T21:28:01.065186144+00:00",
+  "state": "running",
+  "results": {},
+  "attempts": [],
+  "created_at": "2026-09-15T21:28:07.240057324+00:00",
+  "completed_at": null,
   "error": null,
   "action_applied": false
 }
