@@ -1,0 +1,19 @@
+{
+  "completed_at": null,
+  "config_revision": 81,
+  "created_at": "2026-09-15T12:09:03.603173225+00:00",
+  "error": null,
+  "event": {
+    "id": "node.startup.ready",
+    "kind": "system",
+    "name": "Node Startup Ready",
+    "source": "node.startup.ready"
+  },
+  "execution_state": "running",
+  "gate": "satisfied",
+  "goal_id": null,
+  "id": "04e2fa44aa4a392b7290c03bfb1e35c1d79dc997d30f141abde842efcebb8ac9",
+  "node_id": "default",
+  "result_count": 0,
+  "state": "running"
+}
