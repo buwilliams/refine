@@ -1,10 +1,10 @@
 {
-  "id": "317c746102701c1c772c4184adc5c09e76b310f6ddd79d4d0ccc598b0780afdf",
+  "id": "96902041a6f8182ce0c8fe82d18041504ec4ea6d2e0d108b2fffa1f15916b2ee",
   "event": {
-    "id": "workflow.quality.enter",
-    "name": "Workflow Quality Enter",
+    "id": "workflow.governance.enter",
+    "name": "Workflow Governance Enter",
     "kind": "system",
-    "source": "workflow.quality.enter",
+    "source": "workflow.governance.enter",
     "enabled": true,
     "scope": {
       "node_id": null
@@ -12,8 +12,8 @@
     "parameters": [],
     "bindings": [
       {
-        "id": "default-quality",
-        "skill_id": "default-quality",
+        "id": "default-governance",
+        "skill_id": "default-governance",
         "enabled": true,
         "mode": "blocking",
         "order": 0,
@@ -48,101 +48,78 @@
     "goal_id": "00000T19G1926GC2MSDXWRJ000",
     "round_idx": 1,
     "workflow_revision": 40,
-    "candidate_commit": "6c55ff272c6c32c1b7d23b0dfe8a855fbd738bc9",
+    "candidate_commit": "819217ceebfa97a70304e651b24ef0609e749e49",
     "data": {
       "context": {
-        "agent_context": {
-          "assembled_at": "2026-09-15T18:09:14Z",
-          "current_round": {
+        "assembled_at": "2026-09-15T18:09:14Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "There are problems with the layout.\n\nThis appears out of any kind of layout before the table:\n↔\nUse your agents and repositories\nConnect supported installed agents to the projects you already work on.\n\n⌘\nCoordinate delivery across machines\nKeep teams and agent fleets working through shared Goals and review steps.\n\n↶\nKeep ownership and recover work\nMIT open source, isolated Git worktrees, and retained attempts you can inspect.\n\nCompare the capabilities behind that workflow. Direct agents is a category; features vary by agent.\n\n✓ Built in\n+ Custom setup / integration\n~ Varies\n? Not documented\n× Not offered\nScroll to compare products → (or focus the table and use arrow keys)",
+          "reporter": "Buddy Williams",
+          "round": 2
+        },
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000T19G1926GC2MSDXWRJ000",
+          "name": "The website comparison chart is now informational and really hard to grok for ca",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": false,
+          "constitution": "",
+          "product": "",
+          "rules": []
+        },
+        "guidance_candidates": [],
+        "previous_rounds": [
+          {
             "assignee": "Buddy Williams",
-            "prompt": "There are problems with the layout.\n\nThis appears out of any kind of layout before the table:\n↔\nUse your agents and repositories\nConnect supported installed agents to the projects you already work on.\n\n⌘\nCoordinate delivery across machines\nKeep teams and agent fleets working through shared Goals and review steps.\n\n↶\nKeep ownership and recover work\nMIT open source, isolated Git worktrees, and retained attempts you can inspect.\n\nCompare the capabilities behind that workflow. Direct agents is a category; features vary by agent.\n\n✓ Built in\n+ Custom setup / integration\n~ Varies\n? Not documented\n× Not offered\nScroll to compare products → (or focus the table and use arrow keys)",
-            "reporter": "Buddy Williams",
-            "round": 2
-          },
-          "goal": {
-            "assignee": "Buddy Williams",
-            "id": "00000T19G1926GC2MSDXWRJ000",
-            "name": "The website comparison chart is now informational and really hard to grok for ca",
-            "node_id": "default",
-            "priority": "low",
-            "reporter": "Buddy Williams"
-          },
-          "governance": {
-            "configured": false,
-            "constitution": "",
-            "product": "",
-            "rules": []
-          },
-          "guidance_candidates": [],
-          "previous_rounds": [
-            {
-              "assignee": "Buddy Williams",
-              "governance_checked_at": "2026-09-15T17:13:54Z",
-              "governance_details": {
-                "candidate_commit": "7fb282cb297066b2dbb584f5af350b4acdcc662f",
-                "configured": true,
-                "failed_actions": [],
-                "phase": "post_implementation",
-                "skill_results": [
-                  {
-                    "artifacts": null,
-                    "binding_id": "workflow.governance.enter:default-governance",
-                    "evidence": [
-                      "Reviewed the implementation against the recorded plan, project design documentation, MIT license, and installed-agent provider definitions.",
-                      "Quality evidence names the final candidate: 3 Chromium tests passed, 0 failed, 0 skipped, covering four viewport widths, table semantics, disclosures, overflow, and keyboard navigation. Quality corrected obscured mobile keyboard focus.",
-                      "Inspected Quality’s desktop, 320px mobile, and focused-product screenshots. Candidate diff whitespace checks passed.",
-                      "Competitor qualifications are consistent with the checked official sources: [Blitzy](https://blitzy.com/), [n8n licensing](https://github.com/n8n-io/n8n/blob/master/README.md#license), [distributed workers](https://docs.n8n.io/deploy/host-n8n/configure-n8n/scaling/enable-queue-mode), and [Execute Command](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.executecommand)."
-                    ],
-                    "invocation_id": "e4e184f18d8605fd56f1b23ec40775b772f7db3e079435b90af4f68b3174f062",
-                    "outcome": "success",
-                    "role": "governance",
-                    "summary": "Pass. Candidate 7fb282cb297066b2dbb584f5af350b4acdcc662f meets the Goal, fits the architecture, and supports Refine’s purpose. Three prominent benefit callouts, six capability rows with labeled symbols, and a highlighted Refine column make the reasons to choose Refine easy to scan. Qualifications remain available through accessible disclosures. Desktop and mobile screenshots confirm readable benefits and initial Refine visibility at 320px. Changes stay within the website surface, using existing assets, native HTML disclosures, and one focused keyboard-scrolling helper. The content emphasizes agent coordination, user ownership, and recoverable work. No necessary corrections identified. Optional improvement: extend browser coverage beyond Chromium."
-                  }
-                ],
-                "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T19G1926GC2MSDXWRJ000-round-1"
-              },
-              "governance_message": "Governance checks passed.",
-              "implementation_report": "workflow.implement.enter:default-implement: Task #1: Defined six capabilities, verified competitor classifications against official sources, and checked Refine claims against current code and documentation.\nTask #2: Added three benefit callouts, a symbol-and-label matrix with Refine highlighted first, expandable explanations and sources, and a Get Started link.\nTask #3: Added responsive styling, accessible disclosures, keyboard scrolling, and pinned capability labels. Refine is initially visible at 320px; only labels remain pinned so competing columns can be fully revealed.\nTask #4: Updated browser coverage. All three tests passed with Chromium; none skipped. Desktop and mobile screenshots were inspected.\nNo unfinished implementation work or material departures from the plan.",
-              "implementation_reported_at": "2026-09-15T17:07:21Z",
-              "prompt": "The website comparison chart is now informational and really hard to grok for capabilities. The intent is to show what Refine has/does that is distinct from other popular products/platforms. Can you make this more visual so users can see at a glance why they might choose to use Refine?",
-              "quality_checked_at": "2026-09-15T17:12:20Z",
-              "quality_details": {
-                "candidate_commit": "7fb282cb297066b2dbb584f5af350b4acdcc662f",
-                "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T19G1926GC2MSDXWRJ000-round-1",
-                "diagnostics": [
-                  "Reused Skill review workflow.quality.enter:default-quality for final candidate content: automation/invocations/dfd36a1249596c8b3530ba9322d939655a4277a9fe4254c0e619c95f5f17d465.json"
-                ],
-                "evaluation_scope": "isolated_candidate",
-                "operation_id": "1a0a60e1b90f7ad16",
-                "provider_attempts": [],
-                "quality_proof": {
-                  "checked_at": "2026-09-15T17:12:20Z",
-                  "checked_candidate_commit": "7fb282cb297066b2dbb584f5af350b4acdcc662f",
-                  "evaluation_scope": "isolated_candidate",
-                  "goal_id": "00000T19G1926GC2MSDXWRJ000",
-                  "operation_id": "1a0a60e1b90f7ad16",
-                  "results": [
-                    {
-                      "command": "",
-                      "evidence": "Quality passed after correcting one mobile keyboard accessibility defect and strengthening the browser tests. No remaining failures in the tested scope. Validation used Chromium; other browser engines were not tested.\n\n",
-                      "status": "passed",
-                      "test": "workflow.quality.enter:default-quality"
-                    }
+            "governance_checked_at": "2026-09-15T17:13:54Z",
+            "governance_details": {
+              "candidate_commit": "7fb282cb297066b2dbb584f5af350b4acdcc662f",
+              "configured": true,
+              "failed_actions": [],
+              "phase": "post_implementation",
+              "skill_results": [
+                {
+                  "artifacts": null,
+                  "binding_id": "workflow.governance.enter:default-governance",
+                  "evidence": [
+                    "Reviewed the implementation against the recorded plan, project design documentation, MIT license, and installed-agent provider definitions.",
+                    "Quality evidence names the final candidate: 3 Chromium tests passed, 0 failed, 0 skipped, covering four viewport widths, table semantics, disclosures, overflow, and keyboard navigation. Quality corrected obscured mobile keyboard focus.",
+                    "Inspected Quality’s desktop, 320px mobile, and focused-product screenshots. Candidate diff whitespace checks passed.",
+                    "Competitor qualifications are consistent with the checked official sources: [Blitzy](https://blitzy.com/), [n8n licensing](https://github.com/n8n-io/n8n/blob/master/README.md#license), [distributed workers](https://docs.n8n.io/deploy/host-n8n/configure-n8n/scaling/enable-queue-mode), and [Execute Command](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.executecommand)."
                   ],
-                  "round_idx": 0,
-                  "schema_version": 1,
-                  "skills": {
-                    "invocations": {
-                      "workflow.quality.enter:default-quality": "dfd36a1249596c8b3530ba9322d939655a4277a9fe4254c0e619c95f5f17d465"
-                    },
-                    "required_bindings": [
-                      "workflow.quality.enter:default-quality"
-                    ],
-                    "requirements_id": "9fe971f6b60ac378d8ecd9e7e448b3fcb1ac096baf3723270caa2a43e20aec88"
-                  },
-                  "source_candidate_commit": "7fb282cb297066b2dbb584f5af350b4acdcc662f",
-                  "state": "passed"
-                },
+                  "invocation_id": "e4e184f18d8605fd56f1b23ec40775b772f7db3e079435b90af4f68b3174f062",
+                  "outcome": "success",
+                  "role": "governance",
+                  "summary": "Pass. Candidate 7fb282cb297066b2dbb584f5af350b4acdcc662f meets the Goal, fits the architecture, and supports Refine’s purpose. Three prominent benefit callouts, six capability rows with labeled symbols, and a highlighted Refine column make the reasons to choose Refine easy to scan. Qualifications remain available through accessible disclosures. Desktop and mobile screenshots confirm readable benefits and initial Refine visibility at 320px. Changes stay within the website surface, using existing assets, native HTML disclosures, and one focused keyboard-scrolling helper. The content emphasizes agent coordination, user ownership, and recoverable work. No necessary corrections identified. Optional improvement: extend browser coverage beyond Chromium."
+                }
+              ],
+              "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T19G1926GC2MSDXWRJ000-round-1"
+            },
+            "governance_message": "Governance checks passed.",
+            "implementation_report": "workflow.implement.enter:default-implement: Task #1: Defined six capabilities, verified competitor classifications against official sources, and checked Refine claims against current code and documentation.\nTask #2: Added three benefit callouts, a symbol-and-label matrix with Refine highlighted first, expandable explanations and sources, and a Get Started link.\nTask #3: Added responsive styling, accessible disclosures, keyboard scrolling, and pinned capability labels. Refine is initially visible at 320px; only labels remain pinned so competing columns can be fully revealed.\nTask #4: Updated browser coverage. All three tests passed with Chromium; none skipped. Desktop and mobile screenshots were inspected.\nNo unfinished implementation work or material departures from the plan.",
+            "implementation_reported_at": "2026-09-15T17:07:21Z",
+            "prompt": "The website comparison chart is now informational and really hard to grok for capabilities. The intent is to show what Refine has/does that is distinct from other popular products/platforms. Can you make this more visual so users can see at a glance why they might choose to use Refine?",
+            "quality_checked_at": "2026-09-15T17:12:20Z",
+            "quality_details": {
+              "candidate_commit": "7fb282cb297066b2dbb584f5af350b4acdcc662f",
+              "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T19G1926GC2MSDXWRJ000-round-1",
+              "diagnostics": [
+                "Reused Skill review workflow.quality.enter:default-quality for final candidate content: automation/invocations/dfd36a1249596c8b3530ba9322d939655a4277a9fe4254c0e619c95f5f17d465.json"
+              ],
+              "evaluation_scope": "isolated_candidate",
+              "operation_id": "1a0a60e1b90f7ad16",
+              "provider_attempts": [],
+              "quality_proof": {
+                "checked_at": "2026-09-15T17:12:20Z",
+                "checked_candidate_commit": "7fb282cb297066b2dbb584f5af350b4acdcc662f",
+                "evaluation_scope": "isolated_candidate",
+                "goal_id": "00000T19G1926GC2MSDXWRJ000",
+                "operation_id": "1a0a60e1b90f7ad16",
                 "results": [
                   {
                     "command": "",
@@ -151,52 +128,48 @@
                     "test": "workflow.quality.enter:default-quality"
                   }
                 ],
-                "source_candidate_commit": "7fb282cb297066b2dbb584f5af350b4acdcc662f"
+                "round_idx": 0,
+                "schema_version": 1,
+                "skills": {
+                  "invocations": {
+                    "workflow.quality.enter:default-quality": "dfd36a1249596c8b3530ba9322d939655a4277a9fe4254c0e619c95f5f17d465"
+                  },
+                  "required_bindings": [
+                    "workflow.quality.enter:default-quality"
+                  ],
+                  "requirements_id": "9fe971f6b60ac378d8ecd9e7e448b3fcb1ac096baf3723270caa2a43e20aec88"
+                },
+                "source_candidate_commit": "7fb282cb297066b2dbb584f5af350b4acdcc662f",
+                "state": "passed"
               },
-              "quality_message": "Quality Skills reported success.",
-              "quality_state": "passed",
-              "reporter": "Buddy Williams",
-              "round": 1,
-              "rule_state": "passed"
-            }
-          ],
-          "version": 1,
-          "workflow_summary": "Refine gives this Goal Agent an isolated worktree, the current Round, and available planning context. Follow the Goal and applicable Skill instructions and use your judgment to decide when to stop. Quality and Governance agents make their own decisions using their Skills before integration and human Review. Refine coordinates workflow transitions and Git actions. Do not directly advance Goal state, approve, merge, or push."
-        },
-        "implementation_report": "workflow.implement.enter:default-implement: Task #1: Reproduced the reported unformatted layout using the preceding stylesheet. Production currently serves matching CSS with a four-hour cache lifetime; the user's earlier cached response remains unconfirmed.\nTask #2: Added content-derived CSS/JavaScript URL versions and a documented update/check script with stale-reference regression coverage.\nTask #3: Inspection confirmed the existing desktop columns, mobile items, icons, and table guidance render correctly with current styles. No additional layout edits were needed.\nTask #4: Switched comparison tests to the real website server and added asset-delivery, alignment, wrapping, and clipping checks at four widths. Existing accessibility checks pass. No unfinished implementation work.",
-        "plans": [
-          {
-            "artifacts": {
-              "desired_behavior": "The benefits, introduction, legend, and scrolling guidance form a clearly arranged comparison section on desktop and mobile. Ensure visitors receive the matching styles and scripts, then correct any remaining layout defects.",
-              "tasks": [
-                "Task #1 - Establish the failure mechanism. Serve this worktree through `refine website` and inspect the complete comparison section at desktop and mobile widths. Compare fresh assets with the preceding stylesheet to determine whether stale CSS reproduces the reported unformatted content. If production access becomes available, compare its referenced asset bytes and cache headers with the candidate.",
-                "Task #2 - Keep website assets synchronized with the HTML. Add content-derived version identifiers to the site.css and site.js references, following the existing screenshot URL convention. Provide a small repeatable update/check mechanism so future asset edits refresh those identifiers. Confirm the existing static server resolves versioned URLs correctly; keep the change within website assets and tooling unless a serving defect is demonstrated.",
-                "Task #3 - Resolve remaining layout problems after current styles load. Present benefits as three aligned desktop columns and clearly separated mobile items, with each icon attached visually to its heading and description. Keep the introduction, wrapping legend, and scrolling guidance grouped immediately above the table. Adjust existing HTML/CSS only where inspection shows defects. Preserve capability content, Refine highlighting, disclosures, and keyboard access.",
-                "Task #4 - Hand off focused regression coverage to Quality. Extend tests to verify benefit placement, icon/text alignment, legend wrapping, and absence of clipping at 1440, 1024, 390, and 320 pixels. Include an asset-version regression that exposes outdated references and verify versioned requests through the actual website server. Quality should run the comparison browser suite without skips and inspect screenshots including the content above the table. Record production verification separately if access remains unavailable."
-              ]
+              "results": [
+                {
+                  "command": "",
+                  "evidence": "Quality passed after correcting one mobile keyboard accessibility defect and strengthening the browser tests. No remaining failures in the tested scope. Validation used Chromium; other browser engines were not tested.\n\n",
+                  "status": "passed",
+                  "test": "workflow.quality.enter:default-quality"
+                }
+              ],
+              "source_candidate_commit": "7fb282cb297066b2dbb584f5af350b4acdcc662f"
             },
-            "binding_id": "default-plan",
-            "evidence": [
-              "index.html references unversioned site.css and site.js URLs.",
-              "site.css already defines a three-column benefits grid, a mobile stack, styled icons, and a wrapping legend.",
-              "Existing comparison browser tests intercept asset requests with fresh local files, leaving stale-asset behavior uncovered.",
-              "Production HTML and stylesheet requests returned HTTP 403; the live cause remains unconfirmed."
-            ],
-            "invocation_id": "87433cc44ee18479e55dae6fb361bb27c0bdc8f74366a0fcd06554f8f563ff04",
-            "outcome": "success",
-            "role": "plan",
-            "summary": "Plan ready. Asset freshness is the leading hypothesis because layout rules already exist while their URLs remain unchanged. Confirm that mechanism before making targeted layout adjustments. Historical memory documents stale CDN image assets on this website; it does not establish the current production cause.\n\n"
+            "quality_message": "Quality Skills reported success.",
+            "quality_state": "passed",
+            "reporter": "Buddy Williams",
+            "round": 1,
+            "rule_state": "passed"
           }
-        ]
+        ],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree, the current Round, and available planning context. Follow the Goal and applicable Skill instructions and use your judgment to decide when to stop. Quality and Governance agents make their own decisions using their Skills before integration and human Review. Refine coordinates workflow transitions and Git actions. Do not directly advance Goal state, approve, merge, or push."
       },
       "event": {},
       "goal": {
         "assignee": "Buddy Williams",
         "base_commit": "678a59932da0c2ccbe3b241737fb9ddc8b2329dc",
         "branch_name": "refine/00000T19G1926GC2MSDXWRJ000/round-2-execution-d89993e6-c257-4c78-9a2b-efce50e21d4d",
-        "candidate_commit": "6c55ff272c6c32c1b7d23b0dfe8a855fbd738bc9",
+        "candidate_commit": "819217ceebfa97a70304e651b24ef0609e749e49",
         "created": "2026-09-15T16:58:17Z",
-        "event_generation": 12,
+        "event_generation": 13,
         "feature_id": null,
         "feature_order": null,
         "id": "00000T19G1926GC2MSDXWRJ000",
@@ -233,27 +206,31 @@
             "implementation_report": "workflow.implement.enter:default-implement: Task #1: Reproduced the reported unformatted layout using the preceding stylesheet. Production currently serves matching CSS with a four-hour cache lifetime; the user's earlier cached response remains unconfirmed.\nTask #2: Added content-derived CSS/JavaScript URL versions and a documented update/check script with stale-reference regression coverage.\nTask #3: Inspection confirmed the existing desktop columns, mobile items, icons, and table guidance render correctly with current styles. No additional layout edits were needed.\nTask #4: Switched comparison tests to the real website server and added asset-delivery, alignment, wrapping, and clipping checks at four widths. Existing accessibility checks pass. No unfinished implementation work.",
             "implementation_reported_at": "2026-09-15T18:16:12Z",
             "prompt": "There are problems with the layout.\n\nThis appears out of any kind of layout before the table:\n↔\nUse your agents and repositories\nConnect supported installed agents to the projects you already work on.\n\n⌘\nCoordinate delivery across machines\nKeep teams and agent fleets working through shared Goals and review steps.\n\n↶\nKeep ownership and recover work\nMIT open source, isolated Git worktrees, and retained attempts you can inspect.\n\nCompare the capabilities behind that workflow. Direct agents is a category; features vary by agent.\n\n✓ Built in\n+ Custom setup / integration\n~ Varies\n? Not documented\n× Not offered\nScroll to compare products → (or focus the table and use arrow keys)",
+            "quality_agent_report": "workflow.quality.enter:default-quality: Quality passed. Eight tests cover the changed behavior with no failures or skips. Added missing-reference regression coverage; no implementation corrections were needed. Historical cache guidance informed verification, but does not establish the original production cause.\n\n",
+            "quality_candidate_commit": "819217ceebfa97a70304e651b24ef0609e749e49",
+            "quality_message": "Quality Skills reported success.",
+            "quality_state": "passed",
             "reporter": "Buddy Williams",
-            "updated": "2026-09-15T18:16:14Z"
+            "updated": "2026-09-15T18:18:12Z"
           }
         ],
-        "status": "quality",
+        "status": "governance",
         "target_branch": "main",
-        "updated": "2026-09-15T18:16:14Z",
-        "workflow_revision": 59
+        "updated": "2026-09-15T18:18:12Z",
+        "workflow_revision": 69
       },
       "system": {
-        "candidate_commit": "6c55ff272c6c32c1b7d23b0dfe8a855fbd738bc9",
+        "candidate_commit": "819217ceebfa97a70304e651b24ef0609e749e49",
         "node_id": "default",
         "project_root": "/home/buddy/projects/refine-next",
         "refine_executable": "/home/buddy/projects/refine/bin/refine",
-        "workflow_step": "quality",
+        "workflow_step": "governance",
         "workspace": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T19G1926GC2MSDXWRJ000-round-2-execution-d89993e6-c257-4c78-9a2b-efce50e21d4d"
       }
     },
     "metadata": {
       "behavior": "EventSkill",
-      "event_operation_id": "1a0a648aa99f7ad1c",
+      "event_operation_id": "1a0a64a794df7ad1e",
       "goal_id": "00000T19G1926GC2MSDXWRJ000",
       "kind": "workflow",
       "managed_worktree": {
@@ -272,7 +249,7 @@
       "provider": "codex",
       "round_idx": 1,
       "started_bindings": {
-        "default-quality": "2026-09-15T18:16:16.030524979+00:00"
+        "default-governance": "2026-09-15T18:18:14.433131101+00:00"
       },
       "target_app_id": "/home/buddy/projects/refine-next",
       "template_snapshot": {
@@ -575,15 +552,15 @@
         }
       },
       "workflow_revision": 40,
-      "workflow_state": "quality",
-      "workflow_step_generation": 12
+      "workflow_state": "governance",
+      "workflow_step_generation": 13
     }
   },
   "bindings": [
     {
       "binding": {
-        "id": "default-quality",
-        "skill_id": "default-quality",
+        "id": "default-governance",
+        "skill_id": "default-governance",
         "enabled": true,
         "mode": "blocking",
         "order": 0,
@@ -594,10 +571,10 @@
         "inputs": {}
       },
       "skill": {
-        "id": "default-quality",
-        "name": "Quality",
-        "prompt": "## Quality\n\nTest the implementation. Create and groom tests to cover the behavior described in the plan.\n\n### Outcome\n\nMeaningful tests cover the changed behavior and pass. Provide a brief report of the behavior tested, tests added or updated, commands run and their results, and any remaining failures or gaps. Include runtime or browser test results where useful. These results support Governance's verification of the work.\n\n### Guardrails\n\n- Test observable behavior, including relevant failure cases and effects on existing functionality. Tests should catch defects rather than mirror the implementation.\n- Keep useful tests, update tests for changed behavior, and remove obsolete or meaningless tests.\n- Investigate failures, correct problems in the implementation or tests, and rerun affected tests.\n- Choose tests suited to the change. Expand coverage when failures or affected behavior call for it.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
-        "role": "quality",
+        "id": "default-governance",
+        "name": "Governance",
+        "prompt": "## Governance\n\nVerify that the implementation meets the user-defined Goal, fits the system architecture, and serves the project's purpose.\n\n### Outcome\n\nA clear assessment of whether the implementation satisfies all three. Begin with the verdict, then briefly explain how the work meets the Goal, fits the architecture, and supports the project's purpose, using concrete evidence from the implementation and Quality results. For each gap, describe what falls short, why it matters, and the recommended correction. Separate necessary corrections from optional improvements.\n\n### Guardrails\n\n- Read the context that helps explain the user's Goal, the system architecture, and the project's purpose.\n- Compare the implementation with the user's desired outcome as well as the plan. Completing the plan and passing tests alone do not establish that the Goal is met.\n- Look for clear responsibilities, shared behavior implemented in one place, and interfaces that remain easy to use and maintain.\n- Judge design choices by how they serve the project. Allow sound approaches that differ from personal preference.\n- Group related issues by their underlying cause so the next step can address them together.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
+        "role": "governance",
         "enabled": true,
         "scope": {
           "node_id": null
@@ -608,67 +585,11 @@
       "parameters": {}
     }
   ],
-  "state": "succeeded",
-  "results": {
-    "default-quality": {
-      "invocation_id": "317c746102701c1c772c4184adc5c09e76b310f6ddd79d4d0ccc598b0780afdf",
-      "binding_id": "default-quality",
-      "role": "quality",
-      "outcome": "success",
-      "summary": "Quality passed. Eight tests cover the changed behavior with no failures or skips. Added missing-reference regression coverage; no implementation corrections were needed. Historical cache guidance informed verification, but does not establish the original production cause.\n\n",
-      "evidence": [
-        "Chromium comparison suite: 5 passed, 0 failed, 0 skipped. Verified actual-server asset delivery, layout at 1440/1024/390/320px, table semantics, disclosures, touch interaction, and keyboard navigation.",
-        "Asset-version suite after Quality changes: 3 passed, 0 failed, 0 skipped.",
-        "Inspected screenshots at all four widths: aligned desktop columns, separated mobile benefits, attached icons, wrapping legend, and readable table guidance.",
-        "Asset-version check and Git whitespace checks passed."
-      ],
-      "artifacts": {
-        "commands": [
-          "NODE_PATH=/tmp/refine-comparison-tools/node_modules REFINE_BIN=/home/buddy/projects/refine/bin/refine COMPARISON_SCREENSHOT_DIR=/tmp/refine-comparison-quality-round2 node --test tests/website_asset_versions.test.js tests/website_comparison_browser.test.js",
-          "node --test tests/website_asset_versions.test.js",
-          "node scripts/website-asset-versions.js --check",
-          "git diff --check"
-        ],
-        "limitations": [
-          "Browser validation used Chromium only.",
-          "Production was not rechecked during Quality; the user's original cached response remains unconfirmed."
-        ],
-        "screenshots": "/tmp/refine-comparison-quality-round2/comparison-{1440,1024,390,320}.png",
-        "tests_added": "tests/website_asset_versions.test.js: missing CSS or JavaScript references fail in both check and write modes without partially updating the homepage."
-      }
-    }
-  },
-  "attempts": [
-    {
-      "attempt": 0,
-      "binding_id": "default-quality",
-      "checkout": {
-        "observation": {
-          "branch": "refine/00000T19G1926GC2MSDXWRJ000/round-2-execution-d89993e6-c257-4c78-9a2b-efce50e21d4d",
-          "head_commit": "6c55ff272c6c32c1b7d23b0dfe8a855fbd738bc9",
-          "status_porcelain": [
-            " M tests/website_asset_versions.test.js"
-          ]
-        },
-        "tree": "e4fff4cb2d40f6792062243140856e31496ba904"
-      },
-      "checkout_recorded": true,
-      "diagnostic": null,
-      "host_bound_result": true,
-      "observational_violation": false,
-      "operation_id": null,
-      "process_id": "proc-1789496176311-1014481-11188",
-      "prompt_bytes": 18955,
-      "provider_session_id": null,
-      "purpose": "work",
-      "raw_output": "{\n  \"outcome\": \"success\",\n  \"evidence\": [\n    \"Chromium comparison suite: 5 passed, 0 failed, 0 skipped. Verified actual-server asset delivery, layout at 1440/1024/390/320px, table semantics, disclosures, touch interaction, and keyboard navigation.\",\n    \"Asset-version suite after Quality changes: 3 passed, 0 failed, 0 skipped.\",\n    \"Inspected screenshots at all four widths: aligned desktop columns, separated mobile benefits, attached icons, wrapping legend, and readable table guidance.\",\n    \"Asset-version check and Git whitespace checks passed.\"\n  ],\n  \"artifacts\": {\n    \"tests_added\": \"tests/website_asset_versions.test.js: missing CSS or JavaScript references fail in both check and write modes without partially updating the homepage.\",\n    \"commands\": [\n      \"NODE_PATH=/tmp/refine-comparison-tools/node_modules REFINE_BIN=/home/buddy/projects/refine/bin/refine COMPARISON_SCREENSHOT_DIR=/tmp/refine-comparison-quality-round2 node --test tests/website_asset_versions.test.js tests/website_comparison_browser.test.js\",\n      \"node --test tests/website_asset_versions.test.js\",\n      \"node scripts/website-asset-versions.js --check\",\n      \"git diff --check\"\n    ],\n    \"screenshots\": \"/tmp/refine-comparison-quality-round2/comparison-{1440,1024,390,320}.png\",\n    \"limitations\": [\n      \"Browser validation used Chromium only.\",\n      \"Production was not rechecked during Quality; the user's original cached response remains unconfirmed.\"\n    ]\n  },\n  \"summary\": \"Quality passed. Eight tests cover the changed behavior with no failures or skips. Added missing-reference regression coverage; no implementation corrections were needed. Historical cache guidance informed verification, but does not establish the original production cause.\\n\\n\"\n}",
-      "received_at": "2026-09-15T18:18:04.491706582+00:00",
-      "started_at": "2026-09-15T18:16:16.278716197+00:00",
-      "workflow_revision": 40
-    }
-  ],
-  "created_at": "2026-09-15T18:16:14.922646169+00:00",
-  "completed_at": "2026-09-15T18:18:06.090726661+00:00",
+  "state": "running",
+  "results": {},
+  "attempts": [],
+  "created_at": "2026-09-15T18:18:13.357811960+00:00",
+  "completed_at": null,
   "error": null,
   "action_applied": false
 }
