@@ -1,10 +1,10 @@
 {
-  "id": "81d2413745b0331f93bc2fff6e57955e96aac6e2de9644eb7cd5d8ba2cb676f5",
+  "id": "fec36582ae6a46fc501c2412155cceb481bceec4ba409bf6447ab6524fe2a6c7",
   "event": {
-    "id": "workflow.quality.enter",
-    "name": "Workflow Quality Enter",
+    "id": "workflow.governance.enter",
+    "name": "Workflow Governance Enter",
     "kind": "system",
-    "source": "workflow.quality.enter",
+    "source": "workflow.governance.enter",
     "enabled": true,
     "scope": {
       "node_id": null
@@ -12,8 +12,8 @@
     "parameters": [],
     "bindings": [
       {
-        "id": "default-quality",
-        "skill_id": "default-quality",
+        "id": "default-governance",
+        "skill_id": "default-governance",
         "enabled": true,
         "mode": "blocking",
         "order": 0,
@@ -48,65 +48,43 @@
     "goal_id": "00000T19F2G97H0BEDPKDXE002",
     "round_idx": 0,
     "workflow_revision": 2,
-    "candidate_commit": "917ded25aa4644e144bf258ffdaf91f52b6e973f",
+    "candidate_commit": "4a30beb267631fb6ee0115822dea491050bf9422",
     "data": {
       "context": {
-        "agent_context": {
-          "assembled_at": "2026-09-15T16:24:44Z",
-          "current_round": {
-            "assignee": "Buddy Williams",
-            "prompt": "Update the website surface comparison table from: agents directly, agent loops, conductor, and Refine to: direct agents, Blitzy (https://blitzy.com), n8n (https://n8n.io/), and Refine. This removes agent loops and conductor.\n\nYou'll need to research Blitzy and n8n. I think n8n is generic, with workflows designed for software development, while Blitzy is purpose-built for software development modernization, though they have moved into feature development.\n\nSome of the key attributes of Refine are that it is open-source, local-first, built for BYOT (bring your own software), BYOA (bring your own agent), and agent-first orchestration through surfaces, though I suspect you'll find more differentiators.",
-            "reporter": "Buddy Williams",
-            "round": 1
-          },
-          "goal": {
-            "assignee": "Buddy Williams",
-            "id": "00000T19F2G97H0BEDPKDXE002",
-            "name": "Update the website surface comparison table from: agents directly, agent loops",
-            "node_id": "default",
-            "priority": "low",
-            "reporter": "Buddy Williams"
-          },
-          "governance": {
-            "configured": false,
-            "constitution": "",
-            "product": "",
-            "rules": []
-          },
-          "guidance_candidates": [],
-          "previous_rounds": [],
-          "version": 1,
-          "workflow_summary": "Refine gives this Goal Agent an isolated worktree, the current Round, and available planning context. Follow the Goal and applicable Skill instructions and use your judgment to decide when to stop. Quality and Governance agents make their own decisions using their Skills before integration and human Review. Refine coordinates workflow transitions and Git actions. Do not directly advance Goal state, approve, merge, or push."
+        "assembled_at": "2026-09-15T16:24:44Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "Update the website surface comparison table from: agents directly, agent loops, conductor, and Refine to: direct agents, Blitzy (https://blitzy.com), n8n (https://n8n.io/), and Refine. This removes agent loops and conductor.\n\nYou'll need to research Blitzy and n8n. I think n8n is generic, with workflows designed for software development, while Blitzy is purpose-built for software development modernization, though they have moved into feature development.\n\nSome of the key attributes of Refine are that it is open-source, local-first, built for BYOT (bring your own software), BYOA (bring your own agent), and agent-first orchestration through surfaces, though I suspect you'll find more differentiators.",
+          "reporter": "Buddy Williams",
+          "round": 1
         },
-        "implementation_report": "workflow.implement.enter:default-implement: Task 1: Defined descriptive operating-model comparisons, distinguishing model selection, external MCP clients, and installed coding-agent supervision.\nTask 2: Replaced the introduction and table in src/surfaces/website/index.html with Direct agents, Blitzy, n8n, and Refine across eight rows.\nTask 3: Added official sources dated 2026-09-15. Updated scoped CSS for equal-width columns, readable minimum width, source spacing, link focus, and n8n casing. Preserved semantic headers, scrolling, and Refine highlighting.\nTask 4: Completed structural and HTTP smoke checks; browser rendering and interaction validation remain for Quality. Preview server stopped after checking.\nNo substantive plan departures or unfinished implementation work. Two files changed.",
-        "plans": [
-          {
-            "artifacts": {
-              "plan": "Visitors should understand how Direct agents, Blitzy, n8n, and Refine approach software delivery. Replace the existing comparison’s categories and assumptions with concise, sourced descriptions that explain Refine’s open-source, local-first orchestration of users’ software and agents.\n\n1. [ ] Task #1 - Define the comparison around each product’s operating model.\n   Use the research below to finalize short cell descriptions. Define Direct agents as using a coding agent without an added orchestration platform; capabilities vary by agent. Describe Blitzy as purpose-built autonomous software development covering existing-code modernization, refactoring, and feature development. Describe n8n as general-purpose workflow and AI automation with software-development integrations and templates. Describe Refine as software-delivery coordination around existing repositories and supported installed agents. Use descriptive text instead of unsupported yes/no judgments. Distinguish choosing models, connecting external agents, and supervising installed coding agents.\n\n2. [ ] Task #2 - Rewrite the comparison section in src/surfaces/website/index.html.\n   Depends on Task #1. Set the product columns, in order, to Direct agents, Blitzy, n8n, and Refine; link Blitzy and n8n to their official sites. Replace the introduction’s claims about loops, single-machine orchestrators, and missing management capabilities. Use approximately eight rows: primary purpose; source/license; deployment and local work; bring your own software (BYOT); bring your own agent (BYOA); agent access and orchestration surfaces; delivery workflow and review; coordination and recovery.\n   Make Refine’s cells concrete: MIT open source; local repositories and runtime; existing software projects; supported installed agent CLIs; shared CLI/API/MCP/browser behavior; durable Goals and Rounds with configurable Skills, Quality, Governance, and Review; Git worktree isolation, node coordination, and retained execution evidence. Check final capability wording against current implementation and Hub documentation, rather than treating future design intent as shipped behavior.\n   Credit Blitzy’s existing-code support, specialized multi-agent development, validation, and enterprise deployment options. Credit n8n’s source availability, self-hosting, integrations, custom workflows, human approvals, and MCP. Explain differences in what each coordinates without claiming those capabilities are unique to Refine. For undocumented competitor capabilities, qualify or omit the claim rather than asserting absence.\n\n3. [ ] Task #3 - Add compact sourcing and preserve the table’s usability.\n   Depends on Task #2. Add a short source note with official product/documentation links and the research date, 2026-09-15. Identify n8n as source-available/fair-code using its published license description. Keep competitor performance statistics and prices outside this comparison. Preserve semantic column and row headers, the keyboard-focusable horizontal scroll region, and the highlighted Refine column. Adjust src/surfaces/website/assets/site.css only where the longer descriptions need wrapping, link focus styling, or spacing. Preserve the n8n brand casing if the existing uppercase header styling would obscure it.\n\n4. [ ] Task #4 - Hand off focused validation to Quality.\n   Depends on Task #3. Preview through `/home/buddy/projects/refine/bin/refine website --static-root <worktree> --port <available-port>`. Quality should inspect desktop and narrow-screen rendering, keyboard scrolling and links, readable cell alignment, and the four requested product headings. Confirm Agent Loops and Conductor and their associated assumptions are removed from the comparison. Verify source links and trace material claims to the research or current Refine behavior. This is a static website content change; use focused checks and existing applicable checks without introducing a new test framework."
-            },
-            "binding_id": "default-plan",
-            "evidence": [
-              "The existing comparison is in src/surfaces/website/index.html:114 onward. Its introduction and nine rows assume the old categories. Styling already provides horizontal overflow and an 860px minimum table width in src/surfaces/website/assets/site.css.",
-              "Refine grounding: LICENSE confirms MIT; src/surfaces/refine-hub/overview.md describes agent fleets and Skills; docs/intent/03-application/01-agents/09-agent-first-orchestration.md explains shared orchestration responsibilities; docs/intent/05-surfaces/06-mcp.md describes the local MCP adapter. These documentation paths are under src/surfaces/refine-hub.",
-              "Blitzy advertises modernization, refactoring, new features, existing-code understanding, specialized agents, and tested delivery. Deployment offerings include cloud VPC, customer VPC, and custom on-premises options. These are vendor claims, not independently tested results. [Blitzy product overview](https://blitzy.com/).",
-              "n8n describes visual workflows with custom code, self-hosted or cloud deployment, model flexibility, human approvals, and execution visibility. [n8n product overview](https://n8n.io/). Its repository identifies its licensing as fair-code/source-available under Sustainable Use and Enterprise licenses. [n8n README](https://github.com/n8n-io/n8n/blob/master/README.md).",
-              "n8n has software-development integrations and templates, including GitHub PR automation. [GitHub integrations](https://n8n.io/integrations/github/). Its built-in MCP server supports discovering, executing, creating, and editing workflows. [Official MCP documentation source](https://github.com/n8n-io/n8n-docs/blob/main/docs/connect/connect-to-n8n-mcp-server.md)."
-            ],
-            "invocation_id": "f4ab5d8908943f085185228228d31399df53ce748c2ddadae8c86586e6f8418d",
-            "outcome": "success",
-            "role": "plan",
-            "summary": "Plan ready for Implement. The central change is a factual comparison of operating models, with explicit BYOT, BYOA, licensing, local operation, and shared surfaces. Research confirms substantial overlapping capabilities, so a header-only replacement would leave misleading claims. No files or workflow state were changed. Prior memory helped locate the website assets; paths and styling were verified in this worktree.\n\n"
-          }
-        ]
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000T19F2G97H0BEDPKDXE002",
+          "name": "Update the website surface comparison table from: agents directly, agent loops",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": false,
+          "constitution": "",
+          "product": "",
+          "rules": []
+        },
+        "guidance_candidates": [],
+        "previous_rounds": [],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree, the current Round, and available planning context. Follow the Goal and applicable Skill instructions and use your judgment to decide when to stop. Quality and Governance agents make their own decisions using their Skills before integration and human Review. Refine coordinates workflow transitions and Git actions. Do not directly advance Goal state, approve, merge, or push."
       },
       "event": {},
       "goal": {
         "assignee": "Buddy Williams",
         "base_commit": "168a3ee441505c98ae37cf584db2613575b1c206",
         "branch_name": "refine/00000T19F2G97H0BEDPKDXE002/round-1",
-        "candidate_commit": "917ded25aa4644e144bf258ffdaf91f52b6e973f",
+        "candidate_commit": "4a30beb267631fb6ee0115822dea491050bf9422",
         "created": "2026-09-15T16:24:40Z",
-        "event_generation": 5,
+        "event_generation": 6,
         "feature_id": null,
         "feature_order": null,
         "id": "00000T19F2G97H0BEDPKDXE002",
@@ -124,27 +102,31 @@
             "implementation_report": "workflow.implement.enter:default-implement: Task 1: Defined descriptive operating-model comparisons, distinguishing model selection, external MCP clients, and installed coding-agent supervision.\nTask 2: Replaced the introduction and table in src/surfaces/website/index.html with Direct agents, Blitzy, n8n, and Refine across eight rows.\nTask 3: Added official sources dated 2026-09-15. Updated scoped CSS for equal-width columns, readable minimum width, source spacing, link focus, and n8n casing. Preserved semantic headers, scrolling, and Refine highlighting.\nTask 4: Completed structural and HTTP smoke checks; browser rendering and interaction validation remain for Quality. Preview server stopped after checking.\nNo substantive plan departures or unfinished implementation work. Two files changed.",
             "implementation_reported_at": "2026-09-15T16:30:12Z",
             "prompt": "Update the website surface comparison table from: agents directly, agent loops, conductor, and Refine to: direct agents, Blitzy (https://blitzy.com), n8n (https://n8n.io/), and Refine. This removes agent loops and conductor.\n\nYou'll need to research Blitzy and n8n. I think n8n is generic, with workflows designed for software development, while Blitzy is purpose-built for software development modernization, though they have moved into feature development.\n\nSome of the key attributes of Refine are that it is open-source, local-first, built for BYOT (bring your own software), BYOA (bring your own agent), and agent-first orchestration through surfaces, though I suspect you'll find more differentiators.",
+            "quality_agent_report": "workflow.quality.enter:default-quality: Quality passed. Added two browser tests covering comparison content, accessibility, responsive layout, and keyboard scrolling. Both passed without skips. Live preview checks passed; no implementation fixes were needed.",
+            "quality_candidate_commit": "4a30beb267631fb6ee0115822dea491050bf9422",
+            "quality_message": "Quality Skills reported success.",
+            "quality_state": "passed",
             "reporter": "Buddy Williams",
-            "updated": "2026-09-15T16:30:13Z"
+            "updated": "2026-09-15T16:33:48Z"
           }
         ],
-        "status": "quality",
+        "status": "governance",
         "target_branch": "main",
-        "updated": "2026-09-15T16:30:13Z",
-        "workflow_revision": 21
+        "updated": "2026-09-15T16:33:48Z",
+        "workflow_revision": 31
       },
       "system": {
-        "candidate_commit": "917ded25aa4644e144bf258ffdaf91f52b6e973f",
+        "candidate_commit": "4a30beb267631fb6ee0115822dea491050bf9422",
         "node_id": "default",
         "project_root": "/home/buddy/projects/refine-next",
         "refine_executable": "/home/buddy/projects/refine/bin/refine",
-        "workflow_step": "quality",
+        "workflow_step": "governance",
         "workspace": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T19F2G97H0BEDPKDXE002-round-1"
       }
     },
     "metadata": {
       "behavior": "EventSkill",
-      "event_operation_id": "1a0a5e79a5bddd45e",
+      "event_operation_id": "1a0a5eade5fddd4510",
       "goal_id": "00000T19F2G97H0BEDPKDXE002",
       "kind": "workflow",
       "managed_worktree": {
@@ -163,7 +145,7 @@
       "provider": "codex",
       "round_idx": 0,
       "started_bindings": {
-        "default-quality": "2026-09-15T16:30:14.855706118+00:00"
+        "default-governance": "2026-09-15T16:33:48.858552946+00:00"
       },
       "target_app_id": "/home/buddy/projects/refine-next",
       "template_snapshot": {
@@ -466,15 +448,15 @@
         }
       },
       "workflow_revision": 2,
-      "workflow_state": "quality",
-      "workflow_step_generation": 5
+      "workflow_state": "governance",
+      "workflow_step_generation": 6
     }
   },
   "bindings": [
     {
       "binding": {
-        "id": "default-quality",
-        "skill_id": "default-quality",
+        "id": "default-governance",
+        "skill_id": "default-governance",
         "enabled": true,
         "mode": "blocking",
         "order": 0,
@@ -485,10 +467,10 @@
         "inputs": {}
       },
       "skill": {
-        "id": "default-quality",
-        "name": "Quality",
-        "prompt": "## Quality\n\nTest the implementation. Create and groom tests to cover the behavior described in the plan.\n\n### Outcome\n\nMeaningful tests cover the changed behavior and pass. Provide a brief report of the behavior tested, tests added or updated, commands run and their results, and any remaining failures or gaps. Include runtime or browser test results where useful. These results support Governance's verification of the work.\n\n### Guardrails\n\n- Test observable behavior, including relevant failure cases and effects on existing functionality. Tests should catch defects rather than mirror the implementation.\n- Keep useful tests, update tests for changed behavior, and remove obsolete or meaningless tests.\n- Investigate failures, correct problems in the implementation or tests, and rerun affected tests.\n- Choose tests suited to the change. Expand coverage when failures or affected behavior call for it.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
-        "role": "quality",
+        "id": "default-governance",
+        "name": "Governance",
+        "prompt": "## Governance\n\nVerify that the implementation meets the user-defined Goal, fits the system architecture, and serves the project's purpose.\n\n### Outcome\n\nA clear assessment of whether the implementation satisfies all three. Begin with the verdict, then briefly explain how the work meets the Goal, fits the architecture, and supports the project's purpose, using concrete evidence from the implementation and Quality results. For each gap, describe what falls short, why it matters, and the recommended correction. Separate necessary corrections from optional improvements.\n\n### Guardrails\n\n- Read the context that helps explain the user's Goal, the system architecture, and the project's purpose.\n- Compare the implementation with the user's desired outcome as well as the plan. Completing the plan and passing tests alone do not establish that the Goal is met.\n- Look for clear responsibilities, shared behavior implemented in one place, and interfaces that remain easy to use and maintain.\n- Judge design choices by how they serve the project. Allow sound approaches that differ from personal preference.\n- Group related issues by their underlying cause so the next step can address them together.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
+        "role": "governance",
         "enabled": true,
         "scope": {
           "node_id": null
@@ -499,68 +481,11 @@
       "parameters": {}
     }
   ],
-  "state": "succeeded",
-  "results": {
-    "default-quality": {
-      "invocation_id": "81d2413745b0331f93bc2fff6e57955e96aac6e2de9644eb7cd5d8ba2cb676f5",
-      "binding_id": "default-quality",
-      "role": "quality",
-      "outcome": "success",
-      "summary": "Quality passed. Added two browser tests covering comparison content, accessibility, responsive layout, and keyboard scrolling. Both passed without skips. Live preview checks passed; no implementation fixes were needed.",
-      "evidence": [
-        "NODE_PATH=/home/buddy/projects/refine/node_modules node --test tests/website_comparison_browser.test.js — 2 passed, 0 failed, 0 skipped.",
-        "Verified requested headings, removal of obsolete categories, semantic headers, source links, n8n casing, Refine highlighting, and unclipped cell text at 1440, 1024, 390, and 320 pixels. Keyboard focus, scrolling, and access to the final column passed.",
-        "Refine website preview on port 18749 returned HTTP 200. Desktop and mobile screenshots were inspected; no JavaScript errors occurred. Preview stopped afterward.",
-        "Competitor descriptions checked against [Blitzy](https://blitzy.com/), [n8n](https://n8n.io/), [n8n licensing](https://github.com/n8n-io/n8n/blob/master/README.md#license), and [n8n MCP documentation](https://docs.n8n.io/connect/connect-to-n8n-mcp-server).",
-        "Source links returned HTTP 200 except Blitzy's direct automated request, which returned 403; its content was accessible through web research.",
-        "node --check tests/website_comparison_browser.test.js and git diff --check passed."
-      ],
-      "artifacts": {
-        "remaining_gaps": [
-          "Browser validation used Chromium; Firefox and Safari were not tested.",
-          "Competitor capabilities were verified against published documentation, not exercised in their products."
-        ],
-        "screenshots": [
-          "/tmp/refine-comparison-quality/comparison-1440.png",
-          "/tmp/refine-comparison-quality/comparison-390.png"
-        ],
-        "tests_added": [
-          "tests/website_comparison_browser.test.js"
-        ]
-      }
-    }
-  },
-  "attempts": [
-    {
-      "attempt": 0,
-      "binding_id": "default-quality",
-      "checkout": {
-        "observation": {
-          "branch": "refine/00000T19F2G97H0BEDPKDXE002/round-1",
-          "head_commit": "917ded25aa4644e144bf258ffdaf91f52b6e973f",
-          "status_porcelain": [
-            "?? tests/website_comparison_browser.test.js"
-          ]
-        },
-        "tree": "bc767c34093e9f4d3a201bdea3c2fc318b371f0c"
-      },
-      "checkout_recorded": true,
-      "diagnostic": null,
-      "host_bound_result": true,
-      "observational_violation": false,
-      "operation_id": null,
-      "process_id": "proc-1789489815109-908613-4186",
-      "prompt_bytes": 14700,
-      "provider_session_id": null,
-      "purpose": "work",
-      "raw_output": "{\n  \"outcome\": \"success\",\n  \"summary\": \"Quality passed. Added two browser tests covering comparison content, accessibility, responsive layout, and keyboard scrolling. Both passed without skips. Live preview checks passed; no implementation fixes were needed.\",\n  \"evidence\": [\n    \"NODE_PATH=/home/buddy/projects/refine/node_modules node --test tests/website_comparison_browser.test.js — 2 passed, 0 failed, 0 skipped.\",\n    \"Verified requested headings, removal of obsolete categories, semantic headers, source links, n8n casing, Refine highlighting, and unclipped cell text at 1440, 1024, 390, and 320 pixels. Keyboard focus, scrolling, and access to the final column passed.\",\n    \"Refine website preview on port 18749 returned HTTP 200. Desktop and mobile screenshots were inspected; no JavaScript errors occurred. Preview stopped afterward.\",\n    \"Competitor descriptions checked against [Blitzy](https://blitzy.com/), [n8n](https://n8n.io/), [n8n licensing](https://github.com/n8n-io/n8n/blob/master/README.md#license), and [n8n MCP documentation](https://docs.n8n.io/connect/connect-to-n8n-mcp-server).\",\n    \"Source links returned HTTP 200 except Blitzy's direct automated request, which returned 403; its content was accessible through web research.\",\n    \"node --check tests/website_comparison_browser.test.js and git diff --check passed.\"\n  ],\n  \"artifacts\": {\n    \"tests_added\": [\n      \"tests/website_comparison_browser.test.js\"\n    ],\n    \"screenshots\": [\n      \"/tmp/refine-comparison-quality/comparison-1440.png\",\n      \"/tmp/refine-comparison-quality/comparison-390.png\"\n    ],\n    \"remaining_gaps\": [\n      \"Browser validation used Chromium; Firefox and Safari were not tested.\",\n      \"Competitor capabilities were verified against published documentation, not exercised in their products.\"\n    ]\n  }\n}",
-      "received_at": "2026-09-15T16:33:40.196982920+00:00",
-      "started_at": "2026-09-15T16:30:15.080032976+00:00",
-      "workflow_revision": 2
-    }
-  ],
-  "created_at": "2026-09-15T16:30:13.765466975+00:00",
-  "completed_at": "2026-09-15T16:33:41.765574049+00:00",
+  "state": "running",
+  "results": {},
+  "attempts": [],
+  "created_at": "2026-09-15T16:33:49.088604924+00:00",
+  "completed_at": null,
   "error": null,
   "action_applied": false
 }

@@ -1,9 +1,9 @@
 {
   "base_commit": "168a3ee441505c98ae37cf584db2613575b1c206",
   "branch_name": "refine/00000T19F2G97H0BEDPKDXE002/round-1",
-  "candidate_commit": "917ded25aa4644e144bf258ffdaf91f52b6e973f",
+  "candidate_commit": "4a30beb267631fb6ee0115822dea491050bf9422",
   "created": "2026-09-15T16:24:40Z",
-  "event_generation": 5,
+  "event_generation": 6,
   "feature_id": null,
   "feature_order": null,
   "id": "00000T19F2G97H0BEDPKDXE002",
@@ -46,11 +46,11 @@
       "created": "2026-09-15T16:24:40Z",
       "event_configuration": {
         "events": {
-          "workflow.quality.enter": {
+          "workflow.governance.enter": {
             "bindings": [
               {
                 "enabled": true,
-                "id": "default-quality",
+                "id": "default-governance",
                 "inputs": {},
                 "mode": "blocking",
                 "order": 0,
@@ -58,30 +58,30 @@
                 "scope": {
                   "node_id": null
                 },
-                "skill_id": "default-quality"
+                "skill_id": "default-governance"
               }
             ],
             "enabled": true,
-            "id": "workflow.quality.enter",
+            "id": "workflow.governance.enter",
             "kind": "system",
-            "name": "Workflow Quality Enter",
+            "name": "Workflow Governance Enter",
             "on_success": null,
             "parameters": [],
             "scope": {
               "node_id": null
             },
-            "source": "workflow.quality.enter"
+            "source": "workflow.governance.enter"
           }
         },
         "revision": 82,
         "schema_version": 3,
         "skills": {
-          "default-quality": {
+          "default-governance": {
             "enabled": true,
-            "id": "default-quality",
-            "name": "Quality",
+            "id": "default-governance",
+            "name": "Governance",
             "parameters": [],
-            "prompt": "## Quality\n\nTest the implementation. Create and groom tests to cover the behavior described in the plan.\n\n### Outcome\n\nMeaningful tests cover the changed behavior and pass. Provide a brief report of the behavior tested, tests added or updated, commands run and their results, and any remaining failures or gaps. Include runtime or browser test results where useful. These results support Governance's verification of the work.\n\n### Guardrails\n\n- Test observable behavior, including relevant failure cases and effects on existing functionality. Tests should catch defects rather than mirror the implementation.\n- Keep useful tests, update tests for changed behavior, and remove obsolete or meaningless tests.\n- Investigate failures, correct problems in the implementation or tests, and rerun affected tests.\n- Choose tests suited to the change. Expand coverage when failures or affected behavior call for it.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
+            "prompt": "## Governance\n\nVerify that the implementation meets the user-defined Goal, fits the system architecture, and serves the project's purpose.\n\n### Outcome\n\nA clear assessment of whether the implementation satisfies all three. Begin with the verdict, then briefly explain how the work meets the Goal, fits the architecture, and supports the project's purpose, using concrete evidence from the implementation and Quality results. For each gap, describe what falls short, why it matters, and the recommended correction. Separate necessary corrections from optional improvements.\n\n### Guardrails\n\n- Read the context that helps explain the user's Goal, the system architecture, and the project's purpose.\n- Compare the implementation with the user's desired outcome as well as the plan. Completing the plan and passing tests alone do not establish that the Goal is met.\n- Look for clear responsibilities, shared behavior implemented in one place, and interfaces that remain easy to use and maintain.\n- Judge design choices by how they serve the project. Allow sound approaches that differ from personal preference.\n- Group related issues by their underlying cause so the next step can address them together.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
             "provenance": "refine-default-v1",
             "role": "task",
             "scope": {
@@ -118,6 +118,43 @@
           },
           "round_idx": 0,
           "source": "workflow.implement.enter",
+          "state": "succeeded"
+        },
+        "81d2413745b0331f93bc2fff6e57955e96aac6e2de9644eb7cd5d8ba2cb676f5": {
+          "candidate_commit": "917ded25aa4644e144bf258ffdaf91f52b6e973f",
+          "generation": 5,
+          "results": {
+            "default-quality": {
+              "artifacts": {
+                "remaining_gaps": [
+                  "Browser validation used Chromium; Firefox and Safari were not tested.",
+                  "Competitor capabilities were verified against published documentation, not exercised in their products."
+                ],
+                "screenshots": [
+                  "/tmp/refine-comparison-quality/comparison-1440.png",
+                  "/tmp/refine-comparison-quality/comparison-390.png"
+                ],
+                "tests_added": [
+                  "tests/website_comparison_browser.test.js"
+                ]
+              },
+              "binding_id": "default-quality",
+              "evidence": [
+                "NODE_PATH=/home/buddy/projects/refine/node_modules node --test tests/website_comparison_browser.test.js — 2 passed, 0 failed, 0 skipped.",
+                "Verified requested headings, removal of obsolete categories, semantic headers, source links, n8n casing, Refine highlighting, and unclipped cell text at 1440, 1024, 390, and 320 pixels. Keyboard focus, scrolling, and access to the final column passed.",
+                "Refine website preview on port 18749 returned HTTP 200. Desktop and mobile screenshots were inspected; no JavaScript errors occurred. Preview stopped afterward.",
+                "Competitor descriptions checked against [Blitzy](https://blitzy.com/), [n8n](https://n8n.io/), [n8n licensing](https://github.com/n8n-io/n8n/blob/master/README.md#license), and [n8n MCP documentation](https://docs.n8n.io/connect/connect-to-n8n-mcp-server).",
+                "Source links returned HTTP 200 except Blitzy's direct automated request, which returned 403; its content was accessible through web research.",
+                "node --check tests/website_comparison_browser.test.js and git diff --check passed."
+              ],
+              "invocation_id": "81d2413745b0331f93bc2fff6e57955e96aac6e2de9644eb7cd5d8ba2cb676f5",
+              "outcome": "success",
+              "role": "quality",
+              "summary": "Quality passed. Added two browser tests covering comparison content, accessibility, responsive layout, and keyboard scrolling. Both passed without skips. Live preview checks passed; no implementation fixes were needed."
+            }
+          },
+          "round_idx": 0,
+          "source": "workflow.quality.enter",
           "state": "succeeded"
         },
         "f4ab5d8908943f085185228228d31399df53ce748c2ddadae8c86586e6f8418d": {
@@ -386,6 +423,78 @@
               }
             }
           }
+        },
+        "5:default:workflow.quality.exit": {
+          "events": {
+            "workflow.quality.exit": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.quality.exit",
+              "kind": "system",
+              "name": "Workflow Quality Exit",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.quality.exit"
+            }
+          },
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {}
+        },
+        "5:default:workflow.quality.success": {
+          "events": {},
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {}
+        },
+        "6:default:workflow.governance.enter": {
+          "events": {
+            "workflow.governance.enter": {
+              "bindings": [
+                {
+                  "enabled": true,
+                  "id": "default-governance",
+                  "inputs": {},
+                  "mode": "blocking",
+                  "order": 0,
+                  "overrides": null,
+                  "scope": {
+                    "node_id": null
+                  },
+                  "skill_id": "default-governance"
+                }
+              ],
+              "enabled": true,
+              "id": "workflow.governance.enter",
+              "kind": "system",
+              "name": "Workflow Governance Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.governance.enter"
+            }
+          },
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {
+            "default-governance": {
+              "enabled": true,
+              "id": "default-governance",
+              "name": "Governance",
+              "parameters": [],
+              "prompt": "## Governance\n\nVerify that the implementation meets the user-defined Goal, fits the system architecture, and serves the project's purpose.\n\n### Outcome\n\nA clear assessment of whether the implementation satisfies all three. Begin with the verdict, then briefly explain how the work meets the Goal, fits the architecture, and supports the project's purpose, using concrete evidence from the implementation and Quality results. For each gap, describe what falls short, why it matters, and the recommended correction. Separate necessary corrections from optional improvements.\n\n### Guardrails\n\n- Read the context that helps explain the user's Goal, the system architecture, and the project's purpose.\n- Compare the implementation with the user's desired outcome as well as the plan. Completing the plan and passing tests alone do not establish that the Goal is met.\n- Look for clear responsibilities, shared behavior implemented in one place, and interfaces that remain easy to use and maintain.\n- Judge design choices by how they serve the project. Allow sound approaches that differ from personal preference.\n- Group related issues by their underlying cause so the next step can address them together.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
+              "provenance": "refine-default-v1",
+              "role": "task",
+              "scope": {
+                "node_id": null
+              }
+            }
+          }
         }
       },
       "implementation_report": "workflow.implement.enter:default-implement: Task 1: Defined descriptive operating-model comparisons, distinguishing model selection, external MCP clients, and installed coding-agent supervision.\nTask 2: Replaced the introduction and table in src/surfaces/website/index.html with Direct agents, Blitzy, n8n, and Refine across eight rows.\nTask 3: Added official sources dated 2026-09-15. Updated scoped CSS for equal-width columns, readable minimum width, source spacing, link focus, and n8n casing. Preserved semantic headers, scrolling, and Refine highlighting.\nTask 4: Completed structural and HTTP smoke checks; browser rendering and interaction validation remain for Quality. Preview server stopped after checking.\nNo substantive plan departures or unfinished implementation work. Two files changed.",
@@ -445,8 +554,132 @@
         }
       ],
       "prompt": "Update the website surface comparison table from: agents directly, agent loops, conductor, and Refine to: direct agents, Blitzy (https://blitzy.com), n8n (https://n8n.io/), and Refine. This removes agent loops and conductor.\n\nYou'll need to research Blitzy and n8n. I think n8n is generic, with workflows designed for software development, while Blitzy is purpose-built for software development modernization, though they have moved into feature development.\n\nSome of the key attributes of Refine are that it is open-source, local-first, built for BYOT (bring your own software), BYOA (bring your own agent), and agent-first orchestration through surfaces, though I suspect you'll find more differentiators.",
+      "quality_agent_report": "workflow.quality.enter:default-quality: Quality passed. Added two browser tests covering comparison content, accessibility, responsive layout, and keyboard scrolling. Both passed without skips. Live preview checks passed; no implementation fixes were needed.",
+      "quality_candidate_commit": "4a30beb267631fb6ee0115822dea491050bf9422",
+      "quality_checked_at": "2026-09-15T16:33:46Z",
+      "quality_details": {
+        "candidate_commit": "4a30beb267631fb6ee0115822dea491050bf9422",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T19F2G97H0BEDPKDXE002-round-1",
+        "diagnostics": [
+          "Reused Skill review workflow.quality.enter:default-quality for final candidate content: automation/invocations/81d2413745b0331f93bc2fff6e57955e96aac6e2de9644eb7cd5d8ba2cb676f5.json"
+        ],
+        "evaluation_scope": "isolated_candidate",
+        "operation_id": "1a0a5eacd48ddd45f",
+        "provider_attempts": [],
+        "quality_proof": {
+          "checked_at": "2026-09-15T16:33:46Z",
+          "checked_candidate_commit": "4a30beb267631fb6ee0115822dea491050bf9422",
+          "evaluation_scope": "isolated_candidate",
+          "goal_id": "00000T19F2G97H0BEDPKDXE002",
+          "operation_id": "1a0a5eacd48ddd45f",
+          "results": [
+            {
+              "command": "",
+              "evidence": "Quality passed. Added two browser tests covering comparison content, accessibility, responsive layout, and keyboard scrolling. Both passed without skips. Live preview checks passed; no implementation fixes were needed.",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality"
+            }
+          ],
+          "round_idx": 0,
+          "schema_version": 1,
+          "skills": {
+            "invocations": {
+              "workflow.quality.enter:default-quality": "81d2413745b0331f93bc2fff6e57955e96aac6e2de9644eb7cd5d8ba2cb676f5"
+            },
+            "required_bindings": [
+              "workflow.quality.enter:default-quality"
+            ],
+            "requirements_id": "9fe971f6b60ac378d8ecd9e7e448b3fcb1ac096baf3723270caa2a43e20aec88"
+          },
+          "source_candidate_commit": "4a30beb267631fb6ee0115822dea491050bf9422",
+          "state": "passed"
+        },
+        "results": [
+          {
+            "command": "",
+            "evidence": "Quality passed. Added two browser tests covering comparison content, accessibility, responsive layout, and keyboard scrolling. Both passed without skips. Live preview checks passed; no implementation fixes were needed.",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality"
+          }
+        ],
+        "source_candidate_commit": "4a30beb267631fb6ee0115822dea491050bf9422"
+      },
+      "quality_message": "Quality Skills reported success.",
+      "quality_requirements": {
+        "candidate_commit": "4a30beb267631fb6ee0115822dea491050bf9422",
+        "id": "9fe971f6b60ac378d8ecd9e7e448b3fcb1ac096baf3723270caa2a43e20aec88",
+        "node_id": "default",
+        "required_bindings": [
+          "workflow.quality.enter:default-quality"
+        ],
+        "selected": [
+          {
+            "attachments": [],
+            "binding": {
+              "binding": {
+                "enabled": true,
+                "id": "default-quality",
+                "inputs": {},
+                "mode": "blocking",
+                "order": 0,
+                "overrides": null,
+                "scope": {
+                  "node_id": null
+                },
+                "skill_id": "default-quality"
+              },
+              "parameters": {},
+              "skill": {
+                "enabled": true,
+                "id": "default-quality",
+                "name": "Quality",
+                "parameters": [],
+                "prompt": "## Quality\n\nTest the implementation. Create and groom tests to cover the behavior described in the plan.\n\n### Outcome\n\nMeaningful tests cover the changed behavior and pass. Provide a brief report of the behavior tested, tests added or updated, commands run and their results, and any remaining failures or gaps. Include runtime or browser test results where useful. These results support Governance's verification of the work.\n\n### Guardrails\n\n- Test observable behavior, including relevant failure cases and effects on existing functionality. Tests should catch defects rather than mirror the implementation.\n- Keep useful tests, update tests for changed behavior, and remove obsolete or meaningless tests.\n- Investigate failures, correct problems in the implementation or tests, and rerun affected tests.\n- Choose tests suited to the change. Expand coverage when failures or affected behavior call for it.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
+                "provenance": "refine-default-v1",
+                "role": "quality",
+                "scope": {
+                  "node_id": null
+                }
+              }
+            },
+            "contract_version": 1,
+            "key": "workflow.quality.enter:default-quality"
+          }
+        ]
+      },
+      "quality_skill_results": [
+        {
+          "artifacts": {
+            "remaining_gaps": [
+              "Browser validation used Chromium; Firefox and Safari were not tested.",
+              "Competitor capabilities were verified against published documentation, not exercised in their products."
+            ],
+            "screenshots": [
+              "/tmp/refine-comparison-quality/comparison-1440.png",
+              "/tmp/refine-comparison-quality/comparison-390.png"
+            ],
+            "tests_added": [
+              "tests/website_comparison_browser.test.js"
+            ]
+          },
+          "binding_id": "workflow.quality.enter:default-quality",
+          "evidence": [
+            "NODE_PATH=/home/buddy/projects/refine/node_modules node --test tests/website_comparison_browser.test.js — 2 passed, 0 failed, 0 skipped.",
+            "Verified requested headings, removal of obsolete categories, semantic headers, source links, n8n casing, Refine highlighting, and unclipped cell text at 1440, 1024, 390, and 320 pixels. Keyboard focus, scrolling, and access to the final column passed.",
+            "Refine website preview on port 18749 returned HTTP 200. Desktop and mobile screenshots were inspected; no JavaScript errors occurred. Preview stopped afterward.",
+            "Competitor descriptions checked against [Blitzy](https://blitzy.com/), [n8n](https://n8n.io/), [n8n licensing](https://github.com/n8n-io/n8n/blob/master/README.md#license), and [n8n MCP documentation](https://docs.n8n.io/connect/connect-to-n8n-mcp-server).",
+            "Source links returned HTTP 200 except Blitzy's direct automated request, which returned 403; its content was accessible through web research.",
+            "node --check tests/website_comparison_browser.test.js and git diff --check passed."
+          ],
+          "invocation_id": "81d2413745b0331f93bc2fff6e57955e96aac6e2de9644eb7cd5d8ba2cb676f5",
+          "outcome": "success",
+          "role": "quality",
+          "summary": "Quality passed. Added two browser tests covering comparison content, accessibility, responsive layout, and keyboard scrolling. Both passed without skips. Live preview checks passed; no implementation fixes were needed."
+        }
+      ],
+      "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "updated": "2026-09-15T16:30:13Z",
+      "updated": "2026-09-15T16:33:48Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-15T16:24:41Z",
         "generation": 2,
@@ -456,9 +689,9 @@
       "workspace_branch": "refine/00000T19F2G97H0BEDPKDXE002/round-1"
     }
   ],
-  "status": "quality",
+  "status": "governance",
   "target_branch": "main",
-  "updated": "2026-09-15T16:30:13Z",
+  "updated": "2026-09-15T16:33:48Z",
   "workflow_controls": [
     {
       "actor": "operator",
@@ -522,7 +755,17 @@
       "round_idx": 0,
       "to": "quality",
       "workflow_revision": 20
+    },
+    {
+      "at": "2026-09-15T16:33:48.117326074+00:00",
+      "forced": false,
+      "from": "quality",
+      "generation": 6,
+      "node_id": "default",
+      "round_idx": 0,
+      "to": "governance",
+      "workflow_revision": 30
     }
   ],
-  "workflow_revision": 21
+  "workflow_revision": 31
 }
