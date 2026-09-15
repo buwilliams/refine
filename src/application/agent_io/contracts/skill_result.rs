@@ -323,10 +323,12 @@ mod tests {
             ),
             (stringified, "completion-envelope or stringification layers"),
         ] {
-            let error = decode_result(&output, "i", "b", "quality", true)
-                .unwrap_err()
-                .to_string();
-            assert!(error.contains(diagnostic), "{error}");
+            for transported in [output.clone(), format!("Review complete. {output} Done.")] {
+                let error = decode_result(&transported, "i", "b", "quality", true)
+                    .unwrap_err()
+                    .to_string();
+                assert!(error.contains(diagnostic), "{error}");
+            }
         }
     }
 }

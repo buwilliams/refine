@@ -294,6 +294,62 @@ fn forced_cancellation_does_not_require_readable_entry_gate_evidence() {
 }
 
 #[test]
+fn extended_fresh_completions_preserve_blocking_gate_decisions() {
+    for outcome in ["success", "failure", "error"] {
+        let f = Fixture::new();
+        let _smoke = SmokeSkill::install(&f.service, &f.temp);
+        let script = f.temp.join("lifecycle-smoke.py");
+        let source = fs::read_to_string(&script).unwrap();
+        fs::write(
+            &script,
+            source.replace(
+                "print(json.dumps(result))\n",
+                &format!("result['outcome'] = '{outcome}'\nresult['checklist'] = [{{'id': 'P1'}}]\nprint('Review complete. ' + json.dumps(result) + ' Done.')\n"),
+            ),
+        )
+        .unwrap();
+        let before = f.snapshot();
+        f.gate("workflow.backlog.exit", BindingMode::Blocking);
+        f.request_todo();
+        f.dispatch();
+        let invocation = f.invocation("workflow.backlog.exit");
+        let completed = f.execute(&invocation);
+        let result = completed.results.values().next().unwrap();
+        assert_eq!(result.outcome, outcome);
+        assert_eq!(result.invocation_id, invocation.id);
+        assert_eq!(completed.attempts.len(), 1);
+        assert_eq!(
+            completed.state,
+            match outcome {
+                "success" => InvocationState::Succeeded,
+                "failure" => InvocationState::Failed,
+                "error" => InvocationState::Error,
+                _ => unreachable!(),
+            },
+            "{outcome}"
+        );
+        f.dispatch();
+        assert_eq!(
+            f.work().show_goal_detail("FRESH").unwrap()["status"],
+            if outcome == "success" {
+                "todo"
+            } else {
+                "failed"
+            }
+        );
+        assert_eq!(
+            fs::read_to_string(invocation.context.cwd.join("launches.txt"))
+                .unwrap()
+                .lines()
+                .count(),
+            1
+        );
+        f.assert_no_candidate();
+        assert_eq!(before, f.snapshot());
+    }
+}
+
+#[test]
 fn extended_completion_replays_retained_receipt_without_provider_launch() {
     for outcome in ["success", "failure", "error"] {
         let f = Fixture::new();
