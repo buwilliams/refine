@@ -1,6 +1,6 @@
 {
   "schema_version": 3,
-  "revision": 81,
+  "revision": 82,
   "skills": {
     "default-governance": {
       "id": "default-governance",
@@ -65,7 +65,7 @@
     "fetch-goals-from-email-on-startup": {
       "id": "fetch-goals-from-email-on-startup",
       "name": "Fetch Goals from Email on startup",
-      "prompt": "Queue the Custom Skill `fetch-goals-from-email` once for this startup occurrence. Run system.refine_executable with arguments `skills trigger fetch-goals-from-email --request-id startup-email-<invocation_id>`, copying invocation_id exactly from this invocation's completion contract. Set REFINE_DAEMON_PORT to the daemon_port parameter for that command. Use safely quoted arguments. Report the queued invocation ID, then complete this startup Skill immediately. Do not wait for the child Skill: releasing this agent slot lets it run even when concurrency is limited to one. Reuse the same request ID if the command needs a retry; do not create a polling loop or fetch email directly. If the target Skill is missing or disabled, report that error without changing its configuration.",
+      "prompt": "Queue the Custom Skill `fetch-goals-from-email` once for this startup occurrence. Run system.refine_executable with arguments `skills trigger fetch-goals-from-email --request-id startup-email-<invocation_id>`, copying invocation_id exactly from the Skill execution context supplied by Refine. Set REFINE_DAEMON_PORT to the daemon_port parameter for that command. Use safely quoted arguments. Report the queued invocation ID, then complete this startup Skill immediately. Do not wait for the child Skill: releasing this agent slot lets it run even when concurrency is limited to one. Reuse the same request ID if the command needs a retry; do not create a polling loop or fetch email directly. If the target Skill is missing or disabled, report that error without changing its configuration.",
       "role": "task",
       "enabled": true,
       "scope": {
