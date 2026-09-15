@@ -345,6 +345,79 @@ test("New stays below Search and supports keyboard, dismissal, and viewport posi
   } finally { await app.close(); }
 });
 
+for (const theme of ["light", "dark"]) for (const layout of ["desktop", "collapsed", "mobile"]) {
+  test(`New chevron and menu icons remain aligned and readable (${layout}, ${theme})`, { skip: SKIP }, async () => {
+    const app = await openApp();
+    try {
+      const { page } = app;
+      const viewport = layout === "mobile" ? { width: 390, height: 844 } : { width: 1280, height: 900 };
+      await page.setViewportSize(viewport);
+      await page.emulateMedia({ colorScheme: theme });
+      await page.goto(app.origin, { waitUntil: "networkidle" });
+      assert.equal(await page.locator("html").getAttribute("data-theme"), theme);
+      if (layout === "collapsed") await page.locator("#rail-toggle").click();
+      if (layout === "mobile") await page.locator("#mobile-rail-toggle").click();
+      const chevrons = await page.locator('#rail-new-toggle .nav-context-more, [data-topbar-picker] .nav-context-more, [data-testid="toolbar-add"] .nav-context-more').evaluateAll(elements => elements.map(el => {
+        const style = getComputedStyle(el), arrow = getComputedStyle(el, "::after");
+        const row = el.parentElement.getBoundingClientRect(), box = el.getBoundingClientRect();
+        return { display: style.display, rightInset: row.right - box.right,
+          arrow: [arrow.content, arrow.width, arrow.height, arrow.borderRight, arrow.borderBottom, arrow.transform, arrow.color] };
+      }));
+      assert.equal(chevrons.length, 4);
+      for (const chevron of chevrons) {
+        assert.deepEqual(chevron.arrow, chevrons[0].arrow);
+        assert.equal(chevron.display === "none", layout === "collapsed");
+        if (layout !== "collapsed") assert.ok(Math.abs(chevron.rightInset - chevrons[0].rightInset) < 2);
+      }
+      await page.locator("#rail-new-toggle").click();
+      const panel = page.getByRole("menu", { name: "New", exact: true });
+      await panel.waitFor();
+      const panelBox = await panel.boundingBox();
+      assert.ok(panelBox.x >= 0 && panelBox.y >= 0 && panelBox.x + panelBox.width <= viewport.width && panelBox.y + panelBox.height <= viewport.height);
+      const items = panel.getByRole("menuitem");
+      const labels = ["New Goal", "New Plan", "New Feature", "Import"];
+      let previousIconX, previousTextX;
+      for (let i = 0; i < labels.length; i++) {
+        const item = panel.getByRole("menuitem", { name: labels[i], exact: true });
+        assert.equal(await item.isVisible(), true);
+        const geometry = await item.evaluate(el => {
+          const svg = el.querySelector("svg"), icon = svg.getBoundingClientRect();
+          const ink = svg.querySelector("use").getBBox();
+          const range = document.createRange();
+          range.selectNodeContents(el.lastChild);
+          const label = range.getBoundingClientRect(), row = el.getBoundingClientRect();
+          return { icon: icon.toJSON(), label: label.toJSON(), row: row.toJSON(), ink: { width: ink.width, height: ink.height },
+            hidden: svg.getAttribute("aria-hidden"), focusable: svg.getAttribute("focusable"),
+            stroke: getComputedStyle(svg).stroke, color: getComputedStyle(el).color };
+        });
+        const { icon, label, row, ink } = geometry;
+        assert.ok(ink.width > 0 && ink.height > 0, "sprite symbol must render");
+        assert.equal(geometry.hidden, "true");
+        assert.equal(geometry.focusable, "false");
+        assert.equal(geometry.stroke, geometry.color);
+        assert.ok(icon.width >= 16 && icon.height >= 16);
+        assert.ok(label.width > 0 && label.height > 0 && label.right <= row.right);
+        assert.ok(label.left > icon.right, "label must have a gap after its icon");
+        assert.ok(Math.abs((icon.top + icon.bottom) / 2 - (label.top + label.bottom) / 2) < 2);
+        if (i > 0) {
+          assert.equal(icon.x, previousIconX);
+          assert.equal(label.x, previousTextX);
+        }
+        previousIconX = icon.x;
+        previousTextX = label.x;
+      }
+      assert.equal(await items.count(), 4);
+      if (process.env.REFINE_NEW_MENU_SCREENSHOTS) {
+        await page.screenshot({ path: `${process.env.REFINE_NEW_MENU_SCREENSHOTS}/${layout}-${theme}.png` });
+      }
+      await page.keyboard.press("Escape");
+      assert.equal(await panel.isVisible(), false);
+      assert.equal(await page.locator("#rail-new-toggle").evaluate(el => el === document.activeElement), true);
+      assert.deepEqual(app.pageErrors, []);
+    } finally { await app.close(); }
+  });
+}
+
 for (const layout of ["desktop", "collapsed", "mobile"]) test(`New opens shared creation flows and fresh Plans (${layout})`, { skip: SKIP }, async () => {
   const mobile = layout === "mobile";
   let starts = 0;
@@ -399,7 +472,16 @@ for (const layout of ["desktop", "collapsed", "mobile"]) test(`New opens shared 
       if (mobile) {
         await item.focus();
         await page.keyboard.press(name === "New Plan" ? "Space" : "Enter");
-      } else await item.click();
+      } else if (layout === "collapsed") await item.locator("svg").click();
+      else {
+        const position = await item.evaluate(el => {
+          const range = document.createRange();
+          range.selectNodeContents(el.lastChild);
+          const label = range.getBoundingClientRect(), row = el.getBoundingClientRect();
+          return { x: label.x + label.width / 2 - row.x, y: label.y + label.height / 2 - row.y };
+        });
+        await item.click({ position });
+      }
       assert.equal(await page.locator("#rail-new-menu").getAttribute("open"), null);
     }
     await select("New Goal");

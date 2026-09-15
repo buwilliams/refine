@@ -16,18 +16,24 @@ fn static_rail_new_menu_exposes_shared_creation_commands() {
     assert!(menu.contains("navigation.svg#plus"));
     assert!(menu.contains(r#"aria-label="New" title="New" aria-haspopup="menu""#));
     assert!(menu.contains(r#"role="menu" aria-labelledby="rail-new-toggle""#));
+    let toggle = menu.split("</summary>").next().unwrap();
+    assert!(toggle.contains(r#"<span class="nav-context-more" aria-hidden="true"></span>"#));
     let mut previous = 0;
-    for (command, label) in [
-        ("goal.new", "New Goal"),
-        ("plan.open", "New Plan"),
-        ("feature.new", "New Feature"),
-        ("goal.import", "Import"),
+    for (command, label, icon) in [
+        ("goal.new", "New Goal", "target"),
+        ("plan.open", "New Plan", "notebook-pen"),
+        ("feature.new", "New Feature", "layers"),
+        ("goal.import", "Import", "download"),
     ] {
         let position = menu
-            .find(&format!(
-                r#"data-rail-command="{command}">{label}</button>"#
-            ))
+            .find(&format!(r#"data-rail-command="{command}""#))
             .unwrap();
+        let item = menu[position..].split("</button>").next().unwrap();
+        assert!(item.ends_with(label));
+        assert!(item.contains(&format!(
+            r#"href="/static/vendor/lucide/navigation.svg#{icon}""#
+        )));
+        assert!(item.contains(r#"<svg class="rail-icon" aria-hidden="true" focusable="false""#));
         assert!(position > previous);
         previous = position;
     }
