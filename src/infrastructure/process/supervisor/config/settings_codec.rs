@@ -24,7 +24,6 @@ pub(super) fn default_settings() -> JsonObject {
         ("worker_cpu_priority", "normal"),
         ("resource_isolation_mode", "process_group"),
         ("chat_idle_timeout_seconds", "300"),
-        ("backlog_promote_after_seconds", "3600"),
         ("worktree_cleanup_after_seconds", "0"),
         ("state_sync_debounce_seconds", "5"),
         ("state_sync_stale_threshold_seconds", "900"),
@@ -84,7 +83,6 @@ pub(super) fn allowed_settings() -> BTreeSet<&'static str> {
         "worker_cpu_priority",
         "resource_isolation_mode",
         "chat_idle_timeout_seconds",
-        "backlog_promote_after_seconds",
         "worktree_cleanup_after_seconds",
         "state_sync_debounce_seconds",
         "state_sync_stale_threshold_seconds",
@@ -268,7 +266,6 @@ pub(super) fn normalize_setting(key: &str, value: &Value) -> RefineResult<String
                 "agent_idle_timeout_seconds"
                     | "agent_hard_cap_seconds"
                     | "agent_limit_pause_seconds"
-                    | "backlog_promote_after_seconds"
                     | "worktree_cleanup_after_seconds"
                     | "state_sync_debounce_seconds"
                     | "project_update_pulse_interval_seconds"

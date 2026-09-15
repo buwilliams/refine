@@ -17,7 +17,6 @@ pub(crate) use settings::{
 use crate::application::fleet::nodes::FileNodeRegistryService;
 use crate::application::projects::projection::ActiveGoalIndex;
 use crate::application::work_items::FileWorkItemService;
-use crate::application::workflow::engine::scheduling::BacklogPromotionService;
 use crate::error::{RefineError, RefineResult};
 use crate::infrastructure::observability::logs::FileLogService;
 use crate::infrastructure::process::subprocess::{
@@ -143,27 +142,6 @@ impl WorkflowEngine {
             policy.active_node_id = node_id.to_string();
         }
         Ok(policy)
-    }
-
-    pub fn apply_runtime_settings(&self) -> RefineResult<usize> {
-        if self.workflow_paused()? {
-            return Ok(0);
-        }
-        self.promote_backlog_to_todo()
-    }
-
-    pub fn promote_backlog_to_todo(&self) -> RefineResult<usize> {
-        let Some(refine_dir) = self.refine_dir()? else {
-            return Ok(0);
-        };
-        self.promote_backlog_to_todo_for_refine_dir(&refine_dir)
-    }
-
-    pub(crate) fn promote_backlog_to_todo_for_refine_dir(
-        &self,
-        refine_dir: &Path,
-    ) -> RefineResult<usize> {
-        BacklogPromotionService::new(refine_dir, &self.runtime_root).promote_backlog_to_todo()
     }
 
     pub fn set_workflow_paused(&self, paused: bool) -> RefineResult<ProcessPauseState> {

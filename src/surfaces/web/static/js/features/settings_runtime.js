@@ -23,16 +23,6 @@ function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
     ["3600",  "1 hour"],
     ["10800", "3 hours"],
   ];
-  const backlogOptions = [
-    ["-1",    "Never"],
-    ["0",     "Instant"],
-    ["300",   "5 minutes"],
-    ["1800",  "30 minutes"],
-    ["3600",  "1 hour"],
-    ["10800", "3 hours"],
-    ["21600", "6 hours"],
-    ["86400", "24 hours"],
-  ];
   const worktreeCleanupOptions = [
     ["-1",    "Manual only"],
     ["0",     "Immediately"],
@@ -81,7 +71,6 @@ function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
   const workerCpuPriority = String(s.worker_cpu_priority ?? "low");
   const resourceIsolation = String(s.resource_isolation_mode ?? "auto");
   const agentLimitPause = String(s.agent_limit_pause_seconds ?? "60");
-  const backlogPromote = String(s.backlog_promote_after_seconds ?? "3600");
   const worktreeCleanup = String(s.worktree_cleanup_after_seconds ?? "0");
   const stateDebounce = String(s.state_sync_debounce_seconds ?? "5");
   const remoteFetchInterval = String(s.project_update_pulse_interval_seconds ?? "300");
@@ -198,16 +187,6 @@ function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
         description: "set to 0 to disable auto-close",
         valueLabel: s.chat_idle_timeout_seconds || 300,
         control: `<input type="number" id="s-chat-idle" data-testid="runtime-chat-idle-timeout" value="${s.chat_idle_timeout_seconds || 300}">`,
-      })}
-      ${renderSettingsEditableField({
-        id: "s-backlog-promote",
-        label: "Auto-promote backlog → todo",
-        guideItemId: "runtime-backlog-promote",
-        description: "how long a Goal may sit in backlog before the Workflow Engine moves it to todo. Default 1 hour.",
-        valueLabel: optionLabel(backlogOptions, backlogPromote),
-        control: `<select id="s-backlog-promote" data-testid="runtime-backlog-promote">
-          ${backlogOptions.map(([v, lbl]) => `<option value="${v}" ${backlogPromote === v ? "selected" : ""}>${lbl}</option>`).join("")}
-        </select>`,
       })}
       ${renderSettingsEditableField({
         id: "s-worktree-cleanup-delay",
@@ -430,7 +409,6 @@ async function autosaveSettingsRuntime(options = {}) {
     resource_isolation_mode: $("#s-resource-isolation").value,
     agent_limit_pause_seconds: $("#s-agent-limit-pause").value,
     chat_idle_timeout_seconds: $("#s-chat-idle").value,
-    backlog_promote_after_seconds: $("#s-backlog-promote").value,
     worktree_cleanup_after_seconds: $("#s-worktree-cleanup-delay").value,
     state_sync_debounce_seconds: $("#s-state-sync-debounce").value,
     project_update_pulse_interval_seconds: $("#s-project-update-pulse").value,
@@ -450,7 +428,7 @@ function bindNodeRuntimeConfigControls() {
   const root = document.querySelector('[data-tab-pane="runtime"]');
   const autosaveRuntime = bindSettingsAutosave(
     root,
-    "#s-cap, #s-automatic-resource-budget-percent, #s-pattern, #s-error-timeout, #s-idle, #s-hard, #s-worker-memory, #s-ui-memory, #s-worker-cpu-priority, #s-resource-isolation, #s-agent-limit-pause, #s-chat-idle, #s-backlog-promote, #s-worktree-cleanup-delay, #s-state-sync-debounce, #s-project-update-pulse, #s-state-sync-stale-threshold, #s-state-sync-auto-recovery, #s-state-sync-agent-resolution, #s-file-browser-ignore",
+    "#s-cap, #s-automatic-resource-budget-percent, #s-pattern, #s-error-timeout, #s-idle, #s-hard, #s-worker-memory, #s-ui-memory, #s-worker-cpu-priority, #s-resource-isolation, #s-agent-limit-pause, #s-chat-idle, #s-worktree-cleanup-delay, #s-state-sync-debounce, #s-project-update-pulse, #s-state-sync-stale-threshold, #s-state-sync-auto-recovery, #s-state-sync-agent-resolution, #s-file-browser-ignore",
     autosaveSettingsRuntime,
     { event: "settings-editable-commit" },
   );

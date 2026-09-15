@@ -83,7 +83,10 @@ fn web_server_creates_features_and_updates_membership() {
 fn web_server_feature_goal_authoring_is_one_policy_driven_api_operation() {
     let temp_root = unique_temp_dir("http-feature-goal-authoring");
     let refine_dir = temp_root.join(".refine");
+    let waiting = create_aged_backlog_goal(&refine_dir, "WAITING");
+    let before = fs::read(&waiting).unwrap();
     let mut server = server_with_projection();
+    server.runtime_root = Some(temp_root.join("run/8080"));
     server.target_root = Some(temp_root.clone());
     assert_eq!(
         server
@@ -199,8 +202,9 @@ fn web_server_feature_goal_authoring_is_one_policy_driven_api_operation() {
             .list_goal_summaries()
             .unwrap()
             .len(),
-        2
+        3
     );
 
+    assert_eq!(fs::read(waiting).unwrap(), before);
     remove_temp_dir(&temp_root);
 }

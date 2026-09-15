@@ -98,12 +98,6 @@ impl InProcessWebServer {
             .as_ref()
             .map(|goal| goal.id.as_str())
             .unwrap_or("");
-        if let Some(runtime_root) = &self.runtime_root
-            && let Err(error) = BacklogPromotionService::new(&service.refine_dir, runtime_root)
-                .promote_backlog_to_todo_from_projection(&snapshot, result.goal.as_ref())
-        {
-            return error_response(error);
-        }
         if self.runtime_root.is_some() {
             let projection = match self.rebuild_current_projection_cache() {
                 Ok(projection) => projection,

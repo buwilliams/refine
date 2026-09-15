@@ -123,7 +123,6 @@ fn planned_capability_directories_exist() {
         "application/workflow/engine/context",
         "application/workflow/engine/execution",
         "application/workflow/engine/policy",
-        "application/workflow/engine/scheduling",
         "application/workflow/phases/implementation_planning",
         "application/workflow/phases/quality",
         "application/workflow/governance",

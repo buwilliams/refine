@@ -236,7 +236,7 @@ Confirm the four things this migration was for:
 2. **Work schedules.** If workflow was running before the migration, resume it
    with `REFINE_DAEMON_PORT="$PORT" ./r workflow resume`, then confirm a Todo
    Goal starts. The scheduler now reads `runtime/active-goals.jsonl`; if
-   that file is absent after a promotion pass, the node is not on the upgraded
+   that file is absent after a scheduler pass, the node is not on the upgraded
    build. If workflow was already paused, leave it paused and report that
    scheduling was not exercised.
 3. **Caches stay bounded.** After some work has run, confirm no

@@ -14,7 +14,7 @@ Backlog exists so Refine can preserve work without pretending every known Goal s
 
 Backlog should protect intent while delaying commitment. A backlog Goal should still be readable, attributable, and connected to Features or source context, but it should not consume workflow capacity until it is promoted.
 
-Promotion from backlog to todo should be explicit or policy-driven. It should preserve the Goal's context and make clear why the work is now eligible for action.
+Backlog Goals wait until a user or user-configured Skill explicitly starts them with `refine goal start ID`. Refine does not promote Goals based on their age. The existing lifecycle validates the authored Round and preserves the Goal's context. See [Skills configuration](../../../../product/reference.md#skills-configure) for configuring this guidance.
 
 ## What Happens
 
@@ -23,7 +23,7 @@ When a Goal is in backlog:
 - Refine stores the work as durable target-app state.
 - Users or agents can inspect, edit, enrich, deduplicate, prioritize, or attach it to a Feature.
 - Workflow automation should not start implementation.
-- Promotion rules or explicit user action can move it to todo when it has enough context to act on.
+- A user or configured Skill can explicitly move it to todo when it has enough context to act on.
 - The transition to todo should preserve source context, ordering, reporter, priority, and Feature membership.
 - A Goal with no non-empty authored Round is not promotable. It is excluded
   from Feature and priority eligibility so malformed work cannot hold a valid

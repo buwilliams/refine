@@ -104,15 +104,19 @@ fn git_output(repo: &Path, args: &[&str]) -> String {
 
 #[test]
 fn workflow_pass_reports_only_projection_mutations() {
-    let idle = WorkflowPassResult {
-        promoted: 0,
-        steps: Vec::new(),
-    };
-    let promoted = WorkflowPassResult {
-        promoted: 1,
-        steps: Vec::new(),
+    let idle = WorkflowPassResult { steps: Vec::new() };
+    let advanced = WorkflowPassResult {
+        steps: vec![WorkflowStepResult {
+            goal_id: "GOAL1".into(),
+            provider: "smoke-ai".into(),
+            branch: String::new(),
+            commit: String::new(),
+            merge: None,
+            final_status: "plan".into(),
+            provider_output: String::new(),
+        }],
     };
 
     assert!(!idle.changed_projection());
-    assert!(promoted.changed_projection());
+    assert!(advanced.changed_projection());
 }

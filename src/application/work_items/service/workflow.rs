@@ -138,10 +138,17 @@ impl FileWorkItemService {
     }
 
     pub fn start_goal_workflow(&self, goal_id: &str) -> RefineResult<GoalSummaryProjection> {
+        let _goal_lock = self.acquire_goal_mutation_lock(goal_id)?;
         let current = self.show_goal_summary(goal_id)?;
         match current.goal.status {
-            GoalStatus::Backlog => self.transition_goal_status(goal_id, GoalStatus::Todo),
-            GoalStatus::Todo => Ok(current),
+            GoalStatus::Backlog | GoalStatus::Todo => {
+                self.authored_goal_commitment(goal_id)?;
+                if current.goal.status == GoalStatus::Backlog {
+                    self.transition_goal_status(goal_id, GoalStatus::Todo)
+                } else {
+                    Ok(current)
+                }
+            }
             _ => Err(RefineError::InvalidInput(format!(
                 "Goal {goal_id} can only be queued from backlog or todo"
             ))),

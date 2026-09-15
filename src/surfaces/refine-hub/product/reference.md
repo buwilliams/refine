@@ -298,12 +298,6 @@ Standalone chat idle timeout closes inactive standalone chats. Set it to zero to
 
 Default: 300 seconds.
 
-<h3 id="runtime-backlog-promote">Auto-promote backlog to todo</h3>
-
-Auto-promote backlog to todo controls how long the Workflow Engine leaves backlog Goals alone before making them eligible for work.
-
-Default: 1 hour. Use Never to keep backlog manual.
-
 <h3 id="runtime-worktree-cleanup">Inactive worktree hibernation</h3>
 
 Todo Goals are state-only. Once admitted to Plan, each Goal round gets an isolated worktree used through Implement, Quality, and Governance. A clean Goal worktree in any status is hibernated after the retention delay when no live process or operation uses it; its recoverable branch recreates the checkout on demand, and ignored build and cache content is discarded with the checkout. Dirty, standalone, and state worktrees remain protected. Exact Refine candidate refs already present in the target branch may be retired locally and upstream.

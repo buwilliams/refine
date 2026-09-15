@@ -139,11 +139,18 @@ fn web_server_updates_feature_metadata_and_runs_goal_actions() {
     assert_eq!(retry_quality.status, 200);
     assert_eq!(retry_quality.body["goal"]["status"], "quality");
 
-    let started = server.handle(ApiRequest {
-        method: "POST".to_string(),
-        path: "/api/goals/GOAL4/start".to_string(),
-        body: Some(json!({})),
-    });
+    let start = || {
+        server.handle(ApiRequest {
+            method: "POST".to_string(),
+            path: "/api/goals/GOAL4/start".to_string(),
+            body: Some(json!({})),
+        })
+    };
+    assert_eq!(start().status, 409);
+    goal_actions
+        .append_goal_round_summary("GOAL4", "QA", "Implement the fourth Goal")
+        .unwrap();
+    let started = start();
     assert_eq!(started.status, 200);
     assert_eq!(started.body["goal"]["status"], "todo");
     FileWorkItemService::new(&refine_dir)

@@ -108,14 +108,13 @@ fn web_server_routes_work_goal_queries_through_projection() {
 }
 
 #[test]
-fn web_server_instantly_promotes_new_goal_when_configured() {
-    let temp_root = unique_temp_dir("http-goal-create-instant-promote");
+fn web_server_goal_creation_preserves_aged_backlog() {
+    let temp_root = unique_temp_dir("http-goal-create-backlog");
     let refine_dir = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
     fs::create_dir_all(&refine_dir).unwrap();
-    FileSettingsService::with_active_root(&refine_dir, &runtime_root)
-        .update(&json!({"backlog_promote_after_seconds": "0"}))
-        .unwrap();
+    let waiting = create_aged_backlog_goal(&refine_dir, "WAITING");
+    let before = fs::read(&waiting).unwrap();
     let mut server = server_with_projection();
     server.target_root = Some(temp_root.clone());
     server.runtime_root = Some(runtime_root);
@@ -125,23 +124,24 @@ fn web_server_instantly_promotes_new_goal_when_configured() {
         path: "/api/goals".to_string(),
         body: Some(json!({
             "id": "GOAL1",
-            "name": "Instantly promoted Goal",
+            "name": "New backlog Goal",
             "reporter": "Reporter",
-            "prompt": "Implement the instantly promoted Goal"
+            "prompt": "Implement new work"
         })),
     });
 
     assert_eq!(created.status, 201);
-    assert_eq!(created.body["goal"]["status"], "todo");
+    assert_eq!(created.body["goal"]["status"], "backlog");
     assert_eq!(
         FileWorkItemService::new(&refine_dir)
             .show_goal_summary("GOAL1")
             .unwrap()
             .goal
             .status,
-        GoalStatus::Todo
+        GoalStatus::Backlog
     );
 
+    assert_eq!(fs::read(waiting).unwrap(), before);
     remove_temp_dir(&temp_root);
 }
 

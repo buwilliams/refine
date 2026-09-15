@@ -45,13 +45,12 @@ impl Default for WorkflowPolicy {
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct WorkflowPassResult {
-    pub promoted: usize,
     pub steps: Vec<WorkflowStepResult>,
 }
 
 impl WorkflowPassResult {
     pub fn changed_projection(&self) -> bool {
-        self.promoted != 0 || !self.steps.is_empty()
+        !self.steps.is_empty()
     }
 }
 
