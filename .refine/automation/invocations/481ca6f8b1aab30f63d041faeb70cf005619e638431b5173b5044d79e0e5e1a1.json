@@ -390,11 +390,47 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "succeeded",
+  "results": {
+    "trigger-2748a40c-20f1-4533-851a-d3d752e56013": {
+      "invocation_id": "481ca6f8b1aab30f63d041faeb70cf005619e638431b5173b5044d79e0e5e1a1",
+      "binding_id": "trigger-2748a40c-20f1-4533-851a-d3d752e56013",
+      "role": "task",
+      "outcome": "success",
+      "summary": "Fetched 0 messages in one batch (limit 25). No Goals were imported or recovered. No errors or retry evidence were reported. No more mail was indicated.\n\n",
+      "evidence": [],
+      "artifacts": null
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "trigger-2748a40c-20f1-4533-851a-d3d752e56013",
+      "checkout": {
+        "observation": {
+          "branch": "main",
+          "head_commit": "d5a74a62db1e0dcabc124c55c8a78da5c73f8efb",
+          "status_porcelain": []
+        },
+        "tree": "b429afd9ca3d0875d2cd4bd6e0513c2a2c0b0450"
+      },
+      "checkout_recorded": true,
+      "diagnostic": null,
+      "host_bound_result": true,
+      "observational_violation": false,
+      "operation_id": null,
+      "process_id": "proc-1789488300107-908613-38",
+      "prompt_bytes": 2487,
+      "provider_session_id": null,
+      "purpose": "work",
+      "raw_output": "{\"outcome\":\"success\",\"summary\":\"Fetched 0 messages in one batch (limit 25). No Goals were imported or recovered. No errors or retry evidence were reported. No more mail was indicated.\\n\\n\"}",
+      "received_at": "2026-09-15T16:05:31.575524413+00:00",
+      "started_at": "2026-09-15T16:05:00.092164496+00:00",
+      "workflow_revision": null
+    }
+  ],
   "created_at": "2026-09-15T16:04:53.921341228+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-15T16:05:31.625845002+00:00",
   "error": null,
   "action_applied": false
 }
