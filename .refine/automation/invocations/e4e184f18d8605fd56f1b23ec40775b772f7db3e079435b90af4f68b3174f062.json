@@ -481,11 +481,52 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "succeeded",
+  "results": {
+    "default-governance": {
+      "invocation_id": "e4e184f18d8605fd56f1b23ec40775b772f7db3e079435b90af4f68b3174f062",
+      "binding_id": "default-governance",
+      "role": "governance",
+      "outcome": "success",
+      "summary": "Pass. Candidate 7fb282cb297066b2dbb584f5af350b4acdcc662f meets the Goal, fits the architecture, and supports Refine’s purpose. Three prominent benefit callouts, six capability rows with labeled symbols, and a highlighted Refine column make the reasons to choose Refine easy to scan. Qualifications remain available through accessible disclosures. Desktop and mobile screenshots confirm readable benefits and initial Refine visibility at 320px. Changes stay within the website surface, using existing assets, native HTML disclosures, and one focused keyboard-scrolling helper. The content emphasizes agent coordination, user ownership, and recoverable work. No necessary corrections identified. Optional improvement: extend browser coverage beyond Chromium.",
+      "evidence": [
+        "Reviewed the implementation against the recorded plan, project design documentation, MIT license, and installed-agent provider definitions.",
+        "Quality evidence names the final candidate: 3 Chromium tests passed, 0 failed, 0 skipped, covering four viewport widths, table semantics, disclosures, overflow, and keyboard navigation. Quality corrected obscured mobile keyboard focus.",
+        "Inspected Quality’s desktop, 320px mobile, and focused-product screenshots. Candidate diff whitespace checks passed.",
+        "Competitor qualifications are consistent with the checked official sources: [Blitzy](https://blitzy.com/), [n8n licensing](https://github.com/n8n-io/n8n/blob/master/README.md#license), [distributed workers](https://docs.n8n.io/deploy/host-n8n/configure-n8n/scaling/enable-queue-mode), and [Execute Command](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.executecommand)."
+      ],
+      "artifacts": null
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "default-governance",
+      "checkout": {
+        "observation": {
+          "branch": "refine/00000T19G1926GC2MSDXWRJ000/round-1",
+          "head_commit": "7fb282cb297066b2dbb584f5af350b4acdcc662f",
+          "status_porcelain": []
+        },
+        "tree": "e9415462c70711854bcc3eb3eee08c1f4058c748"
+      },
+      "checkout_recorded": true,
+      "diagnostic": null,
+      "host_bound_result": true,
+      "observational_violation": false,
+      "operation_id": null,
+      "process_id": "proc-1789492345410-1014481-4360",
+      "prompt_bytes": 7440,
+      "provider_session_id": null,
+      "purpose": "work",
+      "raw_output": "{\n  \"outcome\": \"success\",\n  \"summary\": \"Pass. Candidate 7fb282cb297066b2dbb584f5af350b4acdcc662f meets the Goal, fits the architecture, and supports Refine’s purpose. Three prominent benefit callouts, six capability rows with labeled symbols, and a highlighted Refine column make the reasons to choose Refine easy to scan. Qualifications remain available through accessible disclosures. Desktop and mobile screenshots confirm readable benefits and initial Refine visibility at 320px. Changes stay within the website surface, using existing assets, native HTML disclosures, and one focused keyboard-scrolling helper. The content emphasizes agent coordination, user ownership, and recoverable work. No necessary corrections identified. Optional improvement: extend browser coverage beyond Chromium.\",\n  \"evidence\": [\n    \"Reviewed the implementation against the recorded plan, project design documentation, MIT license, and installed-agent provider definitions.\",\n    \"Quality evidence names the final candidate: 3 Chromium tests passed, 0 failed, 0 skipped, covering four viewport widths, table semantics, disclosures, overflow, and keyboard navigation. Quality corrected obscured mobile keyboard focus.\",\n    \"Inspected Quality’s desktop, 320px mobile, and focused-product screenshots. Candidate diff whitespace checks passed.\",\n    \"Competitor qualifications are consistent with the checked official sources: [Blitzy](https://blitzy.com/), [n8n licensing](https://github.com/n8n-io/n8n/blob/master/README.md#license), [distributed workers](https://docs.n8n.io/deploy/host-n8n/configure-n8n/scaling/enable-queue-mode), and [Execute Command](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.executecommand).\"\n  ]\n}",
+      "received_at": "2026-09-15T17:13:52.286071888+00:00",
+      "started_at": "2026-09-15T17:12:25.379315953+00:00",
+      "workflow_revision": 2
+    }
+  ],
   "created_at": "2026-09-15T17:12:23.815464617+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-15T17:13:53.770942983+00:00",
   "error": null,
   "action_applied": false
 }

@@ -3,10 +3,30 @@
   "branch_name": "refine/00000T19G1926GC2MSDXWRJ000/round-1",
   "candidate_commit": "7fb282cb297066b2dbb584f5af350b4acdcc662f",
   "created": "2026-09-15T16:58:17Z",
-  "event_generation": 6,
+  "event_generation": 7,
   "feature_id": null,
   "feature_order": null,
   "id": "00000T19G1926GC2MSDXWRJ000",
+  "integration_history": [
+    {
+      "complete": true,
+      "generation": 6,
+      "integration": {
+        "candidate_commit": "7fb282cb297066b2dbb584f5af350b4acdcc662f",
+        "integrated_at": "2026-09-15T17:13:59.490644730+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n src/surfaces/website/assets/site.css     | 236 +++++++++++++++++++++++++++++--\n src/surfaces/website/assets/site.js      |  23 +++\n src/surfaces/website/index.html          | 158 ++++++++++++---------\n tests/website_comparison_browser.test.js | 129 ++++++++++++++---\n 4 files changed, 447 insertions(+), 99 deletions(-)",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "678a59932da0c2ccbe3b241737fb9ddc8b2329dc"
+      },
+      "round_idx": 0
+    }
+  ],
   "name": "The website comparison chart is now informational and really hard to grok for ca",
   "node_id": "default",
   "notes": [],
@@ -46,49 +66,23 @@
       "created": "2026-09-15T16:58:17Z",
       "event_configuration": {
         "events": {
-          "workflow.governance.enter": {
-            "bindings": [
-              {
-                "enabled": true,
-                "id": "default-governance",
-                "inputs": {},
-                "mode": "blocking",
-                "order": 0,
-                "overrides": null,
-                "scope": {
-                  "node_id": null
-                },
-                "skill_id": "default-governance"
-              }
-            ],
+          "workflow.governance.exit": {
+            "bindings": [],
             "enabled": true,
-            "id": "workflow.governance.enter",
+            "id": "workflow.governance.exit",
             "kind": "system",
-            "name": "Workflow Governance Enter",
+            "name": "Workflow Governance Exit",
             "on_success": null,
             "parameters": [],
             "scope": {
               "node_id": null
             },
-            "source": "workflow.governance.enter"
+            "source": "workflow.governance.exit"
           }
         },
         "revision": 82,
         "schema_version": 3,
-        "skills": {
-          "default-governance": {
-            "enabled": true,
-            "id": "default-governance",
-            "name": "Governance",
-            "parameters": [],
-            "prompt": "## Governance\n\nVerify that the implementation meets the user-defined Goal, fits the system architecture, and serves the project's purpose.\n\n### Outcome\n\nA clear assessment of whether the implementation satisfies all three. Begin with the verdict, then briefly explain how the work meets the Goal, fits the architecture, and supports the project's purpose, using concrete evidence from the implementation and Quality results. For each gap, describe what falls short, why it matters, and the recommended correction. Separate necessary corrections from optional improvements.\n\n### Guardrails\n\n- Read the context that helps explain the user's Goal, the system architecture, and the project's purpose.\n- Compare the implementation with the user's desired outcome as well as the plan. Completing the plan and passing tests alone do not establish that the Goal is met.\n- Look for clear responsibilities, shared behavior implemented in one place, and interfaces that remain easy to use and maintain.\n- Judge design choices by how they serve the project. Allow sound approaches that differ from personal preference.\n- Group related issues by their underlying cause so the next step can address them together.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
-            "provenance": "refine-default-v1",
-            "role": "task",
-            "scope": {
-              "node_id": null
-            }
-          }
-        }
+        "skills": {}
       },
       "event_results": {
         "a73a03772970771bafe094cae6c553c1a87de579d530b5bec132b62fbc86466f": {
@@ -168,6 +162,29 @@
           },
           "round_idx": 0,
           "source": "workflow.implement.enter",
+          "state": "succeeded"
+        },
+        "e4e184f18d8605fd56f1b23ec40775b772f7db3e079435b90af4f68b3174f062": {
+          "candidate_commit": "7fb282cb297066b2dbb584f5af350b4acdcc662f",
+          "generation": 6,
+          "results": {
+            "default-governance": {
+              "artifacts": null,
+              "binding_id": "default-governance",
+              "evidence": [
+                "Reviewed the implementation against the recorded plan, project design documentation, MIT license, and installed-agent provider definitions.",
+                "Quality evidence names the final candidate: 3 Chromium tests passed, 0 failed, 0 skipped, covering four viewport widths, table semantics, disclosures, overflow, and keyboard navigation. Quality corrected obscured mobile keyboard focus.",
+                "Inspected Quality’s desktop, 320px mobile, and focused-product screenshots. Candidate diff whitespace checks passed.",
+                "Competitor qualifications are consistent with the checked official sources: [Blitzy](https://blitzy.com/), [n8n licensing](https://github.com/n8n-io/n8n/blob/master/README.md#license), [distributed workers](https://docs.n8n.io/deploy/host-n8n/configure-n8n/scaling/enable-queue-mode), and [Execute Command](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.executecommand)."
+              ],
+              "invocation_id": "e4e184f18d8605fd56f1b23ec40775b772f7db3e079435b90af4f68b3174f062",
+              "outcome": "success",
+              "role": "governance",
+              "summary": "Pass. Candidate 7fb282cb297066b2dbb584f5af350b4acdcc662f meets the Goal, fits the architecture, and supports Refine’s purpose. Three prominent benefit callouts, six capability rows with labeled symbols, and a highlighted Refine column make the reasons to choose Refine easy to scan. Qualifications remain available through accessible disclosures. Desktop and mobile screenshots confirm readable benefits and initial Refine visibility at 320px. Changes stay within the website surface, using existing assets, native HTML disclosures, and one focused keyboard-scrolling helper. The content emphasizes agent coordination, user ownership, and recoverable work. No necessary corrections identified. Optional improvement: extend browser coverage beyond Chromium."
+            }
+          },
+          "round_idx": 0,
+          "source": "workflow.governance.enter",
           "state": "succeeded"
         }
       },
@@ -482,8 +499,83 @@
               }
             }
           }
+        },
+        "6:default:workflow.governance.exit": {
+          "events": {
+            "workflow.governance.exit": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.governance.exit",
+              "kind": "system",
+              "name": "Workflow Governance Exit",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.governance.exit"
+            }
+          },
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {}
+        },
+        "6:default:workflow.governance.success": {
+          "events": {},
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {}
+        },
+        "7:default:workflow.review.enter": {
+          "events": {
+            "workflow.review.enter": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.review.enter",
+              "kind": "system",
+              "name": "Workflow Review Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.review.enter"
+            }
+          },
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {}
         }
       },
+      "governance_candidate_commit": "7fb282cb297066b2dbb584f5af350b4acdcc662f",
+      "governance_checked_at": "2026-09-15T17:13:54Z",
+      "governance_details": {
+        "candidate_commit": "7fb282cb297066b2dbb584f5af350b4acdcc662f",
+        "configured": true,
+        "failed_actions": [],
+        "phase": "post_implementation",
+        "skill_results": [
+          {
+            "artifacts": null,
+            "binding_id": "workflow.governance.enter:default-governance",
+            "evidence": [
+              "Reviewed the implementation against the recorded plan, project design documentation, MIT license, and installed-agent provider definitions.",
+              "Quality evidence names the final candidate: 3 Chromium tests passed, 0 failed, 0 skipped, covering four viewport widths, table semantics, disclosures, overflow, and keyboard navigation. Quality corrected obscured mobile keyboard focus.",
+              "Inspected Quality’s desktop, 320px mobile, and focused-product screenshots. Candidate diff whitespace checks passed.",
+              "Competitor qualifications are consistent with the checked official sources: [Blitzy](https://blitzy.com/), [n8n licensing](https://github.com/n8n-io/n8n/blob/master/README.md#license), [distributed workers](https://docs.n8n.io/deploy/host-n8n/configure-n8n/scaling/enable-queue-mode), and [Execute Command](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.executecommand)."
+            ],
+            "invocation_id": "e4e184f18d8605fd56f1b23ec40775b772f7db3e079435b90af4f68b3174f062",
+            "outcome": "success",
+            "role": "governance",
+            "summary": "Pass. Candidate 7fb282cb297066b2dbb584f5af350b4acdcc662f meets the Goal, fits the architecture, and supports Refine’s purpose. Three prominent benefit callouts, six capability rows with labeled symbols, and a highlighted Refine column make the reasons to choose Refine easy to scan. Qualifications remain available through accessible disclosures. Desktop and mobile screenshots confirm readable benefits and initial Refine visibility at 320px. Changes stay within the website surface, using existing assets, native HTML disclosures, and one focused keyboard-scrolling helper. The content emphasizes agent coordination, user ownership, and recoverable work. No necessary corrections identified. Optional improvement: extend browser coverage beyond Chromium."
+          }
+        ],
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T19G1926GC2MSDXWRJ000-round-1"
+      },
+      "governance_message": "Governance checks passed.",
+      "governance_recovery_analysis": null,
+      "governance_recovery_round_prompt": null,
+      "governance_rule_actions": [],
       "implementation_report": "workflow.implement.enter:default-implement: Task #1: Defined six capabilities, verified competitor classifications against official sources, and checked Refine claims against current code and documentation.\nTask #2: Added three benefit callouts, a symbol-and-label matrix with Refine highlighted first, expandable explanations and sources, and a Get Started link.\nTask #3: Added responsive styling, accessible disclosures, keyboard scrolling, and pinned capability labels. Refine is initially visible at 320px; only labels remain pinned so competing columns can be fully revealed.\nTask #4: Updated browser coverage. All three tests passed with Chromium; none skipped. Desktop and mobile screenshots were inspected.\nNo unfinished implementation work or material departures from the plan.",
       "implementation_reported_at": "2026-09-15T17:07:21Z",
       "logs": [],
@@ -655,19 +747,34 @@
       ],
       "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "updated": "2026-09-15T17:12:23Z",
+      "rule_state": "passed",
+      "updated": "2026-09-15T17:13:55Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-15T16:58:18Z",
         "generation": 2,
         "round_idx": 0,
         "workflow_revision": 2
       },
+      "workflow_git_remote": "origin",
+      "workflow_integration": {
+        "candidate_commit": "7fb282cb297066b2dbb584f5af350b4acdcc662f",
+        "integrated_at": "2026-09-15T17:13:59.490644730+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n src/surfaces/website/assets/site.css     | 236 +++++++++++++++++++++++++++++--\n src/surfaces/website/assets/site.js      |  23 +++\n src/surfaces/website/index.html          | 158 ++++++++++++---------\n tests/website_comparison_browser.test.js | 129 ++++++++++++++---\n 4 files changed, 447 insertions(+), 99 deletions(-)",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "678a59932da0c2ccbe3b241737fb9ddc8b2329dc"
+      },
       "workspace_branch": "refine/00000T19G1926GC2MSDXWRJ000/round-1"
     }
   ],
-  "status": "governance",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-09-15T17:12:23Z",
+  "updated": "2026-09-15T17:14:01Z",
   "workflow_controls": [
     {
       "actor": "operator",
@@ -741,7 +848,17 @@
       "round_idx": 0,
       "to": "governance",
       "workflow_revision": 30
+    },
+    {
+      "at": "2026-09-15T17:14:01.939051777+00:00",
+      "forced": false,
+      "from": "governance",
+      "generation": 7,
+      "node_id": "default",
+      "round_idx": 0,
+      "to": "review",
+      "workflow_revision": 39
     }
   ],
-  "workflow_revision": 31
+  "workflow_revision": 39
 }
