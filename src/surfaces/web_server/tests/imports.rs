@@ -85,56 +85,64 @@ fn web_server_parses_import_csv_in_background() {
 }
 
 #[test]
-fn web_server_background_feature_import_promotes_all_instant_backlog_goals() {
-    let temp_root = unique_temp_dir("http-import-feature-promote-all");
-    let refine_dir = temp_root.join(".refine");
-    let runtime_root = temp_root.join("run/8080");
-    fs::create_dir_all(&refine_dir).unwrap();
-    FileSettingsService::new(&refine_dir)
-        .update(&json!({"backlog_promote_after_seconds": "0"}))
-        .unwrap();
-    let mut server = server_with_projection();
-    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
-    server.runtime_root = Some(runtime_root.clone());
+fn web_server_feature_import_preserves_aged_backlog() {
+    for background in [false, true] {
+        let temp_root = unique_temp_dir("http-import-feature-backlog");
+        let refine_dir = temp_root.join(".refine");
+        let runtime_root = temp_root.join("run/8080");
+        fs::create_dir_all(&refine_dir).unwrap();
+        let waiting = create_aged_backlog_goal(&refine_dir, "WAITING");
+        let before = fs::read(&waiting).unwrap();
+        let mut server = server_with_projection();
+        server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
+        server.runtime_root = Some(runtime_root.clone());
 
-    let started = server.handle(ApiRequest {
-        method: "POST".to_string(),
-        path: "/api/import/persist".to_string(),
-        body: Some(json!({
-            "background": true,
-            "new_feature_name": "Instant Feature",
-            "drafts": [
-                {
-                    "name": "First imported Goal",
-                    "prompt": "First target",
-                    "priority": "high"
-                },
-                {
-                    "name": "Second imported Goal",
-                    "prompt": "Second target",
-                    "priority": "medium"
-                },
-                {
-                    "name": "Third imported Goal",
-                    "prompt": "Third target",
-                    "priority": "low"
-                }
-            ]
-        })),
-    });
-    assert_eq!(started.status, 202);
-    let operation_id = started.body["operation"]["id"].as_str().unwrap();
-    let registry = FileOperationRegistry::new(&runtime_root);
-    let operation = wait_for_operation_status(&registry, operation_id, OperationState::Succeeded);
-    let result = operation.result;
-    assert_eq!(result["http_status"], 201);
-    assert_eq!(result["count"], 3);
-    assert_eq!(result["promoted"], 3);
-    let goals = result["goals"].as_array().unwrap();
-    assert_eq!(goals.len(), 3);
-    assert!(goals.iter().all(|goal| goal["status"] == "todo"));
+        let started = server.handle(ApiRequest {
+            method: "POST".to_string(),
+            path: "/api/import/persist".to_string(),
+            body: Some(json!({
+                "background": background,
+                "new_feature_name": "Instant Feature",
+                "drafts": [
+                    {
+                        "name": "First imported Goal",
+                        "prompt": "First target",
+                        "priority": "high"
+                    },
+                    {
+                        "name": "Second imported Goal",
+                        "prompt": "Second target",
+                        "priority": "medium"
+                    },
+                    {
+                        "name": "Third imported Goal",
+                        "prompt": "Third target",
+                        "priority": "low"
+                    }
+                ]
+            })),
+        });
+        let result = if background {
+            assert_eq!(started.status, 202);
+            let operation_id = started.body["operation"]["id"].as_str().unwrap();
+            let registry = FileOperationRegistry::new(&runtime_root);
+            let operation =
+                wait_for_operation_status(&registry, operation_id, OperationState::Succeeded);
+            assert_eq!(operation.result["http_status"], 201);
+            operation.result
+        } else {
+            assert_eq!(started.status, 201);
+            started.body
+        };
+        assert_eq!(result["count"], 3);
+        assert_eq!(result["promoted"], 0);
+        let goals = result["goals"].as_array().unwrap();
+        assert_eq!(goals.len(), 3);
+        assert!(goals.iter().all(|goal| goal["status"] == "backlog"));
 
-    remove_temp_dir(&temp_root);
+        assert_eq!(fs::read(waiting).unwrap(), before);
+        remove_temp_dir(&temp_root);
+    }
 }
 
 #[test]

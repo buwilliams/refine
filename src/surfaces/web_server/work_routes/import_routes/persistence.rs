@@ -173,16 +173,6 @@ impl InProcessWebServer {
         }
     }
 
-    pub(crate) fn promote_backlog_after_mutation(&self) -> Result<usize, RefineError> {
-        let Some(runtime_root) = &self.runtime_root else {
-            return Ok(0);
-        };
-        let Some(target_root) = self.target_root() else {
-            return Ok(0);
-        };
-        WorkflowEngine::with_target_root(runtime_root, target_root).promote_backlog_to_todo()
-    }
-
     pub(super) fn import_persist_response(&self, refine_dir: PathBuf, body: Value) -> ApiResponse {
         let drafts = match import_drafts_from_value(&body, None) {
             Ok(drafts) => drafts,
@@ -202,18 +192,6 @@ impl InProcessWebServer {
         result: crate::application::imports::ImportPersistResult,
     ) -> ApiResponse {
         let service = self.work_item_service(refine_dir);
-        let mut failures = Vec::new();
-        let promoted = match self.promote_backlog_after_mutation() {
-            Ok(count) => count,
-            Err(error) => {
-                failures.push(json!({
-                    "index": 1,
-                    "name": "workflow",
-                    "message": error.to_string()
-                }));
-                0
-            }
-        };
         let created = result
             .goal_ids
             .iter()
@@ -228,14 +206,14 @@ impl InProcessWebServer {
             .unwrap_or(Value::Null);
 
         ApiResponse::json(
-            if failures.is_empty() { 201 } else { 207 },
+            201,
             json!({
-                "ok": failures.is_empty(),
+                "ok": true,
                 "count": created.len(),
                 "created": created,
                 "goals": created.iter().map(|goal| &goal.goal).collect::<Vec<_>>(),
-                "promoted": promoted,
-                "failures": failures,
+                "promoted": 0,
+                "failures": [],
                 "duplicate_actions": result.duplicate_actions,
                 "feature": feature
             }),

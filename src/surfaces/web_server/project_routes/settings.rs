@@ -46,9 +46,6 @@ impl InProcessWebServer {
         };
         match updated {
             Ok(value) => {
-                if let Err(error) = self.apply_current_runtime_settings() {
-                    return error_response(error);
-                }
                 let value = self.with_runtime_settings(value);
                 if let Err(error) = self.current_projection_with_runtime_shared() {
                     return error_response(error);
@@ -57,18 +54,6 @@ impl InProcessWebServer {
             }
             Err(error) => error_response(error),
         }
-    }
-
-    pub(crate) fn apply_current_runtime_settings(&self) -> RefineResult<()> {
-        let Some(runtime_root) = &self.runtime_root else {
-            return Ok(());
-        };
-        let Some(target_root) = self.current_target_root()? else {
-            return Ok(());
-        };
-        WorkflowEngine::with_target_root(runtime_root, target_root)
-            .apply_runtime_settings()
-            .map(|_| ())
     }
 
     pub(crate) fn handle_upgrade_status(&self) -> ApiResponse {

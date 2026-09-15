@@ -58,7 +58,7 @@ impl FileWorkItemService {
     /// create route uses this with its process-hot snapshot so duplicate
     /// detection and validation do not independently reload project state. New
     /// Goal persistence is collapsed into one atomic record write; the caller
-    /// owns the single projection refresh after backlog promotion.
+    /// owns the single projection refresh after creation.
     pub fn author_goal_from_projection(
         &self,
         request: GoalAuthoringRequest,

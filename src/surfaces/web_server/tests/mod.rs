@@ -505,3 +505,22 @@ fn percent_encode_for_test(value: &str) -> String {
         })
         .collect()
 }
+
+// Age fixture records directly so regressions catch the former one-hour fallback.
+fn create_aged_backlog_goal(refine_dir: &Path, id: &str) -> PathBuf {
+    let items = FileWorkItemService::new(refine_dir);
+    items
+        .create_goal_summary("Waiting backlog work", Some(id))
+        .unwrap();
+    let goal = items
+        .append_goal_round_summary(id, "Reporter", "An unrelated authored request")
+        .unwrap();
+    let path = refine_dir.join(goal.goal.json_path);
+    let mut value: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    value["updated"] = json!("2000-01-01T00:00:00Z");
+    fs::write(&path, serde_json::to_vec(&value).unwrap()).unwrap();
+    FileProjectProjectionStore::new(refine_dir)
+        .rebuild_projection()
+        .unwrap();
+    path
+}

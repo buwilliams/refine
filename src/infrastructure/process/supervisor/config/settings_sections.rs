@@ -15,7 +15,6 @@ pub(super) const RUNTIME_SETTINGS: &[&str] = &[
     "worker_cpu_priority",
     "resource_isolation_mode",
     "chat_idle_timeout_seconds",
-    "backlog_promote_after_seconds",
     "worktree_cleanup_after_seconds",
     "state_sync_debounce_seconds",
     "state_sync_stale_threshold_seconds",

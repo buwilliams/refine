@@ -47,11 +47,6 @@ impl WorkflowEngine {
     pub fn evaluate_workflow(&self) -> RefineResult<WorkflowPassResult> {
         self.execute_pass(None)
     }
-    pub fn promote(&self) -> RefineResult<usize> {
-        self.ensure_automation_running()?;
-        self.promote_backlog_to_todo()
-    }
-
     pub fn execute_work(&self) -> RefineResult<Vec<WorkflowStepResult>> {
         self.execute_pass(None).map(|pass| pass.steps)
     }
@@ -65,7 +60,6 @@ impl WorkflowEngine {
         &self,
         worker_registry: Option<&std::path::Path>,
     ) -> RefineResult<WorkflowPassResult> {
-        let mut promoted = 0;
         let mut results = Vec::new();
         let mut errors = Vec::new();
         std::thread::scope(|scope| {
@@ -129,7 +123,7 @@ impl WorkflowEngine {
                 {
                     let handle: std::thread::ScopedJoinHandle<
                         '_,
-                        RefineResult<(usize, Vec<(String, super::admission::AdmissionLease, u64)>)>,
+                        RefineResult<Vec<(String, super::admission::AdmissionLease, u64)>>,
                     > = discovery.take().unwrap();
                     let outcome = handle.join().unwrap_or_else(|_| {
                         Err(RefineError::Conflict("workflow discovery panicked".into()))
@@ -143,8 +137,7 @@ impl WorkflowEngine {
                         failure.as_deref(),
                     );
                     match outcome {
-                        Ok((count, ids)) => {
-                            promoted += count;
+                        Ok(ids) => {
                             cycle_failures = 0;
                             let empty = ids.is_empty();
                             for (id, lease, generation) in ids {
@@ -213,12 +206,11 @@ impl WorkflowEngine {
                     let failed = failed.clone();
                     discovery = Some(scope.spawn(move || contain("admission", || {
                         crate::infrastructure::process::supervisor::coordination::with_lock_timeout(Duration::from_millis(200), || {
-                            if self.workflow_paused()? || !self.target_still_attached(worker_registry)? { return Ok((0, Vec::new())); }
+                            if self.workflow_paused()? || !self.target_still_attached(worker_registry)? { return Ok(Vec::new()); }
                             #[cfg(test)]
                             test_hooks::scheduler(self)?;
                             let skills_first = super::admission::skills_first(&self.runtime_root);
                             self.service_pending_skills(usize::from(skills_first));
-                            let promoted = self.promote_backlog_to_todo()?;
                             let mut candidates = Vec::new();
                             let mut excluded = ids;
                             for (id, generation) in &failed {
@@ -231,7 +223,7 @@ impl WorkflowEngine {
                                 }
                             }
                             self.service_pending_skills(32);
-                            Ok((promoted, candidates))
+                            Ok(candidates)
                         })
                     })));
                 }
@@ -243,7 +235,6 @@ impl WorkflowEngine {
         }
         results.sort_by_key(|(order, _)| *order);
         Ok(WorkflowPassResult {
-            promoted,
             steps: results.into_iter().map(|(_, result)| result).collect(),
         })
     }

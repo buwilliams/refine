@@ -48,3 +48,16 @@ test("Runtime omits the retired email approval setting", () => {
   const html = context.renderNodeRuntimeConfigSections({ auto_approve: "true" }, "Default", "claude");
   assert.doesNotMatch(html, /s-auto-approve|email-request Goals/);
 });
+
+test("Runtime neither renders nor submits retired backlog promotion", async () => {
+  const { context, control, requests } = runtimeSettings();
+  const html = context.renderNodeRuntimeConfigSections({ backlog_promote_after_seconds: "0" }, "Default", "claude");
+  assert.doesNotMatch(html, /s-backlog-promote|runtime-backlog-promote|Auto-promote/);
+  context.bindNodeRuntimeConfigControls();
+  assert.equal(control("#s-backlog-promote").listeners["settings-editable-commit"], undefined);
+  control("#s-cap").value = "3";
+  await context.autosaveSettingsRuntime();
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].body.parallel_run_cap, "3");
+  assert.equal(Object.hasOwn(requests[0].body, "backlog_promote_after_seconds"), false);
+});

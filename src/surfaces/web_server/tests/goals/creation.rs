@@ -262,7 +262,7 @@ fn warmed_goal_create_post_completes_under_fifty_milliseconds_at_current_scale()
             .filter(|goal| goal.goal.status == GoalStatus::Backlog)
             .count(),
         GOAL_COUNT,
-        "fresh performance fixtures must not turn the create benchmark into a bulk promotion test"
+        "creating a Goal must preserve existing Backlog Goals"
     );
 
     eprintln!(

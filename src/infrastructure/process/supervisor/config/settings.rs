@@ -221,7 +221,8 @@ impl FileSettingsService {
                     Value::String(normalize_setting(new_key, &value)?),
                 );
                 migrated = true;
-            } else if key == "quality_timing"
+            } else if key == "backlog_promote_after_seconds"
+                || key == "quality_timing"
                 || key == RETIRED_SUPERVISOR_STALL_KEY
                 || key == RETIRED_WORKTREE_GENERATED_PATHS_KEY
                 || is_retired_development_request_setting(&key)

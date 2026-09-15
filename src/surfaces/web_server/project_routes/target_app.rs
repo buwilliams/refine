@@ -230,9 +230,6 @@ impl InProcessWebServer {
                             {
                                 return error_response(error);
                             }
-                            if let Err(error) = self.apply_current_runtime_settings() {
-                                return error_response(error);
-                            }
                         }
                         Ok(None) => {}
                         Err(error) => return error_response(error),

@@ -579,12 +579,14 @@ fn web_server_project_attach_creates_missing_local_project() {
 }
 
 #[test]
-fn web_server_applies_runtime_settings_updates_immediately() {
+fn web_server_runtime_settings_updates_preserve_aged_backlog() {
     let temp_root = unique_temp_dir("http-runtime-settings-apply");
     let app_root = temp_root.join("app");
     let refine_dir = app_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
     fs::create_dir_all(&refine_dir).unwrap();
+    let waiting = create_aged_backlog_goal(&refine_dir, "WAITING");
+    let before = fs::read(&waiting).unwrap();
     let mut server = server_with_projection();
     server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
@@ -608,15 +610,15 @@ fn web_server_applies_runtime_settings_updates_immediately() {
         path: "/api/settings".to_string(),
         body: Some(json!({
             "parallel_run_cap": 2,
-            "parallel_per_node_cap": 2,
-            "backlog_promote_after_seconds": "0"
+            "parallel_per_node_cap": 2
         })),
     });
     assert_eq!(updated.status, 200);
     assert_eq!(updated.body["settings"]["parallel_run_cap"], "2");
-    assert_eq!(
-        updated.body["settings"]["backlog_promote_after_seconds"],
-        "0"
+    assert!(
+        updated.body["settings"]
+            .get("backlog_promote_after_seconds")
+            .is_none()
     );
 
     assert!(!runtime_root.join("workflow-automation-state.json").exists());
@@ -640,8 +642,9 @@ fn web_server_applies_runtime_settings_updates_immediately() {
         body: None,
     });
     assert_eq!(goal.status, 200);
-    assert_eq!(goal.body["goal"]["status"], "todo");
+    assert_eq!(goal.body["goal"]["status"], "backlog");
 
+    assert_eq!(fs::read(waiting).unwrap(), before);
     remove_temp_dir(&temp_root);
 }
 

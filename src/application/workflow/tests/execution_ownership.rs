@@ -124,14 +124,10 @@ fn restart_recovery_preserves_goal_state_and_removes_retired_execution_files() {
 }
 
 #[test]
-fn backlog_promotion_changes_only_goal_state_and_does_not_create_worktrees() {
-    let temp_root = unique_temp_dir("state-only-promotion");
+fn explicit_backlog_start_changes_only_goal_state_and_does_not_create_worktrees() {
+    let temp_root = unique_temp_dir("state-only-start");
     let target_root = temp_root.join("target");
     let refine_dir = test_refine_dir(&target_root);
-    let runtime_root = temp_root.join("run/8080");
-    FileSettingsService::new(&refine_dir)
-        .update(&json!({"backlog_promote_after_seconds": "0"}))
-        .unwrap();
     let work_items = FileWorkItemService::new(&refine_dir);
     for index in 0..8 {
         let id = format!("GOAL{index}");
@@ -141,10 +137,9 @@ fn backlog_promotion_changes_only_goal_state_and_does_not_create_worktrees() {
             .unwrap();
     }
 
-    let workflow = WorkflowEngine::with_target_root(&runtime_root, &target_root);
-    assert_eq!(workflow.promote().unwrap(), 8);
     for index in 0..8 {
         let id = format!("GOAL{index}");
+        work_items.start_goal_workflow(&id).unwrap();
         assert_eq!(
             work_items.show_goal_summary(&id).unwrap().goal.status,
             GoalStatus::Todo
@@ -156,14 +151,10 @@ fn backlog_promotion_changes_only_goal_state_and_does_not_create_worktrees() {
 }
 
 #[test]
-fn zero_round_backlog_is_ineligible_while_valid_sibling_promotes() {
-    let temp_root = unique_temp_dir("zero-round-promotion");
+fn explicit_start_rejects_zero_round_backlog_and_queues_valid_sibling() {
+    let temp_root = unique_temp_dir("zero-round-start");
     let target_root = temp_root.join("target");
     let refine_dir = test_refine_dir(&target_root);
-    let runtime_root = temp_root.join("run/8080");
-    FileSettingsService::new(&refine_dir)
-        .update(&json!({"backlog_promote_after_seconds": "0"}))
-        .unwrap();
     let work_items = FileWorkItemService::new(&refine_dir);
     work_items
         .create_goal_summary("Invalid", Some("ZERO1"))
@@ -175,8 +166,30 @@ fn zero_round_backlog_is_ineligible_while_valid_sibling_promotes() {
         .append_goal_round_summary("VALID1", "Reporter", "Authoritative request")
         .unwrap();
 
-    let workflow = WorkflowEngine::with_target_root(&runtime_root, &target_root);
-    assert_eq!(workflow.promote().unwrap(), 1);
+    assert!(work_items.start_goal_workflow("ZERO1").is_err());
+    work_items
+        .create_goal_summary("Empty request", Some("EMPTY1"))
+        .unwrap();
+    let empty = work_items
+        .append_goal_round_summary("EMPTY1", "Reporter", "Original request")
+        .unwrap();
+    let path = refine_dir.join(empty.goal.json_path);
+    let mut value: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    value["rounds"][0]["prompt"] = json!("   ");
+    let before = serde_json::to_vec(&value).unwrap();
+    fs::write(&path, &before).unwrap();
+    assert!(work_items.start_goal_workflow("EMPTY1").is_err());
+    assert_eq!(fs::read(path).unwrap(), before);
+    work_items.start_goal_workflow("VALID1").unwrap();
+    // Starting an already queued, authored Goal remains idempotent.
+    assert_eq!(
+        work_items
+            .start_goal_workflow("VALID1")
+            .unwrap()
+            .goal
+            .status,
+        GoalStatus::Todo
+    );
     assert_eq!(
         work_items.show_goal_summary("ZERO1").unwrap().goal.status,
         GoalStatus::Backlog
@@ -462,4 +475,41 @@ fn newer_round_handoff_supersedes_only_the_same_goal_candidate() {
     );
 
     fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn scheduler_passes_preserve_aged_backlog_goals() {
+    use crate::application::projects::projection::ActiveGoalIndex;
+    let root = unique_temp_dir("aged-backlog-scheduler");
+    let target = root.join("target");
+    let refine_dir = test_refine_dir(&target);
+    let items = FileWorkItemService::new(&refine_dir);
+    let mut records = Vec::new();
+    for id in ["AUTHORED", "EMPTY"] {
+        items.create_goal_summary(id, Some(id)).unwrap();
+        if id == "AUTHORED" {
+            items
+                .append_goal_round_summary(id, "Reporter", "Aged request")
+                .unwrap();
+        }
+        let path = refine_dir.join(items.show_goal_summary(id).unwrap().goal.json_path);
+        let mut value: serde_json::Value =
+            serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+        value["updated"] = json!("2000-01-01T00:00:00Z");
+        let bytes = serde_json::to_vec(&value).unwrap();
+        fs::write(&path, &bytes).unwrap();
+        records.push((path, bytes));
+    }
+    ActiveGoalIndex::rebuild(&refine_dir).unwrap();
+    let workflow = WorkflowEngine::with_target_root(root.join("run"), &target);
+    for _ in 0..2 {
+        let pass = workflow.evaluate_workflow().unwrap();
+        assert!(pass.steps.is_empty());
+        assert!(!pass.changed_projection());
+        for (path, before) in &records {
+            assert_eq!(&fs::read(path).unwrap(), before);
+        }
+    }
+    assert!(!target.join(".git/refine-worktrees").exists());
+    fs::remove_dir_all(root).unwrap();
 }

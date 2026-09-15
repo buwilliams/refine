@@ -123,11 +123,6 @@ impl InProcessWebServer {
                 }),
             );
         }
-        if result.created
-            && let Err(error) = self.promote_backlog_after_mutation()
-        {
-            return error_response(error);
-        }
         if let Err(error) = self.refresh_projection_cache_after_mutation() {
             return error_response(error);
         }

@@ -90,7 +90,8 @@ impl WorkflowBehavior for WorkflowBacklog {
 
     fn advance(&self, _ctx: &mut WorkflowContext<'_>) -> RefineResult<WorkflowAdvanceOutcome> {
         Ok(WorkflowAdvanceOutcome::Blocked {
-            reason: "backlog Goals wait until todo eligibility rules promote them".to_string(),
+            reason: "backlog Goals wait for a user or configured Skill to explicitly start them"
+                .to_string(),
         })
     }
 }

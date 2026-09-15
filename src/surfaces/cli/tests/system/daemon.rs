@@ -812,18 +812,38 @@ fn cli_goal_lifecycle_membership_and_feature_edit_use_tool_services() {
             .contains("\"feature_id\": null")
     );
 
+    let start = || {
+        dispatch(
+            Cli::try_parse_from([
+                "refine",
+                "goal",
+                "start",
+                "GOAL1",
+                "--target-root",
+                target_root.to_str().unwrap(),
+            ])
+            .unwrap(),
+        )
+    };
+    assert!(start().is_err());
     dispatch(
         Cli::try_parse_from([
             "refine",
             "goal",
-            "start",
+            "round",
             "GOAL1",
             "--target-root",
             target_root.to_str().unwrap(),
+            "--reporter",
+            "QA",
+            "--prompt",
+            "Implement the lifecycle Goal",
         ])
         .unwrap(),
     )
     .unwrap();
+
+    start().unwrap();
     assert!(
         fs::read_to_string(refine_dir.join("goals/GO/AL1/goal.json"))
             .unwrap()
