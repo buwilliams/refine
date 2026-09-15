@@ -481,11 +481,52 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "succeeded",
+  "results": {
+    "default-governance": {
+      "invocation_id": "bf61ee06313b1b7ac93e1221981ec7f1dd3cbcbe77e5ec3b53beed39bd0db299",
+      "binding_id": "default-governance",
+      "role": "governance",
+      "outcome": "success",
+      "summary": "Pass. Candidate 51d66e6 meets the Goal and plan: New appears between Search and Node, exposes all four existing commands, and supports keyboard access, dismissal, viewport constraints, and mobile drawer handoff. Responsibilities remain clear: navigation owns interaction; shared commands retain creation behavior. This makes starting work easier while preserving Refine’s workflow semantics. No necessary corrections or optional improvements identified.",
+      "evidence": [
+        "Governance reran all four New browser tests: 4 passed, no failures or skips.",
+        "Quality reported 91 focused JavaScript tests passed, covering selected Node/Reporter, validation, draft retention, confirmations, and independent Plan sessions.",
+        "Quality reported 7 Rust navigation tests passed; two failures reproduced on the base commit. Browser APIs were mocked; live daemon creation was not exercised.",
+        "Navigation intent documentation matches the implementation. Working tree remains clean."
+      ],
+      "artifacts": null
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "default-governance",
+      "checkout": {
+        "observation": {
+          "branch": "refine/00000T19CHAJQGMYH5DRTAT000/round-1",
+          "head_commit": "51d66e6668061f430123693e53d0e8f5f575e942",
+          "status_porcelain": []
+        },
+        "tree": "d5bdf1d611db3a18ee5f885708a12c9f212d81e9"
+      },
+      "checkout_recorded": true,
+      "diagnostic": null,
+      "host_bound_result": true,
+      "observational_violation": false,
+      "operation_id": null,
+      "process_id": "proc-1789484990584-406787-4489",
+      "prompt_bytes": 12833,
+      "provider_session_id": null,
+      "purpose": "work",
+      "raw_output": "{\n  \"outcome\": \"success\",\n  \"summary\": \"Pass. Candidate 51d66e6 meets the Goal and plan: New appears between Search and Node, exposes all four existing commands, and supports keyboard access, dismissal, viewport constraints, and mobile drawer handoff. Responsibilities remain clear: navigation owns interaction; shared commands retain creation behavior. This makes starting work easier while preserving Refine’s workflow semantics. No necessary corrections or optional improvements identified.\",\n  \"evidence\": [\n    \"Governance reran all four New browser tests: 4 passed, no failures or skips.\",\n    \"Quality reported 91 focused JavaScript tests passed, covering selected Node/Reporter, validation, draft retention, confirmations, and independent Plan sessions.\",\n    \"Quality reported 7 Rust navigation tests passed; two failures reproduced on the base commit. Browser APIs were mocked; live daemon creation was not exercised.\",\n    \"Navigation intent documentation matches the implementation. Working tree remains clean.\"\n  ],\n  \"artifacts\": null\n}\n",
+      "received_at": "2026-09-15T15:11:30.961924582+00:00",
+      "started_at": "2026-09-15T15:09:50.527236341+00:00",
+      "workflow_revision": 3
+    }
+  ],
   "created_at": "2026-09-15T15:09:48.315525019+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-15T15:11:32.764066878+00:00",
   "error": null,
   "action_applied": false
 }

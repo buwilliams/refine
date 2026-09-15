@@ -3,10 +3,30 @@
   "branch_name": "refine/00000T19CHAJQGMYH5DRTAT000/round-1",
   "candidate_commit": "51d66e6668061f430123693e53d0e8f5f575e942",
   "created": "2026-09-15T14:56:00Z",
-  "event_generation": 7,
+  "event_generation": 8,
   "feature_id": null,
   "feature_order": null,
   "id": "00000T19CHAJQGMYH5DRTAT000",
+  "integration_history": [
+    {
+      "complete": true,
+      "generation": 7,
+      "integration": {
+        "candidate_commit": "51d66e6668061f430123693e53d0e8f5f575e942",
+        "integrated_at": "2026-09-15T15:11:39.893667896+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n .../docs/intent/05-surfaces/03-browser/02-nav.md   |   6 +-\n src/surfaces/web/static/css/navigation.css         |   2 +\n src/surfaces/web/static/index.html                 |  11 ++\n src/surfaces/web/static/js/common.js               |   8 +-\n src/surfaces/web/static/js/navigation.js           |  44 ++++-\n .../web_server/tests/static_surface/navigation.rs  |  48 +++++\n tests/web_navigation_browser.test.js               | 203 +++++++++++++++++++++\n 7 files changed, 318 insertions(+), 4 deletions(-)",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "38c971d47a022950bb91a730801fa18463a652e6"
+      },
+      "round_idx": 0
+    }
+  ],
   "name": "Add a New menu below Search in the left navigation rail",
   "node_id": "default",
   "notes": [],
@@ -46,49 +66,23 @@
       "created": "2026-09-15T14:56:23Z",
       "event_configuration": {
         "events": {
-          "workflow.governance.enter": {
-            "bindings": [
-              {
-                "enabled": true,
-                "id": "default-governance",
-                "inputs": {},
-                "mode": "blocking",
-                "order": 0,
-                "overrides": null,
-                "scope": {
-                  "node_id": null
-                },
-                "skill_id": "default-governance"
-              }
-            ],
+          "workflow.governance.exit": {
+            "bindings": [],
             "enabled": true,
-            "id": "workflow.governance.enter",
+            "id": "workflow.governance.exit",
             "kind": "system",
-            "name": "Workflow Governance Enter",
+            "name": "Workflow Governance Exit",
             "on_success": null,
             "parameters": [],
             "scope": {
               "node_id": null
             },
-            "source": "workflow.governance.enter"
+            "source": "workflow.governance.exit"
           }
         },
         "revision": 82,
         "schema_version": 3,
-        "skills": {
-          "default-governance": {
-            "enabled": true,
-            "id": "default-governance",
-            "name": "Governance",
-            "parameters": [],
-            "prompt": "## Governance\n\nVerify that the implementation meets the user-defined Goal, fits the system architecture, and serves the project's purpose.\n\n### Outcome\n\nA clear assessment of whether the implementation satisfies all three. Begin with the verdict, then briefly explain how the work meets the Goal, fits the architecture, and supports the project's purpose, using concrete evidence from the implementation and Quality results. For each gap, describe what falls short, why it matters, and the recommended correction. Separate necessary corrections from optional improvements.\n\n### Guardrails\n\n- Read the context that helps explain the user's Goal, the system architecture, and the project's purpose.\n- Compare the implementation with the user's desired outcome as well as the plan. Completing the plan and passing tests alone do not establish that the Goal is met.\n- Look for clear responsibilities, shared behavior implemented in one place, and interfaces that remain easy to use and maintain.\n- Judge design choices by how they serve the project. Allow sound approaches that differ from personal preference.\n- Group related issues by their underlying cause so the next step can address them together.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
-            "provenance": "refine-default-v1",
-            "role": "task",
-            "scope": {
-              "node_id": null
-            }
-          }
-        }
+        "skills": {}
       },
       "event_results": {
         "0834e3d00bf3117788bf77c86d40a647198f44e497bfb5f3741bfe74d088e7c9": {
@@ -137,6 +131,29 @@
           },
           "round_idx": 0,
           "source": "workflow.implement.enter",
+          "state": "succeeded"
+        },
+        "bf61ee06313b1b7ac93e1221981ec7f1dd3cbcbe77e5ec3b53beed39bd0db299": {
+          "candidate_commit": "51d66e6668061f430123693e53d0e8f5f575e942",
+          "generation": 7,
+          "results": {
+            "default-governance": {
+              "artifacts": null,
+              "binding_id": "default-governance",
+              "evidence": [
+                "Governance reran all four New browser tests: 4 passed, no failures or skips.",
+                "Quality reported 91 focused JavaScript tests passed, covering selected Node/Reporter, validation, draft retention, confirmations, and independent Plan sessions.",
+                "Quality reported 7 Rust navigation tests passed; two failures reproduced on the base commit. Browser APIs were mocked; live daemon creation was not exercised.",
+                "Navigation intent documentation matches the implementation. Working tree remains clean."
+              ],
+              "invocation_id": "bf61ee06313b1b7ac93e1221981ec7f1dd3cbcbe77e5ec3b53beed39bd0db299",
+              "outcome": "success",
+              "role": "governance",
+              "summary": "Pass. Candidate 51d66e6 meets the Goal and plan: New appears between Search and Node, exposes all four existing commands, and supports keyboard access, dismissal, viewport constraints, and mobile drawer handoff. Responsibilities remain clear: navigation owns interaction; shared commands retain creation behavior. This makes starting work easier while preserving Refine’s workflow semantics. No necessary corrections or optional improvements identified."
+            }
+          },
+          "round_idx": 0,
+          "source": "workflow.governance.enter",
           "state": "succeeded"
         },
         "c7d307b4260a7927e7b4488f181ad361c1a0543c8f9824e81a670c1d30b65416": {
@@ -473,8 +490,83 @@
               }
             }
           }
+        },
+        "7:default:workflow.governance.exit": {
+          "events": {
+            "workflow.governance.exit": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.governance.exit",
+              "kind": "system",
+              "name": "Workflow Governance Exit",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.governance.exit"
+            }
+          },
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {}
+        },
+        "7:default:workflow.governance.success": {
+          "events": {},
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {}
+        },
+        "8:default:workflow.review.enter": {
+          "events": {
+            "workflow.review.enter": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.review.enter",
+              "kind": "system",
+              "name": "Workflow Review Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.review.enter"
+            }
+          },
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {}
         }
       },
+      "governance_candidate_commit": "51d66e6668061f430123693e53d0e8f5f575e942",
+      "governance_checked_at": "2026-09-15T15:11:33Z",
+      "governance_details": {
+        "candidate_commit": "51d66e6668061f430123693e53d0e8f5f575e942",
+        "configured": true,
+        "failed_actions": [],
+        "phase": "post_implementation",
+        "skill_results": [
+          {
+            "artifacts": null,
+            "binding_id": "workflow.governance.enter:default-governance",
+            "evidence": [
+              "Governance reran all four New browser tests: 4 passed, no failures or skips.",
+              "Quality reported 91 focused JavaScript tests passed, covering selected Node/Reporter, validation, draft retention, confirmations, and independent Plan sessions.",
+              "Quality reported 7 Rust navigation tests passed; two failures reproduced on the base commit. Browser APIs were mocked; live daemon creation was not exercised.",
+              "Navigation intent documentation matches the implementation. Working tree remains clean."
+            ],
+            "invocation_id": "bf61ee06313b1b7ac93e1221981ec7f1dd3cbcbe77e5ec3b53beed39bd0db299",
+            "outcome": "success",
+            "role": "governance",
+            "summary": "Pass. Candidate 51d66e6 meets the Goal and plan: New appears between Search and Node, exposes all four existing commands, and supports keyboard access, dismissal, viewport constraints, and mobile drawer handoff. Responsibilities remain clear: navigation owns interaction; shared commands retain creation behavior. This makes starting work easier while preserving Refine’s workflow semantics. No necessary corrections or optional improvements identified."
+          }
+        ],
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T19CHAJQGMYH5DRTAT000-round-1"
+      },
+      "governance_message": "Governance checks passed.",
+      "governance_recovery_analysis": null,
+      "governance_recovery_round_prompt": null,
+      "governance_rule_actions": [],
       "implementation_report": "workflow.implement.enter:default-implement: Task 1: Added New directly between Search and Node with the four ordered actions.\nTask 2: Reused shared commands, closing menus and releasing the mobile drawer before execution.\nTask 3: Added keyboard navigation, focus restoration, dismissal, menu exclusion, and viewport constraints.\nTask 4: Updated navigation intent documentation.\nTask 5: Added browser and Rust coverage. No implementation departures or unfinished work. Workflow state remains unchanged.",
       "implementation_reported_at": "2026-09-15T15:04:45Z",
       "logs": [],
@@ -622,19 +714,34 @@
       ],
       "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "updated": "2026-09-15T15:09:47Z",
+      "rule_state": "passed",
+      "updated": "2026-09-15T15:11:34Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-15T14:56:24Z",
         "generation": 3,
         "round_idx": 0,
         "workflow_revision": 3
       },
+      "workflow_git_remote": "origin",
+      "workflow_integration": {
+        "candidate_commit": "51d66e6668061f430123693e53d0e8f5f575e942",
+        "integrated_at": "2026-09-15T15:11:39.893667896+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n .../docs/intent/05-surfaces/03-browser/02-nav.md   |   6 +-\n src/surfaces/web/static/css/navigation.css         |   2 +\n src/surfaces/web/static/index.html                 |  11 ++\n src/surfaces/web/static/js/common.js               |   8 +-\n src/surfaces/web/static/js/navigation.js           |  44 ++++-\n .../web_server/tests/static_surface/navigation.rs  |  48 +++++\n tests/web_navigation_browser.test.js               | 203 +++++++++++++++++++++\n 7 files changed, 318 insertions(+), 4 deletions(-)",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "38c971d47a022950bb91a730801fa18463a652e6"
+      },
       "workspace_branch": "refine/00000T19CHAJQGMYH5DRTAT000/round-1"
     }
   ],
-  "status": "governance",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-09-15T15:09:47Z",
+  "updated": "2026-09-15T15:11:42Z",
   "workflow_controls": [
     {
       "actor": "operator",
@@ -718,7 +825,17 @@
       "round_idx": 0,
       "to": "governance",
       "workflow_revision": 31
+    },
+    {
+      "at": "2026-09-15T15:11:42.350453599+00:00",
+      "forced": false,
+      "from": "governance",
+      "generation": 8,
+      "node_id": "default",
+      "round_idx": 0,
+      "to": "review",
+      "workflow_revision": 40
     }
   ],
-  "workflow_revision": 32
+  "workflow_revision": 40
 }
