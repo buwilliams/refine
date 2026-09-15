@@ -65,3 +65,48 @@ test('Runtime edits provider definitions, defaults and node inheritance while re
     assert.deepEqual(app.pageErrors, []);
   } finally { await app.close(); }
 });
+
+test('Runtime retains invalid provider edits and a pending system default across refresh', {skip: SKIP}, async () => {
+  let catalog = structuredClone(defaults), saves = 0;
+  const selection = () => ({catalog, node_override: null, effective_provider: catalog.default_provider, selection_source: 'system'});
+  const app = await openApp({fixture(path, request) {
+    if (path === '/api/settings') return {settings: {...apiFixture(path).settings, agent_cli: catalog.default_provider}, providers: selection()};
+    if (path === '/api/providers') {
+      if (request.method() === 'PUT') { catalog = request.postDataJSON(); catalog.revision++; saves++; }
+      return selection();
+    }
+    return apiFixture(path);
+  }});
+  try {
+    const {page} = app;
+    await page.goto(`${app.origin}/#/settings/runtime`);
+    await page.locator('#provider-system-default').selectOption('gemini');
+    await page.evaluate(() => refreshSettingsTab('runtime', {force: true}));
+    assert.equal(await page.locator('#provider-system-default').inputValue(), 'gemini');
+    assert.equal(catalog.default_provider, 'claude');
+    await page.locator('#provider-save-default').click();
+    await page.waitForFunction(() => document.querySelector('#s-cli option')?.textContent.includes('Gemini'));
+    assert.equal(catalog.default_provider, 'gemini');
+    await page.locator('[data-provider-edit="claude"]').click();
+    const dialog = page.locator('[data-testid="automation-modal"]');
+    await dialog.locator('#provider-executable').fill('/Edited Agent');
+    await dialog.locator('#provider-automated-args').fill('["unfinished"');
+    await dialog.locator('[data-save]').click();
+    await page.waitForFunction(() => document.querySelector('[data-automation-error]')?.textContent.length > 0);
+    assert.equal(saves, 1, 'invalid JSON must not reach the server');
+    await page.evaluate(() => refreshSettingsTab('runtime', {force: true}));
+    assert.equal(await dialog.locator('#provider-executable').inputValue(), '/Edited Agent');
+    assert.equal(await dialog.locator('#provider-automated-args').inputValue(), '["unfinished"');
+    await dialog.locator('#provider-automated-args').fill('["--prompt", "{{context}}"]');
+    await dialog.locator('[data-save]').click();
+    await dialog.waitFor({state: 'detached'});
+    assert.deepEqual(catalog.providers[0].automated.args, ['--prompt', '{{context}}']);
+    await page.locator('[data-provider-edit="claude"]').click();
+    await dialog.locator('[data-delete]').click();
+    await dialog.waitFor({state: 'detached'});
+    assert.equal(catalog.providers.some(p => p.id === 'claude'), false);
+    await page.reload();
+    assert.equal(await page.locator('[data-provider-edit="claude"]').count(), 0);
+    assert.deepEqual(app.pageErrors, []);
+  } finally { await app.close(); }
+});

@@ -187,3 +187,92 @@ fn concurrent_catalog_edits_have_one_winner_and_targets_resolve_independently() 
     std::fs::remove_dir_all(a).unwrap();
     std::fs::remove_dir_all(b).unwrap();
 }
+
+#[test]
+fn rejected_provider_edits_preserve_the_saved_catalog_and_selection() {
+    let root = root();
+    let store = ProviderStore::new(&root);
+    let saved = store.save(defaults()).unwrap();
+    FileSettingsService::for_node(&root, "other")
+        .update(&json!({"agent_cli":"gemini"}))
+        .unwrap();
+    let before = std::fs::read(root.join("providers.json")).unwrap();
+    let mut invalid = Vec::new();
+    for mode in ["automated", "interactive"] {
+        for (key, value) in [
+            ("args", json!("--prompt {{context}}")),
+            ("args", json!([42])),
+            ("args", json!(["{{unknown}}"])),
+            ("args", json!(["{{context"])),
+            ("args", json!(["\u{0}"])),
+            ("args", json!(["{{session_id}}"])),
+            ("transport", json!("native_stdin")),
+            ("stdin", json!("{{context}}")),
+        ] {
+            let mut draft = json!(saved);
+            draft["providers"][0][mode][key] = value;
+            invalid.push(draft);
+        }
+    }
+    let mut referenced = json!(saved);
+    referenced["providers"]
+        .as_array_mut()
+        .unwrap()
+        .retain(|p| p["id"] != "gemini");
+    invalid.push(referenced);
+    for draft in invalid {
+        assert!(
+            save(&root, &draft).is_err(),
+            "accepted invalid catalog: {draft}"
+        );
+        assert_eq!(std::fs::read(root.join("providers.json")).unwrap(), before);
+        assert_eq!(
+            FileSettingsService::for_node(&root, "other")
+                .load()
+                .unwrap()["agent_cli"],
+            "gemini"
+        );
+    }
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn system_default_changes_only_inheriting_nodes_and_unknown_selections_can_be_repaired() {
+    let root = root();
+    let inherited = FileSettingsService::for_node(&root, "default");
+    let selected = FileSettingsService::for_node(&root, "other");
+    inherited.update(&json!({"parallel_run_cap":"2"})).unwrap();
+    selected.update(&json!({"agent_cli":"gemini"})).unwrap();
+    let mut catalog = ProviderStore::new(&root).load().unwrap();
+    catalog.default_provider = "codex".into();
+    save(&root, &json!(catalog)).unwrap();
+    assert_eq!(inherited.load().unwrap()["agent_cli"], "codex");
+    assert_eq!(selected.load().unwrap()["agent_cli"], "gemini");
+    let path = root.join("nodes.json");
+    let mut nodes: Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+    let node = nodes["nodes"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|n| n["id"] == "default")
+        .unwrap();
+    node["settings"]["agent_cli"] = json!("removed-on-another-node");
+    std::fs::write(path, serde_json::to_vec(&nodes).unwrap()).unwrap();
+    assert_eq!(
+        inherited.load().unwrap()["agent_cli"],
+        "removed-on-another-node"
+    );
+    let response = response(&root, inherited.provider_override().unwrap().as_deref()).unwrap();
+    assert!(
+        response["selection_error"]
+            .as_str()
+            .unwrap()
+            .contains("not configured")
+    );
+    let service = HostAgentProviderService::new().with_refine_dir(&root);
+    assert!(service.selected_provider_id("").is_err());
+    assert_eq!(service.selected_provider_id("claude").unwrap(), "claude");
+    inherited.update(&json!({"agent_cli":null})).unwrap();
+    assert_eq!(service.selected_provider_id("").unwrap(), "codex");
+    std::fs::remove_dir_all(root).unwrap();
+}

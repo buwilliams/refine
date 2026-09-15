@@ -903,7 +903,13 @@ fn provider_catalog_adopts_remote_edits_and_preserves_node_inheritance() {
     let mut catalog = ProviderStore::new(&a).load().unwrap();
     catalog.default_provider = "codex".into();
     catalog.providers[0].executable = "/custom/Claude".into();
+    let mut custom = crate::model::providers::ProviderDefinition::generic("SyncedAgent");
+    custom.executable = "/Custom Agent/bin/cli".into();
+    catalog.providers.push(custom);
     ProviderStore::new(&a).save(catalog).unwrap();
+    FileSettingsService::for_node(&a, "selected-node")
+        .update(&serde_json::json!({"agent_cli":"SyncedAgent"}))
+        .unwrap();
     fixture.service(&fixture.a).sync().unwrap();
     fixture.service(&fixture.b).sync().unwrap();
     assert_eq!(
@@ -921,4 +927,30 @@ fn provider_catalog_adopts_remote_edits_and_preserves_node_inheritance() {
         .unwrap();
     assert_eq!(inheriting.provider_override().unwrap(), None);
     assert_eq!(inheriting.load().unwrap()["agent_cli"], "codex");
+    let selected = FileSettingsService::for_node(&b, "selected-node");
+    assert_eq!(selected.load().unwrap()["agent_cli"], "SyncedAgent");
+    assert_eq!(
+        ProviderStore::new(&b)
+            .load()
+            .unwrap()
+            .provider("SyncedAgent")
+            .unwrap()
+            .executable,
+        "/Custom Agent/bin/cli"
+    );
+    let mut catalog = ProviderStore::new(&b).load().unwrap();
+    catalog.default_provider = "gemini".into();
+    ProviderStore::new(&b).save(catalog).unwrap();
+    fixture.service(&fixture.b).sync().unwrap();
+    fixture.service(&fixture.a).sync().unwrap();
+    assert_eq!(
+        FileSettingsService::for_node(&a, "default").load().unwrap()["agent_cli"],
+        "gemini"
+    );
+    assert_eq!(
+        FileSettingsService::for_node(&a, "selected-node")
+            .load()
+            .unwrap()["agent_cli"],
+        "SyncedAgent"
+    );
 }

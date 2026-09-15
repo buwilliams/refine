@@ -145,7 +145,18 @@ fn config_target_root_adapter_uses_shared_services_and_returns_saved_readback() 
         .into_config(),
     )
     .unwrap();
-    assert_eq!(all["skills"]["items"].as_array().unwrap().len(), 4);
+    let skills = all["skills"]["items"].as_array().unwrap();
+    for id in [
+        "default-plan",
+        "default-implement",
+        "default-quality",
+        "default-governance",
+    ] {
+        assert!(
+            skills.iter().any(|skill| skill["id"] == id),
+            "missing {id}: {all}"
+        );
+    }
     assert!(all.get("events").is_none());
     assert!(all.get("governance").is_none());
     fs::remove_dir_all(root).unwrap();
