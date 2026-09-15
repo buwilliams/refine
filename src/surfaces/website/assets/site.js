@@ -205,8 +205,31 @@
     });
   }
 
+  function wireComparisonFocus() {
+    document.querySelectorAll(".compare-scroll").forEach((region) => {
+      region.addEventListener("focusin", (event) => {
+        const link = event.target.closest("a");
+        const cell = link && link.closest("th, td");
+        const label = region.querySelector("thead th");
+        if (!cell || !label) return;
+
+        // Native focus scrolling does not account for the sticky row labels.
+        const bounds = region.getBoundingClientRect();
+        const pinned = label.getBoundingClientRect();
+        const focused = cell.getBoundingClientRect();
+        const gap = 1; // Clear the pinned divider and the region border.
+        if (focused.left < pinned.right + gap) {
+          region.scrollLeft -= pinned.right + gap - focused.left;
+        } else if (focused.right > bounds.right - gap) {
+          region.scrollLeft += focused.right - bounds.right + gap;
+        }
+      });
+    });
+  }
+
   fillOriginText();
   wireCopyButtons();
   wireMenus();
   wireCarousels();
+  wireComparisonFocus();
 })();

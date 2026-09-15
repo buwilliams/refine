@@ -113,97 +113,125 @@
 
       <section id="compare" class="section compare-section" aria-labelledby="compare-title">
         <div class="section-heading">
-          <p class="eyebrow">Why Refine</p>
-          <h2 id="compare-title">Ways to coordinate software delivery.</h2>
-          <p>
-            Direct agents means using a coding agent without an added orchestration platform;
-            capabilities vary by agent. Blitzy specializes in autonomous software development.
-            n8n connects tools through general-purpose workflows and AI automation. Refine
-            coordinates software delivery around your existing repositories and installed agents.
-          </p>
+          <p class="eyebrow">Why choose Refine</p>
+          <h2 id="compare-title">Your agents. Your machines. Your code.</h2>
+          <p>Bring your coding agents into one durable delivery workflow, with code and history under your control.</p>
         </div>
-        <div class="compare-scroll" tabindex="0" role="region" aria-label="Comparison of agent workflows">
+        <div class="compare-benefits">
+          <article>
+            <span class="compare-benefit-icon" aria-hidden="true">↔</span>
+            <h3>Use your agents and repositories</h3>
+            <p>Connect supported installed agents to the projects you already work on.</p>
+          </article>
+          <article>
+            <span class="compare-benefit-icon" aria-hidden="true">⌘</span>
+            <h3>Coordinate delivery across machines</h3>
+            <p>Keep teams and agent fleets working through shared Goals and review steps.</p>
+          </article>
+          <article>
+            <span class="compare-benefit-icon" aria-hidden="true">↶</span>
+            <h3>Keep ownership and recover work</h3>
+            <p>MIT open source, isolated Git worktrees, and retained attempts you can inspect.</p>
+          </article>
+        </div>
+        <p class="compare-intro">Compare the capabilities behind that workflow. <strong>Direct agents</strong> is a category; features vary by agent.</p>
+        <ul class="compare-legend" aria-label="Capability status legend">
+          <li><span class="compare-mark is-built-in" aria-hidden="true">✓</span> Built in</li>
+          <li><span class="compare-mark" aria-hidden="true">+</span> Custom setup / integration</li>
+          <li><span class="compare-mark" aria-hidden="true">~</span> Varies</li>
+          <li><span class="compare-mark" aria-hidden="true">?</span> Not documented</li>
+          <li><span class="compare-mark" aria-hidden="true">×</span> Not offered</li>
+        </ul>
+        <p id="compare-scroll-hint" class="compare-scroll-hint">Scroll to compare products <span aria-hidden="true">→</span> <span class="compare-keyboard-hint">(or focus the table and use arrow keys)</span></p>
+        <div class="compare-scroll" tabindex="0" role="region" aria-label="Comparison of agent workflows" aria-describedby="compare-scroll-hint">
           <table class="compare-table">
+            <caption class="visually-hidden">Software delivery capabilities. Qualifications and sources follow the table.</caption>
+            <colgroup><col class="compare-capability-col"><col class="compare-refine-col"><col><col><col></colgroup>
             <thead>
               <tr>
                 <th scope="col">Capability</th>
+                <th scope="col" class="compare-refine">Refine</th>
                 <th scope="col">Direct agents</th>
                 <th scope="col"><a href="https://blitzy.com/">Blitzy</a></th>
                 <th scope="col"><a href="https://n8n.io/">n8n</a></th>
-                <th scope="col" class="compare-refine">Refine</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <th scope="row">Primary purpose</th>
-                <td>Coding tasks directed through your chosen agent</td>
-                <td>Autonomous modernization, refactoring, and feature development</td>
-                <td>General-purpose workflow and AI automation, including development integrations and templates</td>
-                <td class="compare-refine">Coordinate teams and agent fleets delivering software</td>
+                <th scope="row">MIT open source</th>
+                <td class="compare-refine"><span class="compare-status"><span class="compare-mark is-built-in" aria-hidden="true">✓</span><span>Built in</span></span></td>
+                <td><span class="compare-status"><span class="compare-mark" aria-hidden="true">~</span><span>Varies</span></span></td>
+                <td><span class="compare-status"><span class="compare-mark" aria-hidden="true">×</span><span>Not offered</span></span></td>
+                <td><span class="compare-status"><span class="compare-mark" aria-hidden="true">×</span><span>Not offered</span></span></td>
               </tr>
               <tr>
-                <th scope="row">Source and license</th>
-                <td>Depends on the agent</td>
-                <td>Commercial platform with proprietary technology</td>
-                <td>Source-available / fair-code; Sustainable Use and Enterprise licenses</td>
-                <td class="compare-refine">MIT open source</td>
+                <th scope="row">Local repositories & runtime</th>
+                <td class="compare-refine"><span class="compare-status"><span class="compare-mark is-built-in" aria-hidden="true">✓</span><span>Built in</span></span></td>
+                <td><span class="compare-status"><span class="compare-mark" aria-hidden="true">~</span><span>Varies</span></span></td>
+                <td><span class="compare-status"><span class="compare-mark" aria-hidden="true">+</span><span>Custom setup</span></span></td>
+                <td><span class="compare-status"><span class="compare-mark" aria-hidden="true">+</span><span>Custom setup</span></span></td>
               </tr>
               <tr>
-                <th scope="row">Deployment and local work</th>
-                <td>Local or hosted, depending on the agent</td>
-                <td>Blitzy cloud, customer VPC, or custom on-premises options, depending on engagement</td>
-                <td>Self-hosted or managed cloud</td>
-                <td class="compare-refine">Local-first repositories and runtime; model hosting depends on your agent</td>
+                <th scope="row">Use installed coding agents</th>
+                <td class="compare-refine"><span class="compare-status"><span class="compare-mark is-built-in" aria-hidden="true">✓</span><span>Built in</span></span></td>
+                <td><span class="compare-status"><span class="compare-mark" aria-hidden="true">~</span><span>Varies</span></span></td>
+                <td><span class="compare-status"><span class="compare-mark" aria-hidden="true">?</span><span>Not documented</span></span></td>
+                <td><span class="compare-status"><span class="compare-mark" aria-hidden="true">+</span><span>Custom setup</span></span></td>
               </tr>
               <tr>
-                <th scope="row">Bring your own software (BYOT)</th>
-                <td>Work with repositories your agent can access</td>
-                <td>Understands and extends existing codebases, or builds new products</td>
-                <td>Connect existing systems through integrations, APIs, and custom code</td>
-                <td class="compare-refine">Work in your existing software projects with your tools and Git history</td>
+                <th scope="row">Delivery & review steps</th>
+                <td class="compare-refine"><span class="compare-status"><span class="compare-mark is-built-in" aria-hidden="true">✓</span><span>Built in</span></span></td>
+                <td><span class="compare-status"><span class="compare-mark" aria-hidden="true">~</span><span>Varies</span></span></td>
+                <td><span class="compare-status"><span class="compare-mark is-built-in" aria-hidden="true">✓</span><span>Built in</span></span></td>
+                <td><span class="compare-status"><span class="compare-mark" aria-hidden="true">+</span><span>Custom setup</span></span></td>
               </tr>
               <tr>
-                <th scope="row">Bring your own agent (BYOA)</th>
-                <td>Choose and operate the coding agent yourself</td>
-                <td>Blitzy orchestrates its specialized agents across foundation models</td>
-                <td>Choose models for workflow agents; connect external clients through MCP</td>
-                <td class="compare-refine">Supervise supported installed coding-agent CLIs</td>
+                <th scope="row">Coordinate across machines</th>
+                <td class="compare-refine"><span class="compare-status"><span class="compare-mark is-built-in" aria-hidden="true">✓</span><span>Built in</span></span></td>
+                <td><span class="compare-status"><span class="compare-mark" aria-hidden="true">~</span><span>Varies</span></span></td>
+                <td><span class="compare-status"><span class="compare-mark" aria-hidden="true">?</span><span>Not documented</span></span></td>
+                <td><span class="compare-status"><span class="compare-mark is-built-in" aria-hidden="true">✓</span><span>Built in</span></span></td>
               </tr>
               <tr>
-                <th scope="row">Agent access and orchestration surfaces</th>
-                <td>The agent’s own terminal, editor, or web interface</td>
-                <td>Platform for submitting requirements and reviewing specifications and delivery</td>
-                <td>Visual workflow editor, API, and MCP access to build and run workflows</td>
-                <td class="compare-refine">Agent-first access through CLI and MCP; API and browser share application behavior</td>
-              </tr>
-              <tr>
-                <th scope="row">Delivery workflow and review</th>
-                <td>Agent features plus your team’s testing and review process</td>
-                <td>Specification approval, code generation, validation, and handoff for team review</td>
-                <td>Custom workflows with human approvals; development steps use integrations and templates</td>
-                <td class="compare-refine">Durable Goals and Rounds; configurable Skills, Quality, Governance, and Review</td>
-              </tr>
-              <tr>
-                <th scope="row">Coordination and recovery</th>
-                <td>Session and resume features vary; you coordinate work across agents</td>
-                <td>Long-running multi-agent development with shared codebase context and a remaining-work handoff</td>
-                <td>Workflow execution visibility, logs, and step reruns</td>
-                <td class="compare-refine">Git worktree isolation, node coordination, and retained execution evidence for recovery</td>
+                <th scope="row">Isolated work & recovery evidence</th>
+                <td class="compare-refine"><span class="compare-status"><span class="compare-mark is-built-in" aria-hidden="true">✓</span><span>Built in</span></span></td>
+                <td><span class="compare-status"><span class="compare-mark" aria-hidden="true">~</span><span>Varies</span></span></td>
+                <td><span class="compare-status"><span class="compare-mark" aria-hidden="true">?</span><span>Not documented</span></span></td>
+                <td><span class="compare-status"><span class="compare-mark" aria-hidden="true">+</span><span>Custom setup</span></span></td>
               </tr>
             </tbody>
           </table>
         </div>
-        <p class="compare-sources">
-          Sources checked <time datetime="2026-09-15">2026-09-15</time>:
-          <a href="https://blitzy.com/">Blitzy product and deployment options</a>;
-          <a href="https://n8n.io/">n8n product</a>,
-          <a href="https://github.com/n8n-io/n8n/blob/master/README.md#license">license</a>,
-          <a href="https://n8n.io/integrations/github/">GitHub integrations</a>, and
-          <a href="https://docs.n8n.io/connect/connect-to-n8n-mcp-server">MCP documentation</a>;
-          <a href="/docs">Refine Hub</a> and
-          <a href="https://github.com/buwilliams/refine">source</a>.
-          Product descriptions reflect published capabilities, not independent performance testing.
-        </p>
+        <div class="compare-details">
+          <details>
+            <summary>What the capabilities mean</summary>
+            <dl>
+              <dt>MIT open source</dt>
+              <dd>The platform itself is MIT licensed. Refine’s license does not change the licenses or service terms of your agents and models.</dd>
+              <dt>Local repositories &amp; runtime</dt>
+              <dd>Run the coordinator alongside repositories you control. Refine uses your existing projects and Git history; model hosting depends on your agent.</dd>
+              <dt>Use installed coding agents</dt>
+              <dd>Refine supervises supported coding-agent CLIs, including Claude Code, Codex, Gemini, and Copilot. Choosing an AI model alone is a different capability.</dd>
+              <dt>Delivery &amp; review steps</dt>
+              <dd>Refine retains Goals and Rounds through Plan, Implement, Quality, Governance, and Review. Edit Skills and event bindings to configure the work at each step.</dd>
+              <dt>Coordinate across machines</dt>
+              <dd>Refine coordinates work across registered nodes. This row also counts distributed workflow workers; it does not imply identical fleet behavior.</dd>
+              <dt>Isolated work &amp; recovery evidence</dt>
+              <dd>Refine uses a separate Git worktree for Goal work and retains failed attempts, logs, and candidate context for an explicit recovery decision.</dd>
+            </dl>
+          </details>
+          <details class="compare-sources">
+            <summary>Product qualifications &amp; sources</summary>
+            <p>Sources checked <time datetime="2026-09-15">September 15, 2026</time>. These are readings of published capabilities, not performance tests. “Not documented” means the sources below do not establish that capability; it does not mean the product cannot do it. “Custom setup” means integration or additional configuration is needed.</p>
+            <ul>
+              <li><strong>Refine:</strong> see the <a href="/docs">Refine Hub</a> and <a href="https://github.com/buwilliams/refine">source and MIT license</a>. Built-in capabilities still require installation, agent authentication, and node configuration.</li>
+              <li><strong>Direct agents:</strong> a category of independently operated coding agents, rather than one platform. Licensing, local or hosted execution, review, isolation, and recovery depend on the agent and your setup; no universal product rating is implied.</li>
+              <li><strong>Blitzy:</strong> its <a href="https://blitzy.com/">product, deployment options, and FAQ</a> describe proprietary technology, existing-codebase development, editable specification approval, validation, and team handoff. Customer VPC and custom on-premises deployments are available by engagement. Its own specialized agents are documented; supervising installed coding-agent CLIs, coordinating your separate machines, and retaining isolated Git work for recovery are not established there.</li>
+              <li><strong>n8n:</strong> the <a href="https://github.com/n8n-io/n8n/blob/master/README.md#license">product and license overview</a> describes a source-available platform under Sustainable Use and Enterprise licenses, with self-hosting, integrations, and human approvals. <a href="https://docs.n8n.io/deploy/host-n8n/configure-n8n/scaling/enable-queue-mode">Queue mode</a> distributes executions across workers. We classify repository work, installed coding agents, software delivery steps, and Git isolation with recovery evidence as custom setup: they can be assembled with workflow logic and tools such as <a href="https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.executecommand">Execute Command</a>, rather than an equivalent documented delivery lifecycle. That node runs on self-hosted instances, is disabled by default, and is unavailable on n8n Cloud.</li>
+            </ul>
+          </details>
+        </div>
+        <p class="compare-cta"><a href="#start">Get started with Refine <span aria-hidden="true">→</span></a></p>
       </section>
 
       <section id="product" class="section product-section" aria-labelledby="product-title">
