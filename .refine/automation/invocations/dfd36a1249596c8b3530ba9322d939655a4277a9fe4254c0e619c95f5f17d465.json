@@ -497,11 +497,58 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "succeeded",
+  "results": {
+    "default-quality": {
+      "invocation_id": "dfd36a1249596c8b3530ba9322d939655a4277a9fe4254c0e619c95f5f17d465",
+      "binding_id": "default-quality",
+      "role": "quality",
+      "outcome": "success",
+      "summary": "Quality passed after correcting one mobile keyboard accessibility defect and strengthening the browser tests. No remaining failures in the tested scope. Validation used Chromium; other browser engines were not tested.\n\n",
+      "evidence": [
+        "Chromium: NODE_PATH=/tmp/refine-comparison-tools/node_modules node --test tests/website_comparison_browser.test.js — 3 passed, 0 failed, 0 skipped.",
+        "Covered table semantics, status labels, sources, highlighting, keyboard/touch disclosures, overflow, and product visibility at 1440, 1024, 390, and 320px.",
+        "Added regression coverage that reproduced obscured keyboard-focused product columns. Fixed focus scrolling in site.js; forward and reverse navigation now pass.",
+        "Inspected desktop/mobile screenshots and the corrected 320px focused column. Benefits remain readable with disclosures closed.",
+        "git diff --check and node --check for both changed JavaScript files passed."
+      ],
+      "artifacts": {
+        "screenshots": "/tmp/refine-comparison-quality-round1/"
+      }
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "default-quality",
+      "checkout": {
+        "observation": {
+          "branch": "refine/00000T19G1926GC2MSDXWRJ000/round-1",
+          "head_commit": "663648b1cf8d840fb26aad5af6ef29634a6b2710",
+          "status_porcelain": [
+            " M src/surfaces/website/assets/site.js",
+            " M tests/website_comparison_browser.test.js"
+          ]
+        },
+        "tree": "e9415462c70711854bcc3eb3eee08c1f4058c748"
+      },
+      "checkout_recorded": true,
+      "diagnostic": null,
+      "host_bound_result": true,
+      "observational_violation": false,
+      "operation_id": null,
+      "process_id": "proc-1789492046071-1014481-3463",
+      "prompt_bytes": 12033,
+      "provider_session_id": null,
+      "purpose": "work",
+      "raw_output": "{\n  \"outcome\": \"success\",\n  \"evidence\": [\n    \"Chromium: NODE_PATH=/tmp/refine-comparison-tools/node_modules node --test tests/website_comparison_browser.test.js — 3 passed, 0 failed, 0 skipped.\",\n    \"Covered table semantics, status labels, sources, highlighting, keyboard/touch disclosures, overflow, and product visibility at 1440, 1024, 390, and 320px.\",\n    \"Added regression coverage that reproduced obscured keyboard-focused product columns. Fixed focus scrolling in site.js; forward and reverse navigation now pass.\",\n    \"Inspected desktop/mobile screenshots and the corrected 320px focused column. Benefits remain readable with disclosures closed.\",\n    \"git diff --check and node --check for both changed JavaScript files passed.\"\n  ],\n  \"artifacts\": {\n    \"screenshots\": \"/tmp/refine-comparison-quality-round1/\"\n  },\n  \"summary\": \"Quality passed after correcting one mobile keyboard accessibility defect and strengthening the browser tests. No remaining failures in the tested scope. Validation used Chromium; other browser engines were not tested.\\n\\n\"\n}",
+      "received_at": "2026-09-15T17:12:13.378352388+00:00",
+      "started_at": "2026-09-15T17:07:26.037662022+00:00",
+      "workflow_revision": 2
+    }
+  ],
   "created_at": "2026-09-15T17:07:24.473028499+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-15T17:12:15.199222321+00:00",
   "error": null,
   "action_applied": false
 }
