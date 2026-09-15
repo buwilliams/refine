@@ -46,23 +46,49 @@
       "created": "2026-09-15T14:56:23Z",
       "event_configuration": {
         "events": {
-          "workflow.quality.exit": {
-            "bindings": [],
+          "workflow.governance.enter": {
+            "bindings": [
+              {
+                "enabled": true,
+                "id": "default-governance",
+                "inputs": {},
+                "mode": "blocking",
+                "order": 0,
+                "overrides": null,
+                "scope": {
+                  "node_id": null
+                },
+                "skill_id": "default-governance"
+              }
+            ],
             "enabled": true,
-            "id": "workflow.quality.exit",
+            "id": "workflow.governance.enter",
             "kind": "system",
-            "name": "Workflow Quality Exit",
+            "name": "Workflow Governance Enter",
             "on_success": null,
             "parameters": [],
             "scope": {
               "node_id": null
             },
-            "source": "workflow.quality.exit"
+            "source": "workflow.governance.enter"
           }
         },
         "revision": 82,
         "schema_version": 3,
-        "skills": {}
+        "skills": {
+          "default-governance": {
+            "enabled": true,
+            "id": "default-governance",
+            "name": "Governance",
+            "parameters": [],
+            "prompt": "## Governance\n\nVerify that the implementation meets the user-defined Goal, fits the system architecture, and serves the project's purpose.\n\n### Outcome\n\nA clear assessment of whether the implementation satisfies all three. Begin with the verdict, then briefly explain how the work meets the Goal, fits the architecture, and supports the project's purpose, using concrete evidence from the implementation and Quality results. For each gap, describe what falls short, why it matters, and the recommended correction. Separate necessary corrections from optional improvements.\n\n### Guardrails\n\n- Read the context that helps explain the user's Goal, the system architecture, and the project's purpose.\n- Compare the implementation with the user's desired outcome as well as the plan. Completing the plan and passing tests alone do not establish that the Goal is met.\n- Look for clear responsibilities, shared behavior implemented in one place, and interfaces that remain easy to use and maintain.\n- Judge design choices by how they serve the project. Allow sound approaches that differ from personal preference.\n- Group related issues by their underlying cause so the next step can address them together.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
+            "provenance": "refine-default-v1",
+            "role": "task",
+            "scope": {
+              "node_id": null
+            }
+          }
+        }
       },
       "event_results": {
         "0834e3d00bf3117788bf77c86d40a647198f44e497bfb5f3741bfe74d088e7c9": {
@@ -401,6 +427,52 @@
           "revision": 82,
           "schema_version": 3,
           "skills": {}
+        },
+        "7:default:workflow.governance.enter": {
+          "events": {
+            "workflow.governance.enter": {
+              "bindings": [
+                {
+                  "enabled": true,
+                  "id": "default-governance",
+                  "inputs": {},
+                  "mode": "blocking",
+                  "order": 0,
+                  "overrides": null,
+                  "scope": {
+                    "node_id": null
+                  },
+                  "skill_id": "default-governance"
+                }
+              ],
+              "enabled": true,
+              "id": "workflow.governance.enter",
+              "kind": "system",
+              "name": "Workflow Governance Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.governance.enter"
+            }
+          },
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {
+            "default-governance": {
+              "enabled": true,
+              "id": "default-governance",
+              "name": "Governance",
+              "parameters": [],
+              "prompt": "## Governance\n\nVerify that the implementation meets the user-defined Goal, fits the system architecture, and serves the project's purpose.\n\n### Outcome\n\nA clear assessment of whether the implementation satisfies all three. Begin with the verdict, then briefly explain how the work meets the Goal, fits the architecture, and supports the project's purpose, using concrete evidence from the implementation and Quality results. For each gap, describe what falls short, why it matters, and the recommended correction. Separate necessary corrections from optional improvements.\n\n### Guardrails\n\n- Read the context that helps explain the user's Goal, the system architecture, and the project's purpose.\n- Compare the implementation with the user's desired outcome as well as the plan. Completing the plan and passing tests alone do not establish that the Goal is met.\n- Look for clear responsibilities, shared behavior implemented in one place, and interfaces that remain easy to use and maintain.\n- Judge design choices by how they serve the project. Allow sound approaches that differ from personal preference.\n- Group related issues by their underlying cause so the next step can address them together.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
+              "provenance": "refine-default-v1",
+              "role": "task",
+              "scope": {
+                "node_id": null
+              }
+            }
+          }
         }
       },
       "implementation_report": "workflow.implement.enter:default-implement: Task 1: Added New directly between Search and Node with the four ordered actions.\nTask 2: Reused shared commands, closing menus and releasing the mobile drawer before execution.\nTask 3: Added keyboard navigation, focus restoration, dismissal, menu exclusion, and viewport constraints.\nTask 4: Updated navigation intent documentation.\nTask 5: Added browser and Rust coverage. No implementation departures or unfinished work. Workflow state remains unchanged.",
@@ -550,7 +622,7 @@
       ],
       "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "updated": "2026-09-15T15:09:44Z",
+      "updated": "2026-09-15T15:09:47Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-15T14:56:24Z",
         "generation": 3,
@@ -562,7 +634,7 @@
   ],
   "status": "governance",
   "target_branch": "main",
-  "updated": "2026-09-15T15:09:44Z",
+  "updated": "2026-09-15T15:09:47Z",
   "workflow_controls": [
     {
       "actor": "operator",
@@ -648,5 +720,5 @@
       "workflow_revision": 31
     }
   ],
-  "workflow_revision": 31
+  "workflow_revision": 32
 }
