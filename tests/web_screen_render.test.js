@@ -10,7 +10,7 @@ test("Reporter onboarding selects an existing Reporter before routed modal navig
     await onboarding.waitFor();
     assert.equal(await onboarding.getAttribute("aria-labelledby"), "reporter-onboarding-title");
     assert.match(await onboarding.innerText(), /Who are you\?/);
-    assert.match(await onboarding.innerText(), /Controls > Reporter/);
+    assert.match(await onboarding.innerText(), /Reporter in the left rail/);
 
     await onboarding.getByRole("button", { name: "Reporter", exact: true }).click();
     await app.page.locator('[data-testid="new-goal-modal"]').waitFor();
@@ -145,6 +145,7 @@ test("Controls switches to dark mode and restores the stored theme on reload", {
   try {
     await app.page.emulateMedia({ colorScheme: "light" });
     await app.page.goto(`${app.origin}/#/`);
+    await app.page.locator('[data-testid="nav-settings"]').click();
     await app.page.waitForSelector('[data-testid="create-menu-toggle"]');
     await app.page.evaluate(() => localStorage.removeItem("refine_color_theme"));
     await app.page.reload();
@@ -303,7 +304,6 @@ test("Controls Node selector switches by ID and refreshes the visible Node conte
   const app = await openApp({ fixture });
   try {
     await assertScreenRenders(app, { route: "#/", marker: "#dash" });
-    await app.page.locator('[data-testid="create-menu-toggle"]').click();
     const selector = app.page.locator('[data-testid="global-node"]');
     assert.deepEqual(await selector.locator("option").allTextContents(), ["Alpha", "Beta"]);
     assert.equal(await selector.inputValue(), "node-a");
@@ -488,7 +488,7 @@ test("Toolbar add menu closes when the user clicks outside it", { skip: SKIP }, 
     await app.page.locator('[data-testid="toolbar-add"]').click();
     assert.equal(await menu.evaluate((element) => element.open), true);
 
-    await app.page.locator(".toolbar-dock-label").click();
+    await app.page.locator("#rail-main-section > summary").click();
     assert.equal(await menu.evaluate((element) => element.open), false);
     assert.deepEqual(app.pageErrors, []);
   } finally {
@@ -605,7 +605,7 @@ test("Agent terminal renders transported ANSI control sequences through xterm", 
   }
 });
 
-test("Agent terminal refits from visible geometry after minimize and fullscreen", { skip: SKIP }, async () => {
+test("Agent terminal refits after leaving a window and collapsing the rail", { skip: SKIP }, async () => {
   const backendSizes = [];
   const app = await openApp({
     fixture(pathname) {
@@ -621,7 +621,7 @@ test("Agent terminal refits from visible geometry after minimize and fullscreen"
   const terminalGeometry = async (action = null) => app.page.evaluate(async (nextAction) => {
     if (nextAction === "minimize") minimizeToolbar();
     if (nextAction === "restore") toggleToolbar();
-    if (nextAction === "fullscreen") toggleToolbarFullscreen();
+    if (nextAction === "fullscreen") document.getElementById("rail-toggle").click();
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     await new Promise((resolve) => setTimeout(resolve, 120));
     const terminal = terminalStateFor("responsive-agent");
@@ -679,7 +679,7 @@ test("Agent terminal refits from visible geometry after minimize and fullscreen"
     assert.equal(restored.backendRows, restored.rows);
 
     const fullscreen = await terminalGeometry("fullscreen");
-    assert.ok(fullscreen.rows > restored.rows);
+    assert.ok(fullscreen.cols > restored.cols);
     assert.equal(fullscreen.backendCols, fullscreen.cols);
     assert.equal(fullscreen.backendRows, fullscreen.rows);
     assert.deepEqual(backendSizes.at(-1), {
@@ -688,7 +688,7 @@ test("Agent terminal refits from visible geometry after minimize and fullscreen"
     });
 
     const exitedFullscreen = await terminalGeometry("fullscreen");
-    assert.ok(exitedFullscreen.rows < fullscreen.rows);
+    assert.ok(exitedFullscreen.cols < fullscreen.cols);
     assert.equal(exitedFullscreen.backendCols, exitedFullscreen.cols);
     assert.equal(exitedFullscreen.backendRows, exitedFullscreen.rows);
     assert.deepEqual(backendSizes.at(-1), {
@@ -1183,7 +1183,7 @@ test("every Node, Project, and legacy Settings tab renders and refreshes", { ski
       ["#/project/governance", '[data-testid="settings-templates"]'],
       ["#/settings/events", '[data-testid="settings-templates"]'],
       ["#/settings/skills", '[data-testid="settings-templates"]'],
-      ["#/settings", '[data-testid="settings-pane-processes"].active'],
+      ["#/settings", '[data-testid="settings-pane-application"].active'],
     ]) {
       await assertScreenRenders(app, { route, marker });
       await app.page.evaluate(() => refreshActiveSettingsTab({ force: true }));
@@ -1495,7 +1495,7 @@ test("Custom Skills open a selected agent tab with typed inputs and no Goal cont
     await page.locator('#nav-create-menu > summary').click();
     const nav = page.locator('#nav-manual-skills');
     await nav.locator('[data-manual-skill="inspect"]').waitFor();
-    assert.equal(await nav.locator('.nav-menu-label.nav-context-section-label').textContent(),"Skills");
+    assert.equal(await page.locator('#rail-skills-section > summary .rail-copy').textContent(),"Skills");
     assert.equal(await nav.locator('[data-manual-skill]').count(),1);
     assert.equal(await nav.locator('button').last().textContent(),"Add skill...");
     await nav.locator('[data-manual-skill="inspect"]').click();
@@ -1527,7 +1527,7 @@ test("Shared Skills preserve assignments and support modal controls and cloning"
     await page.goto(`${app.origin}/#/settings/events`);
     await page.locator('[data-testid="settings-templates"]').waitFor();
     assert.equal(new URL(page.url()).hash,"#/settings/skills");
-    assert.deepEqual(await page.locator('.settings-tab').allTextContents().then(labels=>labels.map(s=>s.trim())),["Processes","Nodes","Reporters","Prompts","Hubs","Target App","Runtime"]);
+    assert.deepEqual(await page.locator('.settings-tab').allTextContents().then(labels=>labels.map(s=>s.trim())),["Nodes","Reporters","Prompts","Hubs","Target App","Runtime"]);
     assert.equal(await page.locator('[data-resource-skill]').count(),1);
     await page.locator('[data-resource-skill]').focus(); await page.keyboard.press('Enter');
     const modal = page.locator('[data-testid="automation-modal"]');
@@ -1718,6 +1718,7 @@ for (const cryptoMode of ["without-randomUUID", "without-crypto"]) {
       await modal.locator('[data-save]').click();
       await modal.waitFor({state:'detached'});
       assert.match(data.writes[0].item.id, /^skill-[A-Za-z0-9-]+$/);
+      await app.page.locator(`[data-resource-skill="${data.writes[0].item.id}"]`).waitFor();
       await app.page.locator('[data-resource-skill="inspect"]').click();
       await modal.locator('[data-clone-skill]').click();
       await modal.locator('[data-save]').click();

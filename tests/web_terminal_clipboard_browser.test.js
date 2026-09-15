@@ -331,8 +331,9 @@ test("all profiles and both provider fixtures retain native clipboard and key se
         await app.page.keyboard.press("Control+k");
         await app.settle();
         assert.equal(app.inputs.splice(0).map((input) => input.data).join(""),
-          mode === "terminal" ? "\x03\n\x1a\x0b" : "\x03\n\x0b");
-        assert.equal(await app.page.evaluate(() => !!document.querySelector(".command-palette-backdrop")), false);
+          mode === "terminal" ? "\x03\n\x1a" : "\x03\n");
+        assert.equal(await app.page.evaluate(() => !!document.querySelector(".command-palette-backdrop")), true);
+        await app.page.keyboard.press("Escape");
       }
     }
     assert.deepEqual(app.errors, []);

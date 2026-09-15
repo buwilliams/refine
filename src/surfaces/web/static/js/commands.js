@@ -211,9 +211,11 @@ function registerNavigationCommand(id, title, hash, keywords = []) {
 registerNavigationCommand("nav.dashboard", "Dashboard", "#/", ["home"]);
 registerNavigationCommand("nav.features", "Features", "#/features", ["feature", "planning"]);
 registerNavigationCommand("nav.goals", "Goals", "#/goals", ["issues", "work"]);
+registerNavigationCommand("nav.control", "Control", "#/control", ["processes", "workers", "start", "stop"]);
 registerNavigationCommand("nav.changes", "Changes", "#/changes", ["merges"]);
-registerCommand({ id: "toolbar.logs", title: "View System logs", group: "Toolbar", aliases: ["logs", "activity"], run: () => openSystemLogs() });
+registerCommand({ id: "toolbar.logs", title: "View System logs", group: "Windows", aliases: ["logs", "activity"], run: () => openSystemLogs() });
 for (const [surfaceKey, surface] of Object.entries(SETTINGS_SURFACES || {})) {
+  if (surfaceKey === "control") continue;
   const label = surface.title || surfaceKey;
   for (const tab of surface.tabs || []) {
     registerNavigationCommand(
@@ -284,19 +286,12 @@ registerCommand({
 
 registerCommand({
   id: "toolbar.toggle",
-  title: "Toggle Toolbar",
-  group: "Toolbar",
+  title: "Return to last window or main screen",
+  group: "Windows",
   aliases: ["toolbar", "toggle-toolbar", "chat", "toggle-chat"],
   run: () => toggleToolbar(),
 });
 
-registerCommand({
-  id: "toolbar.fullscreen",
-  title: "Maximize Toolbar",
-  group: "Toolbar",
-  aliases: ["fullscreen-toolbar", "maximize-toolbar", "fullscreen-chat", "maximize-chat"],
-  run: () => toggleToolbarFullscreen(),
-});
 
 for (const [id, title, mode, aliases, keywords] of [
   ["agent.open", "Agent", "agent",
@@ -313,7 +308,7 @@ for (const [id, title, mode, aliases, keywords] of [
   registerCommand({
     id,
     title,
-    group: "Toolbar",
+    group: "Windows",
     aliases,
     keywords,
     run: () => createToolbarTab(mode),
@@ -323,7 +318,7 @@ for (const [id, title, mode, aliases, keywords] of [
 registerCommand({
   id: "files.open",
   title: "Files: open file browser",
-  group: "Toolbar",
+  group: "Windows",
   aliases: ["files", "open-files", "file-browser"],
   keywords: ["source tree file browser"],
   parse: (input) => {
@@ -336,7 +331,7 @@ registerCommand({
 registerCommand({
   id: "files.search",
   title: "Files: search for file",
-  group: "Toolbar",
+  group: "Windows",
   aliases: ["search-files", "find-file", "file-search"],
   keywords: ["source tree file browser"],
   parse: (input) => {
@@ -539,7 +534,7 @@ registerCommand({
     const workflowPaused = !!settingsPayload.runtime?.paused;
     await withButtonBusy(button, workflowPaused ? "Unpausing..." : "Pausing...", async () => {
       await api("POST", "/api/workflow/pause", { paused: !workflowPaused });
-      if (state.currentRoute === "node") await refreshProcessesSettingsTab({ force: true });
+      if (state.currentRoute === "control") await refreshProcessesSettingsTab({ force: true });
       if (typeof refreshAgentStatusIndicator === "function") refreshAgentStatusIndicator();
       if (workflowPaused) scheduleProcessesTabRefreshes();
     });
@@ -569,7 +564,7 @@ registerCommand({
         "Target worktree reset is running in the background",
       );
       toast(r.message || "Target worktree reset", "info");
-      if (state.currentRoute === "node") await refreshProcessesSettingsTab({ force: true });
+      if (state.currentRoute === "control") await refreshProcessesSettingsTab({ force: true });
     });
   },
 });
@@ -588,7 +583,7 @@ for (const action of ["start", "stop", "build"]) {
     run: async ({ button } = {}) => {
       await withButtonBusy(button, busyLabel, async () => {
         await runTargetAppAction(action);
-        if (state.currentRoute === "node") await refreshProcessesSettingsTab({ force: true });
+        if (state.currentRoute === "control") await refreshProcessesSettingsTab({ force: true });
       });
     },
   });
@@ -606,7 +601,7 @@ registerCommand({
       toast(ok ? "Status check OK" : (r.probe_message || "Unhealthy"), ok ? "info" : "error");
       applyTargetAppSnapshot(r);
       drawTargetAppStatusBlock(r);
-      if (state.currentRoute === "node") await refreshProcessesSettingsTab({ force: true });
+      if (state.currentRoute === "control") await refreshProcessesSettingsTab({ force: true });
     });
   },
 });
@@ -786,7 +781,7 @@ registerCommand({
     await withButtonBusy(button, "Checking...", async () => {
       const r = await api("POST", "/api/settings/recheck-auth");
       toast(r.ok ? "Auth OK" : `Auth failed: ${r.message || "(no message)"}`, r.ok ? "info" : "error");
-      if (state.currentRoute === "node" && typeof readSettingsTab === "function" && readSettingsTab() === "processes") {
+      if (state.currentRoute === "control" && typeof readSettingsTab === "function" && readSettingsTab() === "processes") {
         await refreshSettingsTab("processes", { force: true });
       } else if (state.currentRoute === "node") {
         await refreshSettingsTab("runtime", { force: true });
@@ -823,7 +818,7 @@ registerCommand({
       }
       const verb = result.mode === "recreated" ? "recreated" : "rebuilt";
       toast(`Projection cache ${verb}; ${result.goals || 0} Goal${result.goals === 1 ? "" : "s"} indexed`, "info");
-      if (["settings", "node", "project"].includes(state.currentRoute || "")) await refreshSettings({ force: true });
+      if (["control", "settings", "node", "project"].includes(state.currentRoute || "")) await refreshSettings({ force: true });
     });
   },
 });
@@ -857,7 +852,7 @@ registerCommand({
     await withButtonBusy(button, "Cleaning...", async () => {
       const r = await api("POST", "/api/activity/cleanup", { days });
       toast(`Deleted ${r.deleted} log entr${r.deleted === 1 ? "y" : "ies"}.`, "info");
-      if (state.currentRoute === "node") await refreshProcessesSettingsTab({ force: true });
+      if (state.currentRoute === "control") await refreshProcessesSettingsTab({ force: true });
     });
   },
 });

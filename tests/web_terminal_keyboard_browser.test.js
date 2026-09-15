@@ -288,12 +288,13 @@ test("all profiles and provider fixtures preserve Alt arrows and existing contro
         await app.addTab({ id, mode, provider });
         for (const [key, data] of [["Alt+ArrowUp", "\x1b[1;3A"], ["Alt+ArrowDown", "\x1b[1;3B"],
           ["Control+Enter", "\n"], ["Control+z", mode === "terminal" ? "\x1a" : ""],
-          ["Control+k", "\x0b"]]) {
+          ["Control+k", ""]]) {
           await app.page.keyboard.press(key);
           await app.settle();
           assert.deepEqual(app.inputs.splice(0), data ? [{ path: `/api/terminal/session-${id}/input`, data }] : [], `${id}: ${key}`);
         }
-        assert.equal(await app.page.locator(".command-palette-backdrop").count(), 0);
+        assert.equal(await app.page.locator(".command-palette-backdrop").count(), 1);
+        await app.page.keyboard.press("Escape");
       }
     }
     assert.deepEqual(app.errors, []);

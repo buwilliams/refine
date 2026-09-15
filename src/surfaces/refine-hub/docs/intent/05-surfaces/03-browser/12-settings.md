@@ -8,9 +8,11 @@
 - **Scoped Loading**: settings surfaces should fetch only the data needed for the active tab.
 - **Guide Connected**: settings fields should connect to guidance where users need explanation.
 
+Process management lives on the main **Control** screen. Settings opens **Nodes** and contains configuration tabs.
+
 ## Purpose
 
-Settings exist to configure Refine's relationship to the project, node, target app, agents, runtime, Skills, reporters, processes, and performance.
+Settings exist to configure Refine's relationship to the project, node, target app, agents, runtime, Skills, reporters, and performance.
 
 They should help users make Refine work correctly in their environment without requiring deep knowledge of the internal implementation.
 

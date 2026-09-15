@@ -276,7 +276,7 @@ test("duplicate and validation errors stay in the bound composer and recover wit
   const fields = formFields(browser);
   fields.form.requestSubmit();
   assert.equal(browser.root.querySelector("[data-feature-goal-form-status]").textContent,
-    "Pick a reporter in the top-right selector first.");
+    "Choose a Reporter in the left rail first.");
   assert.equal(browser.requests.length, 0);
 
   browser.context.state.lastReporter = "Buddy";

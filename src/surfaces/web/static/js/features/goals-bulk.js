@@ -718,9 +718,14 @@ async function withButtonBusy(btn, busyLabel, fn) {
   if (!btn) return await fn();
   const wasDisabled = btn.disabled;
   const orig = btn.textContent;
-  const operationLabel = String(orig || busyLabel || "Operation").trim() || "Operation";
+  const iconOnly = btn.classList?.contains("process-action-icon");
+  const originalLabel = btn.getAttribute?.("aria-label");
+  const operationLabel = String(originalLabel || orig || busyLabel || "Operation").trim() || "Operation";
   btn.disabled = true;
-  btn.textContent = busyLabel;
+  if (iconOnly) {
+    btn.setAttribute("aria-busy", "true");
+    btn.setAttribute("aria-label", busyLabel);
+  } else btn.textContent = busyLabel;
   recordUiNotice(`${operationLabel} started`, {
     kind: "start",
     source: "ui-operation",
@@ -742,6 +747,9 @@ async function withButtonBusy(btn, busyLabel, fn) {
     // The button may have been re-rendered by the awaited work (e.g., a
     // reload of the view); setting properties on a detached node is a no-op.
     btn.disabled = wasDisabled;
-    btn.textContent = orig;
+    if (iconOnly) {
+      btn.removeAttribute("aria-busy");
+      btn.setAttribute("aria-label", originalLabel);
+    } else btn.textContent = orig;
   }
 }

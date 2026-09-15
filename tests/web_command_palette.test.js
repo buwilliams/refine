@@ -163,16 +163,16 @@ test("Dashboard and Goals palette navigation carries shared node scope", async (
   assert.equal(browser.location.hash, "#/");
 });
 
-test("palette shortcut yields to nested Toolbar targets", () => {
+test("palette shortcut opens from terminal and agent content", () => {
   for (const modifiers of [{ ctrlKey: true }, { metaKey: true }]) {
     const browser = commandPaletteDomRuntime();
     const target = browser.document.querySelector('[data-testid="nested-toolbar-target"]');
 
     const event = browser.dispatchShortcut(target, modifiers);
 
-    assert.equal(event.defaultPrevented, false);
-    assert.equal(event.propagationStopped, false);
-    assert.equal(browser.document.querySelector('[data-testid="command-palette"]'), null);
+    assert.equal(event.defaultPrevented, true);
+    assert.equal(event.propagationStopped, true);
+    assert.ok(browser.document.querySelector('[data-testid="command-palette"]'));
   }
 });
 
@@ -187,7 +187,7 @@ test("palette shortcut consumes an outside target and opens the palette", () => 
   assert.ok(browser.document.querySelector('[data-testid="command-palette"]'));
 });
 
-test("an existing non-palette modal still suppresses the palette shortcut", () => {
+test("palette shortcut opens over an existing modal", () => {
   const browser = commandPaletteDomRuntime();
   const modal = browser.document.createElement("div");
   modal.className = "modal-backdrop";
@@ -196,7 +196,7 @@ test("an existing non-palette modal still suppresses the palette shortcut", () =
 
   const event = browser.dispatchShortcut(target);
 
-  assert.equal(event.defaultPrevented, false);
-  assert.equal(event.propagationStopped, false);
-  assert.equal(browser.document.querySelector('[data-testid="command-palette"]'), null);
+  assert.equal(event.defaultPrevented, true);
+  assert.equal(event.propagationStopped, true);
+  assert.ok(browser.document.querySelector('[data-testid="command-palette"]'));
 });

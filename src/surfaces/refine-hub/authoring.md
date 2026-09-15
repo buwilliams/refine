@@ -1,6 +1,6 @@
 # Update Refine Hub
 
-Run **Update Refine Hub** from the New Goal menu, or choose **Run Skill** next to Refine Hub in Settings → Hubs. Describe what readers should understand after the update. For release notes, include the version and coverage dates.
+Run **Update Refine Hub** from the Settings → Workspace controls & support, or choose **Run Skill** next to Refine Hub in Settings → Hubs. Describe what readers should understand after the update. For release notes, include the version and coverage dates.
 
 The Skill contains the instructions for maintaining product documentation and release notes. You can edit those instructions in Settings → Prompts. This built-in Skill cannot be removed.
 

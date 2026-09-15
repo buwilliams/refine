@@ -50,6 +50,7 @@ test("Hub uses the existing origin and manages sites and paginated records", { s
   try {
     await page.context().route("**/hub/sites/reports/", route => route.fulfill({ contentType: "text/html", body: "<title>Hosted report</title>Report" }));
     await page.goto(`${app.origin}/#/goals`);
+    await page.getByTestId("nav-settings").click();
     await page.getByTestId("create-menu-toggle").click();
     const popupReady = page.waitForEvent("popup");
     await page.locator('[data-hub-open="reports"]').click();
@@ -57,9 +58,10 @@ test("Hub uses the existing origin and manages sites and paginated records", { s
     await popup.waitForURL(`${app.origin}/hub/sites/reports/`);
     assert.equal(await popup.title(), "Hosted report");
     await popup.close();
+    await page.getByTestId("nav-settings").click();
     await page.getByTestId("create-menu-toggle").click();
     await page.locator('[data-hub-add]').click();
-    assert.equal(await page.locator('[data-name]').getAttribute('id'), 'hub-site-name');
+    assert.equal(await page.getByTestId('hub-modal').locator('[data-name]').getAttribute('id'), 'hub-site-name');
     assert.equal(await page.locator('.modal-body button[data-submit]').count(), 0);
     assert.equal(await page.locator('.modal-actions [data-submit]').count(), 1);
     await page.getByLabel('Name', {exact: true}).fill("Usage report");
@@ -135,10 +137,11 @@ test("Hub modal rows open from cells and keyboards; Controls uses the shared men
   const page = app.page;
   try {
     await page.goto(`${app.origin}/#/goals`);
+    await page.getByTestId("nav-settings").click();
     await page.getByTestId("create-menu-toggle").click();
     await page.locator('[data-hub-add]').waitFor();
     const menu = await page.locator('#nav-hubs button').evaluateAll(buttons => buttons.map(button => ({
-      classes: button.className, icons: button.querySelectorAll('svg.nav-menu-icon').length,
+      classes: button.className, icons: button.querySelectorAll('svg.rail-icon').length,
       width: button.getBoundingClientRect().width, border: getComputedStyle(button).borderTopWidth,
       textOffset: button.querySelector('span').getBoundingClientRect().left - button.getBoundingClientRect().left
     })));
@@ -151,6 +154,7 @@ test("Hub modal rows open from cells and keyboards; Controls uses the shared men
       assert.equal(item.width, menu[0].width);
       assert.equal(item.textOffset, menu[0].textOffset);
     }
+    await page.getByTestId("nav-settings").click();
     await page.getByTestId("create-menu-toggle").click();
     await page.goto(`${app.origin}/#/settings/hubs`);
     await page.locator('[data-hub-new-site]').waitFor();

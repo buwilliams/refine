@@ -142,6 +142,7 @@ test('delayed rejection preserves unrelated input and manual recovery selection 
       && typeof window.rejectCopy === 'function'), true, 'fallback copy must be pending before moving focus');
     await page.evaluate(() => {
       const field = document.createElement('textarea');
+      field.style.cssText = 'position:fixed;right:0;bottom:0;width:180px;height:50px;z-index:150';
       field.id = 'unrelated-input';
       field.value = 'ordinary input';
       document.body.appendChild(field);
@@ -181,6 +182,7 @@ test('selection fallback restores both ordinary field carets and DOM ranges', { 
       navigator.clipboard.writeText = undefined;
       document.execCommand = () => false;
       const field = document.createElement('textarea');
+      field.style.cssText = 'position:fixed;right:0;bottom:0;width:180px;height:50px;z-index:150';
       field.id = 'outside'; field.value = 'outside selection';
       document.body.appendChild(field); field.focus(); field.setSelectionRange(3, 9, 'backward');
     });
@@ -188,6 +190,7 @@ test('selection fallback restores both ordinary field carets and DOM ranges', { 
     assert.deepEqual(await page.locator('#outside').evaluate(el => [document.activeElement === el, el.selectionStart, el.selectionEnd, el.selectionDirection]), [true, 3, 9, 'backward']);
     await page.evaluate(() => {
       const paragraph = document.createElement('p');
+      paragraph.style.cssText = 'position:fixed;right:0;bottom:60px';
       paragraph.textContent = 'DOM selection'; document.body.appendChild(paragraph);
       const range = document.createRange(); range.selectNodeContents(paragraph);
       terminalStateFor().term.focus();

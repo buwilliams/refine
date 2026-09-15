@@ -168,7 +168,7 @@ async function refreshNodeContextRoute({ preservedDirty = [] } = {}) {
   if (route === "goals" && typeof refreshGoalsTable === "function") return refreshGoalsTable();
   if (route === "features" && typeof refreshFeaturesTable === "function") return refreshFeaturesTable();
   if (route === "changes" && typeof loadChanges === "function") return loadChanges();
-  if (["settings", "node", "project"].includes(route || "")) {
+  if (["control", "settings", "node", "project"].includes(route || "")) {
     return refreshCurrentSettingsSurface({ force: true });
   }
   if (typeof navigate === "function") return navigate();
@@ -196,6 +196,7 @@ async function applyAuthoritativeNodeContext(project, registry, {
   if (changed) {
     nodeContextGeneration += 1;
     if (typeof refreshManualSkills === "function") refreshManualSkills();
+    if (typeof refreshHubs === "function") refreshHubs();
     invalidateScreenDataCache();
     if (external) preserveExternalDirtySurfaces(preservedDirty);
     else if (!surfacesPrepared) await discardLocalNodeContextSurfaces();

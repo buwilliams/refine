@@ -48,12 +48,13 @@ async function refreshHubs() {
   try {
     const data = await api("GET", "/api/hub/sites");
     if (generation !== hubGeneration || !isNodeContextGenerationCurrent(node)) return;
-    renderInto(root, `<div class="nav-menu-label nav-context-section-label">Hub</div>${data.sites.map(({item}) => `<button class="nav-menu-item nav-control-item nav-management-item" type="button" data-hub-open="${htmlEscape(item.id)}" data-public="${!!item.publication}"><svg class="nav-menu-icon" aria-hidden="true" viewBox="0 0 24 24" focusable="false"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M3 9h18M8 13h8M8 16h5"></path></svg><span>${htmlEscape(item.name)}</span></button>`).join("")}<button class="nav-menu-item nav-control-item nav-management-item" type="button" data-hub-add><svg class="nav-menu-icon" aria-hidden="true" viewBox="0 0 24 24" focusable="false"><path d="M12 5v14M5 12h14"></path></svg><span>Add Hub...</span></button>`);
+    renderInto(root, `${(data.sites || []).map(({item}) => `<button class="rail-row nav-menu-item nav-control-item nav-management-item" type="button" data-hub-open="${htmlEscape(item.id)}" aria-label="${htmlEscape(item.name)}" title="${htmlEscape(item.name)}" data-public="${!!item.publication}"><svg class="rail-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="/static/vendor/lucide/navigation.svg#globe"></use></svg><span class="rail-copy">${htmlEscape(item.name)}</span></button>`).join("")}<button class="rail-row nav-menu-item nav-control-item nav-management-item" type="button" data-hub-add aria-label="Add Hub" title="Add Hub"><svg class="rail-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="/static/vendor/lucide/navigation.svg#plus"></use></svg><span class="rail-copy">Add Hub...</span></button><a class="rail-row" href="#/settings/hubs" data-route="settings" data-testid="rail-manage-hubs" aria-label="Manage Hubs" title="Manage Hubs"><svg class="rail-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="/static/vendor/lucide/navigation.svg#settings"></use></svg><span class="rail-copy">Manage Hubs</span></a>`);
     root.querySelectorAll("[data-hub-open]").forEach(b => b.onclick = () => {
+      if (typeof closeMobileNavigation === "function") closeMobileNavigation();
       const tab = window.open("about:blank", "_blank"); if (tab) tab.opener = null;
       hubSiteUrl(b.dataset.hubOpen, b.dataset.public === "true").then(url => { if (tab) tab.location.replace(url); }).catch(e => {tab?.close(); showActionError(e);});
     });
-    root.querySelector("[data-hub-add]").onclick = () => editHubSite();
+    root.querySelector("[data-hub-add]").onclick = () => { if (typeof closeMobileNavigation === "function") closeMobileNavigation(); editHubSite(); };
     if (typeof registerCommand === "function") registerCommand({id:"hub.manage",title:"Manage Hubs",group:"Hub",run:openHubs});
   } catch (error) { if (generation === hubGeneration) root.textContent = "Hub unavailable"; }
 }
@@ -217,7 +218,7 @@ function editHubRecord(site,collection,record) {
   root.querySelector("[data-write]").onclick=()=>hubAction(root,async()=>{await hubApi(root,"PUT",path,{data:JSON.parse(root.querySelector("[data-data]").value),revision:record?.revision,request_id:hubId()});root._close();await openHubCollection(site,collection);});
   root.querySelector("[data-remove]").onclick=()=>hubAction(root,async()=>{await hubApi(root,"DELETE",path,{revision:record.revision});root._close();await openHubCollection(site,collection);});
 }
-document.getElementById("nav-create-menu")?.addEventListener("toggle",event=>{if(event.target.open)refreshHubs();});
+document.getElementById("rail-hubs-section")?.addEventListener("toggle",event=>{if(event.target.open)refreshHubs();});
 window.addEventListener("load",refreshHubs);
 
 async function* hubImportRecords(file) {
@@ -263,3 +264,5 @@ function hubFileBase64(file) {
     reader.readAsDataURL(file);
   });
 }
+
+window.addEventListener("load", () => refreshHubs());

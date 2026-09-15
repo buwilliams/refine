@@ -30,7 +30,7 @@ function openNewGoalModal(options = {}) {
   if (_newGoalModalOpen) return;
   const reporter = state.lastReporter || "";
   if (!reporter) {
-    toast("Pick a reporter in the top-right selector first", "error");
+    toast("Choose a Reporter in the left rail first", "error");
     return;
   }
   _newGoalModalOpen = true;
@@ -44,7 +44,7 @@ function openNewGoalModal(options = {}) {
       <div class="modal-body">
         <div class="muted small" style="margin-bottom:8px">
           Submitting as <strong class="js-reporter-name">${htmlEscape(reporter)}</strong>
-          — change in the top-right reporter selector.
+          — change in the Reporter picker in the left rail.
         </div>
         <form id="new-goal-form">
           <div class="form-row">
@@ -181,7 +181,7 @@ function openNewGoalModal(options = {}) {
 
   async function submit() {
     const currentReporter = state.lastReporter || "";
-    if (!currentReporter) return toast("Pick a reporter in the top-right selector", "error");
+    if (!currentReporter) return toast("Pick a reporter in the Reporter picker in the left rail", "error");
     const fd = new FormData(form);
     const prompt = (fd.get("prompt") || "").toString().trim();
     const priority = (fd.get("priority") || "low").toString();

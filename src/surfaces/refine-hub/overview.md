@@ -10,6 +10,10 @@ refine coordinates your agent fleet for software delivery. It is not another age
 - **Governance** - keep agent work aligned with your product intent, local rules, and requirements. Review stays grounded before changes merge.
 - **Personal AI** - install refine and manage your fleet with your favorite agent.
 
+## Navigate your workspace
+
+The collapsible left rail brings Dashboard, Features, Goals, Changes, Control, Settings, and open tool windows together. Choose **Windows** for an agent, terminal, files, logs, or Todo List. Each window uses the full content area. **Search** and **Ctrl+K** (⌘K on Mac) work from every screen. [Explore the 4.3.2 navigation update](releases/4.3.2.md).
+
 ## Learn how refine works
 
 You can learn about refine by reading the [online docs](https://getrefine.dev/docs) or by prompting your agent.

@@ -1229,7 +1229,7 @@ function renderRoundForm(
     <form id="${htmlEscape(formId)}" data-kind="${kind}" data-testid="goal-round-form">
       <div class="muted small" style="margin-bottom:8px">
         Submitting as <strong class="js-reporter-name">${htmlEscape(reporter)}</strong>
-        — change in the top-right reporter selector.
+        — change in the Reporter picker in the left rail.
       </div>
       ${disabled ? `
         <p class="muted small">
@@ -1249,7 +1249,7 @@ function renderRoundForm(
 function renderPickReporterNotice() {
   return `
     <p class="muted">
-      Pick a reporter in the top-right selector to enable this form.
+      Pick a reporter in the Reporter picker in the left rail to enable this form.
     </p>
   `;
 }
@@ -1263,7 +1263,7 @@ function bindRoundFormSubmit() {
   bindOnce(form, "submit", async (e) => {
     e.preventDefault();
     const reporter = state.lastReporter || "";
-    if (!reporter) return toast("Pick a reporter in the top-right selector", "error");
+    if (!reporter) return toast("Pick a reporter in the Reporter picker in the left rail", "error");
     const fd = new FormData(form);
     const prompt = (fd.get("prompt") || "").toString().trim();
     if (!prompt) return toast("Provide a prompt", "error");

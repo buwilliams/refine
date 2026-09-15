@@ -422,7 +422,7 @@ function wireReviewsForReporter(reviews) {
 function openAddRoundModal({ goalId, goalName }) {
   const reporter = state.lastReporter || "";
   if (!reporter) {
-    toast("Pick a reporter in the top-right selector first", "error");
+    toast("Choose a Reporter in the left rail first", "error");
     return;
   }
   const root = document.createElement("div");
@@ -437,7 +437,7 @@ function openAddRoundModal({ goalId, goalName }) {
       <div class="modal-body">
         <div class="muted small" style="margin-bottom:8px">
           Submitting as <strong>${htmlEscape(reporter)}</strong>
-          — change in the top-right reporter selector.
+          — change in the Reporter picker in the left rail.
         </div>
         <form id="add-round-form">
           <div class="form-row">

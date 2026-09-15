@@ -94,6 +94,7 @@ test('Resource catalog explains uses, filters types, and follows edited referenc
     await dialog.locator('#template-prompt').fill('No included partials');
     await dialog.locator('[data-save]').click();
     await dialog.waitFor({state: 'detached'});
+    await page.waitForFunction(() => document.querySelector('[data-template-catalog-row][data-template-id="workflow-context"]')?.textContent.includes('Included by Supervised Skill'));
     assert.match(await partialRow.innerText(), /Included by Supervised Skill/);
     assert.doesNotMatch(await partialRow.innerText(), /Included by Workflow/);
     await page.locator('[data-resource-type]').selectOption('Partial');

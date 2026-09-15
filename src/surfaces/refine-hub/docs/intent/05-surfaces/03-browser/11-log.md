@@ -1,6 +1,6 @@
 # Logs
 
-The Toolbar is the browser's single log reader. Logs have no main navigation screen. Legacy Logs links open the corresponding Toolbar tab. A visible View Logs button on the Goal modal opens that Goal's log tab.
+System and Goal Logs windows are the browser's log readers. Legacy Logs links open the corresponding full-height window in the left rail. A visible View Logs button on the Goal modal opens that Goal's log tab.
 
 System receives normal operational events by default. An explicit Start tail / Stop tail control enables or stops following all retained application activity, Round logs, and raw agent/process stdout and stderr. Collection is off by default for System, including after reload or project switching. Stopping tail never stops agents, processes, or ordinary system notices.
 

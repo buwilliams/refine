@@ -59,7 +59,7 @@ function renderFeatureGoalInlineComposer(goals, reporter = "") {
         <input type="hidden" name="goal_id" value="">
         <div class="muted small feature-goal-composer-reporter">
           Submitting as <strong class="js-reporter-name">${htmlEscape(reporter || "none selected")}</strong>
-          — change in the top-right reporter selector.
+          — change in the Reporter picker in the left rail.
         </div>
         <div class="feature-goal-composer-fields">
           <div class="form-row feature-goal-prompt-field">
@@ -253,7 +253,7 @@ function bindFeatureGoalInlineComposer(root, feature, { goalPage = 1, navigateAw
     const priority = form.elements.priority.value;
     const placement = form.elements.placement.value;
     if (!reporter) {
-      setStatus("Pick a reporter in the top-right selector first.", "error");
+      setStatus("Choose a Reporter in the left rail first.", "error");
       form.elements.prompt.focus();
       return;
     }

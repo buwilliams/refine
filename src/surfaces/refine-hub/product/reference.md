@@ -340,9 +340,9 @@ Default: Plan, Implement, Quality, and Governance have required Skills at their 
 
 <h3 id="skills-run">Run a Skill</h3>
 
-Enabled Custom Skills appear in New Goal menu and the command palette. Fill in any requested inputs to open the Skill in its own agent tab, independently of Goals. Use the tab to follow the work or stop the agent.
+Enabled Custom Skills appear in the rail’s Skills section and the command palette. Fill in any requested inputs to open the Skill in its own agent tab, independently of Goals. Use the tab to follow the work or stop the agent.
 
-Action: use Add skill... in New Goal menu to create a Skill from any screen.
+Action: use Add skill... in Settings → Workspace controls & support to create a Skill from any screen.
 
 <h3 id="application-test">Target-app tests</h3>
 
@@ -356,13 +356,13 @@ Process management for this node.
 
 <h3 id="release-workflow">Semantic releases</h3>
 
-Use a Release Skill from New Goal menu → Skills to preview a semantic version, prepare a reviewable Goal, and publish after approval through the existing release commands.
+Use a Release Skill from the rail’s Skills section to preview a semantic version, prepare a reviewable Goal, and publish after approval through the existing release commands.
 
 Default: prepare first; publish only after review and merge.
 
 <h3 id="process-management">Process management</h3>
 
-Process management is the node's centralized list of Refine processes. It shows the target app, daemon, background workers, and current agents with live resource use and direct controls.
+Control contains the selected node's centralized list of Refine processes. It shows the target app, daemon, background workers, and current agents with live resource use and direct controls.
 
 Default: leave healthy processes running.
 
@@ -378,15 +378,15 @@ Common navigation and daily actions.
 
 <h3 id="nav-application-status">Application status</h3>
 
-Target application status appears in the New Goal menu. Use the buttons beneath it for supported actions, including Start/Stop and Configure. Repository reconciliation is automatic.
+Target application status appears in the Settings → Workspace controls & support. Use the buttons beneath it for supported actions, including Start/Stop and Configure. Repository reconciliation is automatic.
 
 Action: use this indicator to inspect and control the target app.
 
 <h3 id="nav-agent-status">Running agents</h3>
 
-Open Settings → Processes to inspect running agents. Workflow status is available in the New Goal menu.
+Open Settings → Processes to inspect running agents. Workflow status is available in the Settings → Workspace controls & support.
 
-Action: inspect individual agent processes in Settings.
+Action: inspect individual agent processes in Control.
 
 <h3 id="nav-reporter">Reporter</h3>
 

@@ -204,8 +204,9 @@ test("every current agent provider process renders a process-specific Stop actio
     const actions = processes.renderActions(row);
     assert.match(actions, /data-testid="process-stop-agent"/);
     assert.match(actions, new RegExp(`data-stop-agent="${row.id}"`));
-    assert.match(actions, />Stop<\/button>/);
-    assert.doesNotMatch(actions, />Cancel<\/button>/);
+    assert.match(actions, /aria-label="Stop agent"/);
+    assert.match(actions, /navigation.svg#square/);
+    assert.doesNotMatch(actions, /aria-label="Cancel agent"/);
   }
   assert.match(
     processes.renderActions(rows[0]),

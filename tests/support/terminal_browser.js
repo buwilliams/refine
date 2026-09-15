@@ -45,6 +45,7 @@ async function openTerminalApp({ mac = false, platform, profile = 'agent', mockC
       await page.locator('[data-testid="terminal-stop"]').waitFor();
     };
     if (profile === 'skill') {
+      await page.getByTestId('nav-settings').click();
       await page.locator('#nav-create-menu > summary').click();
       await page.locator('[data-manual-skill="inspect"]').click();
       const modal = page.locator('[data-testid="automation-modal"]');

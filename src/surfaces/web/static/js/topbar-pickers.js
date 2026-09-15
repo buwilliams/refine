@@ -52,6 +52,11 @@ function initTopbarPickers() {
       if (event.key === "Escape") { root.open = false; summary.focus(); }
     });
     root.addEventListener("toggle", () => summary.setAttribute("aria-expanded", String(root.open)));
+    root.querySelector("[data-picker-add-node]")?.addEventListener("click", event => {
+      root.open = false;
+      if (typeof closeMobileNavigation === "function") closeMobileNavigation();
+      void createNodeFromPrompt(event.currentTarget);
+    });
     select.addEventListener("change", () => syncTopbarPicker(root));
     new MutationObserver(() => syncTopbarPicker(root)).observe(select, {childList: true, subtree: true, attributes: true, characterData: true});
     syncTopbarPicker(root);

@@ -28,10 +28,10 @@ fn local_http_daemon_serves_website_and_markdown_from_repo_root() {
     assert_eq!(docs_home.status, 200);
     assert_eq!(docs_home.content_type, "text/html; charset=utf-8");
     let docs_home = String::from_utf8(docs_home.body).unwrap();
-    assert!(docs_home.contains("<h1>Refine Hub</h1>"));
+    assert!(docs_home.contains("<h1>From your first Goal<br>to a fleet of agents.</h1>"));
     assert!(docs_home.contains("What you need to know"));
     assert!(docs_home.contains("/hub/sites/refine/product/get-started.md"));
-    assert!(docs_home.contains("/hub/sites/refine/releases/4.3.1.md"));
+    assert!(docs_home.contains("/hub/sites/refine/releases/4.3.2.md"));
     assert!(!docs_home.contains("/hub/sites/refine/releases/4.3.0.md"));
 
     let raw_doc = daemon.handle_wire_request(HttpRequest {
@@ -110,6 +110,9 @@ fn refine_hub_is_available_without_a_target_and_rejects_mutation() {
         "/hub/sites/refine/product/get-started.md",
         "/hub/sites/refine/hub.css",
         "/hub/sites/refine/releases/images/4.3/prompts.png",
+        "/hub/sites/refine/releases/4.3.2.md",
+        "/hub/sites/refine/releases/images/4.3.2/dashboard.png",
+        "/hub/sites/refine/releases/images/4.3.2/files.png",
         "/api/hub/sites",
         "/api/hub/sites/refine",
     ] {

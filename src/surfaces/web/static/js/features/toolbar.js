@@ -22,13 +22,10 @@ const TERMINAL_LINE_HEIGHT = 1.35;
 let filesSearchTimer = null;
 let filesSearchRequestSeq = 0;
 let filesSearchAbortController = null;
-let toolbarResizeGesture = null;
 const chatState = {
   tabs: {},                // tabId → { goalId, label, sessionId, output, closedReason }
   activeTabId: null,
-  open: false,             // dock expanded?
-  bodyHeight: null,        // user-resized body height in px; null → 20vh default
-  fullscreen: false,       // when true, panel fills viewport below the topbar
+  open: false,             // window occupies the content area?
 };
 const systemOperationState = {
   messages: [],
@@ -161,19 +158,12 @@ function loadChatStateFromStorage() {
       );
       for (const tab of Object.values(chatState.tabs)) {
         if (tab.mode === "standalone") tab.label = "Agent in Worktree";
-        if (tab.mode === "plan") tab.label = "Planing Agent";
+        if (tab.mode === "plan") tab.label = "Planning Agent";
       }
       if (parsed.activeTabId && chatState.tabs[parsed.activeTabId]) {
         chatState.activeTabId = parsed.activeTabId;
       }
       if (typeof parsed.open === "boolean") chatState.open = parsed.open;
-      if (typeof parsed.bodyHeight === "number" && parsed.bodyHeight > 0) {
-        chatState.bodyHeight = parsed.bodyHeight;
-      }
-      if (typeof parsed.fullscreen === "boolean") {
-        chatState.fullscreen = parsed.fullscreen;
-      }
-
     }
   } catch {}
   ensureStandaloneTab();
@@ -210,49 +200,32 @@ function saveChatStateToStorage() {
     toolbarStateStorage().setItem(CHAT_TABS_STORAGE_KEY, JSON.stringify({
       tabs, activeTabId: chatState.activeTabId,
       version: CHAT_TABS_STORAGE_VERSION,
-      open: chatState.open, bodyHeight: chatState.bodyHeight,
-      fullscreen: chatState.fullscreen,
+      open: chatState.open,
     }));
   } catch {}
 }
-
-function defaultToolbarBodyHeight() {
-  return Math.max(320, Math.round(window.innerHeight * 0.32));
-}
-
-function defaultChatBodyHeight() { return defaultToolbarBodyHeight(); }
-
-function clampToolbarBodyHeight(px) {
-  const min = 320;
-  const max = Math.max(min, Math.round(window.innerHeight * 0.85));
-  return Math.max(min, Math.min(max, Math.round(px)));
-}
-
-function clampChatBodyHeight(px) { return clampToolbarBodyHeight(px); }
 
 function initToolbar() {
   loadChatStateFromStorage();
   if (typeof drainPendingSystemOperations === "function") drainPendingSystemOperations();
   drawToolbar();
   observeToolbarSize();
-  observeTopbarHeight();
 }
 
 function initChatDock() { initToolbar(); }
 
 function closeToolbarAddMenuOnOutsideClick(event) {
-  const menu = $("#toolbar-dock")?.querySelector(".toolbar-add-menu");
+  const menu = document.querySelector(".toolbar-add-menu");
   if (menu?.open && !menu.contains(event.target)) menu.open = false;
 }
 
 document.addEventListener("click", closeToolbarAddMenuOnOutsideClick);
 
 function resetChatForProjectSwitch() {
+  if (typeof resetWorkspaceNavigation === "function") resetWorkspaceNavigation();
   chatState.tabs = {};
   chatState.activeTabId = null;
   chatState.open = false;
-  chatState.bodyHeight = null;
-  chatState.fullscreen = false;
   toolbarSystemDashboard = null;
   toolbarSystemDiagnosticsOpen = false;
   resetSystemStateRecovery();
@@ -306,35 +279,11 @@ function resetTerminalState() {
   if (stops.length) Promise.allSettled(stops).then(refreshProcessesTabForChatChange);
 }
 
-// Publish the topbar's actual height as --topbar-height on <html> so the
-// fullscreen Toolbar can anchor its top edge just below the main nav.
-function observeTopbarHeight() {
-  const topbar = document.querySelector(".topbar");
-  if (!topbar) return;
-  const apply = () => {
-    document.documentElement.style.setProperty(
-      "--topbar-height", `${topbar.offsetHeight}px`,
-    );
-  };
-  apply();
-  if (typeof ResizeObserver === "function") {
-    new ResizeObserver(apply).observe(topbar);
-  } else {
-    window.addEventListener("resize", apply);
-  }
-}
-
-// Keep --toolbar-dock-height in sync with whatever vertical space the dock
-// actually occupies (collapsed bar, expanded panel, or mid-drag). `body`
-// reads this variable as its bottom padding so page content never slides
-// underneath the dock.
+// Refit the active terminal when the shared content area changes size.
 function observeToolbarSize() {
   const root = $("#toolbar-dock");
   if (!root) return;
   const apply = () => {
-    document.documentElement.style.setProperty(
-      "--toolbar-dock-height", `${root.offsetHeight}px`,
-    );
     scheduleActiveTerminalFit();
   };
   apply();
@@ -385,7 +334,7 @@ function nextToolbarLabel(mode) {
     files: "Files",
     todo: "Todo List",
     terminal: "Terminal",
-    plan: "Planing Agent",
+    plan: "Planning Agent",
   }[mode] || "Tool";
   const count = Object.values(chatState.tabs).filter((tab) => tab.mode === mode).length + 1;
   return count === 1 ? base : `${base} ${count}`;
@@ -397,7 +346,6 @@ async function createToolbarTab(mode, options = {}) {
     const existing = Object.keys(chatState.tabs).find((id) => chatState.tabs[id]?.mode === "todo");
     if (existing) return activateToolbarTab(existing);
   }
-  if (mode === "system" && chatState.bodyHeight === null) chatState.bodyHeight = Math.min(420, Math.floor(window.innerHeight * .5));
   const tabId = nextToolbarTabId(mode);
   chatState.tabs[tabId] = normalizeInteractiveTerminalTab({
     goalId: null,
@@ -407,13 +355,8 @@ async function createToolbarTab(mode, options = {}) {
     initialPrompt: String(options.initialPrompt || "").trim(),
     skillLaunch: options.skillLaunch || null,
   });
-  chatState.activeTabId = tabId;
-  chatState.open = true;
   saveChatStateToStorage();
-  drawToolbar();
-  if (toolbarTabUsesTerminal(chatState.tabs[tabId])) {
-    await startTerminalSession(chatState.tabs[tabId]);
-  }
+  await activateToolbarTab(tabId);
   return tabId;
 }
 
@@ -428,7 +371,6 @@ function goalLogTabId(goalId) {
 function openGoalLogTail({ goalId, goalName = "" } = {}) {
   if (!goalId) return;
   ensureStandaloneTab();
-  if (chatState.bodyHeight === null) chatState.bodyHeight = Math.min(420, Math.floor(window.innerHeight * .5));
   const tabId = goalLogTabId(goalId);
   if (!chatState.tabs[tabId]) {
     chatState.tabs[tabId] = {
@@ -447,11 +389,9 @@ function openGoalLogTail({ goalId, goalName = "" } = {}) {
   } else if (goalName) {
     chatState.tabs[tabId].goalName = goalName;
   }
-  chatState.activeTabId = tabId;
-  chatState.open = true;
-  saveChatStateToStorage();
   chatState.tabs[tabId].logsLoaded = false;
-  drawToolbar();
+  void activateToolbarTab(tabId);
+
 }
 
 async function renderGoalPlan() {
@@ -466,10 +406,14 @@ async function openPlanChatDock(options = {}) {
   return createToolbarTab("plan", { initialPrompt });
 }
 
-async function activateToolbarTab(tabId, { toggleIfActive = false } = {}) {
+async function activateToolbarTab(tabId) {
   ensureStandaloneTab();
   const tab = chatState.tabs[tabId];
   if (!tab) return;
+  if (typeof navigateToWindow === "function") {
+    const pending = navigateToWindow(tabId);
+    if (pending) return pending;
+  }
   const previousTabId = chatState.activeTabId;
   const wasActive = previousTabId === tabId;
   const switchedTabs = !!previousTabId && !wasActive;
@@ -479,11 +423,6 @@ async function activateToolbarTab(tabId, { toggleIfActive = false } = {}) {
   const preserveCopy = terminalPreservesCopy(terminal);
   let shouldStart = !!terminal && !preserveCopy && !terminal.loading && !terminal.stopping &&
     (!terminal.sessionId || (terminal.statusChecked && terminal.exited));
-
-  if (toggleIfActive && wasActive && chatState.open && !shouldStart && terminal?.statusChecked !== false) {
-    toggleToolbar();
-    return;
-  }
 
   chatState.activeTabId = tabId;
   chatState.open = true;
@@ -502,33 +441,22 @@ async function activateToolbarTab(tabId, { toggleIfActive = false } = {}) {
   if (shouldStart) await startTerminalSession(tab);
 }
 
+// Compatibility entrypoints used by older commands and integrations.
 function toggleToolbar() {
-  chatState.open = !chatState.open;
-  // Collapsing the dock also exits fullscreen — leaving fullscreen on
-  // while the body is hidden would orphan the topbar offset.
-  if (!chatState.open) chatState.fullscreen = false;
-  saveChatStateToStorage();
-  drawToolbar();
+  if (chatState.open) return minimizeToolbar();
+  const tab = currentToolbarTab();
+  if (tab) return activateToolbarTab(chatState.activeTabId);
+  document.querySelector(".toolbar-add-menu")?.setAttribute("open", "");
 }
-
-function toggleChatDock() { toggleToolbar(); }
-
+function toggleChatDock() { return toggleToolbar(); }
 function minimizeToolbar() {
-  if (!chatState.open && !chatState.fullscreen) return;
-  chatState.open = false;
-  chatState.fullscreen = false;
-  saveChatStateToStorage();
-  drawToolbar();
+  if (typeof workspaceNavigation !== "undefined") {
+    location.hash = workspaceNavigation.mainHash || "#/";
+  } else {
+    chatState.open = false;
+    drawToolbar();
+  }
 }
-
-function toggleToolbarFullscreen() {
-  chatState.fullscreen = !chatState.fullscreen;
-  if (chatState.fullscreen) chatState.open = true;  // fullscreen implies open
-  saveChatStateToStorage();
-  drawToolbar();
-}
-
-function toggleChatFullscreen() { toggleToolbarFullscreen(); }
 
 function drawToolbar() {
   const root = $("#toolbar-dock");
@@ -540,8 +468,6 @@ function drawToolbar() {
   }
   ensureStandaloneTab();
   const active = currentToolbarTab();
-  const tabs = chatState.tabs;
-  const activeId = chatState.activeTabId;
   const filesActive = active?.mode === "files";
   const todoActive = active?.mode === "todo";
   const systemActive = active?.mode === "system";
@@ -549,10 +475,7 @@ function drawToolbar() {
   const goalLogsActive = active?.mode === "goal_logs";
 
   root.classList.toggle("open", !!chatState.open);
-  root.classList.toggle("fullscreen", !!chatState.fullscreen);
-  if (chatState.open && !chatState.bodyHeight) {
-    chatState.bodyHeight = defaultToolbarBodyHeight();
-  }
+  if (typeof renderWindowNavigation === "function") renderWindowNavigation();
   if (!terminalActive) {
     const output = root.querySelector(".terminal-output");
     // Keep the inactive xterm's DOM with its terminal instance. If Idiomorph
@@ -562,61 +485,12 @@ function drawToolbar() {
     releaseAfterMorph(output);
   }
   renderInto(root, `
-    <div class="toolbar-dock-resize" id="toolbar-dock-resize"
-         role="separator" aria-orientation="horizontal"
-         aria-label="Resize Toolbar"
-         data-testid="toolbar-resize"
-         title="Drag to resize"></div>
-    <div class="toolbar-dock-bar" id="toolbar-dock-bar"
-         data-testid="toolbar-bar"
-         title="${chatState.open ? "Click to collapse" : "Click a tab to expand Toolbar"}">
-      <span class="toolbar-dock-label">TOOLBAR</span>
-      <details class="toolbar-add-menu" data-testid="toolbar-add-menu">
-        <summary class="toolbar-add-button" data-testid="toolbar-add" aria-label="Add Toolbar tab" title="Add tab">
-          <svg class="toolbar-action-icon" data-testid="toolbar-add-icon" aria-hidden="true" viewBox="0 0 20 20" focusable="false">
-            <path d="M10 4v12M4 10h12"></path>
-          </svg>
-        </summary>
-        <div class="toolbar-add-options" role="menu">
-          ${[
-            ["agent", "Agent"],
-            ["standalone", "Agent in Worktree"],
-            ["system", "System"],
-            ["files", "Files"],
-            ["todo", "Todo List"],
-            ["terminal", "Terminal"],
-            ["plan", "Planing Agent"],
-          ].map(([mode, label]) => `<button type="button" role="menuitem" data-add-toolbar-tab="${mode}">${label}</button>`).join("")}
-        </div>
-      </details>
-      <div class="toolbar-tabs">
-        ${Object.entries(tabs).map(([id, t]) => `
-          <button class="toolbar-tab ${id === activeId ? "active" : ""} ${toolbarTabActivityClass(t)}"
-                  data-tab-id="${htmlEscape(id)}"
-                  data-testid="toolbar-tab-${htmlEscape(id)}"
-                  title="${htmlEscape(toolbarTabTitle(t))}">
-            ${htmlEscape(t.label)}${toolbarTabSessionDot(t)}
-            <span class="toolbar-tab-close" data-close-tab="${htmlEscape(id)}" data-testid="toolbar-tab-close" title="Close tab">
-              <svg class="toolbar-action-icon" data-testid="toolbar-tab-close-icon" aria-hidden="true" viewBox="0 0 20 20" focusable="false">
-                <path d="M5 5l10 10M15 5L5 15"></path>
-              </svg>
-            </span>
-          </button>`).join("")}
-      </div>
-      <button class="toolbar-dock-toggle toolbar-dock-fullscreen-btn${chatState.fullscreen ? " active" : ""}"
-              id="btn-dock-fullscreen"
-              data-testid="toolbar-fullscreen"
-              aria-label="${chatState.fullscreen ? "Exit fullscreen Toolbar" : "Fullscreen Toolbar"}"
-              aria-pressed="${chatState.fullscreen ? "true" : "false"}"
-              title="${chatState.fullscreen ? "Exit fullscreen" : "Fullscreen"}">⛶</button>
-      <button class="toolbar-dock-toggle toolbar-dock-collapse" id="btn-dock-toggle"
-              data-testid="toolbar-collapse"
-              aria-label="${chatState.open ? "Collapse Toolbar" : "Expand Toolbar"}"
-              title="${chatState.open ? "Collapse Toolbar" : "Expand Toolbar"}">▾</button>
-    </div>
+    <header class="window-content-header">
+      <h2>${htmlEscape(active?.label || "Window")}</h2>
+      <span class="muted">${htmlEscape(active ? toolbarTabTitle(active) : "")}</span>
+    </header>
     <div class="toolbar-dock-body${terminalActive ? " terminal-toolbar-body" : ""}"
-         data-testid="toolbar-body"
-         style="${chatState.bodyHeight ? `height:${chatState.bodyHeight}px` : ""}">
+         data-testid="toolbar-body">
       ${filesActive
         ? renderFilesPanel()
         : todoActive
@@ -627,7 +501,7 @@ function drawToolbar() {
             ? renderTerminalPanel(active)
             : goalLogsActive
               ? renderGoalLogPanel(active)
-              : `<div class="toolbar-empty muted" data-testid="toolbar-empty">Use the Add button to open a tool or agent.</div>`}
+              : `<div class="toolbar-empty muted" data-testid="toolbar-empty">Use Windows to open a tool or agent.</div>`}
     </div>
   `, () => {
     if (filesActive) bindFilesPanel(root);
@@ -650,19 +524,6 @@ function drawToolbar() {
       if (out) scrollGoalLogEdge(active, out);
     }
 
-    $$(".toolbar-tab", root).forEach((el) => {
-      bindOnce(el, "click", (e) => void handleToolbarTabClick(e, el));
-    });
-    $$("[data-add-toolbar-tab]", root).forEach((el) => {
-      bindOnce(el, "click", () => {
-        root.querySelector(".toolbar-add-menu")?.removeAttribute("open");
-        void createToolbarTab(el.dataset.addToolbarTab);
-      });
-    });
-    bindOnce($("#btn-dock-toggle"), "click", toggleToolbar);
-    bindOnce($("#btn-dock-fullscreen"), "click", toggleToolbarFullscreen);
-
-    wireToolbarResize(root);
     if (filesActive && !filesState.entriesByPath[""] && !filesState.loading) {
       loadFilesDirectory("", { expand: true, redraw: true });
     }
@@ -1445,6 +1306,7 @@ async function reattachTerminalSession(tab = currentToolbarTab(), existingTermin
         refreshProcessesTabForChatChange();
       }
       if (chatState.activeTabId === tabId) drawToolbar();
+      else if (typeof renderWindowNavigation === "function") renderWindowNavigation();
       return terminal.connected;
     } catch (error) {
       if (terminal.sessionId !== sessionId || terminal.stopping) return false;
@@ -1462,6 +1324,7 @@ async function reattachTerminalSession(tab = currentToolbarTab(), existingTermin
         terminal.error = `Unable to reattach terminal: ${error?.message || String(error)}`;
       }
       if (chatState.activeTabId === tabId) drawToolbar();
+      else if (typeof renderWindowNavigation === "function") renderWindowNavigation();
       return false;
     } finally {
       terminal.attachmentPromise = null;
@@ -1492,18 +1355,21 @@ function connectTerminalEvents(tab = currentToolbarTab()) {
       tab.attentionMessage = terminal.attentionMessage;
       saveChatStateToStorage();
       if (chatState.activeTabId === tabId) drawToolbar();
+      else if (typeof renderWindowNavigation === "function") renderWindowNavigation();
     } catch {}
   });
   bindOnce(source, "terminal_error", (event) => {
     handleTerminalEvent(event, terminal);
     terminal.error = "Terminal stream error.";
     if (chatState.activeTabId === tabId) drawToolbar();
+      else if (typeof renderWindowNavigation === "function") renderWindowNavigation();
   });
   bindOnce(source, "terminal_exit", (event) => {
     handleTerminalEvent(event, terminal);
     finishTerminalExit(tab, terminal);
     refreshProcessesTabForChatChange();
     if (chatState.activeTabId === tabId) drawToolbar();
+      else if (typeof renderWindowNavigation === "function") renderWindowNavigation();
   });
   source.onerror = () => {
     if (terminal.exited || terminal.eventSource !== source) return;
@@ -1516,6 +1382,7 @@ function connectTerminalEvents(tab = currentToolbarTab()) {
     terminal.reattaching = true;
     void reattachTerminalSession(tab, terminal);
     if (chatState.activeTabId === tabId) drawToolbar();
+      else if (typeof renderWindowNavigation === "function") renderWindowNavigation();
   };
 }
 
@@ -2610,10 +2477,7 @@ async function openFilesToolbar(options = {}) {
       sessionId: null,
     };
   }
-  chatState.activeTabId = tabId;
-  chatState.open = true;
-  saveChatStateToStorage();
-  drawToolbar();
+  await activateToolbarTab(tabId);
   const opts = typeof options === "string" ? { path: options } : options;
   const path = String(opts.path || "");
   const search = String(opts.search || "").trim();
@@ -2795,62 +2659,10 @@ function parentPath(path) {
   return parts.join("/");
 }
 
-function wireToolbarResize(root) {
-  const handle = root.querySelector("#toolbar-dock-resize");
-  const body = root.querySelector(".toolbar-dock-body");
-  if (!handle || !body) return;
-  bindOnce(handle, "pointerdown", (e) => {
-    if (!chatState.open) return;
-    e.preventDefault();
-    finishToolbarResize();
-    toolbarResizeGesture = {
-      root,
-      pointerId: e.pointerId,
-      startY: e.clientY,
-      startHeight: body.getBoundingClientRect().height,
-    };
-    root.classList.add("resizing");
-    // The Toolbar redraws for terminal lifecycle events. Keep the gesture on
-    // document so replacing the resize handle cannot strand pointer capture.
-    document.addEventListener("pointermove", moveToolbarResize);
-    document.addEventListener("pointerup", finishToolbarResize);
-    document.addEventListener("pointercancel", finishToolbarResize);
-  });
-}
-
-function moveToolbarResize(event) {
-  const gesture = toolbarResizeGesture;
-  if (!gesture || event.pointerId !== gesture.pointerId) return;
-  const body = gesture.root.querySelector(".toolbar-dock-body");
-  if (!body) return;
-  // Drag up grows the panel; drag down shrinks it.
-  const next = clampToolbarBodyHeight(
-    gesture.startHeight + (gesture.startY - event.clientY),
-  );
-  body.style.height = next + "px";
-  chatState.bodyHeight = next;
-  if (toolbarTabUsesTerminal(currentToolbarTab())) resizeTerminalRenderer();
-}
-
-function finishToolbarResize(event = null) {
-  const gesture = toolbarResizeGesture;
-  if (!gesture || (event?.pointerId != null && event.pointerId !== gesture.pointerId)) return;
-  toolbarResizeGesture = null;
-  document.removeEventListener("pointermove", moveToolbarResize);
-  document.removeEventListener("pointerup", finishToolbarResize);
-  document.removeEventListener("pointercancel", finishToolbarResize);
-  gesture.root.classList.remove("resizing");
-  saveChatStateToStorage();
-  scheduleActiveTerminalFit();
-}
-
-function wireChatDockResize(root) { wireToolbarResize(root); }
-
-// Back-compat alias used by helpers below; thin wrapper.
 function drawChat() { drawToolbar(); }
 
 function refreshProcessesTabForChatChange() {
-  if (state.currentRoute !== "node") return;
+  if (state.currentRoute !== "control") return;
   if (typeof readSettingsTab === "function" && readSettingsTab() !== "processes") return;
   if (typeof refreshSettings !== "function") return;
   refreshSettings().catch(() => {});
@@ -2867,7 +2679,7 @@ function handleToolbarTabClick(event, tabElement) {
   }
   const tabId = tabElement?.dataset?.tabId;
   if (!tabId) return;
-  return activateToolbarTab(tabId, { toggleIfActive: true });
+  return activateToolbarTab(tabId);
 }
 
 async function closeChatTab(tabId) {
@@ -2914,6 +2726,7 @@ function removeToolbarTab(tabId) {
   }
   saveChatStateToStorage();
   drawChat();
+  if (typeof navigateAfterWindowClose === "function") navigateAfterWindowClose(tabId);
 }
 
 function removeToolbarTabsForStoppedProcess(processId, sessionId = "") {

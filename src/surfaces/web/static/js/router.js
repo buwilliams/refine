@@ -13,6 +13,7 @@ const routes = {
   goals_plan: renderGoalPlan,
   changes: renderChanges,
   settings: renderSettings,
+  control: renderControl,
 };
 
 function parseHash() {
@@ -22,6 +23,10 @@ function parseHash() {
   // views that care about query params read them off location.hash directly.
   const path = raw.split("?", 1)[0];
   const parts = path.split("/").filter(Boolean);
+  if (parts[0] === "windows" && parts[1]) {
+    try { return { route: "window", id: decodeURIComponent(parts[1]) }; }
+    catch { return { route: "dashboard" }; }
+  }
   if (parts.length === 0) return { route: "dashboard" };
   if (parts[0] === "goals") {
     if (parts.length === 1) return { route: "goals" };
@@ -37,10 +42,15 @@ function parseHash() {
   }
   if (parts[0] === "chat") return { route: "chat_redirect" };
   if (parts[0] === "logs") return { route: "logs_redirect" };
+  if (parts[0] === "control") return { route: "control", tab: "processes" };
   if (parts[0] === "changes") return { route: "changes" };
   if (["system", "settings", "node", "governance", "project"].includes(parts[0])) {
     const retired = ["governance", "quality", "guidance", "events", "releases"];
-    let tab = parts[1] || (["governance", "project"].includes(parts[0]) ? "skills" : "processes");
+    let tab = parts[1] || (["governance", "project"].includes(parts[0]) ? "skills" : "application");
+    if (["processes", "agents", "system"].includes(tab) || (parts[0] === "system" && !parts[1])) {
+      history.replaceState(null, "", "#/control");
+      return { route: "control", tab: "processes" };
+    }
     if (retired.includes(tab)) tab = "skills";
     if (parts[0] !== "settings" || tab !== parts[1]) history.replaceState(null, "", `#/settings/${tab}`);
     return { route: "settings", tab };
@@ -62,17 +72,22 @@ function navigate() {
     const params = new URLSearchParams(location.hash.split("?")[1] || "");
     const goalId = params.get("goal_id");
     if (goalId) openGoalLogTail({ goalId }); else openSystemLogs();
-    location.hash = "#/";
     return;
   }
   if (r.route === "chat_redirect") {
-    // Legacy `#/chat[?goal=...]` deep links now open the dock and bounce to
-    // the dashboard so the URL no longer points at a removed screen.
+    // Legacy chat links now resolve to an agent window.
     const hashQs = new URLSearchParams(location.hash.split("?")[1] || "");
     const goalId = hashQs.get("goal") || null;
     openAgentDock(goalId ? { goalId } : {});
-    location.hash = "#/";
     return;
+  }
+  if (r.route === "window") {
+    if (_goalModalRoot) closeGoalDetailModal({ navigateAway: false });
+    if (_featureModalRoot) closeFeatureModal({ navigateAway: false });
+  }
+  if (typeof routeWorkspace === "function") {
+    const handled = routeWorkspace(r, destinationHash);
+    if (handled) return handled;
   }
   // Leaving the Goals list forgets in-memory bulk-selection exceptions on
   // purpose — a fresh visit starts with all matching Goals selected again.
@@ -133,7 +148,7 @@ function navigate() {
 
   if (
     prevRoute === r.route &&
-    (r.route === "settings" || r.route === "node" || r.route === "project")
+    (r.route === "control" || r.route === "settings" || r.route === "node" || r.route === "project")
   ) {
     state.currentRoute = r.route;
     state.currentGoal = null;
@@ -162,12 +177,15 @@ function navigate() {
 }
 
 function highlightNav(route) {
+  if (typeof syncWorkspaceVisibility === "function") syncWorkspaceVisibility();
   for (const a of $$(".nav a")) {
     const r = a.dataset.route;
     a.classList.toggle("active",
       r === route ||
       (r === "goals" && route.startsWith("goals")) ||
       (r === "features" && route.startsWith("features")));
+    if (a.classList.contains("active")) a.setAttribute("aria-current", "page");
+    else a.removeAttribute("aria-current");
   }
 }
 
@@ -180,5 +198,6 @@ let _prevHashURL = location.href;
 window.addEventListener("hashchange", (e) => {
   try { _prevHashURL = e.oldURL || location.href; }
   catch { _prevHashURL = location.href; }
-  navigate();
+  const pending = navigate();
+  if (pending?.catch) pending.catch(showActionError);
 });

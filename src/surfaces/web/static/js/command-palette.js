@@ -20,13 +20,6 @@ function initCommandPalette() {
       && !e.shiftKey
       && String(e.key || "").toLowerCase() === "k";
     if (!isShortcut) return;
-    if (document.querySelector(".modal-backdrop:not(.command-palette-backdrop)")) {
-      return;
-    }
-    const toolbarDock = document.querySelector("#toolbar-dock");
-    if (toolbarDock?.contains(e.target)) {
-      return;
-    }
     e.preventDefault();
     e.stopPropagation();
     openCommandPalette();
@@ -35,6 +28,9 @@ function initCommandPalette() {
 
 function openCommandPalette() {
   if (commandPaletteOpen) return;
+  if (document.getElementById("navigation-rail")?.classList.contains("mobile-open")) closeMobileNavigation(true);
+  const previousFocus = document.activeElement;
+  const keyboardRoot = document.defaultView || document;
   commandPaletteOpen = true;
   commandPaletteSelected = 0;
   const root = document.createElement("div");
@@ -63,8 +59,9 @@ function openCommandPalette() {
 
   function close() {
     commandPaletteOpen = false;
-    document.removeEventListener("keydown", onKey, true);
+    keyboardRoot.removeEventListener("keydown", onKey, true);
     root.remove();
+    if (previousFocus?.isConnected) previousFocus.focus();
   }
   function draw() {
     currentResults = searchCommands(input.value);
@@ -109,6 +106,13 @@ function openCommandPalette() {
     await executeItem(currentResults[commandPaletteSelected]);
   }
   function onKey(e) {
+    if (e.key === "Tab") {
+      const controls = [...root.querySelectorAll("input, button:not(:disabled)")];
+      const first = controls[0], last = controls[controls.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last?.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus(); }
+      return;
+    }
     if (e.key === "Escape") {
       e.preventDefault();
       e.stopPropagation();
@@ -141,7 +145,7 @@ function openCommandPalette() {
     commandPaletteSelected = 0;
     draw();
   });
-  document.addEventListener("keydown", onKey, true);
+  keyboardRoot.addEventListener("keydown", onKey, true);
   draw();
   input.focus();
 }

@@ -14,11 +14,13 @@ test('Quick Actions controls pause and start independently, refresh availability
   try {
     const {page} = app;
     await page.goto(app.origin);
+    await page.locator('[data-testid="nav-settings"]').click();
     await page.locator('#nav-create-menu > summary').click();
     const actions = page.locator('#quick-workflow-actions');
     await actions.getByRole('button', {name:'Pause workflow',exact:true}).click();
     assert.equal(writes.length,0);
     await page.getByTestId('modal-ok').click();
+    await page.locator('[data-testid="nav-settings"]').click();
     await page.locator('#nav-create-menu > summary').click();
     await actions.getByRole('button', {name:'Unpause workflow',exact:true}).click();
     await actions.getByRole('button', {name:'Pause workflow',exact:true}).waitFor();
@@ -48,14 +50,17 @@ test('Target application actions honor configuration, confirm start and stop, an
   try {
     const {page}=app;
     await page.goto(app.origin);
+    await page.locator('[data-testid="nav-settings"]').click();
     await page.locator('#nav-create-menu > summary').click();
     const actions=page.locator('#quick-target-actions');
     await actions.getByRole('button',{name:'Start target application',exact:true}).click();
     assert.equal(writes.length,0);
     await page.getByTestId('modal-ok').click();
+    await page.locator('[data-testid="nav-settings"]').click();
     await page.locator('#nav-create-menu > summary').click();
     await actions.getByRole('button',{name:'Stop target application',exact:true}).click();
     await page.getByTestId('modal-ok').click();
+    await page.locator('[data-testid="nav-settings"]').click();
     await page.locator('#nav-create-menu > summary').click();
     await actions.getByRole('button',{name:'Start target application',exact:true}).waitFor();
     assert.deepEqual(writes,['/api/target-app/start','/api/target-app/stop']);
@@ -97,8 +102,8 @@ test('Custom topbar pickers share split borders, support keyboard selection, and
     await picker.getByRole('option',{name:'+ Add new reporter…',exact:true}).click();
     await page.getByTestId('modal-cancel').click();
     await page.waitForFunction(()=>document.querySelector('[data-topbar-picker="reporter"] [data-picker-value]').textContent==='Reviewer');
-    const heights=await page.locator('.nav-picker-summary, .nav-create-menu > summary, #btn-new-goal').evaluateAll(els=>els.map(el=>el.getBoundingClientRect().height));
-    assert.deepEqual(heights,[34,34,34,34]);
+    const heights=await page.locator('.nav-picker-summary').evaluateAll(els=>els.map(el=>el.getBoundingClientRect().height));
+    assert.ok(heights.every(height => height >= 44));
     assert.equal(await picker.locator('.nav-context-more').evaluate(el=>getComputedStyle(el).borderLeftWidth),'1px');
     await picker.locator('summary').click();
     await page.locator('[data-topbar-picker="node"] > summary').click();

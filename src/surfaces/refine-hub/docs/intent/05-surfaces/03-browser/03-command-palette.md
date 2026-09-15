@@ -19,11 +19,11 @@ The command palette should sit above individual screens. It should know about gl
 
 Current implementation details that matter to intent:
 
-- the topbar exposes the palette as a persistent shell action;
+- Search in the left rail exposes the palette as a persistent shell action;
 - command registration is shared rather than hardcoded only in page buttons;
 - file search integrates with toolbar file behavior;
 - keyboard selection should make the next Enter action explicit.
-- global palette shortcuts yield while focus is within the toolbar so terminal and agent interactions retain their native keyboard behavior.
+- Ctrl+K (⌘K on Mac) opens the palette globally, including terminal and agent content; Refine consumes the shortcut before it reaches the terminal. Closing the palette restores focus without dismissing an underlying dialog.
 
 The palette should not become an unrelated shortcut list. It should mirror real product capability.
 

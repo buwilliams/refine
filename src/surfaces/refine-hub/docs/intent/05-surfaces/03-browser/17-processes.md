@@ -1,4 +1,6 @@
-# Processes
+# Control and processes
+
+Open **Control** in the main navigation to manage processes on the selected Node. Target app **Build**, **Start/Stop**, and **Check status** actions use icons with accessible names and hover labels. Legacy Processes links redirect to `#/control`.
 
 ## Key Ideas
 
@@ -18,7 +20,7 @@ Stop confirms process exit and conditionally returns an unchanged linked Goal to
 
 The Goal terminal and Processes view use the same Process Infrastructure through Application control. The Processes pause control reflects canonical `workflow_paused` state: pause blocks new Goal admission and quiesces automatic Git sync and inactive-worktree cleanup at safe boundaries, while already active Goal executions continue unless stopped separately. Resume makes admission and those repository workers eligible again. The browser does not relabel live Agents or unrelated active operations as paused, terminate Agents, or create browser-specific pause state.
 
-The shared Node tab strip describes the runtime above Processes. A validated
+The Settings tab strip describes the runtime. Control shows daemon update status in its process row. A validated
 published release retains `Running latest` or `Upgrade available` version
 language. A source runtime says `Running from HEAD` and names whether it is up
 to date with, behind, ahead of, or diverged from its cached upstream only when

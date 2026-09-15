@@ -161,7 +161,7 @@ function enterNoProjectMode(project = null, { openGuidePanel = false } = {}) {
 }
 
 function refreshCurrentSettingsSurface(options = {}) {
-  if (!["settings", "node", "project"].includes(state.currentRoute || "")) return undefined;
+  if (!["control", "settings", "node", "project"].includes(state.currentRoute || "")) return undefined;
   if (typeof refreshActiveSettingsTab === "function") {
     return refreshActiveSettingsTab(options);
   }
@@ -1160,7 +1160,7 @@ async function applyProjectAttachResult(result, options = {}) {
   await refreshTargetAppToggle();
   if (location.hash !== "#/settings/application") {
     location.hash = "#/settings/application";
-  } else if (["settings", "node", "project"].includes(state.currentRoute || "")) {
+  } else if (["control", "settings", "node", "project"].includes(state.currentRoute || "")) {
     await refreshSettings();
   } else {
     navigate();
@@ -1677,7 +1677,7 @@ document.addEventListener("change", async (e) => {
 });
 
 function closeTopbarMenus(target = null) {
-  for (const menu of $$(".topbar-actions details[open]")) {
+  for (const menu of $$(".topbar-actions details[open], .navigation-rail .nav-menu[open]")) {
     if (!target || !menu.contains(target)) menu.open = false;
   }
 }
@@ -1787,7 +1787,7 @@ function scheduleRouteDataRefresh() {
     // Refresh only the table on background updates so an active workflow
     // keystroke in the search box isn't interrupted by a full re-render.
     if (state.currentRoute === "goals") refreshGoalsTable();
-    if (["settings", "node", "project"].includes(state.currentRoute || "")) {
+    if (["control", "settings", "node", "project"].includes(state.currentRoute || "")) {
       refreshCurrentSettingsSurface();
     }
     // Changes screen: an approved implementation can land asynchronously;
@@ -1830,7 +1830,7 @@ function initSSE() {
     if (state.currentRoute === "dashboard") refreshDashboard();
     if (state.currentRoute === "goals") refreshGoalsTable();
     if (state.currentRoute === "changes") loadChanges();
-    if (["settings", "node", "project"].includes(state.currentRoute || "")) {
+    if (["control", "settings", "node", "project"].includes(state.currentRoute || "")) {
       refreshCurrentSettingsSurface({ force: true });
     }
     if (state.currentRoute === "goals_detail" && state.currentGoal) {
@@ -1879,7 +1879,7 @@ function initSSE() {
     if (typeof scheduleAgentStatusRefresh === "function") scheduleAgentStatusRefresh();
     if (typeof refreshTargetAppToggle === "function") refreshTargetAppToggle();
     if (state.currentRoute === "dashboard") refreshDashboard();
-    if (["settings", "node", "project"].includes(state.currentRoute || "")) {
+    if (["control", "settings", "node", "project"].includes(state.currentRoute || "")) {
       refreshCurrentSettingsSurface();
     }
   });
@@ -1887,7 +1887,7 @@ function initSSE() {
     if (typeof refreshToolbarSyncHealth === "function") refreshToolbarSyncHealth(true);
     invalidateScreenDataCache();
     if (state.currentRoute === "dashboard") refreshDashboard();
-    if (["settings", "node", "project"].includes(state.currentRoute || "")) {
+    if (["control", "settings", "node", "project"].includes(state.currentRoute || "")) {
       refreshCurrentSettingsSurface();
     }
   });

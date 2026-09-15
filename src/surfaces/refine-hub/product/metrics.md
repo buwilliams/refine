@@ -1,6 +1,6 @@
 # Understand your use of Refine
 
-**Metrics Hub** ships with Refine. Open it from **New Goal → Hub**, or from **Settings → Hubs**. It reports on the attached target app, including Goals received from other nodes through state synchronization.
+**Metrics Hub** ships with Refine. Open it from **Settings → Workspace controls & support → Hub**, or from **Settings → Hubs**. It reports on the attached target app, including Goals received from other nodes through state synchronization.
 
 ![Metrics Hub with time horizons, key statistics, and delivery trends](../releases/images/4.3/metrics-overview.png)
 
@@ -28,6 +28,6 @@ The report is a snapshot of retained records, not a reconstruction of historical
 
 ## Keep it maintained
 
-The built-in **Update Metrics Hub** Skill runs the refresh command and reviews freshness, charts, and missing evidence. Run it manually from the New Goal menu or Settings → Hubs. To automate maintenance, attach the Skill to an appropriate event in Settings → Prompts, such as after a Goal finishes. It has no automatic event assignment by default.
+The built-in **Update Metrics Hub** Skill runs the refresh command and reviews freshness, charts, and missing evidence. Run it manually from the Settings → Workspace controls & support or Settings → Hubs. To automate maintenance, attach the Skill to an appropriate event in Settings → Prompts, such as after a Goal finishes. It has no automatic event assignment by default.
 
 Metrics Hub and its maintenance Skill cannot be removed. The Skill's instructions remain editable. A failed refresh leaves the previous saved report available.

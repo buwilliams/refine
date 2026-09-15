@@ -1,6 +1,6 @@
 [package]
 name = "refine"
-version = "4.3.1"
+version = "4.3.2"
 edition = "2024"
 autotests = false
 description = "Agentic software delivery across local and fleet workflows"

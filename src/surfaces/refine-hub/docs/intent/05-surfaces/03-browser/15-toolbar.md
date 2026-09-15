@@ -1,20 +1,20 @@
-# Toolbar
+# Windows (formerly Toolbar)
 
 ## Key Ideas
 
-- **Lazy Utility Dock**: the toolbar starts empty and creates a tab only when the user asks for one.
+- **Lazy Utility Windows**: the Windows section starts empty and creates a tab only when the user asks for one.
 - **Native Agent Harnesses**: agent interaction uses the configured frontier-lab CLI in a real terminal rather than a Refine-owned chat imitation.
 - **Independent Agents**: every Agent command starts a distinct general-purpose agent session; agents are not coupled to Goal Agent turns or an automatic Supervisor role.
-- **Shared Terminal Surface**: Terminal, Agent, Agent in Worktree, Planing Agent, Goal, and Standalone use one terminal renderer and backend lifecycle.
+- **Shared Terminal Surface**: Terminal, Agent, Agent in Worktree, Planning Agent, Goal, and Standalone use one terminal renderer and backend lifecycle.
 - **Reporter Utilities**: Todo List uses the selected Reporter and shared
   target-app state rather than browser storage.
 - **Recoverable State**: live sessions reattach after navigation or reload without making browser storage the source of process truth.
 
 ## Purpose
 
-The toolbar keeps supporting work close at hand without eagerly launching processes or replacing the main route. Refine orchestrates agents, workflow, and evidence, while native agent harnesses retain their conversation, tool-call, approval, and rendering UX.
+Tools and agents open as full-height windows selected in the left rail. Switching windows preserves their independent sessions and keeps the underlying main screen mounted. Refine orchestrates agents, workflow, and evidence, while native agent harnesses retain their conversation, tool-call, approval, and rendering UX.
 
-The add menu appears immediately after the Toolbar label and offers:
+Windows in the left rail offers:
 
 - Agent;
 - Agent in Worktree;
@@ -22,7 +22,7 @@ The add menu appears immediately after the Toolbar label and offers:
 - Files;
 - Todo List;
 - Terminal;
-- Planing Agent.
+- Planning Agent.
 
 Each selection creates or opens only the requested surface. Repeated Agent selections create independent sessions with unique labels such as Agent, Agent 2, and Agent 3. Agent in Worktree and Standalone use isolated Refine worktrees. Goal tabs attach to the workflow-owned Goal Agent already implementing that Goal and never launch a duplicate. Opening a live Goal tab queues a bounded background attachment operation immediately, then waits for the exact runtime session to acknowledge one-way protection from its idle and completion watchdogs before presenting the terminal; an exit, mismatched session, or unavailable acknowledgment fails the operation instead of returning a stale snapshot. This exemption is specific to a Toolbar-opened workflow Goal Agent and does not change other terminal attachment paths.
 
@@ -55,18 +55,17 @@ Each selection creates or opens only the requested surface. Repeated Agent selec
   returned to todo;
 - terminal sizing ignores hidden or unmeasurable layouts, retains the last valid
   geometry, and refits the renderer and managed PTY together after restore,
-  resize, and fullscreen transitions;
-- the Add menu is anchored to its Toolbar control, so it follows the collapsed,
-  resized, and fullscreen Toolbar positions;
+  viewport changes and rail collapse;
+- Windows stays in the rail; the former dock resize handle and fullscreen controls are removed;
 - an interrupted browser event stream is not evidence that the managed process exited;
 - terminal state remains tab-specific, including process identifier, provider, current directory, output, and worktree identity;
-- reselecting an Agent, Planing Agent, Goal, or Standalone terminal preserves
+- reselecting an Agent, Planning Agent, Goal, or Standalone terminal preserves
   its session and scrollback while presenting its latest output at the bottom,
   except while a selection, pending copy, or manual copy recovery is retained;
   that context defers automatic restart and forced scrolling, including after
   asynchronous reattachment, while explicit Restart remains available;
 - every Agent terminal receives the resolved active Refine executable and checkout so it can reliably use the correct CLI;
-- normal Agent and Planing Agent toolbar sessions begin with the existing Refine
+- normal Agent and Planning Agent toolbar sessions begin with the existing Refine
   Node, prioritizing investigation, current-Node management, and direct answers;
 - the browser explicitly identifies toolbar-launched terminal sessions, and the
   shared server never infers toolbar guidance eligibility from an Agent profile;
@@ -86,7 +85,7 @@ Each selection creates or opens only the requested surface. Repeated Agent selec
 
 The former automatic and toolbar-specific Supervisor Agent is retired. Upgrade cleanup stops its legacy managed processes and removes its durable session, state, locks, settings, API, and toolbar entry. Refine's process supervisor remains an infrastructure capability and is not an agent profile.
 
-Custom Skills launched from Controls or the command palette open their own agent tab, labeled with the Skill name. Parameters are resolved through the shared Skill service before launch. These sessions use the explicit Skill profile, carry no Goal association, and reuse the normal managed terminal lifecycle, transcript, reconnect, and stop controls.
+Custom Skills launched from the Skills section or the command palette open their own agent tab, labeled with the Skill name. Parameters are resolved through the shared Skill service before launch. These sessions use the explicit Skill profile, carry no Goal association, and reuse the normal managed terminal lifecycle, transcript, reconnect, and stop controls.
 
 ## Boundary
 
@@ -97,7 +96,7 @@ request. Todo data is authoritative in
 the target app's inspectable Refine state; the tab only renders and invokes the
 shared todo API. The toolbar does not implement workflow transitions, duplicate
 Goal ownership, agent turn scheduling, or an alternate conversation protocol.
-The node-first operating contract applies only to normal Agent and Planing Agent
+The node-first operating contract applies only to normal Agent and Planning Agent
 toolbar sessions; it does not alter Goal diagnostics, Agent in Worktree, or the
 planning, implementation, Quality, and Governance workflow agents.
 

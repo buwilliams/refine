@@ -37,6 +37,7 @@ test("every Goal step is selectable and Round deletion uses its inspected revisi
       window.confirmDeletion = true;
       window.modalConfirm = async () => confirmDeletion;
     });
+    await page.addScriptTag({ path: path.join(__dirname, "../src/surfaces/web/static/js/features/goals-prompts.js") });
     await page.addScriptTag({ path: path.join(__dirname, "../src/surfaces/web/static/js/features/goals-detail.js") });
     await page.addScriptTag({ path: path.join(__dirname, "../src/surfaces/web/static/js/features/workflow-controls.js") });
     await page.evaluate(() => {

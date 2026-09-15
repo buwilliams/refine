@@ -1,53 +1,28 @@
-# Nav
-
-## Key Ideas
-
-- **Orientation First**: nav should tell the user where they are and which app/node context is active.
-- **Primary Work Paths**: Dashboard, Features, Goals, and Changes are first-class routes.
-- **Context Controls**: app status, reporter, agent status, command palette, and create actions belong in the shell.
-- **Stable Entry Points**: nav should be predictable enough for repeated daily use and future agent-driven UI control.
+# Navigation
 
 ## Purpose
 
-Navigation exists to make Refine's operating context immediately visible and to move users to the main work surfaces without ceremony.
+Refine uses one persistent left rail and one content area. The logo is centered in its own row. The rail contains Search, Node, Reporter, a Windows menu with an always-visible list of open windows, and three independently collapsible sections: Main, Skills, and Hubs. Dashboard has no separate global navigation.
 
-The topbar is not just a list of pages. It shows the active node, active app context, reporter context, target-app status, agent status, command palette access, Guide access, management links, appearance preference, and primary create actions.
+## Behavior
 
-## Expected Role
+- Main contains Dashboard, Features, Goals, Changes, Control, and Settings. Control contains process management and target app Build, Start/Stop, and Check actions. Settings opens Nodes by default.
+- Windows lists the explicitly opened tools and agent sessions. Each destination occupies the right content area. Exactly one destination is active across both sections.
+- The whole Main, Skills, or Hubs header row toggles its section. Collapsing a section does not change the active screen or stop a session. The closed Main header indicates when it contains the active screen.
+- Node and Reporter use full-row pickers, showing the selected values in the expanded rail. Node selection uses authoritative IDs and the existing runtime context-switching behavior. With no attached app, Node is disabled.
+- A borderless “Collapse menu <<” control at the bottom collapses the rail to icons; “>>” expands it. It stays available while the navigation list scrolls. Labels remain available through accessible names and hover titles. Rail and section preferences are stored locally. On narrow screens, navigation is a drawer with a dismissible backdrop.
+- Search remains above the collapsible sections and displays Ctrl+K, or ⌘K on Mac. The shortcut opens the shared command palette from all content, including terminals, agents, and dialogs.
+- Main destinations and windows participate in browser history. Switching to a window keeps the underlying main screen mounted. Returning to that same destination preserves its controls and scroll position.
+- Dashboard and Goals continue carrying shared current/all Node scope in the URL.
 
-Nav should keep the system grounded. If the user is attached to the wrong app, using the wrong reporter, or agents are active, the shell should make that context visible before the user takes action.
+## Creation, management, and support
 
-When an attached app has no valid browser-local Reporter selection, the shell should gently ask who the user is after the shared Reporter list is available. The user chooses an existing Reporter or creates one through the shared Reporter capability; Refine does not infer identity from the first available Reporter. The orientation dialog yields to route and utility dialogs so the shell presents one accessible modal context at a time.
+The Windows dropdown offers Agent, Agent in Worktree, System, Files, Todo List, Terminal, and Planning Agent. Goal-specific agent and log windows remain available from their existing actions. Repeated agent launches create independent sessions. Opening or closing the Windows dropdown does not hide existing windows. Context menus align to the top of their opening row and shift upward as needed to stay within the viewport. Node and Reporter menus identify their context with a heading; Add Node and Add Reporter open the shared creation flows.
 
-Reporter selection remains local to the browser and can always be changed or created later under `Controls > Reporter`. Dismissing the first-load orientation leaves identity unselected for the rest of that page lifetime rather than repeatedly interrupting the user.
+Creation actions remain available in their page headers and Search. Settings → Workspace controls & support contains shared creation shortcuts, workflow and target-app quick controls, source update, contact, and appearance controls. Skills and Hubs have their own rail sections, including their Add and Manage actions. Settings owns configuration; Control owns process management.
 
-`Controls > Node`, immediately beside Reporter, displays and switches the runtime-local active Node for the attached app. The selector is reconciled from project status and the non-archived Node registry, shows display names for orientation, and keeps Node IDs authoritative for selection and activation. With no attached app it remains disabled and shows `No node` rather than implying an active context.
+Enabled Custom Skills use shared parameter preflight and open an agent window. Hub entries open sites in a separate browser tab. Published sites use `/hub/sites/<site>/`, and previews use `/hub/preview/<site>/`, under the existing server access boundary.
 
-The current browser shell uses Dashboard, Features, Goals, and Changes as the main nav items. Management actions live in context menus so the main nav stays focused on work. The bright primary create action is `+ New Goal`, with related creation flows available nearby.
+## Reporter orientation
 
-The `Controls > Settings` management entry consolidates Node and Governance configuration and uses Processes (`/#/settings/processes`) as its stable destination so local runtime work is immediately visible. This entry does not change the adjacent active Node selector or its context-switching behavior.
-
-A separate Controls Skills section and command palette group list enabled Custom Skills applicable to the active project and node. Launch forms use the shared parameter preflight and open only when inputs are needed. Definition changes and node switches refresh this list.
-
-Dashboard and Goals navigation carries their shared current/all Node scope in the URL. The URL remains the filter source of truth so reload, sharing, and browser history preserve that scope; a specific named-Node Goals filter is not projected onto Dashboard.
-
-Nav should not hide important operating state or shell preferences in deep settings pages. Active app, node, target-app status, agent status, and the browser-local light/dark appearance toggle are part of the user's working context.
-
-Whenever the running Refine checkout and update channel are discoverable, the
-Controls menu exposes one compact source-update control independently of the
-attached target app. It reads authoritative cached state and moves through
-current, stale, checking, available, Agent progress, reconnecting, success,
-failure, and retry states. Update is one-click authorization with no second
-confirmation; concurrent clients converge on the same operation and attempt.
-
-The Controls Skills section uses the same section labels and menu rows as the rest of Controls. Enabled Custom Skills are followed by **Add skill...**, which opens the New Skill modal without leaving the current screen. Running a Skill opens an agent tab after any required inputs are collected.
-
-The New Goal menu also contains **Hub**, listing sites for the attached app with an **Add Hub...** action. Management lives in the Settings **Hubs** tab immediately after **Prompts**, rather than a Controls management modal. Opening a site uses a new tab. Sites use the same Refine web server: published sites at `/hub/sites/<site>/` and drafts at `/hub/preview/<site>/`. Hosting shares the installation's existing access boundary; publication selects the asset manifest and read-only collections, not a separate listener or account system.
-
-Hub entries in the New Goal menu use the shared management-item layout, including icon spacing, full-width controls, and section labels.
-
-## Future Direction
-
-Future navigation may become more command-palette and agent-driven. As agents take over more work, nav should help people jump to exceptions, evidence, pending review, active processes, and high-risk changes.
-
-The nav should remain quiet and utilitarian: fewer marketing surfaces, more direct access to the work and system state that matter.
+When an attached app has no valid browser-local Reporter selection, Refine asks the user to choose or create a Reporter after loading the shared list. It never infers identity from the first entry. The orientation dialog yields to other dialogs; dismissing it leaves identity unselected for that page lifetime. The Reporter row remains available for later selection.

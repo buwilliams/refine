@@ -24,4 +24,4 @@ Open the Goal to follow its rounds and activity. Its **Prompts** tab shows retai
 
 Use **Settings → Prompts** to manage Skills and Templates. Start with the defaults; change the parts that help agents understand your project's purpose and architecture. See [Customize agent prompts](prompts.md).
 
-Use the status controls inside **New Goal** to inspect the workflow and target application. Their controls let you start, stop, pause, resume, or configure the relevant service where supported.
+Use the status controls inside **Settings → Workspace controls & support** to inspect the workflow and target application. Their controls let you start, stop, pause, resume, or configure the relevant service where supported.

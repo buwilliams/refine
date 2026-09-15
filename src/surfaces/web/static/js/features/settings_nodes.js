@@ -102,19 +102,7 @@ function bindSettingsNodesTab() {
       });
     });
   });
-  bindOnce($("#node-add"), "click", async (e) => {
-    const btn = e.currentTarget;
-    const name = await modalPrompt("Node name", "",
-                                   { title: "Create node" });
-    if (!name || !name.trim()) return;
-    await withButtonBusy(btn, "Creating...", async () => {
-      try {
-        await api("POST", "/api/nodes", { display_name: name.trim() });
-        await reconcileNodeContext();
-        await refreshSettingsTab("application", { force: true });
-      } catch (e) { await showActionError(e); }
-    });
-  });
+  bindOnce($("#node-add"), "click", e => createNodeFromPrompt(e.currentTarget));
   $$("[data-node-activate]").forEach((b) => bindOnce(b, "click", async () => {
     await withButtonBusy(b, "Activating...", async () => {
       await activateNodeContext(b.dataset.nodeActivate);
@@ -300,5 +288,20 @@ function openNodeConnectionModal(button) {
     const focus = form.elements.ssh_host || form.querySelector(".modal-input");
     focus?.focus();
     focus?.select?.();
+  });
+}
+
+async function createNodeFromPrompt(btn) {
+  const name = await modalPrompt("Node name", "",
+                                 { title: "Create node" });
+  if (!name || !name.trim()) return;
+  await withButtonBusy(btn, "Creating...", async () => {
+    try {
+      await api("POST", "/api/nodes", { display_name: name.trim() });
+      await reconcileNodeContext();
+      if (state.currentRoute === "settings" && readSettingsTab() === "application") {
+        await refreshSettingsTab("application", { force: true });
+      }
+    } catch (e) { await showActionError(e); }
   });
 }

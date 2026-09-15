@@ -290,6 +290,10 @@ function isSupportedProcessActionId(proc, actionId) {
   return false;
 }
 
+function processActionIcon(name) {
+  return `<svg class="rail-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="/static/vendor/lucide/navigation.svg#${name}"></use></svg>`;
+}
+
 function renderProcessActions(proc) {
   const actionIds = processActionIds(proc);
   if (actionIds) return renderProcessActionButtons(proc, actionIds);
@@ -297,10 +301,10 @@ function renderProcessActions(proc) {
     return renderStopAgentButton(proc);
   }
   if (proc.kind === "agent" && proc.goal_id) {
-    return `<button class="danger" data-testid="process-cancel-agent" data-cancel-agent="${htmlEscape(proc.goal_id)}">Cancel</button>`;
+    return `<button class="process-action-icon danger" data-testid="process-cancel-agent" data-cancel-agent="${htmlEscape(proc.goal_id)}" type="button" aria-label="Cancel agent" title="Cancel agent">${processActionIcon("x")}</button>`;
   }
   if (proc.kind === "chat" && proc.session_id) {
-    return `<button class="danger" data-testid="process-stop-chat" data-stop-chat="${htmlEscape(proc.session_id)}">Stop</button>`;
+    return `<button class="process-action-icon danger" data-testid="process-stop-chat" data-stop-chat="${htmlEscape(proc.session_id)}" type="button" aria-label="Stop agent session" title="Stop agent session">${processActionIcon("square")}</button>`;
   }
   if (proc.kind === "target_app") {
     const snap = proc.target_app || {};
@@ -312,14 +316,14 @@ function renderProcessActions(proc) {
     const hasStopAction = snap.has_stop_action ?? snap.has_stop_instructions ?? snap.has_stop_command;
     return `
       <span class="target-app-action-slot">
-        <button id="s-target-run-start" data-testid="process-target-app-start" class="${showStop ? "target-app-action-hidden" : ""}" ${showStop || isRunning || inFlight || !hasStartAction ? "disabled" : ""} ${showStop ? `aria-hidden="true" tabindex="-1"` : ""}>Start</button>
-        <button class="danger ${showStop ? "" : "target-app-action-hidden"}" id="s-target-run-stop" data-testid="process-target-app-stop" ${!showStop || isStopped || inFlight || !hasStopAction ? "disabled" : ""} ${showStop ? "" : `aria-hidden="true" tabindex="-1"`}>Stop</button>
+        <button id="s-target-run-start" data-testid="process-target-app-start" class="process-action-icon ${showStop ? "target-app-action-hidden" : ""}" ${showStop || isRunning || inFlight || !hasStartAction ? "disabled" : ""} ${showStop ? `aria-hidden="true" tabindex="-1"` : ""} type="button" aria-label="Start target app" title="Start target app">${processActionIcon("play")}</button>
+        <button class="process-action-icon danger ${showStop ? "" : "target-app-action-hidden"}" id="s-target-run-stop" data-testid="process-target-app-stop" ${!showStop || isStopped || inFlight || !hasStopAction ? "disabled" : ""} ${showStop ? "" : `aria-hidden="true" tabindex="-1"`} type="button" aria-label="Stop target app" title="Stop target app">${processActionIcon("square")}</button>
       </span>
-      <button class="secondary" id="s-target-run-build" data-testid="process-target-app-build" ${inFlight ? "disabled" : ""}>Build</button>
-      <button class="secondary" id="s-target-health-now" data-testid="process-target-app-health">Check</button>`;
+      <button class="process-action-icon secondary" id="s-target-run-build" data-testid="process-target-app-build" ${inFlight ? "disabled" : ""} type="button" aria-label="Build target app" title="Build target app">${processActionIcon("hammer")}</button>
+      <button class="process-action-icon secondary" id="s-target-health-now" data-testid="process-target-app-health" type="button" aria-label="Check target app status" title="Check target app status">${processActionIcon("refresh-cw")}</button>`;
   }
   if (proc.id) {
-    return `<button class="danger" data-testid="process-stop" data-stop-process="${htmlEscape(proc.id)}">Stop</button>`;
+    return `<button class="process-action-icon danger" data-testid="process-stop" data-stop-process="${htmlEscape(proc.id)}" type="button" aria-label="Stop process" title="Stop process">${processActionIcon("square")}</button>`;
   }
   return `<span class="muted small">-</span>`;
 }
@@ -338,31 +342,31 @@ function renderProcessActionButton(proc, actionId) {
       workflow_paused: actionId === "unpause_workflow",
     });
     const disabled = workflowToggleDisabled(proc);
-    return `<button class="${action.shouldPause ? "secondary" : ""}" data-testid="process-workflow-toggle" data-toggle-workflow="${action.direction}" data-workflow-paused="${action.shouldPause ? "false" : "true"}" ${disabled ? "disabled" : ""}>${action.buttonLabel}</button>`;
+    return `<button class="process-action-icon ${action.shouldPause ? "secondary" : ""}" data-testid="process-workflow-toggle" data-toggle-workflow="${action.direction}" data-workflow-paused="${action.shouldPause ? "false" : "true"}" ${disabled ? "disabled" : ""} type="button" aria-label="${action.buttonLabel}" title="${action.buttonLabel}">${processActionIcon(action.shouldPause ? "pause" : "play")}</button>`;
   }
   if (actionId === "start_background_worker" || actionId === "stop_background_worker") {
     const start = actionId === "start_background_worker";
-    return `<button class="${start ? "" : "danger"}" data-testid="process-background-worker-${start ? "start" : "stop"}" data-background-worker-action="${start ? "start" : "stop"}" data-worker-kind="${htmlEscape(proc.worker_kind || "")}">${start ? "Start" : "Stop"}</button>`;
+    return `<button class="process-action-icon ${start ? "" : "danger"}" data-testid="process-background-worker-${start ? "start" : "stop"}" data-background-worker-action="${start ? "start" : "stop"}" data-worker-kind="${htmlEscape(proc.worker_kind || "")}" type="button" aria-label="${start ? "Start" : "Stop"} background worker" title="${start ? "Start" : "Stop"} background worker">${processActionIcon(start ? "play" : "square")}</button>`;
   }
   if (actionId === "stop_process" && proc.id) {
-    return `<button class="danger" data-testid="process-stop" data-stop-process="${htmlEscape(proc.id)}">Stop</button>`;
+    return `<button class="process-action-icon danger" data-testid="process-stop" data-stop-process="${htmlEscape(proc.id)}" type="button" aria-label="Stop process" title="Stop process">${processActionIcon("square")}</button>`;
   }
   if (actionId === "update_refine") {
     const update = proc.source_update || {};
     const disabled = update.enabled !== true || update.update_available !== true;
-    return `<button data-testid="process-daemon-update" data-update-refine ${disabled ? "disabled" : ""} title="${htmlEscape(update.title || "Refine update status unavailable")}">Update</button>`;
+    return `<button class="process-action-icon" data-testid="process-daemon-update" data-update-refine ${disabled ? "disabled" : ""} title="${htmlEscape(update.title || "Refine update status unavailable")}" type="button" aria-label="Update Refine">${processActionIcon("download")}</button>`;
   }
   if (actionId === "stop_daemon") {
-    return `<button class="danger" data-testid="process-daemon-stop" data-stop-daemon>Stop</button>`;
+    return `<button class="process-action-icon danger" data-testid="process-daemon-stop" data-stop-daemon type="button" aria-label="Stop Refine daemon" title="Stop Refine daemon">${processActionIcon("square")}</button>`;
   }
   if (actionId === "stop_agent" && isAgentProviderProcessRecord(proc) && proc.id) {
     return renderStopAgentButton(proc);
   }
   if (actionId === "cancel_agent" && proc.kind === "agent" && proc.goal_id) {
-    return `<button class="danger" data-testid="process-cancel-agent" data-cancel-agent="${htmlEscape(proc.goal_id)}">Cancel</button>`;
+    return `<button class="process-action-icon danger" data-testid="process-cancel-agent" data-cancel-agent="${htmlEscape(proc.goal_id)}" type="button" aria-label="Cancel agent" title="Cancel agent">${processActionIcon("x")}</button>`;
   }
   if ((actionId === "stop_chat" || actionId === "stop") && proc.kind === "chat" && proc.session_id) {
-    return `<button class="danger" data-testid="process-stop-chat" data-stop-chat="${htmlEscape(proc.session_id)}">Stop</button>`;
+    return `<button class="process-action-icon danger" data-testid="process-stop-chat" data-stop-chat="${htmlEscape(proc.session_id)}" type="button" aria-label="Stop agent session" title="Stop agent session">${processActionIcon("square")}</button>`;
   }
   return "";
 }
@@ -371,7 +375,7 @@ function renderStopAgentButton(proc) {
   const goal = proc.goal_id
     ? ` data-stop-agent-goal="${htmlEscape(proc.goal_id)}"`
     : "";
-  return `<button class="danger" data-testid="process-stop-agent" data-stop-agent="${htmlEscape(proc.id)}"${goal}>Stop</button>`;
+  return `<button class="process-action-icon danger" data-testid="process-stop-agent" data-stop-agent="${htmlEscape(proc.id)}"${goal} type="button" aria-label="Stop agent" title="Stop agent">${processActionIcon("square")}</button>`;
 }
 
 function workflowToggleDisabled() { return false; }
@@ -531,7 +535,7 @@ function drawTargetAppStatusBlock(snap) {
     } else if (inFlight) {
       startBtn.title = "Application state is changing.";
     } else {
-      startBtn.title = "";
+      startBtn.title = "Start target app";
     }
     if (!hasStopAction) {
       stopBtn.title = "Configure stop instructions first.";
@@ -540,14 +544,14 @@ function drawTargetAppStatusBlock(snap) {
     } else if (inFlight) {
       stopBtn.title = "Application state is changing.";
     } else {
-      stopBtn.title = "";
+      stopBtn.title = "Stop target app";
     }
     if (inFlight) {
       buildBtn.title = "Application state is changing.";
     } else if (!hasBuildAction) {
       buildBtn.title = "No build instructions configured; build is a no-op.";
     } else {
-      buildBtn.title = "";
+      buildBtn.title = "Build target app";
     }
   }
   const targetRow = document.querySelector('[data-process-id="target-app"]');
@@ -556,7 +560,7 @@ function drawTargetAppStatusBlock(snap) {
     const detailsCell = targetRow.querySelector("[data-process-details]");
     if (statusCell) statusCell.textContent = processStatusLabel(snap.state || "unknown");
     if (detailsCell) {
-      const details = targetAppProcessDetails(snap);
+      const details = [processStatusLabel(snap.state || "unknown"), targetAppProcessDetails(snap)].filter(Boolean).join(" · ");
       detailsCell.textContent = details || "-";
       detailsCell.classList.toggle("muted", !details);
       detailsCell.classList.toggle("small", !details);
@@ -686,7 +690,7 @@ function bindSettingsProcessesTab() {
 function scheduleProcessesTabRefreshes() {
   for (const delay of [750, 2000]) {
     setTimeout(() => {
-      if (state.currentRoute !== "node") return;
+      if (state.currentRoute !== "control") return;
       if (!document.querySelector('[data-tab-pane="processes"].active')) return;
       if (typeof refreshActiveSettingsTab === "function") {
         refreshActiveSettingsTab({ force: true });

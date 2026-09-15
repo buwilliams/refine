@@ -2,7 +2,7 @@
 <p class="eyebrow">The Refine field guide</p>
 <h1>From your first Goal<br>to a fleet of agents.</h1>
 <p class="hero-description">Learn the tools, shape how your agents work, and keep your team moving. Your guide to building with Refine starts here.</p>
-<div class="hero-actions"><a href="product/get-started.md">Get started <span aria-hidden="true">&nbsp; →</span></a><a href="releases/4.3.1.md">See what’s new</a></div>
+<div class="hero-actions"><a href="product/get-started.md">Get started <span aria-hidden="true">&nbsp; →</span></a><a href="releases/4.3.2.md">See what’s new</a></div>
 </div>
 
 ## Make Refine work for you
@@ -15,7 +15,7 @@
 
 ## What you need to know
 
-<div><a class="hub-release" href="releases/4.3.1.md"><div><strong>Inside Refine 4.3.1</strong><p>Metrics Hub for delivery and round statistics, reusable Skills, editable prompts, and clearer Goal rounds. See what changed and how to use it.</p></div><span class="release-arrow" aria-hidden="true">↗</span></a></div>
+<div><a class="hub-release" href="releases/4.3.2.md"><div><strong>Inside Refine 4.3.2</strong><p>One navigation rail, full-height windows for tools and agents, and Search from every screen. See what changed and how to use it.</p></div><span class="release-arrow" aria-hidden="true">↗</span></a></div>
 
 ## Behind the product
 

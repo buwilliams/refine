@@ -2,6 +2,10 @@
 
 let _targetAppDraftDirty = false;
 
+async function renderControl() {
+  await renderSettingsSurface("control");
+}
+
 async function renderSettings() {
   await renderSettingsSurface("settings");
 }
@@ -44,6 +48,7 @@ async function refreshSettings(options = {}) {
     const nodeGeneration = captureNodeContextGeneration();
     const data = await loadSettingsSurfaceData(surface, activeSlug);
     if (!data || !isNodeContextGenerationCurrent(nodeGeneration)) return;
+    if (surface !== settingsSurfaceForRoute() || activeSlug !== readSettingsTab(surface)) return;
     drawSettingsSurface(surface, data, activeSlug);
   } catch (e) {
     const root = document.getElementById("settings-content");
@@ -76,6 +81,7 @@ async function refreshSettingsTab(slug, options = {}) {
     const nodeGeneration = captureNodeContextGeneration();
     const data = await loadSettingsSurfaceData(surface, activeSlug);
     if (!data || !isNodeContextGenerationCurrent(nodeGeneration)) return;
+    if (surface !== settingsSurfaceForRoute() || activeSlug !== readSettingsTab(surface)) return;
     updateSettingsTabContent(
       activeSlug,
       renderSettingsTabBody(surface, activeSlug, data),
@@ -677,12 +683,17 @@ function bindSettingsMarkdownFields(root) {
 }
 
 const SETTINGS_SURFACES = {
+  control: {
+    title: "Control",
+    basePath: "#/control",
+    storageKey: "refine_control_tab",
+    tabs: [{ slug: "processes", label: "Processes" }],
+  },
   settings: {
     title: "Settings",
     basePath: "#/settings",
     storageKey: "refine_settings_tab",
     tabs: [
-      { slug: "processes", label: "Processes" },
       { slug: "application", label: "Nodes" },
       { slug: "reporters", label: "Reporters" },
       { slug: "workflow", label: "Prompts" },
@@ -764,6 +775,7 @@ function setSettingsTab(slug) {
 
 
 function renderSettingsTabStrip(activeSlug, surface = settingsSurfaceForRoute()) {
+  if (surface === SETTINGS_SURFACES.control) return "";
   const releaseStatus = (surface === SETTINGS_SURFACES.settings)
     // The banner has its own authoritative read. Main settings redraws must not
     // morph this empty placeholder over its current status while that read is
@@ -793,13 +805,15 @@ function renderSettingsPane(slug, body, activeSlug) {
 }
 
 function bindSettingsTabHandlers() {
-  $$(".settings-tab", $("#settings-tabs")).forEach((btn) => {
+  $$("#settings-tabs .settings-tab").forEach((btn) => {
     bindOnce(btn, "click", () => {
       setSettingsTab(btn.dataset.tabTarget);
     });
   });
-  bindRuntimeUpgradeBanner();
-  refreshRuntimeUpgradeBanner();
+  if (settingsSurfaceForRoute() === SETTINGS_SURFACES.settings) {
+    bindRuntimeUpgradeBanner();
+    refreshRuntimeUpgradeBanner();
+  }
 }
 
 function renderSqliteCacheSection(error = null) {
@@ -883,10 +897,8 @@ function renderSettingsTabBody(surface, slug, data) {
     }
     return renderSettingsNoProjectTab(surface.title);
   }
+  if (surface === SETTINGS_SURFACES.control) return renderProcessesTab(data.processes, data.source);
   if (surface === SETTINGS_SURFACES.settings) {
-    if (slug === "processes") {
-      return renderProcessesTab(data.processes, data.source);
-    }
     if (slug === "reporters") {
       return renderSettingsReportersTab(data.reps, data.activeNodeLabel);
     }
@@ -969,9 +981,9 @@ function bindSettingsTabBody(surface, slug, data) {
     }
     return;
   }
+  if (surface === SETTINGS_SURFACES.control) bindSettingsProcessesTab(data.source);
   if (surface === SETTINGS_SURFACES.settings) {
-    if (slug === "processes") bindSettingsProcessesTab(data.source);
-    else if (slug === "reporters") bindSettingsReportersTab();
+    if (slug === "reporters") bindSettingsReportersTab();
     else if (slug === "application") {
       bindSettingsApplicationTab(data.currentProject);
       bindSettingsNodesTab();
