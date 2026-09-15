@@ -1,0 +1,19 @@
+{
+  "completed_at": null,
+  "config_revision": 82,
+  "created_at": "2026-09-15T16:04:53.921341228+00:00",
+  "error": null,
+  "event": {
+    "id": "custom",
+    "kind": "custom",
+    "name": "Fetch Goals from Email",
+    "source": null
+  },
+  "execution_state": "running",
+  "gate": "missing",
+  "goal_id": null,
+  "id": "481ca6f8b1aab30f63d041faeb70cf005619e638431b5173b5044d79e0e5e1a1",
+  "node_id": "default",
+  "result_count": 0,
+  "state": "running"
+}
