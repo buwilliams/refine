@@ -1690,7 +1690,13 @@ document.addEventListener("click", (e) => {
   if (menuSummary) {
     closeTopbarMenus(menuSummary);
   }
-  if (e.target.closest("#btn-new-goal")) {
+  const railCommand = e.target.closest("#rail-new-menu [data-rail-command]");
+  if (railCommand) {
+    e.preventDefault();
+    closeTopbarMenus();
+    closeMobileNavigation();
+    runCommand(railCommand.dataset.railCommand);
+  } else if (e.target.closest("#btn-new-goal")) {
     e.preventDefault();
     closeTopbarMenus();
     runCommand("goal.new");

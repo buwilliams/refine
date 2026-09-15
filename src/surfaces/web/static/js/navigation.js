@@ -18,7 +18,12 @@ function initWorkspaceNavigation() {
     }
   } catch { /* Storage can be unavailable in private browser contexts. */ }
   syncRailToggle();
-  rail.querySelectorAll(".nav-menu").forEach(menu => menu.addEventListener("toggle", positionRailMenus));
+  rail.querySelectorAll(".nav-menu").forEach(menu => menu.addEventListener("toggle", () => {
+    if (menu.open) closeTopbarMenus(menu);
+    menu.querySelector('summary[aria-haspopup="menu"]')?.setAttribute("aria-expanded", String(menu.open));
+    positionRailMenus();
+  }));
+  initRailNewMenu();
   document.getElementById("rail-navigation").addEventListener("scroll", positionRailMenus);
   window.addEventListener("resize", positionRailMenus);
   document.getElementById("rail-toggle").addEventListener("click", () => {
@@ -53,6 +58,8 @@ function initWorkspaceNavigation() {
     if (event.key === "Escape") {
       const menu = event.target.closest(".nav-menu");
       if (menu?.open) {
+        event.preventDefault();
+        event.stopPropagation();
         menu.open = false;
         menu.querySelector("summary")?.focus();
       } else closeMobileNavigation(true);
@@ -77,6 +84,36 @@ function initWorkspaceNavigation() {
   });
 }
 
+function initRailNewMenu() {
+  const menu = document.getElementById("rail-new-menu");
+  const summary = menu.querySelector("summary");
+  const items = [...menu.querySelectorAll('[role="menuitem"]')];
+  menu.addEventListener("keydown", event => {
+    const onSummary = event.target === summary;
+    const toggle = onSummary && ["Enter", " "].includes(event.key);
+    if (toggle || ["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (toggle && menu.open) {
+        menu.open = false;
+        return;
+      }
+      closeTopbarMenus(menu);
+      menu.open = true;
+      positionRailMenus();
+      let index = items.indexOf(document.activeElement);
+      if (event.key === "End" || (onSummary && event.key === "ArrowUp")) index = items.length - 1;
+      else if (event.key === "Home" || onSummary) index = 0;
+      else index = (index + (event.key === "ArrowUp" ? -1 : 1) + items.length) % items.length;
+      items[index].focus();
+    } else if (event.key === "Tab" && menu.open) {
+      // Continue the rail's normal tab order outside this menu.
+      menu.open = false;
+      summary.focus();
+    }
+  });
+}
+
 function positionRailMenus() {
   const rail = document.getElementById("navigation-rail");
   const mobile = window.matchMedia("(max-width: 700px)").matches;
@@ -85,7 +122,10 @@ function positionRailMenus() {
     if (!panel) return;
     const anchor = menu.querySelector("summary").getBoundingClientRect();
     panel.style.width = mobile ? `${rail.getBoundingClientRect().width - 16}px` : "";
-    panel.style.top = `${Math.max(8, Math.min(anchor.top, innerHeight - panel.getBoundingClientRect().height - 8))}px`;
+    const bounds = panel.getBoundingClientRect();
+    const left = mobile ? 8 : rail.getBoundingClientRect().right + 8;
+    panel.style.left = `${Math.max(8, Math.min(left, innerWidth - bounds.width - 8))}px`;
+    panel.style.top = `${Math.max(8, Math.min(anchor.top, innerHeight - bounds.height - 8))}px`;
   });
 }
 

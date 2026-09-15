@@ -1,6 +1,54 @@
 use super::*;
 
 #[test]
+fn static_rail_new_menu_exposes_shared_creation_commands() {
+    let static_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surfaces/web/static");
+    let index = fs::read_to_string(static_root.join("index.html")).unwrap();
+    let global = index
+        .split("class=\"rail-global topbar-actions\"")
+        .nth(1)
+        .unwrap();
+    let search = global.find("id=\"btn-command-palette\"").unwrap();
+    let new = global.find("id=\"rail-new-menu\"").unwrap();
+    let node = global.find("data-topbar-picker=\"node\"").unwrap();
+    assert!(search < new && new < node);
+    let menu = global[new..].split("</details>").next().unwrap();
+    assert!(menu.contains("navigation.svg#plus"));
+    assert!(menu.contains(r#"aria-label="New" title="New" aria-haspopup="menu""#));
+    assert!(menu.contains(r#"role="menu" aria-labelledby="rail-new-toggle""#));
+    let mut previous = 0;
+    for (command, label) in [
+        ("goal.new", "New Goal"),
+        ("plan.open", "New Plan"),
+        ("feature.new", "New Feature"),
+        ("goal.import", "Import"),
+    ] {
+        let position = menu
+            .find(&format!(
+                r#"data-rail-command="{command}">{label}</button>"#
+            ))
+            .unwrap();
+        assert!(position > previous);
+        previous = position;
+    }
+    assert_eq!(menu.matches(r#"role="menuitem""#).count(), 4);
+    for id in [
+        "rail-new-menu",
+        "rail-new-toggle",
+        "rail-new-options",
+        "btn-new-goal",
+        "btn-new-feature",
+        "btn-import",
+    ] {
+        assert_eq!(
+            index.matches(&format!(r#" id="{id}""#)).count(),
+            1,
+            "unique ID {id}"
+        );
+    }
+}
+
+#[test]
 fn web_server_route_groups_cover_static_web_surface() {
     let groups = API_GROUPS
         .iter()
