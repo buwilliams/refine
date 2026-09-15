@@ -31,3 +31,27 @@ test("asset edits require refreshed URLs and the updater preserves other homepag
     }
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
+
+test("missing asset references fail without partially updating the homepage", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "refine-website-assets-"));
+  try {
+    const site = path.join(root, "src/surfaces/website");
+    fs.mkdirSync(path.join(site, "assets"), { recursive: true });
+    fs.writeFileSync(path.join(site, "assets/site.css"), "body { color: navy; }");
+    fs.writeFileSync(path.join(site, "assets/site.js"), "console.log('website');");
+    const homepage = path.join(site, "index.html");
+    for (const present of ["site.css", "site.js"]) {
+      const missing = present === "site.css" ? "site.js" : "site.css";
+      const original = `<link href="/src/surfaces/website/assets/${present}?v=outdated">`;
+      fs.writeFileSync(homepage, original);
+      for (const write of [false, true]) {
+        assert.throws(() => versionWebsiteAssets(root, { write }), error => {
+          assert.equal(error.message, `Missing homepage reference to ${missing}`);
+          return true;
+        });
+        assert.equal(fs.readFileSync(homepage, "utf8"), original,
+          "a missing reference must leave the entire homepage untouched");
+      }
+    }
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
