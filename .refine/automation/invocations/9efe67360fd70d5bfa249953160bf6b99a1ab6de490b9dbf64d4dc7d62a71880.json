@@ -481,11 +481,56 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "succeeded",
+  "results": {
+    "default-governance": {
+      "invocation_id": "9efe67360fd70d5bfa249953160bf6b99a1ab6de490b9dbf64d4dc7d62a71880",
+      "binding_id": "default-governance",
+      "role": "governance",
+      "outcome": "success",
+      "summary": "PASS — the implementation meets the Goal, fits the architecture, and supports Refine’s purpose. Built-in auto-promotion is removed completely; users and configured Skills can start Goals through the existing lifecycle. Configuration migration remains in infrastructure, shared start validation stays in application, and surfaces expose that behavior consistently. This preserves user control over when captured work enters execution without introducing replacement scheduling policy. Quality supports the changed behavior; the full repository suite and formatting remain affected by documented baseline failures. No required corrections found.\n\n",
+      "evidence": [
+        "Reviewed clean candidate 3939536739ab8a607140f4f77033774b8ac56050 against the Goal and all five plan tasks.",
+        "Removed configuration, UI control, scheduler promotion, and promotion side effects from creation, imports, settings updates, and project attachment.",
+        "settings.rs:224 discards legacy values through locked migration. workflow.rs:140 centralizes explicit-start validation. Import responses preserve promoted: 0 compatibility.",
+        "Quality’s final focused Rust run passed 18 tests covering architecture, migration, explicit starts, and aged Backlog preservation. Retained logs corroborate the 13 persistent baseline Rust failures.",
+        "Governance independently reran Runtime browser tests: 2 passed. Candidate diff check passed; worktree is clean."
+      ],
+      "artifacts": {
+        "necessary_corrections": [],
+        "optional_improvements": []
+      }
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "default-governance",
+      "checkout": {
+        "observation": {
+          "branch": "refine/00000T19PJ29Y11YDVAXWRJ001/round-1",
+          "head_commit": "3939536739ab8a607140f4f77033774b8ac56050",
+          "status_porcelain": []
+        },
+        "tree": "9cada55e76ae2d654a3275865b9189dd82ee2cf6"
+      },
+      "checkout_recorded": true,
+      "diagnostic": null,
+      "host_bound_result": true,
+      "observational_violation": false,
+      "operation_id": null,
+      "process_id": "proc-1789508414842-1014481-39471",
+      "prompt_bytes": 6493,
+      "provider_session_id": null,
+      "purpose": "work",
+      "raw_output": "{\n  \"outcome\": \"success\",\n  \"evidence\": [\n    \"Reviewed clean candidate 3939536739ab8a607140f4f77033774b8ac56050 against the Goal and all five plan tasks.\",\n    \"Removed configuration, UI control, scheduler promotion, and promotion side effects from creation, imports, settings updates, and project attachment.\",\n    \"settings.rs:224 discards legacy values through locked migration. workflow.rs:140 centralizes explicit-start validation. Import responses preserve promoted: 0 compatibility.\",\n    \"Quality’s final focused Rust run passed 18 tests covering architecture, migration, explicit starts, and aged Backlog preservation. Retained logs corroborate the 13 persistent baseline Rust failures.\",\n    \"Governance independently reran Runtime browser tests: 2 passed. Candidate diff check passed; worktree is clean.\"\n  ],\n  \"artifacts\": {\n    \"necessary_corrections\": [],\n    \"optional_improvements\": []\n  },\n  \"summary\": \"PASS — the implementation meets the Goal, fits the architecture, and supports Refine’s purpose. Built-in auto-promotion is removed completely; users and configured Skills can start Goals through the existing lifecycle. Configuration migration remains in infrastructure, shared start validation stays in application, and surfaces expose that behavior consistently. This preserves user control over when captured work enters execution without introducing replacement scheduling policy. Quality supports the changed behavior; the full repository suite and formatting remain affected by documented baseline failures. No required corrections found.\\n\\n\"\n}",
+      "received_at": "2026-09-15T21:42:07.955600115+00:00",
+      "started_at": "2026-09-15T21:40:14.796679178+00:00",
+      "workflow_revision": 2
+    }
+  ],
   "created_at": "2026-09-15T21:40:14.215289048+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-15T21:42:09.652666129+00:00",
   "error": null,
   "action_applied": false
 }

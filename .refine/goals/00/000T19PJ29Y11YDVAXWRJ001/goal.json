@@ -3,10 +3,30 @@
   "branch_name": "refine/00000T19PJ29Y11YDVAXWRJ001/round-1",
   "candidate_commit": "3939536739ab8a607140f4f77033774b8ac56050",
   "created": "2026-09-15T20:46:20Z",
-  "event_generation": 6,
+  "event_generation": 7,
   "feature_id": null,
   "feature_order": null,
   "id": "00000T19PJ29Y11YDVAXWRJ001",
+  "integration_history": [
+    {
+      "complete": true,
+      "generation": 6,
+      "integration": {
+        "candidate_commit": "3939536739ab8a607140f4f77033774b8ac56050",
+        "integrated_at": "2026-09-15T21:42:16.666785832+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n .../work_items/service/goal_authoring/authoring.rs |   2 +-\n src/application/work_items/service/workflow.rs     |  11 +-\n src/application/workflow/engine/behaviors/mod.rs   |   3 +-\n src/application/workflow/engine/execution/mod.rs   |  17 +--\n src/application/workflow/engine/mod.rs             |   1 -\n src/application/workflow/engine/policy/mod.rs      |  22 ----\n src/application/workflow/engine/scheduling/mod.rs  | 136 ---------------------\n src/application/workflow/mod.rs                    |   3 +-\n .../workflow/tests/execution_ownership.rs          |  82 ++++++++++---\n src/application/workflow/tests/mod.rs              |  20 +--\n src/architecture_tests.rs                          |   1 -\n .../process/supervisor/config/settings.rs          |   3 +-\n .../process/supervisor/config/settings_codec.rs    |   3 -\n .../supervisor/config/settings_codec/tests.rs      | 119 ++++++++++++++++++\n .../process/supervisor/config/settings_sections.rs |   1 -\n src/surfaces/cli/tests/system/daemon.rs            |  22 +++-\n .../03-application/02-workflow/01-backlog.md       |   4 +-\n .../02-workflow/11-consistency-contract.md         |   2 +-\n .../docs/runbooks/scale-reliability-migration.md   |   2 +-\n src/surfaces/refine-hub/product/reference.md       |   6 -\n .../web/static/js/features/settings_runtime.js     |  24 +---\n src/surfaces/web_server/project_routes/settings.rs |  15 ---\n .../web_server/project_routes/target_app.rs        |   3 -\n .../web_server/tests/features/authoring.rs         |   6 +-\n .../web_server/tests/features/membership.rs        |  17 ++-\n src/surfaces/web_server/tests/goals/creation.rs    |   2 +-\n src/surfaces/web_server/tests/goals/details.rs     |  18 +--\n src/surfaces/web_server/tests/imports.rs           | 104 ++++++++--------\n src/surfaces/web_server/tests/mod.rs               |  19 +++\n src/surfaces/web_server/tests/project_runtime.rs   |  45 +++++--\n src/surfaces/web_server/work_routes.rs             |   2 -\n .../work_routes/feature_routes/authoring.rs        |   5 -\n src/surfaces/web_server/work_routes/goal_routes.rs |   8 +-\n .../work_routes/goal_routes/authoring.rs           |   6 -\n .../web_server/work_routes/import_routes.rs        |   4 +-\n .../work_routes/import_routes/persistence.rs       |  30 +----\n tests/web_settings_runtime.test.js                 |  13 ++\n 37 files changed, 405 insertions(+), 376 deletions(-)\n delete mode 100644 src/application/workflow/engine/scheduling/mod.rs",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "47ccc7c62a1c8c131c37c6884c88f262ec2743ea"
+      },
+      "round_idx": 0
+    }
+  ],
   "name": "Remove the auto-promote configuration from Refine since this can now be handled",
   "node_id": "default",
   "notes": [],
@@ -46,51 +66,52 @@
       "created": "2026-09-15T20:46:20Z",
       "event_configuration": {
         "events": {
-          "workflow.governance.enter": {
-            "bindings": [
-              {
-                "enabled": true,
-                "id": "default-governance",
-                "inputs": {},
-                "mode": "blocking",
-                "order": 0,
-                "overrides": null,
-                "scope": {
-                  "node_id": null
-                },
-                "skill_id": "default-governance"
-              }
-            ],
+          "workflow.governance.exit": {
+            "bindings": [],
             "enabled": true,
-            "id": "workflow.governance.enter",
+            "id": "workflow.governance.exit",
             "kind": "system",
-            "name": "Workflow Governance Enter",
+            "name": "Workflow Governance Exit",
             "on_success": null,
             "parameters": [],
             "scope": {
               "node_id": null
             },
-            "source": "workflow.governance.enter"
+            "source": "workflow.governance.exit"
           }
         },
         "revision": 82,
         "schema_version": 3,
-        "skills": {
-          "default-governance": {
-            "enabled": true,
-            "id": "default-governance",
-            "name": "Governance",
-            "parameters": [],
-            "prompt": "## Governance\n\nVerify that the implementation meets the user-defined Goal, fits the system architecture, and serves the project's purpose.\n\n### Outcome\n\nA clear assessment of whether the implementation satisfies all three. Begin with the verdict, then briefly explain how the work meets the Goal, fits the architecture, and supports the project's purpose, using concrete evidence from the implementation and Quality results. For each gap, describe what falls short, why it matters, and the recommended correction. Separate necessary corrections from optional improvements.\n\n### Guardrails\n\n- Read the context that helps explain the user's Goal, the system architecture, and the project's purpose.\n- Compare the implementation with the user's desired outcome as well as the plan. Completing the plan and passing tests alone do not establish that the Goal is met.\n- Look for clear responsibilities, shared behavior implemented in one place, and interfaces that remain easy to use and maintain.\n- Judge design choices by how they serve the project. Allow sound approaches that differ from personal preference.\n- Group related issues by their underlying cause so the next step can address them together.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
-            "provenance": "refine-default-v1",
-            "role": "task",
-            "scope": {
-              "node_id": null
-            }
-          }
-        }
+        "skills": {}
       },
       "event_results": {
+        "9efe67360fd70d5bfa249953160bf6b99a1ab6de490b9dbf64d4dc7d62a71880": {
+          "candidate_commit": "3939536739ab8a607140f4f77033774b8ac56050",
+          "generation": 6,
+          "results": {
+            "default-governance": {
+              "artifacts": {
+                "necessary_corrections": [],
+                "optional_improvements": []
+              },
+              "binding_id": "default-governance",
+              "evidence": [
+                "Reviewed clean candidate 3939536739ab8a607140f4f77033774b8ac56050 against the Goal and all five plan tasks.",
+                "Removed configuration, UI control, scheduler promotion, and promotion side effects from creation, imports, settings updates, and project attachment.",
+                "settings.rs:224 discards legacy values through locked migration. workflow.rs:140 centralizes explicit-start validation. Import responses preserve promoted: 0 compatibility.",
+                "Quality’s final focused Rust run passed 18 tests covering architecture, migration, explicit starts, and aged Backlog preservation. Retained logs corroborate the 13 persistent baseline Rust failures.",
+                "Governance independently reran Runtime browser tests: 2 passed. Candidate diff check passed; worktree is clean."
+              ],
+              "invocation_id": "9efe67360fd70d5bfa249953160bf6b99a1ab6de490b9dbf64d4dc7d62a71880",
+              "outcome": "success",
+              "role": "governance",
+              "summary": "PASS — the implementation meets the Goal, fits the architecture, and supports Refine’s purpose. Built-in auto-promotion is removed completely; users and configured Skills can start Goals through the existing lifecycle. Configuration migration remains in infrastructure, shared start validation stays in application, and surfaces expose that behavior consistently. This preserves user control over when captured work enters execution without introducing replacement scheduling policy. Quality supports the changed behavior; the full repository suite and formatting remain affected by documented baseline failures. No required corrections found.\n\n"
+            }
+          },
+          "round_idx": 0,
+          "source": "workflow.governance.enter",
+          "state": "succeeded"
+        },
         "dff47d99820f47c5f96601cd1cdb86242325091b876d7cccb02ca95791f98e5b": {
           "candidate_commit": "895be0c5e7527f5afda70523122a9fa7f961b75a",
           "generation": 5,
@@ -433,8 +454,87 @@
               }
             }
           }
+        },
+        "6:default:workflow.governance.exit": {
+          "events": {
+            "workflow.governance.exit": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.governance.exit",
+              "kind": "system",
+              "name": "Workflow Governance Exit",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.governance.exit"
+            }
+          },
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {}
+        },
+        "6:default:workflow.governance.success": {
+          "events": {},
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {}
+        },
+        "7:default:workflow.review.enter": {
+          "events": {
+            "workflow.review.enter": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.review.enter",
+              "kind": "system",
+              "name": "Workflow Review Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.review.enter"
+            }
+          },
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {}
         }
       },
+      "governance_candidate_commit": "3939536739ab8a607140f4f77033774b8ac56050",
+      "governance_checked_at": "2026-09-15T21:42:10Z",
+      "governance_details": {
+        "candidate_commit": "3939536739ab8a607140f4f77033774b8ac56050",
+        "configured": true,
+        "failed_actions": [],
+        "phase": "post_implementation",
+        "skill_results": [
+          {
+            "artifacts": {
+              "necessary_corrections": [],
+              "optional_improvements": []
+            },
+            "binding_id": "workflow.governance.enter:default-governance",
+            "evidence": [
+              "Reviewed clean candidate 3939536739ab8a607140f4f77033774b8ac56050 against the Goal and all five plan tasks.",
+              "Removed configuration, UI control, scheduler promotion, and promotion side effects from creation, imports, settings updates, and project attachment.",
+              "settings.rs:224 discards legacy values through locked migration. workflow.rs:140 centralizes explicit-start validation. Import responses preserve promoted: 0 compatibility.",
+              "Quality’s final focused Rust run passed 18 tests covering architecture, migration, explicit starts, and aged Backlog preservation. Retained logs corroborate the 13 persistent baseline Rust failures.",
+              "Governance independently reran Runtime browser tests: 2 passed. Candidate diff check passed; worktree is clean."
+            ],
+            "invocation_id": "9efe67360fd70d5bfa249953160bf6b99a1ab6de490b9dbf64d4dc7d62a71880",
+            "outcome": "success",
+            "role": "governance",
+            "summary": "PASS — the implementation meets the Goal, fits the architecture, and supports Refine’s purpose. Built-in auto-promotion is removed completely; users and configured Skills can start Goals through the existing lifecycle. Configuration migration remains in infrastructure, shared start validation stays in application, and surfaces expose that behavior consistently. This preserves user control over when captured work enters execution without introducing replacement scheduling policy. Quality supports the changed behavior; the full repository suite and formatting remain affected by documented baseline failures. No required corrections found.\n\n"
+          }
+        ],
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T19PJ29Y11YDVAXWRJ001-round-1"
+      },
+      "governance_message": "Governance checks passed.",
+      "governance_recovery_analysis": null,
+      "governance_recovery_round_prompt": null,
+      "governance_rule_actions": [],
       "implementation_report": "workflow.implement.enter:default-implement: Implemented all five tasks. Backlog Goals now wait for explicit user or Skill starts. Changes remain in the Goal worktree for Quality and Governance.",
       "implementation_reported_at": "2026-09-15T21:19:00Z",
       "logs": [],
@@ -610,7 +710,8 @@
       ],
       "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "updated": "2026-09-15T21:40:13Z",
+      "rule_state": "passed",
+      "updated": "2026-09-15T21:42:11Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-15T20:46:22Z",
         "generation": 2,
@@ -714,12 +815,26 @@
         "workflow_revision": 2,
         "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T19PJ29Y11YDVAXWRJ001-round-1"
       },
+      "workflow_git_remote": "origin",
+      "workflow_integration": {
+        "candidate_commit": "3939536739ab8a607140f4f77033774b8ac56050",
+        "integrated_at": "2026-09-15T21:42:16.666785832+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n .../work_items/service/goal_authoring/authoring.rs |   2 +-\n src/application/work_items/service/workflow.rs     |  11 +-\n src/application/workflow/engine/behaviors/mod.rs   |   3 +-\n src/application/workflow/engine/execution/mod.rs   |  17 +--\n src/application/workflow/engine/mod.rs             |   1 -\n src/application/workflow/engine/policy/mod.rs      |  22 ----\n src/application/workflow/engine/scheduling/mod.rs  | 136 ---------------------\n src/application/workflow/mod.rs                    |   3 +-\n .../workflow/tests/execution_ownership.rs          |  82 ++++++++++---\n src/application/workflow/tests/mod.rs              |  20 +--\n src/architecture_tests.rs                          |   1 -\n .../process/supervisor/config/settings.rs          |   3 +-\n .../process/supervisor/config/settings_codec.rs    |   3 -\n .../supervisor/config/settings_codec/tests.rs      | 119 ++++++++++++++++++\n .../process/supervisor/config/settings_sections.rs |   1 -\n src/surfaces/cli/tests/system/daemon.rs            |  22 +++-\n .../03-application/02-workflow/01-backlog.md       |   4 +-\n .../02-workflow/11-consistency-contract.md         |   2 +-\n .../docs/runbooks/scale-reliability-migration.md   |   2 +-\n src/surfaces/refine-hub/product/reference.md       |   6 -\n .../web/static/js/features/settings_runtime.js     |  24 +---\n src/surfaces/web_server/project_routes/settings.rs |  15 ---\n .../web_server/project_routes/target_app.rs        |   3 -\n .../web_server/tests/features/authoring.rs         |   6 +-\n .../web_server/tests/features/membership.rs        |  17 ++-\n src/surfaces/web_server/tests/goals/creation.rs    |   2 +-\n src/surfaces/web_server/tests/goals/details.rs     |  18 +--\n src/surfaces/web_server/tests/imports.rs           | 104 ++++++++--------\n src/surfaces/web_server/tests/mod.rs               |  19 +++\n src/surfaces/web_server/tests/project_runtime.rs   |  45 +++++--\n src/surfaces/web_server/work_routes.rs             |   2 -\n .../work_routes/feature_routes/authoring.rs        |   5 -\n src/surfaces/web_server/work_routes/goal_routes.rs |   8 +-\n .../work_routes/goal_routes/authoring.rs           |   6 -\n .../web_server/work_routes/import_routes.rs        |   4 +-\n .../work_routes/import_routes/persistence.rs       |  30 +----\n tests/web_settings_runtime.test.js                 |  13 ++\n 37 files changed, 405 insertions(+), 376 deletions(-)\n delete mode 100644 src/application/workflow/engine/scheduling/mod.rs",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "47ccc7c62a1c8c131c37c6884c88f262ec2743ea"
+      },
       "workspace_branch": "refine/00000T19PJ29Y11YDVAXWRJ001/round-1"
     }
   ],
-  "status": "governance",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-09-15T21:40:13Z",
+  "updated": "2026-09-15T21:42:17Z",
   "workflow_controls": [
     {
       "actor": "operator",
@@ -793,7 +908,17 @@
       "round_idx": 0,
       "to": "governance",
       "workflow_revision": 31
+    },
+    {
+      "at": "2026-09-15T21:42:17.839198761+00:00",
+      "forced": false,
+      "from": "governance",
+      "generation": 7,
+      "node_id": "default",
+      "round_idx": 0,
+      "to": "review",
+      "workflow_revision": 40
     }
   ],
-  "workflow_revision": 32
+  "workflow_revision": 40
 }
