@@ -3,7 +3,7 @@
   "branch_name": "refine/DR545471066EDAC30DDBD3C63E/round-1",
   "candidate_commit": "095848579c7b922ea088b96588b99729a74a84f9",
   "created": "2026-09-15T12:41:51Z",
-  "event_generation": 11,
+  "event_generation": 12,
   "feature_id": null,
   "feature_order": null,
   "id": "DR545471066EDAC30DDBD3C63E",
@@ -248,6 +248,26 @@
                 "node_id": null
               },
               "source": "workflow.review.enter"
+            }
+          },
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {}
+        },
+        "12:default:workflow.done.enter": {
+          "events": {
+            "workflow.done.enter": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.done.enter",
+              "kind": "system",
+              "name": "Workflow Done Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.done.enter"
             }
           },
           "revision": 82,
@@ -1215,9 +1235,9 @@
       "workspace_branch": "refine/DR545471066EDAC30DDBD3C63E/round-1"
     }
   ],
-  "status": "review",
+  "status": "done",
   "target_branch": "main",
-  "updated": "2026-09-15T15:31:14Z",
+  "updated": "2026-09-15T16:03:21Z",
   "workflow_context": "",
   "workflow_controls": [
     {
@@ -1376,7 +1396,17 @@
       "round_idx": 0,
       "to": "review",
       "workflow_revision": 57
+    },
+    {
+      "at": "2026-09-15T16:03:21.727553296+00:00",
+      "forced": false,
+      "from": "review",
+      "generation": 12,
+      "node_id": "default",
+      "round_idx": 0,
+      "to": "done",
+      "workflow_revision": 58
     }
   ],
-  "workflow_revision": 57
+  "workflow_revision": 58
 }
