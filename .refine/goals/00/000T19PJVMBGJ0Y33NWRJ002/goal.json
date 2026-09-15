@@ -3,7 +3,7 @@
   "branch_name": "refine/00000T19PJVMBGJ0Y33NWRJ002/round-1",
   "candidate_commit": null,
   "created": "2026-09-15T20:47:12Z",
-  "event_generation": 4,
+  "event_generation": 5,
   "feature_id": null,
   "feature_order": null,
   "id": "00000T19PJVMBGJ0Y33NWRJ002",
@@ -205,6 +205,26 @@
           "revision": 82,
           "schema_version": 3,
           "skills": {}
+        },
+        "5:default:workflow.failed.enter": {
+          "events": {
+            "workflow.failed.enter": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.failed.enter",
+              "kind": "system",
+              "name": "Workflow Failed Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.failed.enter"
+            }
+          },
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {}
         }
       },
       "logs": [],
@@ -273,9 +293,10 @@
       "workspace_branch": "refine/00000T19PJVMBGJ0Y33NWRJ002/round-1"
     }
   ],
-  "status": "cancelled",
+  "status": "failed",
   "target_branch": "main",
-  "updated": "2026-09-15T20:48:32Z",
+  "updated": "2026-09-15T20:48:47Z",
+  "workflow_context": "",
   "workflow_controls": [
     {
       "actor": "operator",
@@ -296,6 +317,39 @@
       "request_id": "e549adbe-9c40-4da0-be84-7dbe0151201c",
       "source_round": 1,
       "to": "cancelled"
+    },
+    {
+      "at": "2026-09-15T20:48:47Z",
+      "decision": true,
+      "forced": true,
+      "from": "cancelled",
+      "generation": 5,
+      "integration_performed": false,
+      "integration_requested": false,
+      "overridden_requirements": [
+        "transition_policy",
+        "workflow_evidence_gates"
+      ],
+      "previous_attempt": {
+        "claimed_at": "2026-09-15T20:47:12Z",
+        "generation": 2,
+        "round_idx": 0,
+        "workflow_revision": 2
+      },
+      "request": {
+        "actor": "Buddy Williams",
+        "context": "",
+        "expected_revision": 10,
+        "force": true,
+        "invocation_id": null,
+        "reason": "User selected workflow step",
+        "request_id": "item-6890c7ca-fc3d-4255-9df1-0b8602c5e333",
+        "to": "failed"
+      },
+      "request_id": "item-6890c7ca-fc3d-4255-9df1-0b8602c5e333",
+      "retained_candidate": null,
+      "source_round": 1,
+      "to": "failed"
     }
   ],
   "workflow_events": [
@@ -340,7 +394,18 @@
       "supersedes_execution": true,
       "to": "cancelled",
       "workflow_revision": 10
+    },
+    {
+      "at": "2026-09-15T20:48:47.238363956+00:00",
+      "forced": true,
+      "from": "cancelled",
+      "generation": 5,
+      "node_id": "default",
+      "round_idx": 0,
+      "supersedes_execution": true,
+      "to": "failed",
+      "workflow_revision": 11
     }
   ],
-  "workflow_revision": 10
+  "workflow_revision": 11
 }
