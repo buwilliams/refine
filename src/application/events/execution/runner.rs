@@ -318,7 +318,7 @@ impl FileEventService {
                     ("context", &prompt_context.to_string()),
                     (
                         "execution",
-                        &json!({"binding_id": pinned.binding.id, "role": pinned.skill.role})
+                        &json!({"invocation_id": id, "binding_id": pinned.binding.id, "role": pinned.skill.role})
                             .to_string(),
                     ),
                     ("completion_contract", &contract.to_string()),

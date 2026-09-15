@@ -138,6 +138,59 @@ fn provider(fixture: &Fixture, script: &str) -> ProviderEnv {
 
 #[cfg(unix)]
 #[test]
+fn startup_skill_can_use_its_invocation_identity_without_returning_identity_fields() {
+    let _env = crate::infrastructure::agents::invocation::smoke_ai_env_lock()
+        .lock()
+        .unwrap_or_else(|p| p.into_inner());
+    let fixture = Fixture::new();
+    let _restore = provider(
+        &fixture,
+        r#"
+import json,sys,pathlib
+prompt=' '.join(sys.argv[1:])
+decode=json.JSONDecoder().raw_decode
+execution=decode(prompt.split('Skill execution:\n',1)[1])[0]
+contract=decode(prompt.split('Refine completion contract (supplied by the system):\n',1)[1])[0]
+assert 'from the Skill execution context' in prompt
+assert not any(key in contract for key in ['invocation_id','binding_id','role'])
+pathlib.Path('request-id').write_text('startup-email-' + execution['invocation_id'])
+print(json.dumps(contract))
+"#,
+    );
+    let service = fixture.service();
+    let mut skill: serde_json::Value = serde_json::from_str(include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/src/surfaces/refine-hub/docs/runbooks/skills/fetch-goals-from-email-on-startup.json"
+    )))
+    .unwrap();
+    let trigger = skill.as_object_mut().unwrap().remove("trigger").unwrap();
+    service
+        .save(
+            "skills",
+            "fetch-goals-from-email-on-startup",
+            json!({"revision":service.config().unwrap().revision,"item":skill,"trigger":trigger}),
+        )
+        .unwrap();
+    let invocation = prepared(&fixture, "node.startup.ready");
+    let completed = service.execute(&invocation.id, || Ok(())).unwrap();
+    assert_eq!(completed.state, InvocationState::Succeeded, "{completed:?}");
+    assert_eq!(completed.results.len(), 1);
+    assert_eq!(
+        std::fs::read_to_string(fixture.0.join("request-id")).unwrap(),
+        format!("startup-email-{}", invocation.id)
+    );
+    let result = completed.results.values().next().unwrap();
+    assert_eq!(result.invocation_id, invocation.id);
+    assert_eq!(result.binding_id, invocation.bindings[0].binding.id);
+    assert_eq!(result.role, "task");
+    assert_eq!(
+        service.execute(&invocation.id, || Ok(())).unwrap(),
+        completed
+    );
+}
+
+#[cfg(unix)]
+#[test]
 fn arbitrary_plan_shapes_are_retained_without_grading() {
     let _env = crate::infrastructure::agents::invocation::smoke_ai_env_lock()
         .lock()
