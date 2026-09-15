@@ -2,7 +2,7 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 const { openApp, apiFixture, SKIP } = require("./support/web_app");
 
-test("Main collapses independently of Windows, persists, and works in a mobile drawer", { skip: SKIP }, async () => {
+test("Main collapses independently of Tools, persists, and works in a mobile drawer", { skip: SKIP }, async () => {
   const app = await openApp();
   try {
     const { page } = app;

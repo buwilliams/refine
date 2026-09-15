@@ -213,7 +213,7 @@ registerNavigationCommand("nav.features", "Features", "#/features", ["feature", 
 registerNavigationCommand("nav.goals", "Goals", "#/goals", ["issues", "work"]);
 registerNavigationCommand("nav.control", "Control", "#/control", ["processes", "workers", "start", "stop"]);
 registerNavigationCommand("nav.changes", "Changes", "#/changes", ["merges"]);
-registerCommand({ id: "toolbar.logs", title: "View System logs", group: "Windows", aliases: ["logs", "activity"], run: () => openSystemLogs() });
+registerCommand({ id: "toolbar.logs", title: "View System logs", group: "Tools", aliases: ["logs", "activity"], run: () => openSystemLogs() });
 for (const [surfaceKey, surface] of Object.entries(SETTINGS_SURFACES || {})) {
   if (surfaceKey === "control") continue;
   const label = surface.title || surfaceKey;
@@ -287,7 +287,7 @@ registerCommand({
 registerCommand({
   id: "toolbar.toggle",
   title: "Return to last window or main screen",
-  group: "Windows",
+  group: "Tools",
   aliases: ["toolbar", "toggle-toolbar", "chat", "toggle-chat"],
   run: () => toggleToolbar(),
 });
@@ -308,7 +308,7 @@ for (const [id, title, mode, aliases, keywords] of [
   registerCommand({
     id,
     title,
-    group: "Windows",
+    group: "Tools",
     aliases,
     keywords,
     run: () => createToolbarTab(mode),
@@ -318,7 +318,7 @@ for (const [id, title, mode, aliases, keywords] of [
 registerCommand({
   id: "files.open",
   title: "Files: open file browser",
-  group: "Windows",
+  group: "Tools",
   aliases: ["files", "open-files", "file-browser"],
   keywords: ["source tree file browser"],
   parse: (input) => {
@@ -331,7 +331,7 @@ registerCommand({
 registerCommand({
   id: "files.search",
   title: "Files: search for file",
-  group: "Windows",
+  group: "Tools",
   aliases: ["search-files", "find-file", "file-search"],
   keywords: ["source tree file browser"],
   parse: (input) => {

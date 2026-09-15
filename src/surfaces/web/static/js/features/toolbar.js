@@ -501,7 +501,7 @@ function drawToolbar() {
             ? renderTerminalPanel(active)
             : goalLogsActive
               ? renderGoalLogPanel(active)
-              : `<div class="toolbar-empty muted" data-testid="toolbar-empty">Use Windows to open a tool or agent.</div>`}
+              : `<div class="toolbar-empty muted" data-testid="toolbar-empty">Use Tools to open a tool or agent.</div>`}
     </div>
   `, () => {
     if (filesActive) bindFilesPanel(root);

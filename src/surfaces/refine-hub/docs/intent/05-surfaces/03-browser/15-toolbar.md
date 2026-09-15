@@ -1,8 +1,8 @@
-# Windows (formerly Toolbar)
+# Tools (formerly Toolbar)
 
 ## Key Ideas
 
-- **Lazy Utility Windows**: the Windows section starts empty and creates a tab only when the user asks for one.
+- **Lazy Utility Windows**: the Tools section starts empty and creates a tab only when the user asks for one.
 - **Native Agent Harnesses**: agent interaction uses the configured frontier-lab CLI in a real terminal rather than a Refine-owned chat imitation.
 - **Independent Agents**: every Agent command starts a distinct general-purpose agent session; agents are not coupled to Goal Agent turns or an automatic Supervisor role.
 - **Shared Terminal Surface**: Terminal, Agent, Agent in Worktree, Planning Agent, Goal, and Standalone use one terminal renderer and backend lifecycle.
@@ -14,7 +14,7 @@
 
 Tools and agents open as full-height windows selected in the left rail. Switching windows preserves their independent sessions and keeps the underlying main screen mounted. Refine orchestrates agents, workflow, and evidence, while native agent harnesses retain their conversation, tool-call, approval, and rendering UX.
 
-Windows in the left rail offers:
+Tools in the left rail offers:
 
 - Agent;
 - Agent in Worktree;
@@ -56,7 +56,7 @@ Each selection creates or opens only the requested surface. Repeated Agent selec
 - terminal sizing ignores hidden or unmeasurable layouts, retains the last valid
   geometry, and refits the renderer and managed PTY together after restore,
   viewport changes and rail collapse;
-- Windows stays in the rail; the former dock resize handle and fullscreen controls are removed;
+- Tools stays in the rail; the former dock resize handle and fullscreen controls are removed;
 - an interrupted browser event stream is not evidence that the managed process exited;
 - terminal state remains tab-specific, including process identifier, provider, current directory, output, and worktree identity;
 - reselecting an Agent, Planning Agent, Goal, or Standalone terminal preserves

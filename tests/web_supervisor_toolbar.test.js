@@ -472,7 +472,7 @@ test("Toolbar starts empty and creates independent general Agent tabs lazily", a
 
   assert.deepEqual([...browser.runtime.tabIds()], []);
   browser.runtime.draw();
-  assert.match(browser.html(), /Use Windows to open/);
+  assert.match(browser.html(), /Use Tools to open/);
 
   const first = await browser.runtime.create("agent");
   const second = await browser.runtime.create("agent");
