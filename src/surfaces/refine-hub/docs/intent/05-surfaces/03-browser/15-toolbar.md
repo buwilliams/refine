@@ -14,7 +14,7 @@
 
 Tools and agents open as full-height windows selected in the left rail. Switching windows preserves their independent sessions and keeps the underlying main screen mounted. Refine orchestrates agents, workflow, and evidence, while native agent harnesses retain their conversation, tool-call, approval, and rendering UX.
 
-Tools in the left rail offers:
+The Tools menu in the left rail offers:
 
 - Agent;
 - Agent in Worktree;
@@ -24,7 +24,7 @@ Tools in the left rail offers:
 - Terminal;
 - Planning Agent.
 
-Each selection creates or opens only the requested surface. Repeated Agent selections create independent sessions with unique labels such as Agent, Agent 2, and Agent 3. Agent in Worktree and Standalone use isolated Refine worktrees. Goal tabs attach to the workflow-owned Goal Agent already implementing that Goal and never launch a duplicate. Opening a live Goal tab queues a bounded background attachment operation immediately, then waits for the exact runtime session to acknowledge one-way protection from its idle and completion watchdogs before presenting the terminal; an exit, mismatched session, or unavailable acknowledgment fails the operation instead of returning a stale snapshot. This exemption is specific to a Toolbar-opened workflow Goal Agent and does not change other terminal attachment paths.
+Each selection creates or opens only the requested surface. Repeated Agent selections create independent sessions with unique labels such as Agent, Agent 2, and Agent 3. Agent in Worktree and Standalone use isolated Refine worktrees. Goal tabs attach to the workflow-owned Goal Agent already implementing that Goal and never launch a duplicate. Opening a live Goal tab queues a bounded background attachment operation immediately, then waits for the exact runtime session to acknowledge one-way protection from its idle and completion watchdogs before presenting the terminal; an exit, mismatched session, or unavailable acknowledgment fails the operation instead of returning a stale snapshot. This exemption is specific to a workflow Goal Agent opened from the rail and does not change other terminal attachment paths.
 
 ## Lifecycle
 
@@ -47,7 +47,7 @@ Each selection creates or opens only the requested surface. Repeated Agent selec
 - when an explicit Stop is already in progress, closing its tab only detaches
   the browser surface and never sends a duplicate Stop; the original
   workflow-aware stop settlement continues and any late failure remains visible;
-- stopping an agent keeps the rest of the Toolbar interactive, and an
+- stopping an agent keeps the other tool windows interactive, and an
   authoritative terminal-exit event releases the terminal UI even while
   workflow stop settlement is still finishing;
 - when explicit cancellation already won, Stop reports the terminal cancelled

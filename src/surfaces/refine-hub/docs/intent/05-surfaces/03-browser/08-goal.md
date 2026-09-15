@@ -69,4 +69,4 @@ Round plan display reads both recorded Plan Skill results and legacy implementat
 
 Activity leads with why the Round failed, with the recorded cause visible before gate results and event history. When a Skill contract error includes an explicit cause after invocation metadata, surface that cause first while retaining the complete recorded error. Diagnostic evidence, rule actions, workflow decisions, and log details are inline, without nested disclosure toggles or boxed panels. Long evidence wraps; the modal owns vertical scrolling, with no additional Activity or log scrollbar.
 
-A visible View Logs button opens the Goal-scoped Toolbar log reader and dismisses the modal. Round Activity explains the attempt; the Toolbar provides full retained log search and live output.
+A visible View Logs button opens the Goal-scoped log window and dismisses the modal. Round Activity explains the attempt; the log window provides full retained log search and live output.

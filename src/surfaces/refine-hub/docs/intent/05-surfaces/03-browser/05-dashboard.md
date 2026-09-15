@@ -20,8 +20,8 @@ The Dashboard should provide broad context without replacing deeper surfaces. Us
 Current implementation details that matter to intent:
 
 - dashboard data comes from daemon-backed projection and diagnostic summaries;
-- routine state-sync health lives as a compact Healthy/Unhealthy label in Toolbar > System; timestamps, attempt IDs, errors, and report paths do not occupy the Dashboard;
-- all system diagnostics, including worker health, count freshness, synchronization errors, and explicit conflict recovery, belong in Toolbar > System, not Dashboard alerts or content;
+- routine state-sync health lives as a compact Healthy/Unhealthy label in Tools → System; timestamps, attempt IDs, errors, and report paths do not occupy the Dashboard;
+- all system diagnostics, including worker health, count freshness, synchronization errors, and explicit conflict recovery, belong in Tools → System, not Dashboard alerts or content;
 - health events refresh System independently of the current page and log-tail setting;
 - workflow visualization is shared with the Goals screen;
 - an intentionally paused workflow is neutral operating context, not a runtime-worker failure needing attention;
@@ -30,7 +30,7 @@ Current implementation details that matter to intent:
 
 The Dashboard should stay compact and practical. Its job is orientation and routing, not detailed editing.
 
-Toolbar > System is the central place for system health, diagnostics, and remedies. Dashboard attention is reserved for work such as failed Goals and pending reviews. A failed Dashboard read shows a brief availability message pointing to System, without diagnostic internals.
+Tools → System is the central place for system health, diagnostics, and remedies. Dashboard attention is reserved for work such as failed Goals and pending reviews. A failed Dashboard read shows a brief availability message pointing to System, without diagnostic internals.
 
 ## Future Direction
 

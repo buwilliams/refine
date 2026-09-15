@@ -342,7 +342,7 @@ Default: Plan, Implement, Quality, and Governance have required Skills at their 
 
 Enabled Custom Skills appear in the rail’s Skills section and the command palette. Fill in any requested inputs to open the Skill in its own agent tab, independently of Goals. Use the tab to follow the work or stop the agent.
 
-Action: use Add skill... in Settings → Workspace controls & support to create a Skill from any screen.
+Action: expand Skills in the rail and choose Add skill… to create a Skill. Manage Skills opens the shared resource editor.
 
 <h3 id="application-test">Target-app tests</h3>
 
@@ -378,13 +378,13 @@ Common navigation and daily actions.
 
 <h3 id="nav-application-status">Application status</h3>
 
-Target application status appears in the Settings → Workspace controls & support. Use the buttons beneath it for supported actions, including Start/Stop and Configure. Repository reconciliation is automatic.
+Control shows target application status and icon actions for Start/Stop, Build, and Check status. Hover labels and accessible names identify each action. Configure its instructions in Settings → Target App. Repository reconciliation is automatic.
 
-Action: use this indicator to inspect and control the target app.
+Action: open Control to inspect and control the target app.
 
 <h3 id="nav-agent-status">Running agents</h3>
 
-Open Settings → Processes to inspect running agents. Workflow status is available in the Settings → Workspace controls & support.
+Open Control to inspect running agents and available worker actions. Workflow status is also available in Settings → Workspace controls & support.
 
 Action: inspect individual agent processes in Control.
 

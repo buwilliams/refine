@@ -12,7 +12,7 @@ refine coordinates your agent fleet for software delivery. It is not another age
 
 ## Navigate your workspace
 
-The collapsible left rail brings Dashboard, Features, Goals, Changes, Control, Settings, and open tool windows together. Choose **Tools** for an agent, terminal, files, logs, or Todo List. Each window uses the full content area. **Search** and **Ctrl+K** (⌘K on Mac) work from every screen. [Explore the 4.3.2 navigation update](releases/4.3.2.md).
+The collapsible left rail brings Dashboard, Features, Goals, Changes, Control, Settings, and open tool windows together. Choose **Tools** for an agent, terminal, files, logs, or Todo List. Each window uses the full content area. **Search** and **Ctrl+K** (⌘K on Mac) work from every screen. [Find your way around Refine](product/navigation.md), or [see the 4.3.2 changes](releases/4.3.2.md).
 
 ## Learn how refine works
 

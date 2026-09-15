@@ -18,7 +18,7 @@ This section is the parent for reusable browser component intent. Components wit
 
 ## Expected Role
 
-Shared components should carry common behavior across Goals, Features, Logs, Changes, Settings, Processes, Toolbar, Guide, and future surfaces.
+Shared components should carry common behavior across Goals, Features, Logs, Changes, Settings, Control, tool windows, Guide, and future surfaces.
 
 The most important shared components are:
 

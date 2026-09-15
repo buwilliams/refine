@@ -5,7 +5,7 @@
 - **Source Proximity**: users should inspect project files without leaving Refine.
 - **Searchable Context**: file search helps users and agents find relevant code quickly.
 - **Read-Oriented By Default**: file browsing should support inspection before mutation.
-- **Toolbar Utility**: files belong near chat and terminal because they support active work.
+- **Tools Window**: files belong near chat and terminal because they support active work.
 
 ## Purpose
 
