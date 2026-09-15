@@ -1,10 +1,10 @@
 {
-  "id": "dff47d99820f47c5f96601cd1cdb86242325091b876d7cccb02ca95791f98e5b",
+  "id": "9efe67360fd70d5bfa249953160bf6b99a1ab6de490b9dbf64d4dc7d62a71880",
   "event": {
-    "id": "workflow.quality.enter",
-    "name": "Workflow Quality Enter",
+    "id": "workflow.governance.enter",
+    "name": "Workflow Governance Enter",
     "kind": "system",
-    "source": "workflow.quality.enter",
+    "source": "workflow.governance.enter",
     "enabled": true,
     "scope": {
       "node_id": null
@@ -12,8 +12,8 @@
     "parameters": [],
     "bindings": [
       {
-        "id": "default-quality",
-        "skill_id": "default-quality",
+        "id": "default-governance",
+        "skill_id": "default-governance",
         "enabled": true,
         "mode": "blocking",
         "order": 0,
@@ -48,47 +48,43 @@
     "goal_id": "00000T19PJ29Y11YDVAXWRJ001",
     "round_idx": 0,
     "workflow_revision": 2,
-    "candidate_commit": "895be0c5e7527f5afda70523122a9fa7f961b75a",
+    "candidate_commit": "3939536739ab8a607140f4f77033774b8ac56050",
     "data": {
       "context": {
-        "agent_context": {
-          "assembled_at": "2026-09-15T20:46:24Z",
-          "current_round": {
-            "assignee": "Buddy Williams",
-            "prompt": "Remove the auto-promote configuration from Refine since this can now be handled by Skills.",
-            "reporter": "Buddy Williams",
-            "round": 1
-          },
-          "goal": {
-            "assignee": "Buddy Williams",
-            "id": "00000T19PJ29Y11YDVAXWRJ001",
-            "name": "Remove the auto-promote configuration from Refine since this can now be handled",
-            "node_id": "default",
-            "priority": "low",
-            "reporter": "Buddy Williams"
-          },
-          "governance": {
-            "configured": false,
-            "constitution": "",
-            "product": "",
-            "rules": []
-          },
-          "guidance_candidates": [],
-          "previous_rounds": [],
-          "version": 1,
-          "workflow_summary": "Refine gives this Goal Agent an isolated worktree, the current Round, and available planning context. Follow the Goal and applicable Skill instructions and use your judgment to decide when to stop. Quality and Governance agents make their own decisions using their Skills before integration and human Review. Refine coordinates workflow transitions and Git actions. Do not directly advance Goal state, approve, merge, or push."
+        "assembled_at": "2026-09-15T20:46:24Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "Remove the auto-promote configuration from Refine since this can now be handled by Skills.",
+          "reporter": "Buddy Williams",
+          "round": 1
         },
-        "implementation_report": "workflow.implement.enter:default-implement: Implemented all five tasks. Backlog Goals now wait for explicit user or Skill starts. Changes remain in the Goal worktree for Quality and Governance.",
-        "plans": null
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000T19PJ29Y11YDVAXWRJ001",
+          "name": "Remove the auto-promote configuration from Refine since this can now be handled",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": false,
+          "constitution": "",
+          "product": "",
+          "rules": []
+        },
+        "guidance_candidates": [],
+        "previous_rounds": [],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree, the current Round, and available planning context. Follow the Goal and applicable Skill instructions and use your judgment to decide when to stop. Quality and Governance agents make their own decisions using their Skills before integration and human Review. Refine coordinates workflow transitions and Git actions. Do not directly advance Goal state, approve, merge, or push."
       },
       "event": {},
       "goal": {
         "assignee": "Buddy Williams",
         "base_commit": "34635cd62aa9f45feec2d2adb92913dab0daac09",
         "branch_name": "refine/00000T19PJ29Y11YDVAXWRJ001/round-1",
-        "candidate_commit": "895be0c5e7527f5afda70523122a9fa7f961b75a",
+        "candidate_commit": "3939536739ab8a607140f4f77033774b8ac56050",
         "created": "2026-09-15T20:46:20Z",
-        "event_generation": 5,
+        "event_generation": 6,
         "feature_id": null,
         "feature_order": null,
         "id": "00000T19PJ29Y11YDVAXWRJ001",
@@ -106,27 +102,31 @@
             "implementation_report": "workflow.implement.enter:default-implement: Implemented all five tasks. Backlog Goals now wait for explicit user or Skill starts. Changes remain in the Goal worktree for Quality and Governance.",
             "implementation_reported_at": "2026-09-15T21:19:00Z",
             "prompt": "Remove the auto-promote configuration from Refine since this can now be handled by Skills.",
+            "quality_agent_report": "workflow.quality.enter:default-quality: Changed behavior is covered and passes. Three test-file changes remain for Governance. The full repository suite remains red on documented baseline failures; no unresolved change-related failure was found. Detailed commands, results, and logs are in the report.\n\n",
+            "quality_candidate_commit": "3939536739ab8a607140f4f77033774b8ac56050",
+            "quality_message": "Quality Skills reported success.",
+            "quality_state": "passed",
             "reporter": "Buddy Williams",
-            "updated": "2026-09-15T21:19:04Z"
+            "updated": "2026-09-15T21:40:13Z"
           }
         ],
-        "status": "quality",
+        "status": "governance",
         "target_branch": "main",
-        "updated": "2026-09-15T21:19:04Z",
-        "workflow_revision": 22
+        "updated": "2026-09-15T21:40:13Z",
+        "workflow_revision": 32
       },
       "system": {
-        "candidate_commit": "895be0c5e7527f5afda70523122a9fa7f961b75a",
+        "candidate_commit": "3939536739ab8a607140f4f77033774b8ac56050",
         "node_id": "default",
         "project_root": "/home/buddy/projects/refine-next",
         "refine_executable": "/home/buddy/projects/refine/bin/refine",
-        "workflow_step": "quality",
+        "workflow_step": "governance",
         "workspace": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T19PJ29Y11YDVAXWRJ001-round-1"
       }
     },
     "metadata": {
       "behavior": "EventSkill",
-      "event_operation_id": "1a0a6f01151f7ad121",
+      "event_operation_id": "1a0a70367c9f7ad124",
       "goal_id": "00000T19PJ29Y11YDVAXWRJ001",
       "kind": "workflow",
       "managed_worktree": {
@@ -145,7 +145,7 @@
       "provider": "codex",
       "round_idx": 0,
       "started_bindings": {
-        "default-quality": "2026-09-15T21:19:07.324092130+00:00"
+        "default-governance": "2026-09-15T21:40:14.467488097+00:00"
       },
       "target_app_id": "/home/buddy/projects/refine-next",
       "template_snapshot": {
@@ -448,15 +448,15 @@
         }
       },
       "workflow_revision": 2,
-      "workflow_state": "quality",
-      "workflow_step_generation": 5
+      "workflow_state": "governance",
+      "workflow_step_generation": 6
     }
   },
   "bindings": [
     {
       "binding": {
-        "id": "default-quality",
-        "skill_id": "default-quality",
+        "id": "default-governance",
+        "skill_id": "default-governance",
         "enabled": true,
         "mode": "blocking",
         "order": 0,
@@ -467,10 +467,10 @@
         "inputs": {}
       },
       "skill": {
-        "id": "default-quality",
-        "name": "Quality",
-        "prompt": "## Quality\n\nTest the implementation. Create and groom tests to cover the behavior described in the plan.\n\n### Outcome\n\nMeaningful tests cover the changed behavior and pass. Provide a brief report of the behavior tested, tests added or updated, commands run and their results, and any remaining failures or gaps. Include runtime or browser test results where useful. These results support Governance's verification of the work.\n\n### Guardrails\n\n- Test observable behavior, including relevant failure cases and effects on existing functionality. Tests should catch defects rather than mirror the implementation.\n- Keep useful tests, update tests for changed behavior, and remove obsolete or meaningless tests.\n- Investigate failures, correct problems in the implementation or tests, and rerun affected tests.\n- Choose tests suited to the change. Expand coverage when failures or affected behavior call for it.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
-        "role": "quality",
+        "id": "default-governance",
+        "name": "Governance",
+        "prompt": "## Governance\n\nVerify that the implementation meets the user-defined Goal, fits the system architecture, and serves the project's purpose.\n\n### Outcome\n\nA clear assessment of whether the implementation satisfies all three. Begin with the verdict, then briefly explain how the work meets the Goal, fits the architecture, and supports the project's purpose, using concrete evidence from the implementation and Quality results. For each gap, describe what falls short, why it matters, and the recommended correction. Separate necessary corrections from optional improvements.\n\n### Guardrails\n\n- Read the context that helps explain the user's Goal, the system architecture, and the project's purpose.\n- Compare the implementation with the user's desired outcome as well as the plan. Completing the plan and passing tests alone do not establish that the Goal is met.\n- Look for clear responsibilities, shared behavior implemented in one place, and interfaces that remain easy to use and maintain.\n- Judge design choices by how they serve the project. Allow sound approaches that differ from personal preference.\n- Group related issues by their underlying cause so the next step can address them together.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
+        "role": "governance",
         "enabled": true,
         "scope": {
           "node_id": null
@@ -481,63 +481,11 @@
       "parameters": {}
     }
   ],
-  "state": "succeeded",
-  "results": {
-    "default-quality": {
-      "invocation_id": "dff47d99820f47c5f96601cd1cdb86242325091b876d7cccb02ca95791f98e5b",
-      "binding_id": "default-quality",
-      "role": "quality",
-      "outcome": "success",
-      "summary": "Changed behavior is covered and passes. Three test-file changes remain for Governance. The full repository suite remains red on documented baseline failures; no unresolved change-related failure was found. Detailed commands, results, and logs are in the report.\n\n",
-      "evidence": [
-        "Final focused Rust run: 18 passed, including architecture, backlog preservation, explicit starts, imports, and settings migration.",
-        "Full Rust suite: 1392 passed, 21 failed, 7 ignored. One obsolete assertion was fixed; seven failures passed isolated reruns; 13 persistent failures match retained baseline results.",
-        "Runtime UI tests: 2 passed. Broader browser suite: 374 passed initially; seven failures passed after dependency/build correction or rerun. One topbar assertion also fails on the baseline.",
-        "cargo build --bin refine and git diff --check passed. Changed Rust files pass formatting; repository-wide formatting fails in ten unchanged files."
-      ],
-      "artifacts": {
-        "report": "/tmp/refine-auto-promote-quality-report.md",
-        "test_changes": [
-          "Added runtime-copy coverage for retired settings and preservation of unrelated configuration.",
-          "Extended API tests for rejected settings updates without partial changes.",
-          "Removed an obsolete architecture assertion requiring the deleted scheduling directory."
-        ]
-      }
-    }
-  },
-  "attempts": [
-    {
-      "attempt": 0,
-      "binding_id": "default-quality",
-      "checkout": {
-        "observation": {
-          "branch": "refine/00000T19PJ29Y11YDVAXWRJ001/round-1",
-          "head_commit": "895be0c5e7527f5afda70523122a9fa7f961b75a",
-          "status_porcelain": [
-            " M src/architecture_tests.rs",
-            " M src/infrastructure/process/supervisor/config/settings_codec/tests.rs",
-            " M src/surfaces/web_server/tests/project_runtime.rs"
-          ]
-        },
-        "tree": "9cada55e76ae2d654a3275865b9189dd82ee2cf6"
-      },
-      "checkout_recorded": true,
-      "diagnostic": null,
-      "host_bound_result": true,
-      "observational_violation": false,
-      "operation_id": null,
-      "process_id": "proc-1789507147825-1014481-33437",
-      "prompt_bytes": 5958,
-      "provider_session_id": null,
-      "purpose": "work",
-      "raw_output": "{\n  \"outcome\": \"success\",\n  \"artifacts\": {\n    \"report\": \"/tmp/refine-auto-promote-quality-report.md\",\n    \"test_changes\": [\n      \"Added runtime-copy coverage for retired settings and preservation of unrelated configuration.\",\n      \"Extended API tests for rejected settings updates without partial changes.\",\n      \"Removed an obsolete architecture assertion requiring the deleted scheduling directory.\"\n    ]\n  },\n  \"evidence\": [\n    \"Final focused Rust run: 18 passed, including architecture, backlog preservation, explicit starts, imports, and settings migration.\",\n    \"Full Rust suite: 1392 passed, 21 failed, 7 ignored. One obsolete assertion was fixed; seven failures passed isolated reruns; 13 persistent failures match retained baseline results.\",\n    \"Runtime UI tests: 2 passed. Broader browser suite: 374 passed initially; seven failures passed after dependency/build correction or rerun. One topbar assertion also fails on the baseline.\",\n    \"cargo build --bin refine and git diff --check passed. Changed Rust files pass formatting; repository-wide formatting fails in ten unchanged files.\"\n  ],\n  \"summary\": \"Changed behavior is covered and passes. Three test-file changes remain for Governance. The full repository suite remains red on documented baseline failures; no unresolved change-related failure was found. Detailed commands, results, and logs are in the report.\\n\\n\"\n}",
-      "received_at": "2026-09-15T21:40:01.235647124+00:00",
-      "started_at": "2026-09-15T21:19:07.765380900+00:00",
-      "workflow_revision": 2
-    }
-  ],
-  "created_at": "2026-09-15T21:19:05.500454378+00:00",
-  "completed_at": "2026-09-15T21:40:03.638434808+00:00",
+  "state": "running",
+  "results": {},
+  "attempts": [],
+  "created_at": "2026-09-15T21:40:14.215289048+00:00",
+  "completed_at": null,
   "error": null,
   "action_applied": false
 }

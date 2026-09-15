@@ -1,9 +1,9 @@
 {
   "base_commit": "34635cd62aa9f45feec2d2adb92913dab0daac09",
   "branch_name": "refine/00000T19PJ29Y11YDVAXWRJ001/round-1",
-  "candidate_commit": "895be0c5e7527f5afda70523122a9fa7f961b75a",
+  "candidate_commit": "3939536739ab8a607140f4f77033774b8ac56050",
   "created": "2026-09-15T20:46:20Z",
-  "event_generation": 5,
+  "event_generation": 6,
   "feature_id": null,
   "feature_order": null,
   "id": "00000T19PJ29Y11YDVAXWRJ001",
@@ -46,11 +46,11 @@
       "created": "2026-09-15T20:46:20Z",
       "event_configuration": {
         "events": {
-          "workflow.quality.enter": {
+          "workflow.governance.enter": {
             "bindings": [
               {
                 "enabled": true,
-                "id": "default-quality",
+                "id": "default-governance",
                 "inputs": {},
                 "mode": "blocking",
                 "order": 0,
@@ -58,36 +58,68 @@
                 "scope": {
                   "node_id": null
                 },
-                "skill_id": "default-quality"
+                "skill_id": "default-governance"
               }
             ],
             "enabled": true,
-            "id": "workflow.quality.enter",
+            "id": "workflow.governance.enter",
             "kind": "system",
-            "name": "Workflow Quality Enter",
+            "name": "Workflow Governance Enter",
             "on_success": null,
             "parameters": [],
             "scope": {
               "node_id": null
             },
-            "source": "workflow.quality.enter"
+            "source": "workflow.governance.enter"
           }
         },
         "revision": 82,
         "schema_version": 3,
         "skills": {
-          "default-quality": {
+          "default-governance": {
             "enabled": true,
-            "id": "default-quality",
-            "name": "Quality",
+            "id": "default-governance",
+            "name": "Governance",
             "parameters": [],
-            "prompt": "## Quality\n\nTest the implementation. Create and groom tests to cover the behavior described in the plan.\n\n### Outcome\n\nMeaningful tests cover the changed behavior and pass. Provide a brief report of the behavior tested, tests added or updated, commands run and their results, and any remaining failures or gaps. Include runtime or browser test results where useful. These results support Governance's verification of the work.\n\n### Guardrails\n\n- Test observable behavior, including relevant failure cases and effects on existing functionality. Tests should catch defects rather than mirror the implementation.\n- Keep useful tests, update tests for changed behavior, and remove obsolete or meaningless tests.\n- Investigate failures, correct problems in the implementation or tests, and rerun affected tests.\n- Choose tests suited to the change. Expand coverage when failures or affected behavior call for it.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
+            "prompt": "## Governance\n\nVerify that the implementation meets the user-defined Goal, fits the system architecture, and serves the project's purpose.\n\n### Outcome\n\nA clear assessment of whether the implementation satisfies all three. Begin with the verdict, then briefly explain how the work meets the Goal, fits the architecture, and supports the project's purpose, using concrete evidence from the implementation and Quality results. For each gap, describe what falls short, why it matters, and the recommended correction. Separate necessary corrections from optional improvements.\n\n### Guardrails\n\n- Read the context that helps explain the user's Goal, the system architecture, and the project's purpose.\n- Compare the implementation with the user's desired outcome as well as the plan. Completing the plan and passing tests alone do not establish that the Goal is met.\n- Look for clear responsibilities, shared behavior implemented in one place, and interfaces that remain easy to use and maintain.\n- Judge design choices by how they serve the project. Allow sound approaches that differ from personal preference.\n- Group related issues by their underlying cause so the next step can address them together.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
             "provenance": "refine-default-v1",
             "role": "task",
             "scope": {
               "node_id": null
             }
           }
+        }
+      },
+      "event_results": {
+        "dff47d99820f47c5f96601cd1cdb86242325091b876d7cccb02ca95791f98e5b": {
+          "candidate_commit": "895be0c5e7527f5afda70523122a9fa7f961b75a",
+          "generation": 5,
+          "results": {
+            "default-quality": {
+              "artifacts": {
+                "report": "/tmp/refine-auto-promote-quality-report.md",
+                "test_changes": [
+                  "Added runtime-copy coverage for retired settings and preservation of unrelated configuration.",
+                  "Extended API tests for rejected settings updates without partial changes.",
+                  "Removed an obsolete architecture assertion requiring the deleted scheduling directory."
+                ]
+              },
+              "binding_id": "default-quality",
+              "evidence": [
+                "Final focused Rust run: 18 passed, including architecture, backlog preservation, explicit starts, imports, and settings migration.",
+                "Full Rust suite: 1392 passed, 21 failed, 7 ignored. One obsolete assertion was fixed; seven failures passed isolated reruns; 13 persistent failures match retained baseline results.",
+                "Runtime UI tests: 2 passed. Broader browser suite: 374 passed initially; seven failures passed after dependency/build correction or rerun. One topbar assertion also fails on the baseline.",
+                "cargo build --bin refine and git diff --check passed. Changed Rust files pass formatting; repository-wide formatting fails in ten unchanged files."
+              ],
+              "invocation_id": "dff47d99820f47c5f96601cd1cdb86242325091b876d7cccb02ca95791f98e5b",
+              "outcome": "success",
+              "role": "quality",
+              "summary": "Changed behavior is covered and passes. Three test-file changes remain for Governance. The full repository suite remains red on documented baseline failures; no unresolved change-related failure was found. Detailed commands, results, and logs are in the report.\n\n"
+            }
+          },
+          "round_idx": 0,
+          "source": "workflow.quality.enter",
+          "state": "succeeded"
         }
       },
       "failure_at": "",
@@ -329,6 +361,78 @@
               }
             }
           }
+        },
+        "5:default:workflow.quality.exit": {
+          "events": {
+            "workflow.quality.exit": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.quality.exit",
+              "kind": "system",
+              "name": "Workflow Quality Exit",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.quality.exit"
+            }
+          },
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {}
+        },
+        "5:default:workflow.quality.success": {
+          "events": {},
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {}
+        },
+        "6:default:workflow.governance.enter": {
+          "events": {
+            "workflow.governance.enter": {
+              "bindings": [
+                {
+                  "enabled": true,
+                  "id": "default-governance",
+                  "inputs": {},
+                  "mode": "blocking",
+                  "order": 0,
+                  "overrides": null,
+                  "scope": {
+                    "node_id": null
+                  },
+                  "skill_id": "default-governance"
+                }
+              ],
+              "enabled": true,
+              "id": "workflow.governance.enter",
+              "kind": "system",
+              "name": "Workflow Governance Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.governance.enter"
+            }
+          },
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {
+            "default-governance": {
+              "enabled": true,
+              "id": "default-governance",
+              "name": "Governance",
+              "parameters": [],
+              "prompt": "## Governance\n\nVerify that the implementation meets the user-defined Goal, fits the system architecture, and serves the project's purpose.\n\n### Outcome\n\nA clear assessment of whether the implementation satisfies all three. Begin with the verdict, then briefly explain how the work meets the Goal, fits the architecture, and supports the project's purpose, using concrete evidence from the implementation and Quality results. For each gap, describe what falls short, why it matters, and the recommended correction. Separate necessary corrections from optional improvements.\n\n### Guardrails\n\n- Read the context that helps explain the user's Goal, the system architecture, and the project's purpose.\n- Compare the implementation with the user's desired outcome as well as the plan. Completing the plan and passing tests alone do not establish that the Goal is met.\n- Look for clear responsibilities, shared behavior implemented in one place, and interfaces that remain easy to use and maintain.\n- Judge design choices by how they serve the project. Allow sound approaches that differ from personal preference.\n- Group related issues by their underlying cause so the next step can address them together.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
+              "provenance": "refine-default-v1",
+              "role": "task",
+              "scope": {
+                "node_id": null
+              }
+            }
+          }
         }
       },
       "implementation_report": "workflow.implement.enter:default-implement: Implemented all five tasks. Backlog Goals now wait for explicit user or Skill starts. Changes remain in the Goal worktree for Quality and Governance.",
@@ -388,8 +492,125 @@
         }
       ],
       "prompt": "Remove the auto-promote configuration from Refine since this can now be handled by Skills.",
+      "quality_agent_report": "workflow.quality.enter:default-quality: Changed behavior is covered and passes. Three test-file changes remain for Governance. The full repository suite remains red on documented baseline failures; no unresolved change-related failure was found. Detailed commands, results, and logs are in the report.\n\n",
+      "quality_candidate_commit": "3939536739ab8a607140f4f77033774b8ac56050",
+      "quality_checked_at": "2026-09-15T21:40:10Z",
+      "quality_details": {
+        "candidate_commit": "3939536739ab8a607140f4f77033774b8ac56050",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T19PJ29Y11YDVAXWRJ001-round-1",
+        "diagnostics": [
+          "Reused Skill review workflow.quality.enter:default-quality for final candidate content: automation/invocations/dff47d99820f47c5f96601cd1cdb86242325091b876d7cccb02ca95791f98e5b.json"
+        ],
+        "evaluation_scope": "isolated_candidate",
+        "operation_id": "1a0a7034c88f7ad123",
+        "provider_attempts": [],
+        "quality_proof": {
+          "checked_at": "2026-09-15T21:40:10Z",
+          "checked_candidate_commit": "3939536739ab8a607140f4f77033774b8ac56050",
+          "evaluation_scope": "isolated_candidate",
+          "goal_id": "00000T19PJ29Y11YDVAXWRJ001",
+          "operation_id": "1a0a7034c88f7ad123",
+          "results": [
+            {
+              "command": "",
+              "evidence": "Changed behavior is covered and passes. Three test-file changes remain for Governance. The full repository suite remains red on documented baseline failures; no unresolved change-related failure was found. Detailed commands, results, and logs are in the report.\n\n",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality"
+            }
+          ],
+          "round_idx": 0,
+          "schema_version": 1,
+          "skills": {
+            "invocations": {
+              "workflow.quality.enter:default-quality": "dff47d99820f47c5f96601cd1cdb86242325091b876d7cccb02ca95791f98e5b"
+            },
+            "required_bindings": [
+              "workflow.quality.enter:default-quality"
+            ],
+            "requirements_id": "9fe971f6b60ac378d8ecd9e7e448b3fcb1ac096baf3723270caa2a43e20aec88"
+          },
+          "source_candidate_commit": "3939536739ab8a607140f4f77033774b8ac56050",
+          "state": "passed"
+        },
+        "results": [
+          {
+            "command": "",
+            "evidence": "Changed behavior is covered and passes. Three test-file changes remain for Governance. The full repository suite remains red on documented baseline failures; no unresolved change-related failure was found. Detailed commands, results, and logs are in the report.\n\n",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality"
+          }
+        ],
+        "source_candidate_commit": "3939536739ab8a607140f4f77033774b8ac56050"
+      },
+      "quality_message": "Quality Skills reported success.",
+      "quality_requirements": {
+        "candidate_commit": "3939536739ab8a607140f4f77033774b8ac56050",
+        "id": "9fe971f6b60ac378d8ecd9e7e448b3fcb1ac096baf3723270caa2a43e20aec88",
+        "node_id": "default",
+        "required_bindings": [
+          "workflow.quality.enter:default-quality"
+        ],
+        "selected": [
+          {
+            "attachments": [],
+            "binding": {
+              "binding": {
+                "enabled": true,
+                "id": "default-quality",
+                "inputs": {},
+                "mode": "blocking",
+                "order": 0,
+                "overrides": null,
+                "scope": {
+                  "node_id": null
+                },
+                "skill_id": "default-quality"
+              },
+              "parameters": {},
+              "skill": {
+                "enabled": true,
+                "id": "default-quality",
+                "name": "Quality",
+                "parameters": [],
+                "prompt": "## Quality\n\nTest the implementation. Create and groom tests to cover the behavior described in the plan.\n\n### Outcome\n\nMeaningful tests cover the changed behavior and pass. Provide a brief report of the behavior tested, tests added or updated, commands run and their results, and any remaining failures or gaps. Include runtime or browser test results where useful. These results support Governance's verification of the work.\n\n### Guardrails\n\n- Test observable behavior, including relevant failure cases and effects on existing functionality. Tests should catch defects rather than mirror the implementation.\n- Keep useful tests, update tests for changed behavior, and remove obsolete or meaningless tests.\n- Investigate failures, correct problems in the implementation or tests, and rerun affected tests.\n- Choose tests suited to the change. Expand coverage when failures or affected behavior call for it.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
+                "provenance": "refine-default-v1",
+                "role": "quality",
+                "scope": {
+                  "node_id": null
+                }
+              }
+            },
+            "contract_version": 1,
+            "key": "workflow.quality.enter:default-quality"
+          }
+        ]
+      },
+      "quality_skill_results": [
+        {
+          "artifacts": {
+            "report": "/tmp/refine-auto-promote-quality-report.md",
+            "test_changes": [
+              "Added runtime-copy coverage for retired settings and preservation of unrelated configuration.",
+              "Extended API tests for rejected settings updates without partial changes.",
+              "Removed an obsolete architecture assertion requiring the deleted scheduling directory."
+            ]
+          },
+          "binding_id": "workflow.quality.enter:default-quality",
+          "evidence": [
+            "Final focused Rust run: 18 passed, including architecture, backlog preservation, explicit starts, imports, and settings migration.",
+            "Full Rust suite: 1392 passed, 21 failed, 7 ignored. One obsolete assertion was fixed; seven failures passed isolated reruns; 13 persistent failures match retained baseline results.",
+            "Runtime UI tests: 2 passed. Broader browser suite: 374 passed initially; seven failures passed after dependency/build correction or rerun. One topbar assertion also fails on the baseline.",
+            "cargo build --bin refine and git diff --check passed. Changed Rust files pass formatting; repository-wide formatting fails in ten unchanged files."
+          ],
+          "invocation_id": "dff47d99820f47c5f96601cd1cdb86242325091b876d7cccb02ca95791f98e5b",
+          "outcome": "success",
+          "role": "quality",
+          "summary": "Changed behavior is covered and passes. Three test-file changes remain for Governance. The full repository suite remains red on documented baseline failures; no unresolved change-related failure was found. Detailed commands, results, and logs are in the report.\n\n"
+        }
+      ],
+      "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "updated": "2026-09-15T21:19:04Z",
+      "updated": "2026-09-15T21:40:13Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-15T20:46:22Z",
         "generation": 2,
@@ -496,9 +717,9 @@
       "workspace_branch": "refine/00000T19PJ29Y11YDVAXWRJ001/round-1"
     }
   ],
-  "status": "quality",
+  "status": "governance",
   "target_branch": "main",
-  "updated": "2026-09-15T21:19:04Z",
+  "updated": "2026-09-15T21:40:13Z",
   "workflow_controls": [
     {
       "actor": "operator",
@@ -562,7 +783,17 @@
       "round_idx": 0,
       "to": "quality",
       "workflow_revision": 20
+    },
+    {
+      "at": "2026-09-15T21:40:12.752999048+00:00",
+      "forced": false,
+      "from": "quality",
+      "generation": 6,
+      "node_id": "default",
+      "round_idx": 0,
+      "to": "governance",
+      "workflow_revision": 31
     }
   ],
-  "workflow_revision": 22
+  "workflow_revision": 32
 }
