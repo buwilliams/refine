@@ -3,7 +3,7 @@
   "branch_name": "refine/00000T19EJ0CNGHM85RBDXE000/round-1",
   "candidate_commit": null,
   "created": "2026-09-15T16:06:39Z",
-  "event_generation": 3,
+  "event_generation": 4,
   "feature_id": null,
   "feature_order": null,
   "id": "00000T19EJ0CNGHM85RBDXE000",
@@ -185,6 +185,26 @@
               }
             }
           }
+        },
+        "4:default:workflow.cancelled.enter": {
+          "events": {
+            "workflow.cancelled.enter": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.cancelled.enter",
+              "kind": "system",
+              "name": "Workflow Cancelled Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.cancelled.enter"
+            }
+          },
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {}
         }
       },
       "logs": [],
@@ -253,9 +273,9 @@
       "workspace_branch": "refine/00000T19EJ0CNGHM85RBDXE000/round-1"
     }
   ],
-  "status": "plan",
+  "status": "cancelled",
   "target_branch": "main",
-  "updated": "2026-09-15T16:06:42Z",
+  "updated": "2026-09-15T16:06:56Z",
   "workflow_controls": [
     {
       "actor": "operator",
@@ -266,6 +286,16 @@
       "request_id": "e4c0ff2e-08e1-440c-bbab-dc2046599f7c",
       "source_round": 1,
       "to": "todo"
+    },
+    {
+      "actor": "operator",
+      "at": "2026-09-15T16:06:56Z",
+      "forced": false,
+      "from": "plan",
+      "reason": "Explicit cancellation",
+      "request_id": "45b13781-a5bd-4f37-9590-507a55b2a1a1",
+      "source_round": 1,
+      "to": "cancelled"
     }
   ],
   "workflow_events": [
@@ -299,7 +329,18 @@
       "round_idx": 0,
       "to": "plan",
       "workflow_revision": 6
+    },
+    {
+      "at": "2026-09-15T16:06:56.892001144+00:00",
+      "forced": true,
+      "from": "plan",
+      "generation": 4,
+      "node_id": "default",
+      "round_idx": 0,
+      "supersedes_execution": true,
+      "to": "cancelled",
+      "workflow_revision": 10
     }
   ],
-  "workflow_revision": 9
+  "workflow_revision": 10
 }
