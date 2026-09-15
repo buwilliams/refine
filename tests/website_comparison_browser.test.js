@@ -1,22 +1,9 @@
 const assert = require("node:assert/strict");
 const path = require("node:path");
 const test = require("node:test");
-const { openApp, SKIP } = require("./support/web_app");
-
-async function routeWebsite(page, origin) {
-  await page.route(`${origin}/`, route => route.fulfill({
-    path: path.join(__dirname, "../src/surfaces/website/index.html"),
-  }));
-  await page.route(`${origin}/src/surfaces/**`, route => route.fulfill({
-    path: path.join(__dirname, "..", new URL(route.request().url()).pathname),
-  }));
-}
-
-async function openWebsite() {
-  const app = await openApp();
-  await routeWebsite(app.page, app.origin);
-  return app;
-}
+const fs = require("node:fs");
+const { createHash } = require("node:crypto");
+const { openWebsite, SKIP } = require("./support/website");
 
 async function assertFocusedProductVisible(region, name, width) {
   assert.equal(await region.evaluate((el, name) => {
@@ -27,6 +14,102 @@ async function assertFocusedProductVisible(region, name, width) {
     return link.textContent === name && rect.left >= pinned.right && rect.right <= bounds.right;
   }, name), true, `focused ${name} column is fully visible beside pinned labels at ${width}`);
 }
+
+test("website server delivers the versioned CSS and JavaScript referenced by the homepage", { skip: SKIP }, async () => {
+  const app = await openWebsite();
+  try {
+    const responses = [];
+    app.page.on("response", response => {
+      if (/\/site\.(css|js)(\?|$)/.test(response.url())) responses.push(response);
+    });
+    await app.page.goto(app.origin);
+    assert.equal(responses.length, 2);
+    for (const response of responses) {
+      const url = new URL(response.url());
+      const local = fs.readFileSync(path.join(__dirname, "..", url.pathname));
+      assert.equal(response.status(), 200);
+      assert.match(response.headers()["content-type"], url.pathname.endsWith("css") ? /text\/css/ : /javascript/);
+      assert.equal(url.searchParams.get("v"), createHash("sha256").update(local).digest("hex").slice(0, 16));
+      assert.deepEqual(await response.body(), local, "versioned requests resolve to the matching asset bytes");
+    }
+    assert.deepEqual(app.pageErrors, []);
+  } finally { await app.close(); }
+});
+
+test("comparison benefits and table guidance stay arranged and unclipped at four widths", { skip: SKIP }, async () => {
+  const app = await openWebsite();
+  try {
+    for (const width of [1440, 1024, 390, 320]) {
+      const { page } = app;
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto(app.origin);
+      const layout = await page.locator("#compare").evaluate(section => {
+        const rect = el => {
+          const r = el.getBoundingClientRect();
+          return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width, height: r.height };
+        };
+        const box = selector => rect(section.querySelector(selector));
+        return {
+          cards: [...section.querySelectorAll(".compare-benefits article")].map(card => ({
+            card: rect(card), icon: rect(card.querySelector(".compare-benefit-icon")),
+            heading: rect(card.querySelector("h3")), description: rect(card.querySelector("p")),
+          })),
+          benefits: box(".compare-benefits"), intro: box(".compare-intro"),
+          legend: box(".compare-legend"), hint: box(".compare-scroll-hint"), table: box(".compare-scroll"),
+          legendItems: [...section.querySelectorAll(".compare-legend li")].map(rect),
+          content: [...section.querySelectorAll(".compare-benefits *, .compare-intro, .compare-legend, .compare-legend li, .compare-scroll-hint")]
+            .map(el => ({ ...rect(el), text: el.textContent, clipped: el.scrollWidth > el.clientWidth + 1 })),
+        };
+      });
+      const near = (a, b, label) => assert.ok(Math.abs(a - b) <= 1, `${label} at ${width}`);
+      assert.equal(layout.cards.length, 3);
+      for (const [i, { card, icon, heading, description }] of layout.cards.entries()) {
+        assert.ok(icon.width >= 30 && icon.height >= 30, `styled benefit icon at ${width}`);
+        assert.ok(icon.top >= card.top && icon.bottom <= card.bottom);
+        assert.ok(heading.bottom <= description.top && description.bottom <= card.bottom);
+        near(heading.left, description.left, "heading and description align");
+        if (width > 680) {
+          near(card.top, layout.cards[0].card.top, "desktop benefit columns align");
+          near(card.width, layout.cards[0].card.width, "desktop columns share width");
+          near(heading.top, layout.cards[0].heading.top, "desktop headings align");
+          near(description.top, layout.cards[0].description.top, "desktop descriptions align");
+          near(icon.left, heading.left, "desktop icon aligns with text");
+          assert.ok(heading.top >= icon.bottom && heading.top - icon.bottom <= 20);
+          if (i) assert.ok(card.left > layout.cards[i - 1].card.right);
+        } else {
+          near(icon.left, card.left, "mobile icon aligns with card");
+          assert.ok(icon.right < heading.left && heading.left - icon.right <= 16);
+          assert.ok(Math.abs(icon.top - heading.top) <= 4, "mobile icon stays beside heading");
+          if (i) assert.ok(card.top - layout.cards[i - 1].card.bottom >= 12, "mobile benefits are separated");
+        }
+      }
+      const flow = [layout.benefits, layout.intro, layout.legend, layout.hint, layout.table];
+      for (let i = 1; i < flow.length; i++) {
+        near(flow[i].left, flow[0].left, "benefits and table guidance align");
+        assert.ok(flow[i].top >= flow[i - 1].bottom && flow[i].top - flow[i - 1].bottom <= 48,
+          `guidance stays grouped above the table at ${width}`);
+      }
+      assert.equal(layout.legendItems.length, 5);
+      const legendRows = new Set(layout.legendItems.map(item => Math.round(item.top)));
+      assert.ok(width > 680 ? legendRows.size === 1 : legendRows.size > 1, `legend wrapping at ${width}`);
+      for (const item of layout.legendItems) {
+        assert.ok(item.left >= layout.legend.left && item.right <= layout.legend.right);
+        assert.ok(item.top >= layout.legend.top && item.bottom <= layout.legend.bottom);
+      }
+      for (const item of layout.content) {
+        assert.ok(item.left >= 0 && item.right <= width && !item.clipped, `clipped content at ${width}: ${item.text}`);
+      }
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+      if (process.env.COMPARISON_SCREENSHOT_DIR) {
+        fs.mkdirSync(process.env.COMPARISON_SCREENSHOT_DIR, { recursive: true });
+        const clip = await page.locator("#compare").boundingBox();
+        await page.screenshot({ fullPage: true, clip,
+          path: path.join(process.env.COMPARISON_SCREENSHOT_DIR, `comparison-${width}.png`) });
+      }
+    }
+    assert.deepEqual(app.pageErrors, []);
+  } finally { await app.close(); }
+});
 
 test("website comparison presents benefits, labeled capabilities, and qualified sources", { skip: SKIP }, async () => {
   const app = await openWebsite();
@@ -90,7 +173,6 @@ test("comparison disclosures open and close with keyboard and touch", { skip: SK
     const context = await page.context().browser().newContext({ hasTouch: true, viewport: { width: 390, height: 900 } });
     try {
       const touchPage = await context.newPage();
-      await routeWebsite(touchPage, app.origin);
       await touchPage.goto(app.origin);
       const details = touchPage.locator(".compare-details details").first();
       await details.locator("summary").tap();

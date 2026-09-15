@@ -230,4 +230,4 @@ async function openApp({
   };
 }
 
-module.exports = { openApp, apiFixture, GOAL, FEATURE, SKIP };
+module.exports = { openApp, apiFixture, GOAL, FEATURE, SKIP, BROWSER };
