@@ -1,9 +1,9 @@
 {
-  "base_commit": "d5a74a62db1e0dcabc124c55c8a78da5c73f8efb",
+  "base_commit": "9c7363164d582fac14e5076b24efdc47ec5f9461",
   "branch_name": "refine/00000T19EJ0CNGHM85RBDXE000/round-1",
   "candidate_commit": null,
   "created": "2026-09-15T16:06:39Z",
-  "event_generation": 6,
+  "event_generation": 10,
   "feature_id": null,
   "feature_order": null,
   "id": "00000T19EJ0CNGHM85RBDXE000",
@@ -13,13 +13,14 @@
   "pending_event_dispatches": {},
   "priority": "low",
   "reporter": "Buddy Williams",
+  "round_edit_revision": 13,
   "rounds": [
     {
       "agent_context": {
-        "assembled_at": "2026-09-15T16:06:42Z",
+        "assembled_at": "2026-09-15T20:49:56Z",
         "current_round": {
           "assignee": "Buddy Williams",
-          "prompt": "The new menu item is missing a chevron indicating it is a drop-down. Add the chevron so that it matches the style of the other menu items with context menus like node, reporter, and tools.",
+          "prompt": "Configure AI Providers and automate provider selection\n\nAllow users to define CLI providers with executable paths, arguments, context transport, credential references, and optional output, availability, and session-continuation behavior. Support multiple configurations of the same CLI without Refine code changes.\n\nStore provider definitions and default selection policies at the refine-state system level. Nodes may select a provider or policy, inheriting the system default when absent. Migrate existing providers into equivalent configurations.\n\nSupport subscription-first selection with configured paid fallback, shared spending limits, and automatic return when subscription capacity becomes available. Preserve work across switches and expose the provider and reason used for each attempt. Keep credential values outside synchronized state.",
           "reporter": "Buddy Williams",
           "round": 1
         },
@@ -43,7 +44,7 @@
         "workflow_summary": "Refine gives this Goal Agent an isolated worktree, the current Round, and available planning context. Follow the Goal and applicable Skill instructions and use your judgment to decide when to stop. Quality and Governance agents make their own decisions using their Skills before integration and human Review. Refine coordinates workflow transitions and Git actions. Do not directly advance Goal state, approve, merge, or push."
       },
       "assignee": "Buddy Williams",
-      "created": "2026-09-15T16:06:39Z",
+      "created": "2026-09-15T20:49:52Z",
       "event_configuration": {
         "events": {
           "workflow.plan.enter": {
@@ -94,53 +95,7 @@
       "failure_category": "",
       "failure_message": "",
       "gate_configurations": {
-        "2:default:workflow.todo.enter": {
-          "events": {
-            "workflow.todo.enter": {
-              "bindings": [],
-              "enabled": true,
-              "id": "workflow.todo.enter",
-              "kind": "system",
-              "name": "Workflow Todo Enter",
-              "on_success": null,
-              "parameters": [],
-              "scope": {
-                "node_id": null
-              },
-              "source": "workflow.todo.enter"
-            }
-          },
-          "revision": 82,
-          "schema_version": 3,
-          "skills": {}
-        },
-        "2:default:workflow.todo.exit": {
-          "events": {
-            "workflow.todo.exit": {
-              "bindings": [],
-              "enabled": true,
-              "id": "workflow.todo.exit",
-              "kind": "system",
-              "name": "Workflow Todo Exit",
-              "on_success": null,
-              "parameters": [],
-              "scope": {
-                "node_id": null
-              },
-              "source": "workflow.todo.exit"
-            }
-          },
-          "revision": 82,
-          "schema_version": 3,
-          "skills": {}
-        },
-        "2:default:workflow.todo.success": {
-          "events": {},
-          "revision": 82,
-          "schema_version": 3,
-          "skills": {}
-        },
-        "3:default:workflow.plan.enter": {
+        "10:default:workflow.plan.enter": {
           "events": {
             "workflow.plan.enter": {
               "bindings": [
@@ -186,62 +141,48 @@
             }
           }
         },
-        "4:default:workflow.cancelled.enter": {
+        "9:default:workflow.todo.enter": {
           "events": {
-            "workflow.cancelled.enter": {
+            "workflow.todo.enter": {
               "bindings": [],
               "enabled": true,
-              "id": "workflow.cancelled.enter",
+              "id": "workflow.todo.enter",
               "kind": "system",
-              "name": "Workflow Cancelled Enter",
+              "name": "Workflow Todo Enter",
               "on_success": null,
               "parameters": [],
               "scope": {
                 "node_id": null
               },
-              "source": "workflow.cancelled.enter"
+              "source": "workflow.todo.enter"
             }
           },
           "revision": 82,
           "schema_version": 3,
           "skills": {}
         },
-        "5:default:workflow.failed.enter": {
+        "9:default:workflow.todo.exit": {
           "events": {
-            "workflow.failed.enter": {
+            "workflow.todo.exit": {
               "bindings": [],
               "enabled": true,
-              "id": "workflow.failed.enter",
+              "id": "workflow.todo.exit",
               "kind": "system",
-              "name": "Workflow Failed Enter",
+              "name": "Workflow Todo Exit",
               "on_success": null,
               "parameters": [],
               "scope": {
                 "node_id": null
               },
-              "source": "workflow.failed.enter"
+              "source": "workflow.todo.exit"
             }
           },
           "revision": 82,
           "schema_version": 3,
           "skills": {}
         },
-        "6:default:workflow.cancelled.enter": {
-          "events": {
-            "workflow.cancelled.enter": {
-              "bindings": [],
-              "enabled": true,
-              "id": "workflow.cancelled.enter",
-              "kind": "system",
-              "name": "Workflow Cancelled Enter",
-              "on_success": null,
-              "parameters": [],
-              "scope": {
-                "node_id": null
-              },
-              "source": "workflow.cancelled.enter"
-            }
-          },
+        "9:default:workflow.todo.success": {
+          "events": {},
           "revision": 82,
           "schema_version": 3,
           "skills": {}
@@ -252,32 +193,10 @@
         {
           "agent_context": null,
           "assignee": "Buddy Williams",
-          "created": "2026-09-15T16:06:39Z",
+          "created": "2026-09-15T20:49:52Z",
           "failure_at": "",
           "failure_category": "",
           "failure_message": "",
-          "gate_configurations": {
-            "1:default:workflow.backlog.enter": {
-              "events": {
-                "workflow.backlog.enter": {
-                  "bindings": [],
-                  "enabled": true,
-                  "id": "workflow.backlog.enter",
-                  "kind": "system",
-                  "name": "Workflow Backlog Enter",
-                  "on_success": null,
-                  "parameters": [],
-                  "scope": {
-                    "node_id": null
-                  },
-                  "source": "workflow.backlog.enter"
-                }
-              },
-              "revision": 82,
-              "schema_version": 3,
-              "skills": {}
-            }
-          },
           "governance_candidate_commit": "",
           "governance_checked_at": "",
           "governance_details": "",
@@ -288,121 +207,45 @@
           "implementation_report": null,
           "implementation_reported_at": null,
           "logs": [],
-          "prompt": "The new menu item is missing a chevron indicating it is a drop-down. Add the chevron so that it matches the style of the other menu items with context menus like node, reporter, and tools.",
+          "prompt": "Configure AI Providers and automate provider selection\n\nAllow users to define CLI providers with executable paths, arguments, context transport, credential references, and optional output, availability, and session-continuation behavior. Support multiple configurations of the same CLI without Refine code changes.\n\nStore provider definitions and default selection policies at the refine-state system level. Nodes may select a provider or policy, inheriting the system default when absent. Migrate existing providers into equivalent configurations.\n\nSupport subscription-first selection with configured paid fallback, shared spending limits, and automatic return when subscription capacity becomes available. Preserve work across switches and expose the provider and reason used for each attempt. Keep credential values outside synchronized state.",
           "quality_checked_at": "",
           "quality_details": "",
           "quality_message": "",
           "quality_state": "unclassified",
           "reporter": "Buddy Williams",
           "rule_state": "unclassified",
-          "updated": "2026-09-15T16:06:39Z",
+          "updated": "2026-09-15T20:49:52Z",
           "workflow_attempt_authority": null,
           "workflow_reconciliation": null,
           "workflow_recovery": null
         }
       ],
-      "prompt": "The new menu item is missing a chevron indicating it is a drop-down. Add the chevron so that it matches the style of the other menu items with context menus like node, reporter, and tools.",
+      "prompt": "Configure AI Providers and automate provider selection\n\nAllow users to define CLI providers with executable paths, arguments, context transport, credential references, and optional output, availability, and session-continuation behavior. Support multiple configurations of the same CLI without Refine code changes.\n\nStore provider definitions and default selection policies at the refine-state system level. Nodes may select a provider or policy, inheriting the system default when absent. Migrate existing providers into equivalent configurations.\n\nSupport subscription-first selection with configured paid fallback, shared spending limits, and automatic return when subscription capacity becomes available. Preserve work across switches and expose the provider and reason used for each attempt. Keep credential values outside synchronized state.",
       "reporter": "Buddy Williams",
-      "updated": "2026-09-15T16:06:42Z",
+      "updated": "2026-09-15T20:49:57Z",
       "workflow_attempt_authority": {
-        "claimed_at": "2026-09-15T16:06:40Z",
-        "generation": 2,
+        "claimed_at": "2026-09-15T20:49:54Z",
+        "generation": 9,
         "round_idx": 0,
-        "workflow_revision": 2
+        "workflow_revision": 15
       },
       "workspace_branch": "refine/00000T19EJ0CNGHM85RBDXE000/round-1"
     }
   ],
-  "status": "cancelled",
+  "status": "plan",
   "target_branch": "main",
-  "updated": "2026-09-15T16:07:17Z",
+  "updated": "2026-09-15T20:49:57Z",
   "workflow_context": "",
   "workflow_controls": [
     {
       "actor": "operator",
-      "at": "2026-09-15T16:06:39Z",
+      "at": "2026-09-15T20:49:53Z",
       "forced": false,
       "from": "backlog",
       "reason": "Explicit step assignment",
-      "request_id": "e4c0ff2e-08e1-440c-bbab-dc2046599f7c",
+      "request_id": "6a637d82-691a-491e-9813-0516df06c6fa",
       "source_round": 1,
       "to": "todo"
-    },
-    {
-      "actor": "operator",
-      "at": "2026-09-15T16:06:56Z",
-      "forced": false,
-      "from": "plan",
-      "reason": "Explicit cancellation",
-      "request_id": "45b13781-a5bd-4f37-9590-507a55b2a1a1",
-      "source_round": 1,
-      "to": "cancelled"
-    },
-    {
-      "at": "2026-09-15T16:07:04Z",
-      "decision": true,
-      "forced": true,
-      "from": "cancelled",
-      "generation": 5,
-      "integration_performed": false,
-      "integration_requested": false,
-      "overridden_requirements": [
-        "transition_policy",
-        "workflow_evidence_gates"
-      ],
-      "previous_attempt": {
-        "claimed_at": "2026-09-15T16:06:40Z",
-        "generation": 2,
-        "round_idx": 0,
-        "workflow_revision": 2
-      },
-      "request": {
-        "actor": "Buddy Williams",
-        "context": "",
-        "expected_revision": 10,
-        "force": true,
-        "invocation_id": null,
-        "reason": "User selected workflow step",
-        "request_id": "item-d6d59c46-30c8-4e6b-87f7-6bb24ae37949",
-        "to": "failed"
-      },
-      "request_id": "item-d6d59c46-30c8-4e6b-87f7-6bb24ae37949",
-      "retained_candidate": null,
-      "source_round": 1,
-      "to": "failed"
-    },
-    {
-      "at": "2026-09-15T16:07:17Z",
-      "decision": true,
-      "forced": true,
-      "from": "failed",
-      "generation": 6,
-      "integration_performed": false,
-      "integration_requested": false,
-      "overridden_requirements": [
-        "transition_policy",
-        "workflow_evidence_gates"
-      ],
-      "previous_attempt": {
-        "claimed_at": "2026-09-15T16:06:40Z",
-        "generation": 2,
-        "round_idx": 0,
-        "workflow_revision": 2
-      },
-      "request": {
-        "actor": "Buddy Williams",
-        "context": "",
-        "expected_revision": 11,
-        "force": true,
-        "invocation_id": null,
-        "reason": "User selected workflow step",
-        "request_id": "item-3a3928d3-dc6c-4275-8949-8aca18908221",
-        "to": "cancelled"
-      },
-      "request_id": "item-3a3928d3-dc6c-4275-8949-8aca18908221",
-      "retained_candidate": null,
-      "source_round": 1,
-      "to": "cancelled"
     }
   ],
   "workflow_events": [
@@ -469,7 +312,49 @@
       "supersedes_execution": true,
       "to": "cancelled",
       "workflow_revision": 12
+    },
+    {
+      "at": "2026-09-15T20:48:53.686713750+00:00",
+      "forced": false,
+      "from": "cancelled",
+      "generation": 7,
+      "node_id": "default",
+      "round_idx": null,
+      "supersedes_execution": true,
+      "to": "backlog",
+      "workflow_revision": 13
+    },
+    {
+      "at": "2026-09-15T20:49:52.253388397+00:00",
+      "from": "backlog",
+      "generation": 8,
+      "node_id": "default",
+      "round_idx": 0,
+      "supersedes_execution": true,
+      "to": "backlog",
+      "workflow_revision": 14
+    },
+    {
+      "at": "2026-09-15T20:49:53.342685835+00:00",
+      "forced": false,
+      "from": "backlog",
+      "generation": 9,
+      "node_id": "default",
+      "round_idx": 0,
+      "supersedes_execution": true,
+      "to": "todo",
+      "workflow_revision": 15
+    },
+    {
+      "at": "2026-09-15T20:49:55.708033085+00:00",
+      "forced": false,
+      "from": "todo",
+      "generation": 10,
+      "node_id": "default",
+      "round_idx": 0,
+      "to": "plan",
+      "workflow_revision": 19
     }
   ],
-  "workflow_revision": 12
+  "workflow_revision": 22
 }
