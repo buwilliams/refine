@@ -1,5 +1,5 @@
 {
-  "id": "11c03d2cb50ae791a818368f54f4aeb25290bbddaf12e23f37700902ce2012b3",
+  "id": "7afa1101f09f97417b1978f7de35233093a76ab29beefd04deda588f931595eb",
   "event": {
     "id": "workflow.quality.enter",
     "name": "Workflow Quality Enter",
@@ -35,7 +35,7 @@
       "repository": "/home/buddy/projects/refine-next",
       "path": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T19PJVMBGJ0Y33NWRJ002-round-1",
       "branch": "refine/00000T19PJVMBGJ0Y33NWRJ002/round-1",
-      "commit": null,
+      "commit": "8205e5dff5f6baef48fe5d110802d5b3a24b879d",
       "allow_rebase": false,
       "registration": {
         "common_dir": "/home/buddy/projects/refine-next/.git",
@@ -48,47 +48,16 @@
     "goal_id": "00000T19PJVMBGJ0Y33NWRJ002",
     "round_idx": 0,
     "workflow_revision": 12,
-    "candidate_commit": "40308ac23e4746db9359b9331083b80a924f5fcd",
+    "candidate_commit": "8205e5dff5f6baef48fe5d110802d5b3a24b879d",
     "data": {
-      "context": {
-        "agent_context": {
-          "assembled_at": "2026-09-15T20:50:13Z",
-          "current_round": {
-            "assignee": "Buddy Williams",
-            "prompt": "Add the ability to configure the AI Providers. Today the Settings > Runtime has a dropdown for AI Provider. Users should be able to modify this configuration, supplying the path and parameters. They should be able to add new CLI agents too. The CLI will need {{context}} variable that Refine will use to send context into the CLI call. This feature will provide the users much more flexibility over the AI Provider. This will be saved at the refine-state system level, but the selected AI Provider at the refine-state node level, if absent will default to system defaults (where we convert what we have to this format). The goal here is that no code change is needed to support a new AI Provider.",
-            "reporter": "Buddy Williams",
-            "round": 1
-          },
-          "goal": {
-            "assignee": "Buddy Williams",
-            "id": "00000T19PJVMBGJ0Y33NWRJ002",
-            "name": "Add the ability to configure the AI Providers. Today the Settings > Runtime has",
-            "node_id": "default",
-            "priority": "low",
-            "reporter": "Buddy Williams"
-          },
-          "governance": {
-            "configured": false,
-            "constitution": "",
-            "product": "",
-            "rules": []
-          },
-          "guidance_candidates": [],
-          "previous_rounds": [],
-          "version": 1,
-          "workflow_summary": "Refine gives this Goal Agent an isolated worktree, the current Round, and available planning context. Follow the Goal and applicable Skill instructions and use your judgment to decide when to stop. Quality and Governance agents make their own decisions using their Skills before integration and human Review. Refine coordinates workflow transitions and Git actions. Do not directly advance Goal state, approve, merge, or push."
-        },
-        "implementation_report": "workflow.implement.enter:default-implement: Implemented all seven plan tasks. Changes are retained for Quality; no Goal transitions, commits, merges, or pushes were performed.",
-        "plans": null
-      },
       "event": {},
       "goal": {
         "assignee": "Buddy Williams",
-        "base_commit": "34635cd62aa9f45feec2d2adb92913dab0daac09",
+        "base_commit": "47ccc7c62a1c8c131c37c6884c88f262ec2743ea",
         "branch_name": "refine/00000T19PJVMBGJ0Y33NWRJ002/round-1",
-        "candidate_commit": "40308ac23e4746db9359b9331083b80a924f5fcd",
+        "candidate_commit": "8205e5dff5f6baef48fe5d110802d5b3a24b879d",
         "created": "2026-09-15T20:47:12Z",
-        "event_generation": 9,
+        "event_generation": 10,
         "feature_id": null,
         "feature_order": null,
         "id": "00000T19PJVMBGJ0Y33NWRJ002",
@@ -107,33 +76,34 @@
             "implementation_reported_at": "2026-09-15T21:28:02Z",
             "prompt": "Add the ability to configure the AI Providers. Today the Settings > Runtime has a dropdown for AI Provider. Users should be able to modify this configuration, supplying the path and parameters. They should be able to add new CLI agents too. The CLI will need {{context}} variable that Refine will use to send context into the CLI call. This feature will provide the users much more flexibility over the AI Provider. This will be saved at the refine-state system level, but the selected AI Provider at the refine-state node level, if absent will default to system defaults (where we convert what we have to this format). The goal here is that no code change is needed to support a new AI Provider.",
             "reporter": "Buddy Williams",
-            "updated": "2026-09-15T21:28:06Z"
+            "updated": "2026-09-15T21:45:52Z"
           }
         ],
-        "status": "quality",
+        "status": "governance",
         "target_branch": "main",
-        "updated": "2026-09-15T21:28:06Z",
+        "updated": "2026-09-15T21:45:52Z",
         "workflow_context": "",
-        "workflow_revision": 31
+        "workflow_revision": 41
       },
       "system": {
-        "candidate_commit": "40308ac23e4746db9359b9331083b80a924f5fcd",
+        "candidate_commit": "8205e5dff5f6baef48fe5d110802d5b3a24b879d",
         "node_id": "default",
         "project_root": "/home/buddy/projects/refine-next",
-        "refine_executable": "/home/buddy/projects/refine/bin/refine",
         "workflow_step": "quality",
         "workspace": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T19PJVMBGJ0Y33NWRJ002-round-1"
-      }
+      },
+      "verification_only": true
     },
     "metadata": {
-      "behavior": "EventSkill",
-      "event_operation_id": "1a0a6f85529f7ad122",
+      "behavior": "WorkflowQuality",
+      "candidate_commit": "8205e5dff5f6baef48fe5d110802d5b3a24b879d",
+      "event_operation_id": "1a0a708a530f7ad128",
       "goal_id": "00000T19PJVMBGJ0Y33NWRJ002",
-      "kind": "workflow",
+      "kind": "quality",
       "managed_worktree": {
         "allow_rebase": false,
         "branch": "refine/00000T19PJVMBGJ0Y33NWRJ002/round-1",
-        "commit": null,
+        "commit": "8205e5dff5f6baef48fe5d110802d5b3a24b879d",
         "path": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T19PJVMBGJ0Y33NWRJ002-round-1",
         "registration": {
           "common_dir": "/home/buddy/projects/refine-next/.git",
@@ -143,10 +113,12 @@
         "repository": "/home/buddy/projects/refine-next"
       },
       "node_id": "default",
+      "operation_id": "1a0a7089a1ff7ad127",
       "provider": "codex",
       "round_idx": 0,
+      "runtime_root": "/home/buddy/projects/refine/run/8082",
       "started_bindings": {
-        "default-quality": "2026-09-15T21:28:08.824971413+00:00"
+        "default-quality": "2026-09-15T21:45:59.115602541+00:00"
       },
       "target_app_id": "/home/buddy/projects/refine-next",
       "template_snapshot": {
@@ -449,8 +421,8 @@
         }
       },
       "workflow_revision": 12,
-      "workflow_state": "quality",
-      "workflow_step_generation": 9
+      "workflow_state": "governance",
+      "workflow_step_generation": 10
     }
   },
   "bindings": [
@@ -482,64 +454,11 @@
       "parameters": {}
     }
   ],
-  "state": "succeeded",
-  "results": {
-    "default-quality": {
-      "invocation_id": "11c03d2cb50ae791a818368f54f4aeb25290bbddaf12e23f37700902ce2012b3",
-      "binding_id": "default-quality",
-      "role": "quality",
-      "outcome": "success",
-      "summary": "Provider-specific Quality checks pass. Added coverage for validation, inheritance, selection repair, synchronization, CLI launches with edited parameters, and browser draft retention. Corrected a stale Skills-count test. Changes are retained for Governance. Ten pre-existing Rust failures and one pre-existing browser failure remain; all reproduce on the base commit.",
-      "evidence": [
-        "Focused Rust regressions: 14 passed.",
-        "Daemon-backed provider CLI test: passed, including literal context delivery and updated launch arguments.",
-        "Provider Chromium tests: 2 passed; Settings browser suite: 24 passed, no skips.",
-        "Full Rust suite: 1406 passed, 11 failed, 7 ignored. All failures reproduced on base; one subsequently corrected and verified.",
-        "Full browser suite: 381 passed, 1 baseline failure, no skips.",
-        "cargo check --all-targets, static-asset checks, cargo fmt --all -- --check, and git diff --check passed."
-      ],
-      "artifacts": {
-        "limitations": "Runtime tests used fixture executables; commercial provider authentication was not exercised.",
-        "report": "/tmp/provider-quality-report.json",
-        "report_contents": "Exact commands, logs, tests added or updated, remaining failure names, and baseline comparisons."
-      }
-    }
-  },
-  "attempts": [
-    {
-      "attempt": 0,
-      "binding_id": "default-quality",
-      "checkout": {
-        "observation": {
-          "branch": "refine/00000T19PJVMBGJ0Y33NWRJ002/round-1",
-          "head_commit": "40308ac23e4746db9359b9331083b80a924f5fcd",
-          "status_porcelain": [
-            " M src/application/agents/providers/tests.rs",
-            " M src/application/persistence_sync/state/tests/synchronization.rs",
-            " M src/surfaces/cli/tests/config.rs",
-            " M tests/cli_surface/config.rs",
-            " M tests/web_settings_providers_browser.test.js"
-          ]
-        },
-        "tree": "897fbce78842494f4fef48cbba56b5ad91648894"
-      },
-      "checkout_recorded": true,
-      "diagnostic": null,
-      "host_bound_result": true,
-      "observational_violation": false,
-      "operation_id": null,
-      "process_id": "proc-1789507689288-1014481-35909",
-      "prompt_bytes": 7156,
-      "provider_session_id": null,
-      "purpose": "work",
-      "raw_output": "{\n  \"outcome\": \"success\",\n  \"summary\": \"Provider-specific Quality checks pass. Added coverage for validation, inheritance, selection repair, synchronization, CLI launches with edited parameters, and browser draft retention. Corrected a stale Skills-count test. Changes are retained for Governance. Ten pre-existing Rust failures and one pre-existing browser failure remain; all reproduce on the base commit.\",\n  \"evidence\": [\n    \"Focused Rust regressions: 14 passed.\",\n    \"Daemon-backed provider CLI test: passed, including literal context delivery and updated launch arguments.\",\n    \"Provider Chromium tests: 2 passed; Settings browser suite: 24 passed, no skips.\",\n    \"Full Rust suite: 1406 passed, 11 failed, 7 ignored. All failures reproduced on base; one subsequently corrected and verified.\",\n    \"Full browser suite: 381 passed, 1 baseline failure, no skips.\",\n    \"cargo check --all-targets, static-asset checks, cargo fmt --all -- --check, and git diff --check passed.\"\n  ],\n  \"artifacts\": {\n    \"report\": \"/tmp/provider-quality-report.json\",\n    \"report_contents\": \"Exact commands, logs, tests added or updated, remaining failure names, and baseline comparisons.\",\n    \"limitations\": \"Runtime tests used fixture executables; commercial provider authentication was not exercised.\"\n  }\n}",
-      "received_at": "2026-09-15T21:45:42.969533038+00:00",
-      "started_at": "2026-09-15T21:28:09.231978414+00:00",
-      "workflow_revision": 12
-    }
-  ],
-  "created_at": "2026-09-15T21:28:07.240057324+00:00",
-  "completed_at": "2026-09-15T21:45:45.092627813+00:00",
+  "state": "running",
+  "results": {},
+  "attempts": [],
+  "created_at": "2026-09-15T21:45:55.890766417+00:00",
+  "completed_at": null,
   "error": null,
   "action_applied": false
 }
