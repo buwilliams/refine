@@ -32,7 +32,7 @@
   "notes": [],
   "pending_event_dispatches": {},
   "priority": "low",
-  "reporter": "buddy.williams@insurity.com",
+  "reporter": "Buddy Williams",
   "rounds": [
     {
       "agent_context": {
@@ -62,7 +62,7 @@
         "version": 1,
         "workflow_summary": "Refine gives this Goal Agent an isolated worktree, the current Round, and available planning context. Follow the Goal and applicable Skill instructions and use your judgment to decide when to stop. Quality and Governance agents make their own decisions using their Skills before integration and human Review. Refine coordinates workflow transitions and Git actions. Do not directly advance Goal state, approve, merge, or push."
       },
-      "assignee": "buddy.williams@insurity.com",
+      "assignee": "Buddy Williams",
       "created": "2026-09-15T12:41:51Z",
       "event_configuration": {
         "events": {
@@ -1021,7 +1021,7 @@
         ]
       },
       "quality_state": "passed",
-      "reporter": "buddy.williams@insurity.com",
+      "reporter": "Buddy Williams",
       "rule_state": "passed",
       "updated": "2026-09-15T15:31:07Z",
       "workflow_attempt_authority": {
@@ -1408,5 +1408,5 @@
       "workflow_revision": 58
     }
   ],
-  "workflow_revision": 58
+  "workflow_revision": 59
 }
