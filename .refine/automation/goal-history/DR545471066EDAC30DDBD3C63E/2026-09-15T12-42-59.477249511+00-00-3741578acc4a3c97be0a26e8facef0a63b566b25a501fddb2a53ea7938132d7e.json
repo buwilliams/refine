@@ -1,19 +1,19 @@
 {
-  "completed_at": null,
+  "completed_at": "2026-09-15T12:47:19.013000250+00:00",
   "config_revision": 82,
   "created_at": "2026-09-15T12:42:59.477249511+00:00",
-  "error": null,
+  "error": "Goal DR545471066EDAC30DDBD3C63E no longer authorizes implement work on node default",
   "event": {
     "id": "workflow.implement.enter",
     "kind": "system",
     "name": "Workflow Implement Enter",
     "source": "workflow.implement.enter"
   },
-  "execution_state": "running",
-  "gate": "missing",
+  "execution_state": "error",
+  "gate": "fault",
   "goal_id": "DR545471066EDAC30DDBD3C63E",
   "id": "3741578acc4a3c97be0a26e8facef0a63b566b25a501fddb2a53ea7938132d7e",
   "node_id": "default",
-  "result_count": 0,
-  "state": "running"
+  "result_count": 1,
+  "state": "error"
 }

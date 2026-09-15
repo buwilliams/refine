@@ -3,7 +3,7 @@
   "branch_name": "refine/DR9F3524610E6B32C2C11775D4/round-1",
   "candidate_commit": null,
   "created": "2026-09-15T12:41:51Z",
-  "event_generation": 4,
+  "event_generation": 6,
   "feature_id": null,
   "feature_order": null,
   "id": "DR9F3524610E6B32C2C11775D4",
@@ -291,6 +291,46 @@
               }
             }
           }
+        },
+        "5:default:workflow.failed.enter": {
+          "events": {
+            "workflow.failed.enter": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.failed.enter",
+              "kind": "system",
+              "name": "Workflow Failed Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.failed.enter"
+            }
+          },
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {}
+        },
+        "6:default:workflow.cancelled.enter": {
+          "events": {
+            "workflow.cancelled.enter": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.cancelled.enter",
+              "kind": "system",
+              "name": "Workflow Cancelled Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.cancelled.enter"
+            }
+          },
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {}
         }
       },
       "logs": [],
@@ -359,9 +399,9 @@
       "workspace_branch": "refine/DR9F3524610E6B32C2C11775D4/round-1"
     }
   ],
-  "status": "implement",
+  "status": "cancelled",
   "target_branch": "main",
-  "updated": "2026-09-15T12:43:00Z",
+  "updated": "2026-09-15T12:47:26Z",
   "workflow_controls": [
     {
       "actor": "operator",
@@ -372,6 +412,16 @@
       "request_id": "bf291a40-c408-41f7-a0f3-ba04c8968cd5",
       "source_round": 1,
       "to": "todo"
+    },
+    {
+      "actor": "operator",
+      "at": "2026-09-15T12:47:26Z",
+      "forced": false,
+      "from": "failed",
+      "reason": "Explicit cancellation",
+      "request_id": "53cc3a87-baa1-4d73-96b0-4c50fdc3d4ca",
+      "source_round": 1,
+      "to": "cancelled"
     }
   ],
   "workflow_events": [
@@ -415,7 +465,28 @@
       "round_idx": 0,
       "to": "implement",
       "workflow_revision": 13
+    },
+    {
+      "at": "2026-09-15T12:47:17.758086870+00:00",
+      "forced": true,
+      "from": "implement",
+      "generation": 5,
+      "node_id": "default",
+      "round_idx": 0,
+      "to": "failed",
+      "workflow_revision": 15
+    },
+    {
+      "at": "2026-09-15T12:47:26.439515754+00:00",
+      "forced": true,
+      "from": "failed",
+      "generation": 6,
+      "node_id": "default",
+      "round_idx": 0,
+      "supersedes_execution": true,
+      "to": "cancelled",
+      "workflow_revision": 16
     }
   ],
-  "workflow_revision": 14
+  "workflow_revision": 16
 }

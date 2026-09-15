@@ -493,11 +493,23 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
+  "state": "error",
+  "results": {
+    "default-implement": {
+      "invocation_id": "3741578acc4a3c97be0a26e8facef0a63b566b25a501fddb2a53ea7938132d7e",
+      "binding_id": "default-implement",
+      "role": "implement",
+      "outcome": "error",
+      "summary": "{\"type\":\"item.completed\",\"item\":{\"id\":\"item_26\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"sed -n '130,145p' src/application/events/execution/lifecycle_tests/support.rs; git diff -- xtask/Cargo.lock; rg -n 'unknown field|extra_field|deny_unknown' src/application/agent_io src/application/events src/application/workflow/tests\\\"\",\"aggregated_output\":\"            .unwrap()\\n            .iter()\\n            .find(|run| run[\\\"event\\\"][\\\"source\\\"] == source)\\n            .unwrap();\\n        ",
+      "evidence": [],
+      "artifacts": {
+        "fault_kind": "execution"
+      }
+    }
+  },
   "attempts": [],
   "created_at": "2026-09-15T12:42:59.477249511+00:00",
-  "completed_at": null,
-  "error": null,
+  "completed_at": "2026-09-15T12:47:19.013000250+00:00",
+  "error": "Goal DR545471066EDAC30DDBD3C63E no longer authorizes implement work on node default",
   "action_applied": false
 }
