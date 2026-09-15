@@ -495,11 +495,55 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "succeeded",
+  "results": {
+    "default-quality": {
+      "invocation_id": "0834e3d00bf3117788bf77c86d40a647198f44e497bfb5f3741bfe74d088e7c9",
+      "binding_id": "default-quality",
+      "role": "quality",
+      "outcome": "success",
+      "summary": "Quality passed for the changed behavior. Strengthened browser coverage for selected Node/Reporter, blank-prompt validation, draft retention after HTTP 503, and all four actions across expanded desktop, collapsed desktop, and mobile. No implementation defects found.",
+      "evidence": [
+        "Focused navigation, command palette, Goal modal, Node selection, and toolbar JavaScript suites: 91 passed, 0 failed, 0 skipped, using installed Playwright Chromium.",
+        "Verified keyboard navigation, focus restoration, dismissal, menu exclusion, viewport bounds, mobile drawer handoff, and independent fresh Plan sessions.",
+        "cargo test --lib static_surface::navigation -- --nocapture: 7 passed, 2 failed. Both failures reproduced using the base commit d7e38092's original tests and static files: obsolete Controls markup and missing Guide targets.",
+        "The new Rust menu test passed individually. JavaScript syntax checks and git diff --check passed.",
+        "Only tests/web_navigation_browser.test.js changed during Quality. Browser tests use mocked APIs; live daemon creation was not exercised. Workflow state and integration remain untouched."
+      ],
+      "artifacts": null
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "default-quality",
+      "checkout": {
+        "observation": {
+          "branch": "refine/00000T19CHAJQGMYH5DRTAT000/round-1",
+          "head_commit": "987a5146086d3483a0d10809674cd728497e4133",
+          "status_porcelain": [
+            " M tests/web_navigation_browser.test.js"
+          ]
+        },
+        "tree": "d5bdf1d611db3a18ee5f885708a12c9f212d81e9"
+      },
+      "checkout_recorded": true,
+      "diagnostic": null,
+      "host_bound_result": true,
+      "observational_violation": false,
+      "operation_id": null,
+      "process_id": "proc-1789484690578-406787-3090",
+      "prompt_bytes": 16680,
+      "provider_session_id": null,
+      "purpose": "work",
+      "raw_output": "{\n  \"outcome\": \"success\",\n  \"summary\": \"Quality passed for the changed behavior. Strengthened browser coverage for selected Node/Reporter, blank-prompt validation, draft retention after HTTP 503, and all four actions across expanded desktop, collapsed desktop, and mobile. No implementation defects found.\",\n  \"evidence\": [\n    \"Focused navigation, command palette, Goal modal, Node selection, and toolbar JavaScript suites: 91 passed, 0 failed, 0 skipped, using installed Playwright Chromium.\",\n    \"Verified keyboard navigation, focus restoration, dismissal, menu exclusion, viewport bounds, mobile drawer handoff, and independent fresh Plan sessions.\",\n    \"cargo test --lib static_surface::navigation -- --nocapture: 7 passed, 2 failed. Both failures reproduced using the base commit d7e38092's original tests and static files: obsolete Controls markup and missing Guide targets.\",\n    \"The new Rust menu test passed individually. JavaScript syntax checks and git diff --check passed.\",\n    \"Only tests/web_navigation_browser.test.js changed during Quality. Browser tests use mocked APIs; live daemon creation was not exercised. Workflow state and integration remain untouched.\"\n  ],\n  \"artifacts\": null\n}\n\n",
+      "received_at": "2026-09-15T15:09:34.237621248+00:00",
+      "started_at": "2026-09-15T15:04:50.534095361+00:00",
+      "workflow_revision": 3
+    }
+  ],
   "created_at": "2026-09-15T15:04:48.416714348+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-15T15:09:36.403165159+00:00",
   "error": null,
   "action_applied": false
 }

@@ -1,9 +1,9 @@
 {
   "base_commit": "d7e38092321b8d16b4cadba7c23057f1a7dc7e73",
   "branch_name": "refine/00000T19CHAJQGMYH5DRTAT000/round-1",
-  "candidate_commit": "987a5146086d3483a0d10809674cd728497e4133",
+  "candidate_commit": "51d66e6668061f430123693e53d0e8f5f575e942",
   "created": "2026-09-15T14:56:00Z",
-  "event_generation": 6,
+  "event_generation": 7,
   "feature_id": null,
   "feature_order": null,
   "id": "00000T19CHAJQGMYH5DRTAT000",
@@ -46,51 +46,49 @@
       "created": "2026-09-15T14:56:23Z",
       "event_configuration": {
         "events": {
-          "workflow.quality.enter": {
-            "bindings": [
-              {
-                "enabled": true,
-                "id": "default-quality",
-                "inputs": {},
-                "mode": "blocking",
-                "order": 0,
-                "overrides": null,
-                "scope": {
-                  "node_id": null
-                },
-                "skill_id": "default-quality"
-              }
-            ],
+          "workflow.quality.exit": {
+            "bindings": [],
             "enabled": true,
-            "id": "workflow.quality.enter",
+            "id": "workflow.quality.exit",
             "kind": "system",
-            "name": "Workflow Quality Enter",
+            "name": "Workflow Quality Exit",
             "on_success": null,
             "parameters": [],
             "scope": {
               "node_id": null
             },
-            "source": "workflow.quality.enter"
+            "source": "workflow.quality.exit"
           }
         },
         "revision": 82,
         "schema_version": 3,
-        "skills": {
-          "default-quality": {
-            "enabled": true,
-            "id": "default-quality",
-            "name": "Quality",
-            "parameters": [],
-            "prompt": "## Quality\n\nTest the implementation. Create and groom tests to cover the behavior described in the plan.\n\n### Outcome\n\nMeaningful tests cover the changed behavior and pass. Provide a brief report of the behavior tested, tests added or updated, commands run and their results, and any remaining failures or gaps. Include runtime or browser test results where useful. These results support Governance's verification of the work.\n\n### Guardrails\n\n- Test observable behavior, including relevant failure cases and effects on existing functionality. Tests should catch defects rather than mirror the implementation.\n- Keep useful tests, update tests for changed behavior, and remove obsolete or meaningless tests.\n- Investigate failures, correct problems in the implementation or tests, and rerun affected tests.\n- Choose tests suited to the change. Expand coverage when failures or affected behavior call for it.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
-            "provenance": "refine-default-v1",
-            "role": "task",
-            "scope": {
-              "node_id": null
-            }
-          }
-        }
+        "skills": {}
       },
       "event_results": {
+        "0834e3d00bf3117788bf77c86d40a647198f44e497bfb5f3741bfe74d088e7c9": {
+          "candidate_commit": "987a5146086d3483a0d10809674cd728497e4133",
+          "generation": 6,
+          "results": {
+            "default-quality": {
+              "artifacts": null,
+              "binding_id": "default-quality",
+              "evidence": [
+                "Focused navigation, command palette, Goal modal, Node selection, and toolbar JavaScript suites: 91 passed, 0 failed, 0 skipped, using installed Playwright Chromium.",
+                "Verified keyboard navigation, focus restoration, dismissal, menu exclusion, viewport bounds, mobile drawer handoff, and independent fresh Plan sessions.",
+                "cargo test --lib static_surface::navigation -- --nocapture: 7 passed, 2 failed. Both failures reproduced using the base commit d7e38092's original tests and static files: obsolete Controls markup and missing Guide targets.",
+                "The new Rust menu test passed individually. JavaScript syntax checks and git diff --check passed.",
+                "Only tests/web_navigation_browser.test.js changed during Quality. Browser tests use mocked APIs; live daemon creation was not exercised. Workflow state and integration remain untouched."
+              ],
+              "invocation_id": "0834e3d00bf3117788bf77c86d40a647198f44e497bfb5f3741bfe74d088e7c9",
+              "outcome": "success",
+              "role": "quality",
+              "summary": "Quality passed for the changed behavior. Strengthened browser coverage for selected Node/Reporter, blank-prompt validation, draft retention after HTTP 503, and all four actions across expanded desktop, collapsed desktop, and mobile. No implementation defects found."
+            }
+          },
+          "round_idx": 0,
+          "source": "workflow.quality.enter",
+          "state": "succeeded"
+        },
         "aac54782e644818001b0761cba3662b311221366d6c3291607d8a18450990162": {
           "candidate_commit": null,
           "generation": 5,
@@ -377,6 +375,32 @@
               }
             }
           }
+        },
+        "6:default:workflow.quality.exit": {
+          "events": {
+            "workflow.quality.exit": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.quality.exit",
+              "kind": "system",
+              "name": "Workflow Quality Exit",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.quality.exit"
+            }
+          },
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {}
+        },
+        "6:default:workflow.quality.success": {
+          "events": {},
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {}
         }
       },
       "implementation_report": "workflow.implement.enter:default-implement: Task 1: Added New directly between Search and Node with the four ordered actions.\nTask 2: Reused shared commands, closing menus and releasing the mobile drawer before execution.\nTask 3: Added keyboard navigation, focus restoration, dismissal, menu exclusion, and viewport constraints.\nTask 4: Updated navigation intent documentation.\nTask 5: Added browser and Rust coverage. No implementation departures or unfinished work. Workflow state remains unchanged.",
@@ -414,8 +438,119 @@
         }
       ],
       "prompt": "Add a New button directly below Search in the persistent left navigation rail so users can start common creation flows from any screen.\n\n### Outcome\n- Show New as a full-width rail row with a plus icon, immediately after Search and before Node. Keep it available independently of collapsible sections and consistent with existing rail styling.\n- Clicking New opens an anchored context menu with New Goal, New Plan, New Feature, and Import, in that order. New Plan opens a fresh Planning Agent session through the existing planning flow. The other items open their existing creation/import flows.\n- Reuse the shared command/actions and their current Node, Reporter, validation, draft retention, and confirmation behavior. Opening the menu itself creates no item or agent session.\n- Make the control and menu usable in expanded and collapsed desktop navigation and the mobile drawer. Retain an accessible New label and hover title when only its icon is visible. Keep the menu within the viewport.\n- Support keyboard opening and navigation, visible focus, Escape dismissal with focus restored to New, outside-click dismissal, and closing after selection. Close other rail menus when opening this one. On mobile, dismiss the drawer and release its focus/inert state before opening the selected flow.\n\n### Implementation context\nThe inspected checkout at d7e38092 puts Search in src/surfaces/web/static/index.html under .rail-global. Existing creation shortcuts are in Settings > Workspace controls & support. Shared commands in src/surfaces/web/static/js/commands.js include goal.new, plan.open, feature.new, and goal.import. plan.open calls openPlanChatDock, which creates a new plan tool session. src/surfaces/web/static/js/common.js already dispatches creation clicks and closes menus; navigation.js owns rail menu positioning, collapse, and mobile drawer behavior. Reuse these boundaries and src/surfaces/web/static/css/navigation.css rather than duplicating creation logic or element IDs.\nUpdate the navigation intent documentation at src/surfaces/refine-hub/docs/intent/05-surfaces/03-browser/02-nav.md to describe the new entry point.\n\n### Guardrails\nKeep this scoped to exposing the existing creation flows. Preserve existing Search shortcuts, page creation actions, Tools, Node/Reporter selection, and retained sessions. Do not invent a new Plan data model or expand the menu to unrelated management actions.\n\n### Verification\nQuality should check the exact rail order and all four menu actions, including a fresh Plan session and preservation of selected Node/Reporter behavior. Verify mouse and keyboard interactions, focus restoration, dismissal, one open menu at a time, and mobile drawer handoff. Exercise expanded and collapsed desktop rails and a narrow viewport for clipping and accessibility. Extend the relevant tests in tests/web_navigation_browser.test.js and src/surfaces/web_server/tests/static_surface/navigation.rs where useful, run focused checks, and distinguish existing failures from regressions.\n\nThis Goal is drafted for review; leave it in backlog until the user asks to start it.",
+      "quality_agent_report": "workflow.quality.enter:default-quality: Quality passed for the changed behavior. Strengthened browser coverage for selected Node/Reporter, blank-prompt validation, draft retention after HTTP 503, and all four actions across expanded desktop, collapsed desktop, and mobile. No implementation defects found.",
+      "quality_candidate_commit": "51d66e6668061f430123693e53d0e8f5f575e942",
+      "quality_checked_at": "2026-09-15T15:09:42Z",
+      "quality_details": {
+        "candidate_commit": "51d66e6668061f430123693e53d0e8f5f575e942",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T19CHAJQGMYH5DRTAT000-round-1",
+        "diagnostics": [
+          "Reused Skill review workflow.quality.enter:default-quality for final candidate content: automation/invocations/0834e3d00bf3117788bf77c86d40a647198f44e497bfb5f3741bfe74d088e7c9.json"
+        ],
+        "evaluation_scope": "isolated_candidate",
+        "operation_id": "1a0a59dd38d63503a",
+        "provider_attempts": [],
+        "quality_proof": {
+          "checked_at": "2026-09-15T15:09:42Z",
+          "checked_candidate_commit": "51d66e6668061f430123693e53d0e8f5f575e942",
+          "evaluation_scope": "isolated_candidate",
+          "goal_id": "00000T19CHAJQGMYH5DRTAT000",
+          "operation_id": "1a0a59dd38d63503a",
+          "results": [
+            {
+              "command": "",
+              "evidence": "Quality passed for the changed behavior. Strengthened browser coverage for selected Node/Reporter, blank-prompt validation, draft retention after HTTP 503, and all four actions across expanded desktop, collapsed desktop, and mobile. No implementation defects found.",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality"
+            }
+          ],
+          "round_idx": 0,
+          "schema_version": 1,
+          "skills": {
+            "invocations": {
+              "workflow.quality.enter:default-quality": "0834e3d00bf3117788bf77c86d40a647198f44e497bfb5f3741bfe74d088e7c9"
+            },
+            "required_bindings": [
+              "workflow.quality.enter:default-quality"
+            ],
+            "requirements_id": "9fe971f6b60ac378d8ecd9e7e448b3fcb1ac096baf3723270caa2a43e20aec88"
+          },
+          "source_candidate_commit": "51d66e6668061f430123693e53d0e8f5f575e942",
+          "state": "passed"
+        },
+        "results": [
+          {
+            "command": "",
+            "evidence": "Quality passed for the changed behavior. Strengthened browser coverage for selected Node/Reporter, blank-prompt validation, draft retention after HTTP 503, and all four actions across expanded desktop, collapsed desktop, and mobile. No implementation defects found.",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality"
+          }
+        ],
+        "source_candidate_commit": "51d66e6668061f430123693e53d0e8f5f575e942"
+      },
+      "quality_message": "Quality Skills reported success.",
+      "quality_requirements": {
+        "candidate_commit": "51d66e6668061f430123693e53d0e8f5f575e942",
+        "id": "9fe971f6b60ac378d8ecd9e7e448b3fcb1ac096baf3723270caa2a43e20aec88",
+        "node_id": "default",
+        "required_bindings": [
+          "workflow.quality.enter:default-quality"
+        ],
+        "selected": [
+          {
+            "attachments": [],
+            "binding": {
+              "binding": {
+                "enabled": true,
+                "id": "default-quality",
+                "inputs": {},
+                "mode": "blocking",
+                "order": 0,
+                "overrides": null,
+                "scope": {
+                  "node_id": null
+                },
+                "skill_id": "default-quality"
+              },
+              "parameters": {},
+              "skill": {
+                "enabled": true,
+                "id": "default-quality",
+                "name": "Quality",
+                "parameters": [],
+                "prompt": "## Quality\n\nTest the implementation. Create and groom tests to cover the behavior described in the plan.\n\n### Outcome\n\nMeaningful tests cover the changed behavior and pass. Provide a brief report of the behavior tested, tests added or updated, commands run and their results, and any remaining failures or gaps. Include runtime or browser test results where useful. These results support Governance's verification of the work.\n\n### Guardrails\n\n- Test observable behavior, including relevant failure cases and effects on existing functionality. Tests should catch defects rather than mirror the implementation.\n- Keep useful tests, update tests for changed behavior, and remove obsolete or meaningless tests.\n- Investigate failures, correct problems in the implementation or tests, and rerun affected tests.\n- Choose tests suited to the change. Expand coverage when failures or affected behavior call for it.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
+                "provenance": "refine-default-v1",
+                "role": "quality",
+                "scope": {
+                  "node_id": null
+                }
+              }
+            },
+            "contract_version": 1,
+            "key": "workflow.quality.enter:default-quality"
+          }
+        ]
+      },
+      "quality_skill_results": [
+        {
+          "artifacts": null,
+          "binding_id": "workflow.quality.enter:default-quality",
+          "evidence": [
+            "Focused navigation, command palette, Goal modal, Node selection, and toolbar JavaScript suites: 91 passed, 0 failed, 0 skipped, using installed Playwright Chromium.",
+            "Verified keyboard navigation, focus restoration, dismissal, menu exclusion, viewport bounds, mobile drawer handoff, and independent fresh Plan sessions.",
+            "cargo test --lib static_surface::navigation -- --nocapture: 7 passed, 2 failed. Both failures reproduced using the base commit d7e38092's original tests and static files: obsolete Controls markup and missing Guide targets.",
+            "The new Rust menu test passed individually. JavaScript syntax checks and git diff --check passed.",
+            "Only tests/web_navigation_browser.test.js changed during Quality. Browser tests use mocked APIs; live daemon creation was not exercised. Workflow state and integration remain untouched."
+          ],
+          "invocation_id": "0834e3d00bf3117788bf77c86d40a647198f44e497bfb5f3741bfe74d088e7c9",
+          "outcome": "success",
+          "role": "quality",
+          "summary": "Quality passed for the changed behavior. Strengthened browser coverage for selected Node/Reporter, blank-prompt validation, draft retention after HTTP 503, and all four actions across expanded desktop, collapsed desktop, and mobile. No implementation defects found."
+        }
+      ],
+      "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "updated": "2026-09-15T15:04:47Z",
+      "updated": "2026-09-15T15:09:44Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-15T14:56:24Z",
         "generation": 3,
@@ -425,9 +560,9 @@
       "workspace_branch": "refine/00000T19CHAJQGMYH5DRTAT000/round-1"
     }
   ],
-  "status": "quality",
+  "status": "governance",
   "target_branch": "main",
-  "updated": "2026-09-15T15:04:47Z",
+  "updated": "2026-09-15T15:09:44Z",
   "workflow_controls": [
     {
       "actor": "operator",
@@ -501,7 +636,17 @@
       "round_idx": 0,
       "to": "quality",
       "workflow_revision": 21
+    },
+    {
+      "at": "2026-09-15T15:09:44.939395854+00:00",
+      "forced": false,
+      "from": "quality",
+      "generation": 7,
+      "node_id": "default",
+      "round_idx": 0,
+      "to": "governance",
+      "workflow_revision": 31
     }
   ],
-  "workflow_revision": 22
+  "workflow_revision": 31
 }
