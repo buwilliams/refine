@@ -3,7 +3,7 @@
   "branch_name": "refine/00000T19G1926GC2MSDXWRJ000/round-2-execution-d89993e6-c257-4c78-9a2b-efce50e21d4d",
   "candidate_commit": "819217ceebfa97a70304e651b24ef0609e749e49",
   "created": "2026-09-15T16:58:17Z",
-  "event_generation": 14,
+  "event_generation": 15,
   "feature_id": null,
   "feature_order": null,
   "id": "00000T19G1926GC2MSDXWRJ000",
@@ -1361,6 +1361,26 @@
           "revision": 82,
           "schema_version": 3,
           "skills": {}
+        },
+        "15:default:workflow.done.enter": {
+          "events": {
+            "workflow.done.enter": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.done.enter",
+              "kind": "system",
+              "name": "Workflow Done Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.done.enter"
+            }
+          },
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {}
         }
       },
       "governance_candidate_commit": "819217ceebfa97a70304e651b24ef0609e749e49",
@@ -1670,9 +1690,9 @@
       ]
     }
   ],
-  "status": "review",
+  "status": "done",
   "target_branch": "main",
-  "updated": "2026-09-15T18:19:40Z",
+  "updated": "2026-09-15T19:03:17Z",
   "workflow_controls": [
     {
       "actor": "operator",
@@ -1849,7 +1869,17 @@
       "round_idx": 1,
       "to": "review",
       "workflow_revision": 77
+    },
+    {
+      "at": "2026-09-15T19:03:17.625640871+00:00",
+      "forced": false,
+      "from": "review",
+      "generation": 15,
+      "node_id": "default",
+      "round_idx": 1,
+      "to": "done",
+      "workflow_revision": 78
     }
   ],
-  "workflow_revision": 77
+  "workflow_revision": 78
 }
