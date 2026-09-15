@@ -1,0 +1,305 @@
+{
+  "base_commit": "9c7363164d582fac14e5076b24efdc47ec5f9461",
+  "branch_name": "refine/00000T19PJ29Y11YDVAXWRJ001/round-1",
+  "candidate_commit": null,
+  "created": "2026-09-15T20:46:20Z",
+  "event_generation": 3,
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000T19PJ29Y11YDVAXWRJ001",
+  "name": "Remove the auto-promote configuration from Refine since this can now be handled",
+  "node_id": "default",
+  "notes": [],
+  "pending_event_dispatches": {},
+  "priority": "low",
+  "reporter": "Buddy Williams",
+  "rounds": [
+    {
+      "agent_context": {
+        "assembled_at": "2026-09-15T20:46:24Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "Remove the auto-promote configuration from Refine since this can now be handled by Skills.",
+          "reporter": "Buddy Williams",
+          "round": 1
+        },
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000T19PJ29Y11YDVAXWRJ001",
+          "name": "Remove the auto-promote configuration from Refine since this can now be handled",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": false,
+          "constitution": "",
+          "product": "",
+          "rules": []
+        },
+        "guidance_candidates": [],
+        "previous_rounds": [],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree, the current Round, and available planning context. Follow the Goal and applicable Skill instructions and use your judgment to decide when to stop. Quality and Governance agents make their own decisions using their Skills before integration and human Review. Refine coordinates workflow transitions and Git actions. Do not directly advance Goal state, approve, merge, or push."
+      },
+      "assignee": "Buddy Williams",
+      "created": "2026-09-15T20:46:20Z",
+      "event_configuration": {
+        "events": {
+          "workflow.plan.enter": {
+            "bindings": [
+              {
+                "enabled": true,
+                "id": "default-plan",
+                "inputs": {},
+                "mode": "blocking",
+                "order": 0,
+                "overrides": null,
+                "scope": {
+                  "node_id": null
+                },
+                "skill_id": "default-plan"
+              }
+            ],
+            "enabled": true,
+            "id": "workflow.plan.enter",
+            "kind": "system",
+            "name": "Workflow Plan Enter",
+            "on_success": null,
+            "parameters": [],
+            "scope": {
+              "node_id": null
+            },
+            "source": "workflow.plan.enter"
+          }
+        },
+        "revision": 82,
+        "schema_version": 3,
+        "skills": {
+          "default-plan": {
+            "enabled": true,
+            "id": "default-plan",
+            "name": "Plan",
+            "parameters": [],
+            "prompt": "## Plan\n\nDevelop a plan to achieve the Goal's desired outcome. If the goal outcome is underspecified or is missing details add only just enough detail so that AI agents do not thrash or become confused.\n\n### Outcome\n\nA clear implementation plan that explains the approach and breaks the work into ordered tasks. Begin with a short description of the desired behavior and proposed solution. Use a numbered checklist, such as `Task #1 - What changes and why`. Include dependencies and important design decisions where they help implementation.\n\n### Guardrails\n\n- Read the context that helps explain the Goal and how the existing system works.\n- Look for the underlying cause. Consider whether a missing or misused concept explains the problem, and improve that concept rather than adding fixes for individual symptoms.\n- Give each task enough detail to guide implementation while leaving room for reasonable implementation choices.\n- Keep the plan focused on the desired outcome. Prefer straightforward changes that fit the existing architecture.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
+            "provenance": "refine-default-v1",
+            "role": "task",
+            "scope": {
+              "node_id": null
+            }
+          }
+        }
+      },
+      "failure_at": "",
+      "failure_category": "",
+      "failure_message": "",
+      "gate_configurations": {
+        "2:default:workflow.todo.enter": {
+          "events": {
+            "workflow.todo.enter": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.todo.enter",
+              "kind": "system",
+              "name": "Workflow Todo Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.todo.enter"
+            }
+          },
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {}
+        },
+        "2:default:workflow.todo.exit": {
+          "events": {
+            "workflow.todo.exit": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.todo.exit",
+              "kind": "system",
+              "name": "Workflow Todo Exit",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.todo.exit"
+            }
+          },
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {}
+        },
+        "2:default:workflow.todo.success": {
+          "events": {},
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {}
+        },
+        "3:default:workflow.plan.enter": {
+          "events": {
+            "workflow.plan.enter": {
+              "bindings": [
+                {
+                  "enabled": true,
+                  "id": "default-plan",
+                  "inputs": {},
+                  "mode": "blocking",
+                  "order": 0,
+                  "overrides": null,
+                  "scope": {
+                    "node_id": null
+                  },
+                  "skill_id": "default-plan"
+                }
+              ],
+              "enabled": true,
+              "id": "workflow.plan.enter",
+              "kind": "system",
+              "name": "Workflow Plan Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.plan.enter"
+            }
+          },
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {
+            "default-plan": {
+              "enabled": true,
+              "id": "default-plan",
+              "name": "Plan",
+              "parameters": [],
+              "prompt": "## Plan\n\nDevelop a plan to achieve the Goal's desired outcome. If the goal outcome is underspecified or is missing details add only just enough detail so that AI agents do not thrash or become confused.\n\n### Outcome\n\nA clear implementation plan that explains the approach and breaks the work into ordered tasks. Begin with a short description of the desired behavior and proposed solution. Use a numbered checklist, such as `Task #1 - What changes and why`. Include dependencies and important design decisions where they help implementation.\n\n### Guardrails\n\n- Read the context that helps explain the Goal and how the existing system works.\n- Look for the underlying cause. Consider whether a missing or misused concept explains the problem, and improve that concept rather than adding fixes for individual symptoms.\n- Give each task enough detail to guide implementation while leaving room for reasonable implementation choices.\n- Keep the plan focused on the desired outcome. Prefer straightforward changes that fit the existing architecture.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
+              "provenance": "refine-default-v1",
+              "role": "task",
+              "scope": {
+                "node_id": null
+              }
+            }
+          }
+        }
+      },
+      "logs": [],
+      "prior_attempts": [
+        {
+          "agent_context": null,
+          "assignee": "Buddy Williams",
+          "created": "2026-09-15T20:46:20Z",
+          "failure_at": "",
+          "failure_category": "",
+          "failure_message": "",
+          "gate_configurations": {
+            "1:default:workflow.backlog.enter": {
+              "events": {
+                "workflow.backlog.enter": {
+                  "bindings": [],
+                  "enabled": true,
+                  "id": "workflow.backlog.enter",
+                  "kind": "system",
+                  "name": "Workflow Backlog Enter",
+                  "on_success": null,
+                  "parameters": [],
+                  "scope": {
+                    "node_id": null
+                  },
+                  "source": "workflow.backlog.enter"
+                }
+              },
+              "revision": 82,
+              "schema_version": 3,
+              "skills": {}
+            }
+          },
+          "governance_candidate_commit": "",
+          "governance_checked_at": "",
+          "governance_details": "",
+          "governance_message": "",
+          "governance_rule_actions": [],
+          "guidance_decision": null,
+          "implementation_plan": null,
+          "implementation_report": null,
+          "implementation_reported_at": null,
+          "logs": [],
+          "prompt": "Remove the auto-promote configuration from Refine since this can now be handled by Skills.",
+          "quality_checked_at": "",
+          "quality_details": "",
+          "quality_message": "",
+          "quality_state": "unclassified",
+          "reporter": "Buddy Williams",
+          "rule_state": "unclassified",
+          "updated": "2026-09-15T20:46:20Z",
+          "workflow_attempt_authority": null,
+          "workflow_reconciliation": null,
+          "workflow_recovery": null
+        }
+      ],
+      "prompt": "Remove the auto-promote configuration from Refine since this can now be handled by Skills.",
+      "reporter": "Buddy Williams",
+      "updated": "2026-09-15T20:46:24Z",
+      "workflow_attempt_authority": {
+        "claimed_at": "2026-09-15T20:46:22Z",
+        "generation": 2,
+        "round_idx": 0,
+        "workflow_revision": 2
+      },
+      "workspace_branch": "refine/00000T19PJ29Y11YDVAXWRJ001/round-1"
+    }
+  ],
+  "status": "plan",
+  "target_branch": "main",
+  "updated": "2026-09-15T20:46:24Z",
+  "workflow_controls": [
+    {
+      "actor": "operator",
+      "at": "2026-09-15T20:46:20Z",
+      "forced": false,
+      "from": "backlog",
+      "reason": "Explicit step assignment",
+      "request_id": "f88ac7e4-a903-4341-9515-e21f45c9762a",
+      "source_round": 1,
+      "to": "todo"
+    }
+  ],
+  "workflow_events": [
+    {
+      "at": "2026-09-15T20:46:20.285218971+00:00",
+      "forced": false,
+      "from": null,
+      "generation": 1,
+      "node_id": "default",
+      "round_idx": 0,
+      "to": "backlog",
+      "workflow_revision": 1
+    },
+    {
+      "at": "2026-09-15T20:46:20.293554162+00:00",
+      "forced": false,
+      "from": "backlog",
+      "generation": 2,
+      "node_id": "default",
+      "round_idx": 0,
+      "supersedes_execution": true,
+      "to": "todo",
+      "workflow_revision": 2
+    },
+    {
+      "at": "2026-09-15T20:46:23.113111364+00:00",
+      "forced": false,
+      "from": "todo",
+      "generation": 3,
+      "node_id": "default",
+      "round_idx": 0,
+      "to": "plan",
+      "workflow_revision": 6
+    }
+  ],
+  "workflow_revision": 9
+}
