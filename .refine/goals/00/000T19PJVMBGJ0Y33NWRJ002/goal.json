@@ -3,7 +3,7 @@
   "branch_name": "refine/00000T19PJVMBGJ0Y33NWRJ002/round-1",
   "candidate_commit": null,
   "created": "2026-09-15T20:47:12Z",
-  "event_generation": 5,
+  "event_generation": 7,
   "feature_id": null,
   "feature_order": null,
   "id": "00000T19PJVMBGJ0Y33NWRJ002",
@@ -16,7 +16,7 @@
   "rounds": [
     {
       "agent_context": {
-        "assembled_at": "2026-09-15T20:47:14Z",
+        "assembled_at": "2026-09-15T20:50:13Z",
         "current_round": {
           "assignee": "Buddy Williams",
           "prompt": "Add the ability to configure the AI Providers. Today the Settings > Runtime has a dropdown for AI Provider. Users should be able to modify this configuration, supplying the path and parameters. They should be able to add new CLI agents too. The CLI will need {{context}} variable that Refine will use to send context into the CLI call. This feature will provide the users much more flexibility over the AI Provider. This will be saved at the refine-state system level, but the selected AI Provider at the refine-state node level, if absent will default to system defaults (where we convert what we have to this format). The goal here is that no code change is needed to support a new AI Provider.",
@@ -94,7 +94,7 @@
       "failure_category": "",
       "failure_message": "",
       "gate_configurations": {
-        "2:default:workflow.todo.enter": {
+        "6:default:workflow.todo.enter": {
           "events": {
             "workflow.todo.enter": {
               "bindings": [],
@@ -114,7 +114,7 @@
           "schema_version": 3,
           "skills": {}
         },
-        "2:default:workflow.todo.exit": {
+        "6:default:workflow.todo.exit": {
           "events": {
             "workflow.todo.exit": {
               "bindings": [],
@@ -134,13 +134,13 @@
           "schema_version": 3,
           "skills": {}
         },
-        "2:default:workflow.todo.success": {
+        "6:default:workflow.todo.success": {
           "events": {},
           "revision": 82,
           "schema_version": 3,
           "skills": {}
         },
-        "3:default:workflow.plan.enter": {
+        "7:default:workflow.plan.enter": {
           "events": {
             "workflow.plan.enter": {
               "bindings": [
@@ -185,46 +185,6 @@
               }
             }
           }
-        },
-        "4:default:workflow.cancelled.enter": {
-          "events": {
-            "workflow.cancelled.enter": {
-              "bindings": [],
-              "enabled": true,
-              "id": "workflow.cancelled.enter",
-              "kind": "system",
-              "name": "Workflow Cancelled Enter",
-              "on_success": null,
-              "parameters": [],
-              "scope": {
-                "node_id": null
-              },
-              "source": "workflow.cancelled.enter"
-            }
-          },
-          "revision": 82,
-          "schema_version": 3,
-          "skills": {}
-        },
-        "5:default:workflow.failed.enter": {
-          "events": {
-            "workflow.failed.enter": {
-              "bindings": [],
-              "enabled": true,
-              "id": "workflow.failed.enter",
-              "kind": "system",
-              "name": "Workflow Failed Enter",
-              "on_success": null,
-              "parameters": [],
-              "scope": {
-                "node_id": null
-              },
-              "source": "workflow.failed.enter"
-            }
-          },
-          "revision": 82,
-          "schema_version": 3,
-          "skills": {}
         }
       },
       "logs": [],
@@ -279,23 +239,256 @@
           "workflow_attempt_authority": null,
           "workflow_reconciliation": null,
           "workflow_recovery": null
+        },
+        {
+          "agent_context": {
+            "assembled_at": "2026-09-15T20:47:14Z",
+            "current_round": {
+              "assignee": "Buddy Williams",
+              "prompt": "Add the ability to configure the AI Providers. Today the Settings > Runtime has a dropdown for AI Provider. Users should be able to modify this configuration, supplying the path and parameters. They should be able to add new CLI agents too. The CLI will need {{context}} variable that Refine will use to send context into the CLI call. This feature will provide the users much more flexibility over the AI Provider. This will be saved at the refine-state system level, but the selected AI Provider at the refine-state node level, if absent will default to system defaults (where we convert what we have to this format). The goal here is that no code change is needed to support a new AI Provider.",
+              "reporter": "Buddy Williams",
+              "round": 1
+            },
+            "goal": {
+              "assignee": "Buddy Williams",
+              "id": "00000T19PJVMBGJ0Y33NWRJ002",
+              "name": "Add the ability to configure the AI Providers. Today the Settings > Runtime has",
+              "node_id": "default",
+              "priority": "low",
+              "reporter": "Buddy Williams"
+            },
+            "governance": {
+              "configured": false,
+              "constitution": "",
+              "product": "",
+              "rules": []
+            },
+            "guidance_candidates": [],
+            "previous_rounds": [],
+            "version": 1,
+            "workflow_summary": "Refine gives this Goal Agent an isolated worktree, the current Round, and available planning context. Follow the Goal and applicable Skill instructions and use your judgment to decide when to stop. Quality and Governance agents make their own decisions using their Skills before integration and human Review. Refine coordinates workflow transitions and Git actions. Do not directly advance Goal state, approve, merge, or push."
+          },
+          "assignee": "Buddy Williams",
+          "created": "2026-09-15T20:47:12Z",
+          "event_configuration": {
+            "events": {
+              "workflow.plan.enter": {
+                "bindings": [
+                  {
+                    "enabled": true,
+                    "id": "default-plan",
+                    "inputs": {},
+                    "mode": "blocking",
+                    "order": 0,
+                    "overrides": null,
+                    "scope": {
+                      "node_id": null
+                    },
+                    "skill_id": "default-plan"
+                  }
+                ],
+                "enabled": true,
+                "id": "workflow.plan.enter",
+                "kind": "system",
+                "name": "Workflow Plan Enter",
+                "on_success": null,
+                "parameters": [],
+                "scope": {
+                  "node_id": null
+                },
+                "source": "workflow.plan.enter"
+              }
+            },
+            "revision": 82,
+            "schema_version": 3,
+            "skills": {
+              "default-plan": {
+                "enabled": true,
+                "id": "default-plan",
+                "name": "Plan",
+                "parameters": [],
+                "prompt": "## Plan\n\nDevelop a plan to achieve the Goal's desired outcome. If the goal outcome is underspecified or is missing details add only just enough detail so that AI agents do not thrash or become confused.\n\n### Outcome\n\nA clear implementation plan that explains the approach and breaks the work into ordered tasks. Begin with a short description of the desired behavior and proposed solution. Use a numbered checklist, such as `Task #1 - What changes and why`. Include dependencies and important design decisions where they help implementation.\n\n### Guardrails\n\n- Read the context that helps explain the Goal and how the existing system works.\n- Look for the underlying cause. Consider whether a missing or misused concept explains the problem, and improve that concept rather than adding fixes for individual symptoms.\n- Give each task enough detail to guide implementation while leaving room for reasonable implementation choices.\n- Keep the plan focused on the desired outcome. Prefer straightforward changes that fit the existing architecture.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
+                "provenance": "refine-default-v1",
+                "role": "task",
+                "scope": {
+                  "node_id": null
+                }
+              }
+            }
+          },
+          "failure_at": "",
+          "failure_category": "",
+          "failure_message": "",
+          "gate_configurations": {
+            "2:default:workflow.todo.enter": {
+              "events": {
+                "workflow.todo.enter": {
+                  "bindings": [],
+                  "enabled": true,
+                  "id": "workflow.todo.enter",
+                  "kind": "system",
+                  "name": "Workflow Todo Enter",
+                  "on_success": null,
+                  "parameters": [],
+                  "scope": {
+                    "node_id": null
+                  },
+                  "source": "workflow.todo.enter"
+                }
+              },
+              "revision": 82,
+              "schema_version": 3,
+              "skills": {}
+            },
+            "2:default:workflow.todo.exit": {
+              "events": {
+                "workflow.todo.exit": {
+                  "bindings": [],
+                  "enabled": true,
+                  "id": "workflow.todo.exit",
+                  "kind": "system",
+                  "name": "Workflow Todo Exit",
+                  "on_success": null,
+                  "parameters": [],
+                  "scope": {
+                    "node_id": null
+                  },
+                  "source": "workflow.todo.exit"
+                }
+              },
+              "revision": 82,
+              "schema_version": 3,
+              "skills": {}
+            },
+            "2:default:workflow.todo.success": {
+              "events": {},
+              "revision": 82,
+              "schema_version": 3,
+              "skills": {}
+            },
+            "3:default:workflow.plan.enter": {
+              "events": {
+                "workflow.plan.enter": {
+                  "bindings": [
+                    {
+                      "enabled": true,
+                      "id": "default-plan",
+                      "inputs": {},
+                      "mode": "blocking",
+                      "order": 0,
+                      "overrides": null,
+                      "scope": {
+                        "node_id": null
+                      },
+                      "skill_id": "default-plan"
+                    }
+                  ],
+                  "enabled": true,
+                  "id": "workflow.plan.enter",
+                  "kind": "system",
+                  "name": "Workflow Plan Enter",
+                  "on_success": null,
+                  "parameters": [],
+                  "scope": {
+                    "node_id": null
+                  },
+                  "source": "workflow.plan.enter"
+                }
+              },
+              "revision": 82,
+              "schema_version": 3,
+              "skills": {
+                "default-plan": {
+                  "enabled": true,
+                  "id": "default-plan",
+                  "name": "Plan",
+                  "parameters": [],
+                  "prompt": "## Plan\n\nDevelop a plan to achieve the Goal's desired outcome. If the goal outcome is underspecified or is missing details add only just enough detail so that AI agents do not thrash or become confused.\n\n### Outcome\n\nA clear implementation plan that explains the approach and breaks the work into ordered tasks. Begin with a short description of the desired behavior and proposed solution. Use a numbered checklist, such as `Task #1 - What changes and why`. Include dependencies and important design decisions where they help implementation.\n\n### Guardrails\n\n- Read the context that helps explain the Goal and how the existing system works.\n- Look for the underlying cause. Consider whether a missing or misused concept explains the problem, and improve that concept rather than adding fixes for individual symptoms.\n- Give each task enough detail to guide implementation while leaving room for reasonable implementation choices.\n- Keep the plan focused on the desired outcome. Prefer straightforward changes that fit the existing architecture.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
+                  "provenance": "refine-default-v1",
+                  "role": "task",
+                  "scope": {
+                    "node_id": null
+                  }
+                }
+              }
+            },
+            "4:default:workflow.cancelled.enter": {
+              "events": {
+                "workflow.cancelled.enter": {
+                  "bindings": [],
+                  "enabled": true,
+                  "id": "workflow.cancelled.enter",
+                  "kind": "system",
+                  "name": "Workflow Cancelled Enter",
+                  "on_success": null,
+                  "parameters": [],
+                  "scope": {
+                    "node_id": null
+                  },
+                  "source": "workflow.cancelled.enter"
+                }
+              },
+              "revision": 82,
+              "schema_version": 3,
+              "skills": {}
+            },
+            "5:default:workflow.failed.enter": {
+              "events": {
+                "workflow.failed.enter": {
+                  "bindings": [],
+                  "enabled": true,
+                  "id": "workflow.failed.enter",
+                  "kind": "system",
+                  "name": "Workflow Failed Enter",
+                  "on_success": null,
+                  "parameters": [],
+                  "scope": {
+                    "node_id": null
+                  },
+                  "source": "workflow.failed.enter"
+                }
+              },
+              "revision": 82,
+              "schema_version": 3,
+              "skills": {}
+            }
+          },
+          "logs": [],
+          "prompt": "Add the ability to configure the AI Providers. Today the Settings > Runtime has a dropdown for AI Provider. Users should be able to modify this configuration, supplying the path and parameters. They should be able to add new CLI agents too. The CLI will need {{context}} variable that Refine will use to send context into the CLI call. This feature will provide the users much more flexibility over the AI Provider. This will be saved at the refine-state system level, but the selected AI Provider at the refine-state node level, if absent will default to system defaults (where we convert what we have to this format). The goal here is that no code change is needed to support a new AI Provider.",
+          "reporter": "Buddy Williams",
+          "updated": "2026-09-15T20:47:14Z",
+          "workflow_attempt_authority": {
+            "claimed_at": "2026-09-15T20:47:12Z",
+            "generation": 2,
+            "round_idx": 0,
+            "workflow_revision": 2
+          },
+          "workspace_branch": "refine/00000T19PJVMBGJ0Y33NWRJ002/round-1"
         }
       ],
       "prompt": "Add the ability to configure the AI Providers. Today the Settings > Runtime has a dropdown for AI Provider. Users should be able to modify this configuration, supplying the path and parameters. They should be able to add new CLI agents too. The CLI will need {{context}} variable that Refine will use to send context into the CLI call. This feature will provide the users much more flexibility over the AI Provider. This will be saved at the refine-state system level, but the selected AI Provider at the refine-state node level, if absent will default to system defaults (where we convert what we have to this format). The goal here is that no code change is needed to support a new AI Provider.",
       "reporter": "Buddy Williams",
-      "updated": "2026-09-15T20:47:14Z",
+      "updated": "2026-09-15T20:50:13Z",
       "workflow_attempt_authority": {
-        "claimed_at": "2026-09-15T20:47:12Z",
-        "generation": 2,
+        "claimed_at": "2026-09-15T20:50:12Z",
+        "generation": 6,
         "round_idx": 0,
-        "workflow_revision": 2
+        "workflow_revision": 12
       },
+      "workflow_claim_history": [
+        {
+          "claimed_at": "2026-09-15T20:47:12Z",
+          "generation": 2,
+          "round_idx": 0,
+          "workflow_revision": 2
+        }
+      ],
       "workspace_branch": "refine/00000T19PJVMBGJ0Y33NWRJ002/round-1"
     }
   ],
-  "status": "failed",
+  "status": "plan",
   "target_branch": "main",
-  "updated": "2026-09-15T20:48:47Z",
+  "updated": "2026-09-15T20:50:13Z",
   "workflow_context": "",
   "workflow_controls": [
     {
@@ -350,6 +543,39 @@
       "retained_candidate": null,
       "source_round": 1,
       "to": "failed"
+    },
+    {
+      "at": "2026-09-15T20:50:10Z",
+      "decision": true,
+      "forced": true,
+      "from": "failed",
+      "generation": 6,
+      "integration_performed": false,
+      "integration_requested": false,
+      "overridden_requirements": [
+        "transition_policy",
+        "workflow_evidence_gates"
+      ],
+      "previous_attempt": {
+        "claimed_at": "2026-09-15T20:47:12Z",
+        "generation": 2,
+        "round_idx": 0,
+        "workflow_revision": 2
+      },
+      "request": {
+        "actor": "Buddy Williams",
+        "context": "",
+        "expected_revision": 11,
+        "force": true,
+        "invocation_id": null,
+        "reason": "User selected workflow step",
+        "request_id": "item-c35b3e8a-5eb3-4c01-a5b2-f1296851252f",
+        "to": "todo"
+      },
+      "request_id": "item-c35b3e8a-5eb3-4c01-a5b2-f1296851252f",
+      "retained_candidate": null,
+      "source_round": 1,
+      "to": "todo"
     }
   ],
   "workflow_events": [
@@ -405,7 +631,28 @@
       "supersedes_execution": true,
       "to": "failed",
       "workflow_revision": 11
+    },
+    {
+      "at": "2026-09-15T20:50:10.586941373+00:00",
+      "forced": true,
+      "from": "failed",
+      "generation": 6,
+      "node_id": "default",
+      "round_idx": 0,
+      "supersedes_execution": true,
+      "to": "todo",
+      "workflow_revision": 12
+    },
+    {
+      "at": "2026-09-15T20:50:12.883304146+00:00",
+      "forced": false,
+      "from": "todo",
+      "generation": 7,
+      "node_id": "default",
+      "round_idx": 0,
+      "to": "plan",
+      "workflow_revision": 16
     }
   ],
-  "workflow_revision": 11
+  "workflow_revision": 18
 }
