@@ -1,10 +1,10 @@
 {
-  "id": "604b87bebdcf5aa5b9b5ce1e1d6f9348256f4ba0f4baf85262b0b591d5549df8",
+  "id": "417ec4da795780c4ea5d7ba15747bdaba066d93d00d58e30e0e3cff0865c4fa4",
   "event": {
-    "id": "workflow.plan.enter",
-    "name": "Workflow Plan Enter",
+    "id": "workflow.implement.enter",
+    "name": "Workflow Implement Enter",
     "kind": "system",
-    "source": "workflow.plan.enter",
+    "source": "workflow.implement.enter",
     "enabled": true,
     "scope": {
       "node_id": null
@@ -12,8 +12,8 @@
     "parameters": [],
     "bindings": [
       {
-        "id": "default-plan",
-        "skill_id": "default-plan",
+        "id": "default-implement",
+        "skill_id": "default-implement",
         "enabled": true,
         "mode": "blocking",
         "order": 0,
@@ -51,31 +51,50 @@
     "candidate_commit": null,
     "data": {
       "context": {
-        "assembled_at": "2026-09-15T20:51:39Z",
-        "current_round": {
-          "assignee": "Buddy Williams",
-          "prompt": "The Goal Modal for the Workflow Step Action currently shows the Todo as the default option, but it really should show the next logical action based on the current workflow step:\nBacklog > Todo\nReview > Done\nFailed > Todo\nCancelled > Failed",
-          "reporter": "Buddy Williams",
-          "round": 1
+        "agent_context": {
+          "assembled_at": "2026-09-15T20:51:39Z",
+          "current_round": {
+            "assignee": "Buddy Williams",
+            "prompt": "The Goal Modal for the Workflow Step Action currently shows the Todo as the default option, but it really should show the next logical action based on the current workflow step:\nBacklog > Todo\nReview > Done\nFailed > Todo\nCancelled > Failed",
+            "reporter": "Buddy Williams",
+            "round": 1
+          },
+          "goal": {
+            "assignee": "Buddy Williams",
+            "id": "00000T19PPW3T11YP0J9WRJ003",
+            "name": "The Goal Modal for the Workflow Step Action currently shows the Todo as the defa",
+            "node_id": "default",
+            "priority": "low",
+            "reporter": "Buddy Williams"
+          },
+          "governance": {
+            "configured": false,
+            "constitution": "",
+            "product": "",
+            "rules": []
+          },
+          "guidance_candidates": [],
+          "previous_rounds": [],
+          "version": 1,
+          "workflow_summary": "Refine gives this Goal Agent an isolated worktree, the current Round, and available planning context. Follow the Goal and applicable Skill instructions and use your judgment to decide when to stop. Quality and Governance agents make their own decisions using their Skills before integration and human Review. Refine coordinates workflow transitions and Git actions. Do not directly advance Goal state, approve, merge, or push."
         },
-        "goal": {
-          "assignee": "Buddy Williams",
-          "id": "00000T19PPW3T11YP0J9WRJ003",
-          "name": "The Goal Modal for the Workflow Step Action currently shows the Todo as the defa",
-          "node_id": "default",
-          "priority": "low",
-          "reporter": "Buddy Williams"
-        },
-        "governance": {
-          "configured": false,
-          "constitution": "",
-          "product": "",
-          "rules": []
-        },
-        "guidance_candidates": [],
-        "previous_rounds": [],
-        "version": 1,
-        "workflow_summary": "Refine gives this Goal Agent an isolated worktree, the current Round, and available planning context. Follow the Goal and applicable Skill instructions and use your judgment to decide when to stop. Quality and Governance agents make their own decisions using their Skills before integration and human Review. Refine coordinates workflow transitions and Git actions. Do not directly advance Goal state, approve, merge, or push."
+        "plans": [
+          {
+            "artifacts": {
+              "implementation_plan": "The Goal modal’s primary Workflow Step Action should display and execute the requested next action: Backlog → Todo, Review → Done, Failed → Todo, and Cancelled → Failed. Derive its label and target from the current Goal status; retain Todo for unspecified statuses.\n\n1. [ ] Task #1 - Derive the primary action in goals-detail.js. Replace the hard-coded Todo button with a small status-to-target mapping. Use the same resolved target for data-goal-step and workflowStatusLabel so the displayed action matches the click behavior. Recompute it on every drawGoalDetail render, including live refreshes. This is a browser presentation default; keep the existing shared workflow move handler and revision checks. Keep Review approval separate: selecting Done continues to change status without merging code. Do not derive this default from workflowForGoal, whose approval and recovery actions have different meanings.\n\n2. [ ] Task #2 - Update the Goal surface intent document. In src/surfaces/refine-hub/docs/intent/05-surfaces/03-browser/08-goal.md, replace the fixed Todo-button description with the four mappings and Todo fallback. Preserve the full step menu and existing explicit-move semantics.\n\n3. [ ] Task #3 - Verify the rendered actions after Task #1. Run node --test tests/web_goal_human_controls.test.js. Using the existing browser harness with mocked transport, check the label and submitted target for all four mappings and the fallback. Redraw an open modal with a changed status and workflow revision, then confirm its primary action submits the updated target and revision. Confirm every dropdown step remains available and Review → Done uses the move endpoint."
+            },
+            "binding_id": "default-plan",
+            "evidence": [
+              "src/surfaces/web/static/js/features/goals-detail.js:343 hard-codes the primary button label and data-goal-step to Todo.",
+              "src/surfaces/web/static/js/features/goals-detail.js:470 routes all data-goal-step buttons through the shared move endpoint using the live Goal and workflow revision.",
+              "tests/web_goal_human_controls.test.js already exercises production rendering, primary-action clicks, and all dropdown targets with mocked HTTP transport."
+            ],
+            "invocation_id": "604b87bebdcf5aa5b9b5ce1e1d6f9348256f4ba0f4baf85262b0b591d5549df8",
+            "outcome": "success",
+            "role": "plan",
+            "summary": "Plan complete. The cause is a fixed presentation default; a status-derived button target addresses the requested behavior within the existing browser architecture. No files or workflow state were changed.\n\n"
+          }
+        ]
       },
       "event": {},
       "goal": {
@@ -84,7 +103,7 @@
         "branch_name": "refine/00000T19PPW3T11YP0J9WRJ003/round-1",
         "candidate_commit": null,
         "created": "2026-09-15T20:51:35Z",
-        "event_generation": 3,
+        "event_generation": 4,
         "feature_id": null,
         "feature_order": null,
         "id": "00000T19PPW3T11YP0J9WRJ003",
@@ -101,26 +120,26 @@
             "failure_message": "",
             "prompt": "The Goal Modal for the Workflow Step Action currently shows the Todo as the default option, but it really should show the next logical action based on the current workflow step:\nBacklog > Todo\nReview > Done\nFailed > Todo\nCancelled > Failed",
             "reporter": "Buddy Williams",
-            "updated": "2026-09-15T20:51:39Z"
+            "updated": "2026-09-15T20:52:47Z"
           }
         ],
-        "status": "plan",
+        "status": "implement",
         "target_branch": "main",
-        "updated": "2026-09-15T20:51:39Z",
-        "workflow_revision": 9
+        "updated": "2026-09-15T20:52:47Z",
+        "workflow_revision": 14
       },
       "system": {
         "candidate_commit": null,
         "node_id": "default",
         "project_root": "/home/buddy/projects/refine-next",
         "refine_executable": "/home/buddy/projects/refine/bin/refine",
-        "workflow_step": "plan",
+        "workflow_step": "implement",
         "workspace": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T19PPW3T11YP0J9WRJ003-round-1"
       }
     },
     "metadata": {
       "behavior": "EventSkill",
-      "event_operation_id": "1a0a6d6f555f7ad119",
+      "event_operation_id": "1a0a6d7ff07f7ad11c",
       "goal_id": "00000T19PPW3T11YP0J9WRJ003",
       "kind": "workflow",
       "managed_worktree": {
@@ -139,7 +158,7 @@
       "provider": "codex",
       "round_idx": 0,
       "started_bindings": {
-        "default-plan": "2026-09-15T20:51:41.303540916+00:00"
+        "default-implement": "2026-09-15T20:52:49.526775636+00:00"
       },
       "target_app_id": "/home/buddy/projects/refine-next",
       "template_snapshot": {
@@ -442,15 +461,15 @@
         }
       },
       "workflow_revision": 2,
-      "workflow_state": "plan",
-      "workflow_step_generation": 3
+      "workflow_state": "implement",
+      "workflow_step_generation": 4
     }
   },
   "bindings": [
     {
       "binding": {
-        "id": "default-plan",
-        "skill_id": "default-plan",
+        "id": "default-implement",
+        "skill_id": "default-implement",
         "enabled": true,
         "mode": "blocking",
         "order": 0,
@@ -461,10 +480,10 @@
         "inputs": {}
       },
       "skill": {
-        "id": "default-plan",
-        "name": "Plan",
-        "prompt": "## Plan\n\nDevelop a plan to achieve the Goal's desired outcome. If the goal outcome is underspecified or is missing details add only just enough detail so that AI agents do not thrash or become confused.\n\n### Outcome\n\nA clear implementation plan that explains the approach and breaks the work into ordered tasks. Begin with a short description of the desired behavior and proposed solution. Use a numbered checklist, such as `Task #1 - What changes and why`. Include dependencies and important design decisions where they help implementation.\n\n### Guardrails\n\n- Read the context that helps explain the Goal and how the existing system works.\n- Look for the underlying cause. Consider whether a missing or misused concept explains the problem, and improve that concept rather than adding fixes for individual symptoms.\n- Give each task enough detail to guide implementation while leaving room for reasonable implementation choices.\n- Keep the plan focused on the desired outcome. Prefer straightforward changes that fit the existing architecture.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
-        "role": "plan",
+        "id": "default-implement",
+        "name": "Implement",
+        "prompt": "## Implement\n\nImplement the plan.\n\n### Outcome\n\nThe plan is implemented in a way that aligns with the project's purpose and architecture. Provide a brief summary organized by plan task: what changed, any important departures from the plan and why, and any unfinished work.\n\n### Guardrails\n\n- Follow established code patterns and put shared behavior in one place. Fix the underlying cause rather than each symptom separately.\n- Keep code focused on one responsibility and preserve stable interfaces where possible. Split mixed responsibilities into separate files. Keep files relatively small, under roughly 1,000 lines where possible.\n- Prefer clear, straightforward code and abstractions that make the behavior easier to understand and maintain.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
+        "role": "implement",
         "enabled": true,
         "scope": {
           "node_id": null
@@ -475,53 +494,11 @@
       "parameters": {}
     }
   ],
-  "state": "succeeded",
-  "results": {
-    "default-plan": {
-      "invocation_id": "604b87bebdcf5aa5b9b5ce1e1d6f9348256f4ba0f4baf85262b0b591d5549df8",
-      "binding_id": "default-plan",
-      "role": "plan",
-      "outcome": "success",
-      "summary": "Plan complete. The cause is a fixed presentation default; a status-derived button target addresses the requested behavior within the existing browser architecture. No files or workflow state were changed.\n\n",
-      "evidence": [
-        "src/surfaces/web/static/js/features/goals-detail.js:343 hard-codes the primary button label and data-goal-step to Todo.",
-        "src/surfaces/web/static/js/features/goals-detail.js:470 routes all data-goal-step buttons through the shared move endpoint using the live Goal and workflow revision.",
-        "tests/web_goal_human_controls.test.js already exercises production rendering, primary-action clicks, and all dropdown targets with mocked HTTP transport."
-      ],
-      "artifacts": {
-        "implementation_plan": "The Goal modal’s primary Workflow Step Action should display and execute the requested next action: Backlog → Todo, Review → Done, Failed → Todo, and Cancelled → Failed. Derive its label and target from the current Goal status; retain Todo for unspecified statuses.\n\n1. [ ] Task #1 - Derive the primary action in goals-detail.js. Replace the hard-coded Todo button with a small status-to-target mapping. Use the same resolved target for data-goal-step and workflowStatusLabel so the displayed action matches the click behavior. Recompute it on every drawGoalDetail render, including live refreshes. This is a browser presentation default; keep the existing shared workflow move handler and revision checks. Keep Review approval separate: selecting Done continues to change status without merging code. Do not derive this default from workflowForGoal, whose approval and recovery actions have different meanings.\n\n2. [ ] Task #2 - Update the Goal surface intent document. In src/surfaces/refine-hub/docs/intent/05-surfaces/03-browser/08-goal.md, replace the fixed Todo-button description with the four mappings and Todo fallback. Preserve the full step menu and existing explicit-move semantics.\n\n3. [ ] Task #3 - Verify the rendered actions after Task #1. Run node --test tests/web_goal_human_controls.test.js. Using the existing browser harness with mocked transport, check the label and submitted target for all four mappings and the fallback. Redraw an open modal with a changed status and workflow revision, then confirm its primary action submits the updated target and revision. Confirm every dropdown step remains available and Review → Done uses the move endpoint."
-      }
-    }
-  },
-  "attempts": [
-    {
-      "attempt": 0,
-      "binding_id": "default-plan",
-      "checkout": {
-        "observation": {
-          "branch": "refine/00000T19PPW3T11YP0J9WRJ003/round-1",
-          "head_commit": "9c7363164d582fac14e5076b24efdc47ec5f9461",
-          "status_porcelain": []
-        },
-        "tree": "e4fff4cb2d40f6792062243140856e31496ba904"
-      },
-      "checkout_recorded": true,
-      "diagnostic": null,
-      "host_bound_result": true,
-      "observational_violation": false,
-      "operation_id": null,
-      "process_id": "proc-1789505501674-1014481-26649",
-      "prompt_bytes": 5788,
-      "provider_session_id": null,
-      "purpose": "work",
-      "raw_output": "{\n  \"outcome\": \"success\",\n  \"artifacts\": {\n    \"implementation_plan\": \"The Goal modal’s primary Workflow Step Action should display and execute the requested next action: Backlog → Todo, Review → Done, Failed → Todo, and Cancelled → Failed. Derive its label and target from the current Goal status; retain Todo for unspecified statuses.\\n\\n1. [ ] Task #1 - Derive the primary action in goals-detail.js. Replace the hard-coded Todo button with a small status-to-target mapping. Use the same resolved target for data-goal-step and workflowStatusLabel so the displayed action matches the click behavior. Recompute it on every drawGoalDetail render, including live refreshes. This is a browser presentation default; keep the existing shared workflow move handler and revision checks. Keep Review approval separate: selecting Done continues to change status without merging code. Do not derive this default from workflowForGoal, whose approval and recovery actions have different meanings.\\n\\n2. [ ] Task #2 - Update the Goal surface intent document. In src/surfaces/refine-hub/docs/intent/05-surfaces/03-browser/08-goal.md, replace the fixed Todo-button description with the four mappings and Todo fallback. Preserve the full step menu and existing explicit-move semantics.\\n\\n3. [ ] Task #3 - Verify the rendered actions after Task #1. Run node --test tests/web_goal_human_controls.test.js. Using the existing browser harness with mocked transport, check the label and submitted target for all four mappings and the fallback. Redraw an open modal with a changed status and workflow revision, then confirm its primary action submits the updated target and revision. Confirm every dropdown step remains available and Review → Done uses the move endpoint.\"\n  },\n  \"evidence\": [\n    \"src/surfaces/web/static/js/features/goals-detail.js:343 hard-codes the primary button label and data-goal-step to Todo.\",\n    \"src/surfaces/web/static/js/features/goals-detail.js:470 routes all data-goal-step buttons through the shared move endpoint using the live Goal and workflow revision.\",\n    \"tests/web_goal_human_controls.test.js already exercises production rendering, primary-action clicks, and all dropdown targets with mocked HTTP transport.\"\n  ],\n  \"summary\": \"Plan complete. The cause is a fixed presentation default; a status-derived button target addresses the requested behavior within the existing browser architecture. No files or workflow state were changed.\\n\\n\"\n}",
-      "received_at": "2026-09-15T20:52:42.126326196+00:00",
-      "started_at": "2026-09-15T20:51:41.632047638+00:00",
-      "workflow_revision": 2
-    }
-  ],
-  "created_at": "2026-09-15T20:51:40.089354490+00:00",
-  "completed_at": "2026-09-15T20:52:44.926037380+00:00",
+  "state": "running",
+  "results": {},
+  "attempts": [],
+  "created_at": "2026-09-15T20:52:48.029657958+00:00",
+  "completed_at": null,
   "error": null,
   "action_applied": false
 }

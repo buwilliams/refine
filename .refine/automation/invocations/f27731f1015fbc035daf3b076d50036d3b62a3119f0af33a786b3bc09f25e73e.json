@@ -1,10 +1,10 @@
 {
-  "id": "604b87bebdcf5aa5b9b5ce1e1d6f9348256f4ba0f4baf85262b0b591d5549df8",
+  "id": "f27731f1015fbc035daf3b076d50036d3b62a3119f0af33a786b3bc09f25e73e",
   "event": {
-    "id": "workflow.plan.enter",
-    "name": "Workflow Plan Enter",
+    "id": "workflow.implement.enter",
+    "name": "Workflow Implement Enter",
     "kind": "system",
-    "source": "workflow.plan.enter",
+    "source": "workflow.implement.enter",
     "enabled": true,
     "scope": {
       "node_id": null
@@ -12,8 +12,8 @@
     "parameters": [],
     "bindings": [
       {
-        "id": "default-plan",
-        "skill_id": "default-plan",
+        "id": "default-implement",
+        "skill_id": "default-implement",
         "enabled": true,
         "mode": "blocking",
         "order": 0,
@@ -30,108 +30,203 @@
   "context": {
     "node_id": "default",
     "target_root": "/home/buddy/projects/refine-next",
-    "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T19PPW3T11YP0J9WRJ003-round-1",
+    "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T19EJ0CNGHM85RBDXE000-round-1",
     "workspace": {
       "repository": "/home/buddy/projects/refine-next",
-      "path": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T19PPW3T11YP0J9WRJ003-round-1",
-      "branch": "refine/00000T19PPW3T11YP0J9WRJ003/round-1",
+      "path": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T19EJ0CNGHM85RBDXE000-round-1",
+      "branch": "refine/00000T19EJ0CNGHM85RBDXE000/round-1",
       "commit": null,
       "allow_rebase": false,
       "registration": {
         "common_dir": "/home/buddy/projects/refine-next/.git",
-        "git_dir": "/home/buddy/projects/refine-next/.git/worktrees/refine-00000T19PPW3T11YP0J9WRJ003-round-1",
-        "identity": "2096:885274:Some(SystemTime { tv_sec: 1789505498, tv_nsec: 966939348 })"
+        "git_dir": "/home/buddy/projects/refine-next/.git/worktrees/refine-00000T19EJ0CNGHM85RBDXE000-round-1",
+        "identity": "2096:870929:Some(SystemTime { tv_sec: 1789505396, tv_nsec: 378495843 })"
       }
     },
     "lifecycle": null,
     "provider": "codex",
-    "goal_id": "00000T19PPW3T11YP0J9WRJ003",
+    "goal_id": "00000T19EJ0CNGHM85RBDXE000",
     "round_idx": 0,
-    "workflow_revision": 2,
+    "workflow_revision": 15,
     "candidate_commit": null,
     "data": {
       "context": {
-        "assembled_at": "2026-09-15T20:51:39Z",
-        "current_round": {
-          "assignee": "Buddy Williams",
-          "prompt": "The Goal Modal for the Workflow Step Action currently shows the Todo as the default option, but it really should show the next logical action based on the current workflow step:\nBacklog > Todo\nReview > Done\nFailed > Todo\nCancelled > Failed",
-          "reporter": "Buddy Williams",
-          "round": 1
+        "agent_context": {
+          "assembled_at": "2026-09-15T20:49:56Z",
+          "current_round": {
+            "assignee": "Buddy Williams",
+            "prompt": "Configure AI Providers and automate provider selection\n\nAllow users to define CLI providers with executable paths, arguments, context transport, credential references, and optional output, availability, and session-continuation behavior. Support multiple configurations of the same CLI without Refine code changes.\n\nStore provider definitions and default selection policies at the refine-state system level. Nodes may select a provider or policy, inheriting the system default when absent. Migrate existing providers into equivalent configurations.\n\nSupport subscription-first selection with configured paid fallback, shared spending limits, and automatic return when subscription capacity becomes available. Preserve work across switches and expose the provider and reason used for each attempt. Keep credential values outside synchronized state.",
+            "reporter": "Buddy Williams",
+            "round": 1
+          },
+          "goal": {
+            "assignee": "Buddy Williams",
+            "id": "00000T19EJ0CNGHM85RBDXE000",
+            "name": "The new menu item is missing a chevron indicating it is a drop-down. Add the che",
+            "node_id": "default",
+            "priority": "low",
+            "reporter": "Buddy Williams"
+          },
+          "governance": {
+            "configured": false,
+            "constitution": "",
+            "product": "",
+            "rules": []
+          },
+          "guidance_candidates": [],
+          "previous_rounds": [],
+          "version": 1,
+          "workflow_summary": "Refine gives this Goal Agent an isolated worktree, the current Round, and available planning context. Follow the Goal and applicable Skill instructions and use your judgment to decide when to stop. Quality and Governance agents make their own decisions using their Skills before integration and human Review. Refine coordinates workflow transitions and Git actions. Do not directly advance Goal state, approve, merge, or push."
         },
-        "goal": {
-          "assignee": "Buddy Williams",
-          "id": "00000T19PPW3T11YP0J9WRJ003",
-          "name": "The Goal Modal for the Workflow Step Action currently shows the Todo as the defa",
-          "node_id": "default",
-          "priority": "low",
-          "reporter": "Buddy Williams"
-        },
-        "governance": {
-          "configured": false,
-          "constitution": "",
-          "product": "",
-          "rules": []
-        },
-        "guidance_candidates": [],
-        "previous_rounds": [],
-        "version": 1,
-        "workflow_summary": "Refine gives this Goal Agent an isolated worktree, the current Round, and available planning context. Follow the Goal and applicable Skill instructions and use your judgment to decide when to stop. Quality and Governance agents make their own decisions using their Skills before integration and human Review. Refine coordinates workflow transitions and Git actions. Do not directly advance Goal state, approve, merge, or push."
+        "plans": [
+          {
+            "artifacts": {
+              "plan": {
+                "checklist": [
+                  {
+                    "description": "Task #1 - Define provider, policy, and attempt concepts in Model. Give each provider a stable configuration ID independent of its executable, allowing multiple configurations of the same CLI. Define executable and argument templates, context transport, credential references, and optional output, availability, cost, and continuation capabilities. Define provider-or-policy selections, ordered subscription candidates, explicitly configured paid fallback, shared budget references, and structured selection reasons. Separate provider identity from shared account/capacity and spending-pool identities. Define precedence as explicit invocation selection, node selection, then system default. An explicit provider remains pinned; fallback requires a policy.",
+                    "id": "P1",
+                    "verification": [
+                      "Validate duplicate IDs, missing references, incompatible capabilities, invalid templates, and invalid spending amounts.",
+                      "Demonstrate two configurations using the same executable with different arguments and credential references."
+                    ]
+                  },
+                  {
+                    "description": "Task #2 - Persist system configuration and migrate existing providers. After P1, add a versioned provider/policy document at the shared refine-state root, with application-owned validation and revision-checked writes. Nodes store only an optional selection; clearing it restores inheritance. Integrate configuration with bootstrap, synchronization, conflict reporting, and node configuration copying. Seed equivalent definitions for Claude, Codex, Gemini, Copilot, smoke-ai, and existing generic executables from the current discovery/invocation behavior. Migrate saved node agent_cli choices without changing effective selection or enabling paid fallback. Make migration idempotent and preserve original configuration evidence. Retire competing agent_cli authority through a documented compatibility path; unrelated settings updates must not materialize inherited provider choices as overrides.",
+                    "id": "P2",
+                    "verification": [
+                      "Test fresh installation, legacy configurations, interrupted/repeated migration, and two-node synchronization.",
+                      "Verify existing custom paths and provider choices survive migration and clearing a node override follows later system-default changes."
+                    ]
+                  },
+                  {
+                    "description": "Task #3 - Drive provider execution from definitions. After P1-P2, refactor src/infrastructure/agents/discovery and invocation so configuration selects executable, arguments, and capabilities instead of provider-name switches. Support supervised invocation and optional interactive/resume commands using argv arrays and documented placeholders for prompt, prompt file, working directory, and session ID. Extend the existing prompt transport for stdin, arguments, and file delivery while retaining effective-environment size checks, private prompt artifacts, explicit runtime roots, and worktree validation. Resolve credential references locally at launch from environment variables or private local files; support existing CLI-managed authentication. Keep values out of synchronized definitions, command metadata, diagnostics, and exported evidence. Retain existing output parsers as selectable adapters and offer plain output plus configurable structured extraction or a documented local adapter command for other CLIs. Normalize output into text, session, availability, and usage facts.",
+                    "id": "P3",
+                    "verification": [
+                      "Use fake executables to inspect exact argv, stdin, file payloads, working directory, and environment, including paths containing spaces.",
+                      "Verify built-in launch compatibility and that a new provider needs configuration only.",
+                      "Test missing credentials, redaction, malformed adapter output, and unsupported interactive/resume capabilities."
+                    ]
+                  },
+                  {
+                    "description": "Task #4 - Implement shared selection and availability behavior. After P1-P3, extend src/application/agents/provider_selection into the common resolver and selection service. Evaluate subscription candidates in configured order before eligible paid fallback. Optional bounded probes and normalized execution results distinguish available, exhausted with retry time, unavailable, and unknown states. Scope cached observations to the node and configured account/capacity identity; an installed executable alone does not prove capacity. With no probe, allow a controlled subscription attempt and learn from its result. Use bounded retries and cooldowns to prevent repeated failed launches. Recheck subscriptions after cooldown and select a recovered subscription at the next attempt boundary without interrupting useful running work. Missing executables or credentials receive explicit diagnostics; ordinary task failures and failed Quality/Governance verdicts do not trigger provider shopping.",
+                    "id": "P4",
+                    "verification": [
+                      "Test precedence, subscription ordering, exhaustion, unknown availability, cooldown expiry, recovery, and no configured fallback.",
+                      "Confirm ordinary work failures do not masquerade as capacity exhaustion."
+                    ]
+                  },
+                  {
+                    "description": "Task #5 - Enforce shared paid-spending admission. Before enabling P4 paid launches, implement application-owned budget reservations and settlement using integer monetary units, explicit currency and accounting periods, and attempt IDs for idempotency. A budget pool covers all configured providers, policies, Goals, and nodes sharing that refine-state system. Reserve a conservative enforceable maximum before launch; settle confirmed usage afterward. Unknown usage retains the reservation. Generic post-run cost estimates alone cannot enforce a limit: paid configurations must supply an enforceable per-attempt cap or bounded charge contract, otherwise report why automatic paid fallback is unavailable. For fleet coordination, use an authoritative Git-backed budget ledger with compare-and-swap publication on a dedicated ref through existing Git infrastructure; local file locks or ordinary eventual state synchronization are insufficient. A reservation is spendable only after confirmed publication. Keep this monetary admission authority separate from workflow advancement. Handle contention, ambiguous publication, crashes, cancellation, period rollover, and budget edits conservatively; never reclaim a potentially running attempt’s allowance solely because a timeout elapsed. When shared reservation authority is unreachable, subscription work can continue but new paid spending waits.",
+                    "id": "P5",
+                    "verification": [
+                      "Race two nodes for the last available allowance and prove their admitted total cannot exceed the pool limit.",
+                      "Test duplicate requests, lost acknowledgments, crashes before/after spawn, unknown cost, rollover with outstanding reservations, and disconnected nodes.",
+                      "Verify all paid entry points, including explicit provider selection and repair attempts, use the same admission path."
+                    ]
+                  },
+                  {
+                    "description": "Task #6 - Integrate selection and preserve work across attempts. After P3-P5, route workflow Event/Skill execution, managed and interactive sessions, chat, direct CLI invocation/resume, and delegated maintenance through the shared launch decision. Audit current direct agent_cli reads and HostAgentProviderService calls so alternate paths cannot bypass selection or spending. Keep each launch’s provider definition revision and policy decision pinned. Record a distinct attempt with provider ID, policy/source, reason, availability evidence, budget reservation, process receipt, usage, and outcome, linked to existing invocation history. On a switch, confirm the previous process tree has exited, retain the same admitted worktree and files, and assemble continuation context from the current request, completed artifacts, retained output, and unfinished work. Resume native sessions only for compatible provider configuration and credential/session scope; otherwise start a fresh session with that handoff. Preserve workflow authority checks before replacement and completion, and do not replay already accepted results. Capacity waiting should use recoverable scheduling rather than holding a worker or checkout lock in a sleep loop.",
+                    "id": "P6",
+                    "verification": [
+                      "Run a fake subscription provider that edits a file and then exhausts capacity; verify the fallback sees and preserves that work.",
+                      "Test restart during a switch, cancellation, superseded Round, late completion, incompatible session IDs, and successful completion before recovery.",
+                      "Verify attempts remain visible and switches do not advance workflow independently."
+                    ]
+                  },
+                  {
+                    "description": "Task #7 - Expose configuration and decisions through existing surfaces. After the shared application services exist, extend the agent/config/node CLI groups and daemon API to list, inspect, validate, save, and remove provider definitions and policies, choose the system default, and set or clear node selection. Refuse deletion of referenced definitions with actionable diagnostics. Replace hard-coded browser provider options in settings_runtime.js with catalog-backed provider/policy choices and an explicit inheritance option. Provide system-level provider, policy, and budget editing, local credential-reference diagnostics, and an effective-selection preview. Show actual provider and reason for every attempt in Goal/Skill history and process views, including fallback, subscription recovery, and spending-related waits. Distinguish reserved, confirmed, and unknown spending.",
+                    "id": "P7",
+                    "verification": [
+                      "Exercise equivalent CLI/API/browser edits and stale-revision conflicts.",
+                      "Verify inherited selections update correctly and attempt history retains the definition revision used.",
+                      "Check that credentials never appear in configuration responses or synchronized exports."
+                    ]
+                  },
+                  {
+                    "description": "Task #8 - Verify the complete behavior and document operation. Add deterministic fake-provider integration coverage for subscription exhaustion, configured paid fallback, shared limit exhaustion, subscription recovery, and work preservation across a daemon restart. Extend provider invocation, Event lifecycle, session/chat, CLI surface, and multi-instance synchronization suites. Update the Agents, Settings, and persistence intent documentation plus a provider configuration runbook with two configurations of one CLI, local credential setup, migration, policy inheritance, budget guarantees, and unsupported-capability diagnostics. Use the repository’s test harness: cargo test for unit coverage and cargo test -- --full for the complete required suite. Report unavailable prerequisites and exact failures separately from passing checks.",
+                    "id": "P8",
+                    "verification": [
+                      "Demonstrate the full subscription → paid fallback → subscription sequence with preserved files and attributable attempts.",
+                      "Prove concurrent spending admission and secret exclusion using fixtures without real credentials or paid requests.",
+                      "Confirm existing built-in and generic provider workflows remain functional after migration."
+                    ]
+                  }
+                ],
+                "summary": "Users can define named CLI provider configurations, select a provider or subscription-first policy, and inherit a system default. Replace executable-name-based behavior with configurable provider capabilities and one shared selection service. Preserve existing launches through migration, coordinate paid spending across nodes, and retain workspace progress and selection evidence across switches. The current Round’s provider requirements define scope; the Goal’s chevron title is stale."
+              }
+            },
+            "binding_id": "default-plan",
+            "evidence": [
+              "Read-only CLI inspection confirmed the Goal remains in Plan and its current Round contains the provider configuration requirements.",
+              "Inspected provider_selection/mod.rs, discovery/mod.rs, invocation/service.rs, output_parser/mod.rs, node settings, and persistence synchronization: current provider behavior is largely name-driven and agent_cli is node-scoped.",
+              "Inspected Event execution and session launch paths for workspace retention, process recovery, and workflow authority checks.",
+              "The worktree remained unchanged. Tests were not run during this planning step."
+            ],
+            "invocation_id": "8414e0b3538d82e9633c62f09168ce583b71dc2bab3ccd6b89ba7f1d7ff8e698",
+            "outcome": "success",
+            "role": "plan",
+            "summary": "Plan ready for implementation. The central changes are configurable provider identities, shared selection behavior, enforceable spending reservations, and durable attempt history. Existing worktree and workflow authority mechanisms should govern switching and recovery; paid fallback remains explicitly configured.\n\n"
+          }
+        ]
       },
       "event": {},
       "goal": {
         "assignee": "Buddy Williams",
         "base_commit": "9c7363164d582fac14e5076b24efdc47ec5f9461",
-        "branch_name": "refine/00000T19PPW3T11YP0J9WRJ003/round-1",
+        "branch_name": "refine/00000T19EJ0CNGHM85RBDXE000/round-1",
         "candidate_commit": null,
-        "created": "2026-09-15T20:51:35Z",
-        "event_generation": 3,
+        "created": "2026-09-15T16:06:39Z",
+        "event_generation": 11,
         "feature_id": null,
         "feature_order": null,
-        "id": "00000T19PPW3T11YP0J9WRJ003",
-        "name": "The Goal Modal for the Workflow Step Action currently shows the Todo as the defa",
+        "id": "00000T19EJ0CNGHM85RBDXE000",
+        "name": "The new menu item is missing a chevron indicating it is a drop-down. Add the che",
         "node_id": "default",
         "notes": [],
         "priority": "low",
         "reporter": "Buddy Williams",
+        "round_edit_revision": 13,
         "rounds": [
           {
             "assignee": "Buddy Williams",
-            "created": "2026-09-15T20:51:35Z",
+            "created": "2026-09-15T20:49:52Z",
             "failure_category": "",
             "failure_message": "",
-            "prompt": "The Goal Modal for the Workflow Step Action currently shows the Todo as the default option, but it really should show the next logical action based on the current workflow step:\nBacklog > Todo\nReview > Done\nFailed > Todo\nCancelled > Failed",
+            "prompt": "Configure AI Providers and automate provider selection\n\nAllow users to define CLI providers with executable paths, arguments, context transport, credential references, and optional output, availability, and session-continuation behavior. Support multiple configurations of the same CLI without Refine code changes.\n\nStore provider definitions and default selection policies at the refine-state system level. Nodes may select a provider or policy, inheriting the system default when absent. Migrate existing providers into equivalent configurations.\n\nSupport subscription-first selection with configured paid fallback, shared spending limits, and automatic return when subscription capacity becomes available. Preserve work across switches and expose the provider and reason used for each attempt. Keep credential values outside synchronized state.",
             "reporter": "Buddy Williams",
-            "updated": "2026-09-15T20:51:39Z"
+            "updated": "2026-09-15T20:52:45Z"
           }
         ],
-        "status": "plan",
+        "status": "implement",
         "target_branch": "main",
-        "updated": "2026-09-15T20:51:39Z",
-        "workflow_revision": 9
+        "updated": "2026-09-15T20:52:45Z",
+        "workflow_context": "",
+        "workflow_revision": 27
       },
       "system": {
         "candidate_commit": null,
         "node_id": "default",
         "project_root": "/home/buddy/projects/refine-next",
         "refine_executable": "/home/buddy/projects/refine/bin/refine",
-        "workflow_step": "plan",
-        "workspace": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T19PPW3T11YP0J9WRJ003-round-1"
+        "workflow_step": "implement",
+        "workspace": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T19EJ0CNGHM85RBDXE000-round-1"
       }
     },
     "metadata": {
       "behavior": "EventSkill",
-      "event_operation_id": "1a0a6d6f555f7ad119",
-      "goal_id": "00000T19PPW3T11YP0J9WRJ003",
+      "event_operation_id": "1a0a6d7f70bf7ad11b",
+      "goal_id": "00000T19EJ0CNGHM85RBDXE000",
       "kind": "workflow",
       "managed_worktree": {
         "allow_rebase": false,
-        "branch": "refine/00000T19PPW3T11YP0J9WRJ003/round-1",
+        "branch": "refine/00000T19EJ0CNGHM85RBDXE000/round-1",
         "commit": null,
-        "path": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T19PPW3T11YP0J9WRJ003-round-1",
+        "path": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T19EJ0CNGHM85RBDXE000-round-1",
         "registration": {
           "common_dir": "/home/buddy/projects/refine-next/.git",
-          "git_dir": "/home/buddy/projects/refine-next/.git/worktrees/refine-00000T19PPW3T11YP0J9WRJ003-round-1",
-          "identity": "2096:885274:Some(SystemTime { tv_sec: 1789505498, tv_nsec: 966939348 })"
+          "git_dir": "/home/buddy/projects/refine-next/.git/worktrees/refine-00000T19EJ0CNGHM85RBDXE000-round-1",
+          "identity": "2096:870929:Some(SystemTime { tv_sec: 1789505396, tv_nsec: 378495843 })"
         },
         "repository": "/home/buddy/projects/refine-next"
       },
@@ -139,7 +234,7 @@
       "provider": "codex",
       "round_idx": 0,
       "started_bindings": {
-        "default-plan": "2026-09-15T20:51:41.303540916+00:00"
+        "default-implement": "2026-09-15T20:52:47.750375782+00:00"
       },
       "target_app_id": "/home/buddy/projects/refine-next",
       "template_snapshot": {
@@ -441,16 +536,16 @@
           }
         }
       },
-      "workflow_revision": 2,
-      "workflow_state": "plan",
-      "workflow_step_generation": 3
+      "workflow_revision": 15,
+      "workflow_state": "implement",
+      "workflow_step_generation": 11
     }
   },
   "bindings": [
     {
       "binding": {
-        "id": "default-plan",
-        "skill_id": "default-plan",
+        "id": "default-implement",
+        "skill_id": "default-implement",
         "enabled": true,
         "mode": "blocking",
         "order": 0,
@@ -461,10 +556,10 @@
         "inputs": {}
       },
       "skill": {
-        "id": "default-plan",
-        "name": "Plan",
-        "prompt": "## Plan\n\nDevelop a plan to achieve the Goal's desired outcome. If the goal outcome is underspecified or is missing details add only just enough detail so that AI agents do not thrash or become confused.\n\n### Outcome\n\nA clear implementation plan that explains the approach and breaks the work into ordered tasks. Begin with a short description of the desired behavior and proposed solution. Use a numbered checklist, such as `Task #1 - What changes and why`. Include dependencies and important design decisions where they help implementation.\n\n### Guardrails\n\n- Read the context that helps explain the Goal and how the existing system works.\n- Look for the underlying cause. Consider whether a missing or misused concept explains the problem, and improve that concept rather than adding fixes for individual symptoms.\n- Give each task enough detail to guide implementation while leaving room for reasonable implementation choices.\n- Keep the plan focused on the desired outcome. Prefer straightforward changes that fit the existing architecture.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
-        "role": "plan",
+        "id": "default-implement",
+        "name": "Implement",
+        "prompt": "## Implement\n\nImplement the plan.\n\n### Outcome\n\nThe plan is implemented in a way that aligns with the project's purpose and architecture. Provide a brief summary organized by plan task: what changed, any important departures from the plan and why, and any unfinished work.\n\n### Guardrails\n\n- Follow established code patterns and put shared behavior in one place. Fix the underlying cause rather than each symptom separately.\n- Keep code focused on one responsibility and preserve stable interfaces where possible. Split mixed responsibilities into separate files. Keep files relatively small, under roughly 1,000 lines where possible.\n- Prefer clear, straightforward code and abstractions that make the behavior easier to understand and maintain.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
+        "role": "implement",
         "enabled": true,
         "scope": {
           "node_id": null
@@ -475,53 +570,11 @@
       "parameters": {}
     }
   ],
-  "state": "succeeded",
-  "results": {
-    "default-plan": {
-      "invocation_id": "604b87bebdcf5aa5b9b5ce1e1d6f9348256f4ba0f4baf85262b0b591d5549df8",
-      "binding_id": "default-plan",
-      "role": "plan",
-      "outcome": "success",
-      "summary": "Plan complete. The cause is a fixed presentation default; a status-derived button target addresses the requested behavior within the existing browser architecture. No files or workflow state were changed.\n\n",
-      "evidence": [
-        "src/surfaces/web/static/js/features/goals-detail.js:343 hard-codes the primary button label and data-goal-step to Todo.",
-        "src/surfaces/web/static/js/features/goals-detail.js:470 routes all data-goal-step buttons through the shared move endpoint using the live Goal and workflow revision.",
-        "tests/web_goal_human_controls.test.js already exercises production rendering, primary-action clicks, and all dropdown targets with mocked HTTP transport."
-      ],
-      "artifacts": {
-        "implementation_plan": "The Goal modal’s primary Workflow Step Action should display and execute the requested next action: Backlog → Todo, Review → Done, Failed → Todo, and Cancelled → Failed. Derive its label and target from the current Goal status; retain Todo for unspecified statuses.\n\n1. [ ] Task #1 - Derive the primary action in goals-detail.js. Replace the hard-coded Todo button with a small status-to-target mapping. Use the same resolved target for data-goal-step and workflowStatusLabel so the displayed action matches the click behavior. Recompute it on every drawGoalDetail render, including live refreshes. This is a browser presentation default; keep the existing shared workflow move handler and revision checks. Keep Review approval separate: selecting Done continues to change status without merging code. Do not derive this default from workflowForGoal, whose approval and recovery actions have different meanings.\n\n2. [ ] Task #2 - Update the Goal surface intent document. In src/surfaces/refine-hub/docs/intent/05-surfaces/03-browser/08-goal.md, replace the fixed Todo-button description with the four mappings and Todo fallback. Preserve the full step menu and existing explicit-move semantics.\n\n3. [ ] Task #3 - Verify the rendered actions after Task #1. Run node --test tests/web_goal_human_controls.test.js. Using the existing browser harness with mocked transport, check the label and submitted target for all four mappings and the fallback. Redraw an open modal with a changed status and workflow revision, then confirm its primary action submits the updated target and revision. Confirm every dropdown step remains available and Review → Done uses the move endpoint."
-      }
-    }
-  },
-  "attempts": [
-    {
-      "attempt": 0,
-      "binding_id": "default-plan",
-      "checkout": {
-        "observation": {
-          "branch": "refine/00000T19PPW3T11YP0J9WRJ003/round-1",
-          "head_commit": "9c7363164d582fac14e5076b24efdc47ec5f9461",
-          "status_porcelain": []
-        },
-        "tree": "e4fff4cb2d40f6792062243140856e31496ba904"
-      },
-      "checkout_recorded": true,
-      "diagnostic": null,
-      "host_bound_result": true,
-      "observational_violation": false,
-      "operation_id": null,
-      "process_id": "proc-1789505501674-1014481-26649",
-      "prompt_bytes": 5788,
-      "provider_session_id": null,
-      "purpose": "work",
-      "raw_output": "{\n  \"outcome\": \"success\",\n  \"artifacts\": {\n    \"implementation_plan\": \"The Goal modal’s primary Workflow Step Action should display and execute the requested next action: Backlog → Todo, Review → Done, Failed → Todo, and Cancelled → Failed. Derive its label and target from the current Goal status; retain Todo for unspecified statuses.\\n\\n1. [ ] Task #1 - Derive the primary action in goals-detail.js. Replace the hard-coded Todo button with a small status-to-target mapping. Use the same resolved target for data-goal-step and workflowStatusLabel so the displayed action matches the click behavior. Recompute it on every drawGoalDetail render, including live refreshes. This is a browser presentation default; keep the existing shared workflow move handler and revision checks. Keep Review approval separate: selecting Done continues to change status without merging code. Do not derive this default from workflowForGoal, whose approval and recovery actions have different meanings.\\n\\n2. [ ] Task #2 - Update the Goal surface intent document. In src/surfaces/refine-hub/docs/intent/05-surfaces/03-browser/08-goal.md, replace the fixed Todo-button description with the four mappings and Todo fallback. Preserve the full step menu and existing explicit-move semantics.\\n\\n3. [ ] Task #3 - Verify the rendered actions after Task #1. Run node --test tests/web_goal_human_controls.test.js. Using the existing browser harness with mocked transport, check the label and submitted target for all four mappings and the fallback. Redraw an open modal with a changed status and workflow revision, then confirm its primary action submits the updated target and revision. Confirm every dropdown step remains available and Review → Done uses the move endpoint.\"\n  },\n  \"evidence\": [\n    \"src/surfaces/web/static/js/features/goals-detail.js:343 hard-codes the primary button label and data-goal-step to Todo.\",\n    \"src/surfaces/web/static/js/features/goals-detail.js:470 routes all data-goal-step buttons through the shared move endpoint using the live Goal and workflow revision.\",\n    \"tests/web_goal_human_controls.test.js already exercises production rendering, primary-action clicks, and all dropdown targets with mocked HTTP transport.\"\n  ],\n  \"summary\": \"Plan complete. The cause is a fixed presentation default; a status-derived button target addresses the requested behavior within the existing browser architecture. No files or workflow state were changed.\\n\\n\"\n}",
-      "received_at": "2026-09-15T20:52:42.126326196+00:00",
-      "started_at": "2026-09-15T20:51:41.632047638+00:00",
-      "workflow_revision": 2
-    }
-  ],
-  "created_at": "2026-09-15T20:51:40.089354490+00:00",
-  "completed_at": "2026-09-15T20:52:44.926037380+00:00",
+  "state": "running",
+  "results": {},
+  "attempts": [],
+  "created_at": "2026-09-15T20:52:45.993572924+00:00",
+  "completed_at": null,
   "error": null,
   "action_applied": false
 }

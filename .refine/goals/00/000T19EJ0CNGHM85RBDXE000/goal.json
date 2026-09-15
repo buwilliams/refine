@@ -3,7 +3,7 @@
   "branch_name": "refine/00000T19EJ0CNGHM85RBDXE000/round-1",
   "candidate_commit": null,
   "created": "2026-09-15T16:06:39Z",
-  "event_generation": 10,
+  "event_generation": 11,
   "feature_id": null,
   "feature_order": null,
   "id": "00000T19EJ0CNGHM85RBDXE000",
@@ -47,11 +47,11 @@
       "created": "2026-09-15T20:49:52Z",
       "event_configuration": {
         "events": {
-          "workflow.plan.enter": {
+          "workflow.implement.enter": {
             "bindings": [
               {
                 "enabled": true,
-                "id": "default-plan",
+                "id": "default-implement",
                 "inputs": {},
                 "mode": "blocking",
                 "order": 0,
@@ -59,36 +59,136 @@
                 "scope": {
                   "node_id": null
                 },
-                "skill_id": "default-plan"
+                "skill_id": "default-implement"
               }
             ],
             "enabled": true,
-            "id": "workflow.plan.enter",
+            "id": "workflow.implement.enter",
             "kind": "system",
-            "name": "Workflow Plan Enter",
+            "name": "Workflow Implement Enter",
             "on_success": null,
             "parameters": [],
             "scope": {
               "node_id": null
             },
-            "source": "workflow.plan.enter"
+            "source": "workflow.implement.enter"
           }
         },
         "revision": 82,
         "schema_version": 3,
         "skills": {
-          "default-plan": {
+          "default-implement": {
             "enabled": true,
-            "id": "default-plan",
-            "name": "Plan",
+            "id": "default-implement",
+            "name": "Implement",
             "parameters": [],
-            "prompt": "## Plan\n\nDevelop a plan to achieve the Goal's desired outcome. If the goal outcome is underspecified or is missing details add only just enough detail so that AI agents do not thrash or become confused.\n\n### Outcome\n\nA clear implementation plan that explains the approach and breaks the work into ordered tasks. Begin with a short description of the desired behavior and proposed solution. Use a numbered checklist, such as `Task #1 - What changes and why`. Include dependencies and important design decisions where they help implementation.\n\n### Guardrails\n\n- Read the context that helps explain the Goal and how the existing system works.\n- Look for the underlying cause. Consider whether a missing or misused concept explains the problem, and improve that concept rather than adding fixes for individual symptoms.\n- Give each task enough detail to guide implementation while leaving room for reasonable implementation choices.\n- Keep the plan focused on the desired outcome. Prefer straightforward changes that fit the existing architecture.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
+            "prompt": "## Implement\n\nImplement the plan.\n\n### Outcome\n\nThe plan is implemented in a way that aligns with the project's purpose and architecture. Provide a brief summary organized by plan task: what changed, any important departures from the plan and why, and any unfinished work.\n\n### Guardrails\n\n- Follow established code patterns and put shared behavior in one place. Fix the underlying cause rather than each symptom separately.\n- Keep code focused on one responsibility and preserve stable interfaces where possible. Split mixed responsibilities into separate files. Keep files relatively small, under roughly 1,000 lines where possible.\n- Prefer clear, straightforward code and abstractions that make the behavior easier to understand and maintain.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
             "provenance": "refine-default-v1",
             "role": "task",
             "scope": {
               "node_id": null
             }
           }
+        }
+      },
+      "event_results": {
+        "8414e0b3538d82e9633c62f09168ce583b71dc2bab3ccd6b89ba7f1d7ff8e698": {
+          "candidate_commit": null,
+          "generation": 10,
+          "results": {
+            "default-plan": {
+              "artifacts": {
+                "plan": {
+                  "checklist": [
+                    {
+                      "description": "Task #1 - Define provider, policy, and attempt concepts in Model. Give each provider a stable configuration ID independent of its executable, allowing multiple configurations of the same CLI. Define executable and argument templates, context transport, credential references, and optional output, availability, cost, and continuation capabilities. Define provider-or-policy selections, ordered subscription candidates, explicitly configured paid fallback, shared budget references, and structured selection reasons. Separate provider identity from shared account/capacity and spending-pool identities. Define precedence as explicit invocation selection, node selection, then system default. An explicit provider remains pinned; fallback requires a policy.",
+                      "id": "P1",
+                      "verification": [
+                        "Validate duplicate IDs, missing references, incompatible capabilities, invalid templates, and invalid spending amounts.",
+                        "Demonstrate two configurations using the same executable with different arguments and credential references."
+                      ]
+                    },
+                    {
+                      "description": "Task #2 - Persist system configuration and migrate existing providers. After P1, add a versioned provider/policy document at the shared refine-state root, with application-owned validation and revision-checked writes. Nodes store only an optional selection; clearing it restores inheritance. Integrate configuration with bootstrap, synchronization, conflict reporting, and node configuration copying. Seed equivalent definitions for Claude, Codex, Gemini, Copilot, smoke-ai, and existing generic executables from the current discovery/invocation behavior. Migrate saved node agent_cli choices without changing effective selection or enabling paid fallback. Make migration idempotent and preserve original configuration evidence. Retire competing agent_cli authority through a documented compatibility path; unrelated settings updates must not materialize inherited provider choices as overrides.",
+                      "id": "P2",
+                      "verification": [
+                        "Test fresh installation, legacy configurations, interrupted/repeated migration, and two-node synchronization.",
+                        "Verify existing custom paths and provider choices survive migration and clearing a node override follows later system-default changes."
+                      ]
+                    },
+                    {
+                      "description": "Task #3 - Drive provider execution from definitions. After P1-P2, refactor src/infrastructure/agents/discovery and invocation so configuration selects executable, arguments, and capabilities instead of provider-name switches. Support supervised invocation and optional interactive/resume commands using argv arrays and documented placeholders for prompt, prompt file, working directory, and session ID. Extend the existing prompt transport for stdin, arguments, and file delivery while retaining effective-environment size checks, private prompt artifacts, explicit runtime roots, and worktree validation. Resolve credential references locally at launch from environment variables or private local files; support existing CLI-managed authentication. Keep values out of synchronized definitions, command metadata, diagnostics, and exported evidence. Retain existing output parsers as selectable adapters and offer plain output plus configurable structured extraction or a documented local adapter command for other CLIs. Normalize output into text, session, availability, and usage facts.",
+                      "id": "P3",
+                      "verification": [
+                        "Use fake executables to inspect exact argv, stdin, file payloads, working directory, and environment, including paths containing spaces.",
+                        "Verify built-in launch compatibility and that a new provider needs configuration only.",
+                        "Test missing credentials, redaction, malformed adapter output, and unsupported interactive/resume capabilities."
+                      ]
+                    },
+                    {
+                      "description": "Task #4 - Implement shared selection and availability behavior. After P1-P3, extend src/application/agents/provider_selection into the common resolver and selection service. Evaluate subscription candidates in configured order before eligible paid fallback. Optional bounded probes and normalized execution results distinguish available, exhausted with retry time, unavailable, and unknown states. Scope cached observations to the node and configured account/capacity identity; an installed executable alone does not prove capacity. With no probe, allow a controlled subscription attempt and learn from its result. Use bounded retries and cooldowns to prevent repeated failed launches. Recheck subscriptions after cooldown and select a recovered subscription at the next attempt boundary without interrupting useful running work. Missing executables or credentials receive explicit diagnostics; ordinary task failures and failed Quality/Governance verdicts do not trigger provider shopping.",
+                      "id": "P4",
+                      "verification": [
+                        "Test precedence, subscription ordering, exhaustion, unknown availability, cooldown expiry, recovery, and no configured fallback.",
+                        "Confirm ordinary work failures do not masquerade as capacity exhaustion."
+                      ]
+                    },
+                    {
+                      "description": "Task #5 - Enforce shared paid-spending admission. Before enabling P4 paid launches, implement application-owned budget reservations and settlement using integer monetary units, explicit currency and accounting periods, and attempt IDs for idempotency. A budget pool covers all configured providers, policies, Goals, and nodes sharing that refine-state system. Reserve a conservative enforceable maximum before launch; settle confirmed usage afterward. Unknown usage retains the reservation. Generic post-run cost estimates alone cannot enforce a limit: paid configurations must supply an enforceable per-attempt cap or bounded charge contract, otherwise report why automatic paid fallback is unavailable. For fleet coordination, use an authoritative Git-backed budget ledger with compare-and-swap publication on a dedicated ref through existing Git infrastructure; local file locks or ordinary eventual state synchronization are insufficient. A reservation is spendable only after confirmed publication. Keep this monetary admission authority separate from workflow advancement. Handle contention, ambiguous publication, crashes, cancellation, period rollover, and budget edits conservatively; never reclaim a potentially running attempt’s allowance solely because a timeout elapsed. When shared reservation authority is unreachable, subscription work can continue but new paid spending waits.",
+                      "id": "P5",
+                      "verification": [
+                        "Race two nodes for the last available allowance and prove their admitted total cannot exceed the pool limit.",
+                        "Test duplicate requests, lost acknowledgments, crashes before/after spawn, unknown cost, rollover with outstanding reservations, and disconnected nodes.",
+                        "Verify all paid entry points, including explicit provider selection and repair attempts, use the same admission path."
+                      ]
+                    },
+                    {
+                      "description": "Task #6 - Integrate selection and preserve work across attempts. After P3-P5, route workflow Event/Skill execution, managed and interactive sessions, chat, direct CLI invocation/resume, and delegated maintenance through the shared launch decision. Audit current direct agent_cli reads and HostAgentProviderService calls so alternate paths cannot bypass selection or spending. Keep each launch’s provider definition revision and policy decision pinned. Record a distinct attempt with provider ID, policy/source, reason, availability evidence, budget reservation, process receipt, usage, and outcome, linked to existing invocation history. On a switch, confirm the previous process tree has exited, retain the same admitted worktree and files, and assemble continuation context from the current request, completed artifacts, retained output, and unfinished work. Resume native sessions only for compatible provider configuration and credential/session scope; otherwise start a fresh session with that handoff. Preserve workflow authority checks before replacement and completion, and do not replay already accepted results. Capacity waiting should use recoverable scheduling rather than holding a worker or checkout lock in a sleep loop.",
+                      "id": "P6",
+                      "verification": [
+                        "Run a fake subscription provider that edits a file and then exhausts capacity; verify the fallback sees and preserves that work.",
+                        "Test restart during a switch, cancellation, superseded Round, late completion, incompatible session IDs, and successful completion before recovery.",
+                        "Verify attempts remain visible and switches do not advance workflow independently."
+                      ]
+                    },
+                    {
+                      "description": "Task #7 - Expose configuration and decisions through existing surfaces. After the shared application services exist, extend the agent/config/node CLI groups and daemon API to list, inspect, validate, save, and remove provider definitions and policies, choose the system default, and set or clear node selection. Refuse deletion of referenced definitions with actionable diagnostics. Replace hard-coded browser provider options in settings_runtime.js with catalog-backed provider/policy choices and an explicit inheritance option. Provide system-level provider, policy, and budget editing, local credential-reference diagnostics, and an effective-selection preview. Show actual provider and reason for every attempt in Goal/Skill history and process views, including fallback, subscription recovery, and spending-related waits. Distinguish reserved, confirmed, and unknown spending.",
+                      "id": "P7",
+                      "verification": [
+                        "Exercise equivalent CLI/API/browser edits and stale-revision conflicts.",
+                        "Verify inherited selections update correctly and attempt history retains the definition revision used.",
+                        "Check that credentials never appear in configuration responses or synchronized exports."
+                      ]
+                    },
+                    {
+                      "description": "Task #8 - Verify the complete behavior and document operation. Add deterministic fake-provider integration coverage for subscription exhaustion, configured paid fallback, shared limit exhaustion, subscription recovery, and work preservation across a daemon restart. Extend provider invocation, Event lifecycle, session/chat, CLI surface, and multi-instance synchronization suites. Update the Agents, Settings, and persistence intent documentation plus a provider configuration runbook with two configurations of one CLI, local credential setup, migration, policy inheritance, budget guarantees, and unsupported-capability diagnostics. Use the repository’s test harness: cargo test for unit coverage and cargo test -- --full for the complete required suite. Report unavailable prerequisites and exact failures separately from passing checks.",
+                      "id": "P8",
+                      "verification": [
+                        "Demonstrate the full subscription → paid fallback → subscription sequence with preserved files and attributable attempts.",
+                        "Prove concurrent spending admission and secret exclusion using fixtures without real credentials or paid requests.",
+                        "Confirm existing built-in and generic provider workflows remain functional after migration."
+                      ]
+                    }
+                  ],
+                  "summary": "Users can define named CLI provider configurations, select a provider or subscription-first policy, and inherit a system default. Replace executable-name-based behavior with configurable provider capabilities and one shared selection service. Preserve existing launches through migration, coordinate paid spending across nodes, and retain workspace progress and selection evidence across switches. The current Round’s provider requirements define scope; the Goal’s chevron title is stale."
+                }
+              },
+              "binding_id": "default-plan",
+              "evidence": [
+                "Read-only CLI inspection confirmed the Goal remains in Plan and its current Round contains the provider configuration requirements.",
+                "Inspected provider_selection/mod.rs, discovery/mod.rs, invocation/service.rs, output_parser/mod.rs, node settings, and persistence synchronization: current provider behavior is largely name-driven and agent_cli is node-scoped.",
+                "Inspected Event execution and session launch paths for workspace retention, process recovery, and workflow authority checks.",
+                "The worktree remained unchanged. Tests were not run during this planning step."
+              ],
+              "invocation_id": "8414e0b3538d82e9633c62f09168ce583b71dc2bab3ccd6b89ba7f1d7ff8e698",
+              "outcome": "success",
+              "role": "plan",
+              "summary": "Plan ready for implementation. The central changes are configurable provider identities, shared selection behavior, enforceable spending reservations, and durable attempt history. Existing worktree and workflow authority mechanisms should govern switching and recovery; paid fallback remains explicitly configured.\n\n"
+            }
+          },
+          "round_idx": 0,
+          "source": "workflow.plan.enter",
+          "state": "succeeded"
         }
       },
       "failure_at": "",
@@ -133,6 +233,78 @@
               "name": "Plan",
               "parameters": [],
               "prompt": "## Plan\n\nDevelop a plan to achieve the Goal's desired outcome. If the goal outcome is underspecified or is missing details add only just enough detail so that AI agents do not thrash or become confused.\n\n### Outcome\n\nA clear implementation plan that explains the approach and breaks the work into ordered tasks. Begin with a short description of the desired behavior and proposed solution. Use a numbered checklist, such as `Task #1 - What changes and why`. Include dependencies and important design decisions where they help implementation.\n\n### Guardrails\n\n- Read the context that helps explain the Goal and how the existing system works.\n- Look for the underlying cause. Consider whether a missing or misused concept explains the problem, and improve that concept rather than adding fixes for individual symptoms.\n- Give each task enough detail to guide implementation while leaving room for reasonable implementation choices.\n- Keep the plan focused on the desired outcome. Prefer straightforward changes that fit the existing architecture.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
+              "provenance": "refine-default-v1",
+              "role": "task",
+              "scope": {
+                "node_id": null
+              }
+            }
+          }
+        },
+        "10:default:workflow.plan.exit": {
+          "events": {
+            "workflow.plan.exit": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.plan.exit",
+              "kind": "system",
+              "name": "Workflow Plan Exit",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.plan.exit"
+            }
+          },
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {}
+        },
+        "10:default:workflow.plan.success": {
+          "events": {},
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {}
+        },
+        "11:default:workflow.implement.enter": {
+          "events": {
+            "workflow.implement.enter": {
+              "bindings": [
+                {
+                  "enabled": true,
+                  "id": "default-implement",
+                  "inputs": {},
+                  "mode": "blocking",
+                  "order": 0,
+                  "overrides": null,
+                  "scope": {
+                    "node_id": null
+                  },
+                  "skill_id": "default-implement"
+                }
+              ],
+              "enabled": true,
+              "id": "workflow.implement.enter",
+              "kind": "system",
+              "name": "Workflow Implement Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.implement.enter"
+            }
+          },
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {
+            "default-implement": {
+              "enabled": true,
+              "id": "default-implement",
+              "name": "Implement",
+              "parameters": [],
+              "prompt": "## Implement\n\nImplement the plan.\n\n### Outcome\n\nThe plan is implemented in a way that aligns with the project's purpose and architecture. Provide a brief summary organized by plan task: what changed, any important departures from the plan and why, and any unfinished work.\n\n### Guardrails\n\n- Follow established code patterns and put shared behavior in one place. Fix the underlying cause rather than each symptom separately.\n- Keep code focused on one responsibility and preserve stable interfaces where possible. Split mixed responsibilities into separate files. Keep files relatively small, under roughly 1,000 lines where possible.\n- Prefer clear, straightforward code and abstractions that make the behavior easier to understand and maintain.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
               "provenance": "refine-default-v1",
               "role": "task",
               "scope": {
@@ -222,7 +394,7 @@
       ],
       "prompt": "Configure AI Providers and automate provider selection\n\nAllow users to define CLI providers with executable paths, arguments, context transport, credential references, and optional output, availability, and session-continuation behavior. Support multiple configurations of the same CLI without Refine code changes.\n\nStore provider definitions and default selection policies at the refine-state system level. Nodes may select a provider or policy, inheriting the system default when absent. Migrate existing providers into equivalent configurations.\n\nSupport subscription-first selection with configured paid fallback, shared spending limits, and automatic return when subscription capacity becomes available. Preserve work across switches and expose the provider and reason used for each attempt. Keep credential values outside synchronized state.",
       "reporter": "Buddy Williams",
-      "updated": "2026-09-15T20:49:57Z",
+      "updated": "2026-09-15T20:52:45Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-15T20:49:54Z",
         "generation": 9,
@@ -232,9 +404,9 @@
       "workspace_branch": "refine/00000T19EJ0CNGHM85RBDXE000/round-1"
     }
   ],
-  "status": "plan",
+  "status": "implement",
   "target_branch": "main",
-  "updated": "2026-09-15T20:49:57Z",
+  "updated": "2026-09-15T20:52:45Z",
   "workflow_context": "",
   "workflow_controls": [
     {
@@ -354,7 +526,17 @@
       "round_idx": 0,
       "to": "plan",
       "workflow_revision": 19
+    },
+    {
+      "at": "2026-09-15T20:52:44.920835408+00:00",
+      "forced": false,
+      "from": "plan",
+      "generation": 11,
+      "node_id": "default",
+      "round_idx": 0,
+      "to": "implement",
+      "workflow_revision": 26
     }
   ],
-  "workflow_revision": 22
+  "workflow_revision": 27
 }

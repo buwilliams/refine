@@ -3,7 +3,7 @@
   "branch_name": "refine/00000T19PJVMBGJ0Y33NWRJ002/round-1",
   "candidate_commit": null,
   "created": "2026-09-15T20:47:12Z",
-  "event_generation": 7,
+  "event_generation": 8,
   "feature_id": null,
   "feature_order": null,
   "id": "00000T19PJVMBGJ0Y33NWRJ002",
@@ -46,11 +46,11 @@
       "created": "2026-09-15T20:47:12Z",
       "event_configuration": {
         "events": {
-          "workflow.plan.enter": {
+          "workflow.implement.enter": {
             "bindings": [
               {
                 "enabled": true,
-                "id": "default-plan",
+                "id": "default-implement",
                 "inputs": {},
                 "mode": "blocking",
                 "order": 0,
@@ -58,36 +58,132 @@
                 "scope": {
                   "node_id": null
                 },
-                "skill_id": "default-plan"
+                "skill_id": "default-implement"
               }
             ],
             "enabled": true,
-            "id": "workflow.plan.enter",
+            "id": "workflow.implement.enter",
             "kind": "system",
-            "name": "Workflow Plan Enter",
+            "name": "Workflow Implement Enter",
             "on_success": null,
             "parameters": [],
             "scope": {
               "node_id": null
             },
-            "source": "workflow.plan.enter"
+            "source": "workflow.implement.enter"
           }
         },
         "revision": 82,
         "schema_version": 3,
         "skills": {
-          "default-plan": {
+          "default-implement": {
             "enabled": true,
-            "id": "default-plan",
-            "name": "Plan",
+            "id": "default-implement",
+            "name": "Implement",
             "parameters": [],
-            "prompt": "## Plan\n\nDevelop a plan to achieve the Goal's desired outcome. If the goal outcome is underspecified or is missing details add only just enough detail so that AI agents do not thrash or become confused.\n\n### Outcome\n\nA clear implementation plan that explains the approach and breaks the work into ordered tasks. Begin with a short description of the desired behavior and proposed solution. Use a numbered checklist, such as `Task #1 - What changes and why`. Include dependencies and important design decisions where they help implementation.\n\n### Guardrails\n\n- Read the context that helps explain the Goal and how the existing system works.\n- Look for the underlying cause. Consider whether a missing or misused concept explains the problem, and improve that concept rather than adding fixes for individual symptoms.\n- Give each task enough detail to guide implementation while leaving room for reasonable implementation choices.\n- Keep the plan focused on the desired outcome. Prefer straightforward changes that fit the existing architecture.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
+            "prompt": "## Implement\n\nImplement the plan.\n\n### Outcome\n\nThe plan is implemented in a way that aligns with the project's purpose and architecture. Provide a brief summary organized by plan task: what changed, any important departures from the plan and why, and any unfinished work.\n\n### Guardrails\n\n- Follow established code patterns and put shared behavior in one place. Fix the underlying cause rather than each symptom separately.\n- Keep code focused on one responsibility and preserve stable interfaces where possible. Split mixed responsibilities into separate files. Keep files relatively small, under roughly 1,000 lines where possible.\n- Prefer clear, straightforward code and abstractions that make the behavior easier to understand and maintain.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
             "provenance": "refine-default-v1",
             "role": "task",
             "scope": {
               "node_id": null
             }
           }
+        }
+      },
+      "event_results": {
+        "b8b366a13b5bcb269b5ad5cbe67883359bb095305bc038289631daa36a5e2ced": {
+          "candidate_commit": null,
+          "generation": 7,
+          "results": {
+            "default-plan": {
+              "artifacts": {
+                "plan": {
+                  "checklist": [
+                    {
+                      "description": "Task #1 - Define the provider configuration model. Add a typed, versioned catalog with stable provider IDs, display names, executable paths or PATH names, and ordered argument templates. Include a system default provider ID. Represent interactive and automated launch modes explicitly, with optional resume/session templates and existing output-format and prompt-transport capabilities. Custom providers default to plain output and no session continuity. Keep shared concepts and validation in Model, resolution in Application, and executable discovery and launching in Infrastructure.",
+                      "id": "P1",
+                      "verification": [
+                        "Validate unique IDs, nonempty executable paths, argument types, supported template variables, and valid default references.",
+                        "A provider with an unfamiliar ID can be defined without adding a provider-name branch."
+                      ]
+                    },
+                    {
+                      "description": "Task #2 - Persist the shared catalog and preserve node inheritance. After P1, add a dedicated configuration document under the existing shared Refine state root, using established locking, atomic writes, revision checks, and state synchronization. Seed Claude, Codex, Gemini, Copilot, and Smoke AI from current behavior, with Claude as the initial system default. Preserve existing node agent_cli selections; convert legacy generic executable selections into catalog entries without changing their executable or case. Keep an absent node selection absent: FileSettingsService currently loads defaults and writes the merged object, so unrelated settings saves and migrations must stop materializing the inherited provider. Support explicitly clearing the node override. Initialization must be idempotent and must not overwrite an existing or remotely adopted catalog.",
+                      "id": "P2",
+                      "verification": [
+                        "Legacy built-in and generic selections survive migration and restart.",
+                        "Changing the system default affects inheriting nodes while explicit node selections remain unchanged.",
+                        "Unrelated settings saves and copy-from-node preserve inheritance.",
+                        "Catalog synchronization and pristine-state adoption preserve user edits and independent node selections."
+                      ]
+                    },
+                    {
+                      "description": "Task #3 - Build launches from configuration. After P1–P2, replace provider-name argument construction in infrastructure/agents/discovery and invocation with resolved configuration. Define {{context}} as Refine's assembled launch context, delivered through the existing prompt transport: substitute the prepared context into argument templates, or a configured stdin template for native stdin providers. Substitute once, preserve argument boundaries and literal context content, and execute the binary directly without shell evaluation. Retain large-context file fallback, artifact lifetime, launch-size checks, explicit worktree cwd, environment handling, supervision, cancellation, and process receipts. Preserve existing built-in output parsing and interactive/resume behavior through declared capabilities. Only introduce additional placeholders needed for those existing modes, such as session ID and cwd, and document their availability.",
+                      "id": "P3",
+                      "verification": [
+                        "Fake executables capture exact argv and stdin for context containing spaces, quotes, newlines, Unicode, shell syntax, and literal template syntax.",
+                        "Large prompts retain existing stdin/file delivery and cleanup behavior.",
+                        "Built-in launch modes retain their current flags and session behavior.",
+                        "An executable path containing spaces works; invalid configuration fails before spawning."
+                      ]
+                    },
+                    {
+                      "description": "Task #4 - Use one resolver across provider consumers. After P2–P3, resolve explicit invocation or retained-session selection first, then the node override, then the system default. Pass the correct target-state context into HostAgentProviderService rather than guessing from the process cwd or a Goal worktree. Update workflow/Skill execution, terminal sessions, chat, direct agent commands, diagnostics, and delegated maintenance callers to use the catalog. Replace fixed discovery lists and provider-name capability checks; scope or invalidate provider status caches when configuration changes. Unknown configured IDs and missing executables must produce actionable errors rather than silently selecting another provider. Resolve a definition consistently for each launch; edits apply to subsequent launches.",
+                      "id": "P4",
+                      "verification": [
+                        "An unfamiliar configured provider launches through both a workflow/Skill path and an interactive terminal path.",
+                        "Direct invocation, diagnostics, and provider discovery use the configured executable.",
+                        "Explicit selections, inherited selections, and retained sessions resolve consistently across targets and nodes."
+                      ]
+                    },
+                    {
+                      "description": "Task #5 - Expose configuration through shared API and CLI operations. After P2, add application operations to read and edit the catalog, set the system default, and set or clear the node selection. Expose them through daemon API routes and the existing config/agent CLI surfaces, reusing structured payload decoding and error handling. Return catalog revision, raw node override, effective provider, and selection source so clients can preserve inheritance. Reject stale catalog edits and prevent deletion of a provider referenced by the system default or a node unless the same supported operation supplies valid replacements. Keep configuration separate from host installation and authentication; a shared definition may be saved when its executable is unavailable on the editing node.",
+                      "id": "P5",
+                      "verification": [
+                        "CLI/API round trips preserve argument arrays and {{context}} exactly.",
+                        "Stale edits, invalid references, and clearing overrides return consistent results.",
+                        "Concurrent edits cannot silently overwrite another catalog revision."
+                      ]
+                    },
+                    {
+                      "description": "Task #6 - Add provider editing to Settings > Runtime. After P5, replace the fixed providerOptions list with catalog data. Offer an explicit Use system default selection showing the effective provider, plus controls to add and edit provider names, executable paths, and ordered arguments. Expose launch-mode and transport options where needed, with a concise {{context}} example and advanced session/output settings. Clearly label the shared catalog/default and the current node selection. Preserve unsaved edits during refresh and show validation or revision conflicts. Remove provider-value lowercasing in settings.js and ensure autosaving unrelated runtime fields does not create a node override.",
+                      "id": "P6",
+                      "verification": [
+                        "Browser tests cover adding a provider, editing a built-in, changing the default, selecting a node override, clearing it, and reloading.",
+                        "Custom IDs and case-sensitive paths render and save correctly.",
+                        "Validation and stale-save failures retain the user's draft."
+                      ]
+                    },
+                    {
+                      "description": "Task #7 - Verify the complete configuration-only workflow and document it. After P3–P6, add an end-to-end fixture that registers an unfamiliar CLI provider through a supported surface, selects it, launches it with Refine context, edits its parameters, and confirms the next launch uses the update without rebuilding Refine. Extend provider invocation, settings, CLI/API, browser, and state-sync tests for the behaviors above. Use the repository's xtask-backed test harness and relevant browser suites, then formatting and diff checks. Update Runtime help and CLI documentation with a working custom-provider example, system/node precedence, template semantics, supported output modes, and host executable requirements.",
+                      "id": "P7",
+                      "verification": [
+                        "The end-to-end fixture demonstrates that supporting a new CLI provider requires configuration only.",
+                        "Existing built-in invocation and prompt-transport regressions pass.",
+                        "Record actual check results and any unresolved failures for Quality."
+                      ]
+                    }
+                  ],
+                  "summary": "Users can add and edit CLI providers in Settings > Runtime, including executable paths and argument templates containing {{context}}. Store the provider catalog and default selection in shared Refine state; store only an optional provider selection on each node. Replace hard-coded launch definitions with configuration while preserving existing providers, prompt delivery, process supervision, and session behavior."
+                }
+              },
+              "binding_id": "default-plan",
+              "evidence": [
+                "Inspected clean Goal worktree at commit 9c736316 and confirmed the live Node targets /home/buddy/projects/refine-next.",
+                "Provider definitions and launch arguments are hard-coded in src/infrastructure/agents/invocation/service.rs and src/infrastructure/agents/discovery/mod.rs.",
+                "src/infrastructure/process/supervisor/config/settings.rs merges compiled defaults and writes resolved settings into node.settings; provider inheritance needs explicit preservation.",
+                "Settings UI contains a fixed provider list, lowercases the selected provider, and includes agent_cli in every runtime autosave.",
+                "Inspected provider selection, prompt transport integration, session resume, state synchronization/bootstrap handling, config CLI dispatch, and the test harness. No implementation changes or tests were performed during planning."
+              ],
+              "invocation_id": "b8b366a13b5bcb269b5ad5cbe67883359bb095305bc038289631daa36a5e2ced",
+              "outcome": "success",
+              "role": "plan",
+              "summary": "Plan ready for Implement. The underlying change is a shared provider catalog used by both configuration surfaces and execution. Key compatibility requirements are preserving node inheritance, migrating existing selections, and retaining interactive, automated, resume, and large-context launch behavior. No Goal transitions or Git mutations were performed.\n\n"
+            }
+          },
+          "round_idx": 0,
+          "source": "workflow.plan.enter",
+          "state": "succeeded"
         }
       },
       "failure_at": "",
@@ -178,6 +274,78 @@
               "name": "Plan",
               "parameters": [],
               "prompt": "## Plan\n\nDevelop a plan to achieve the Goal's desired outcome. If the goal outcome is underspecified or is missing details add only just enough detail so that AI agents do not thrash or become confused.\n\n### Outcome\n\nA clear implementation plan that explains the approach and breaks the work into ordered tasks. Begin with a short description of the desired behavior and proposed solution. Use a numbered checklist, such as `Task #1 - What changes and why`. Include dependencies and important design decisions where they help implementation.\n\n### Guardrails\n\n- Read the context that helps explain the Goal and how the existing system works.\n- Look for the underlying cause. Consider whether a missing or misused concept explains the problem, and improve that concept rather than adding fixes for individual symptoms.\n- Give each task enough detail to guide implementation while leaving room for reasonable implementation choices.\n- Keep the plan focused on the desired outcome. Prefer straightforward changes that fit the existing architecture.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
+              "provenance": "refine-default-v1",
+              "role": "task",
+              "scope": {
+                "node_id": null
+              }
+            }
+          }
+        },
+        "7:default:workflow.plan.exit": {
+          "events": {
+            "workflow.plan.exit": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.plan.exit",
+              "kind": "system",
+              "name": "Workflow Plan Exit",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.plan.exit"
+            }
+          },
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {}
+        },
+        "7:default:workflow.plan.success": {
+          "events": {},
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {}
+        },
+        "8:default:workflow.implement.enter": {
+          "events": {
+            "workflow.implement.enter": {
+              "bindings": [
+                {
+                  "enabled": true,
+                  "id": "default-implement",
+                  "inputs": {},
+                  "mode": "blocking",
+                  "order": 0,
+                  "overrides": null,
+                  "scope": {
+                    "node_id": null
+                  },
+                  "skill_id": "default-implement"
+                }
+              ],
+              "enabled": true,
+              "id": "workflow.implement.enter",
+              "kind": "system",
+              "name": "Workflow Implement Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.implement.enter"
+            }
+          },
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {
+            "default-implement": {
+              "enabled": true,
+              "id": "default-implement",
+              "name": "Implement",
+              "parameters": [],
+              "prompt": "## Implement\n\nImplement the plan.\n\n### Outcome\n\nThe plan is implemented in a way that aligns with the project's purpose and architecture. Provide a brief summary organized by plan task: what changed, any important departures from the plan and why, and any unfinished work.\n\n### Guardrails\n\n- Follow established code patterns and put shared behavior in one place. Fix the underlying cause rather than each symptom separately.\n- Keep code focused on one responsibility and preserve stable interfaces where possible. Split mixed responsibilities into separate files. Keep files relatively small, under roughly 1,000 lines where possible.\n- Prefer clear, straightforward code and abstractions that make the behavior easier to understand and maintain.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
               "provenance": "refine-default-v1",
               "role": "task",
               "scope": {
@@ -468,7 +636,7 @@
       ],
       "prompt": "Add the ability to configure the AI Providers. Today the Settings > Runtime has a dropdown for AI Provider. Users should be able to modify this configuration, supplying the path and parameters. They should be able to add new CLI agents too. The CLI will need {{context}} variable that Refine will use to send context into the CLI call. This feature will provide the users much more flexibility over the AI Provider. This will be saved at the refine-state system level, but the selected AI Provider at the refine-state node level, if absent will default to system defaults (where we convert what we have to this format). The goal here is that no code change is needed to support a new AI Provider.",
       "reporter": "Buddy Williams",
-      "updated": "2026-09-15T20:50:13Z",
+      "updated": "2026-09-15T20:52:40Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-15T20:50:12Z",
         "generation": 6,
@@ -486,9 +654,9 @@
       "workspace_branch": "refine/00000T19PJVMBGJ0Y33NWRJ002/round-1"
     }
   ],
-  "status": "plan",
+  "status": "implement",
   "target_branch": "main",
-  "updated": "2026-09-15T20:50:13Z",
+  "updated": "2026-09-15T20:52:40Z",
   "workflow_context": "",
   "workflow_controls": [
     {
@@ -652,7 +820,17 @@
       "round_idx": 0,
       "to": "plan",
       "workflow_revision": 16
+    },
+    {
+      "at": "2026-09-15T20:52:39.241908458+00:00",
+      "forced": false,
+      "from": "plan",
+      "generation": 8,
+      "node_id": "default",
+      "round_idx": 0,
+      "to": "implement",
+      "workflow_revision": 22
     }
   ],
-  "workflow_revision": 18
+  "workflow_revision": 23
 }
