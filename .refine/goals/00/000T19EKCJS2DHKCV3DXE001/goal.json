@@ -3,7 +3,7 @@
   "branch_name": "refine/00000T19EKCJS2DHKCV3DXE001/round-1",
   "candidate_commit": null,
   "created": "2026-09-15T16:08:09Z",
-  "event_generation": 3,
+  "event_generation": 4,
   "feature_id": null,
   "feature_order": null,
   "id": "00000T19EKCJS2DHKCV3DXE001",
@@ -46,11 +46,11 @@
       "created": "2026-09-15T16:08:09Z",
       "event_configuration": {
         "events": {
-          "workflow.plan.enter": {
+          "workflow.implement.enter": {
             "bindings": [
               {
                 "enabled": true,
-                "id": "default-plan",
+                "id": "default-implement",
                 "inputs": {},
                 "mode": "blocking",
                 "order": 0,
@@ -58,36 +58,58 @@
                 "scope": {
                   "node_id": null
                 },
-                "skill_id": "default-plan"
+                "skill_id": "default-implement"
               }
             ],
             "enabled": true,
-            "id": "workflow.plan.enter",
+            "id": "workflow.implement.enter",
             "kind": "system",
-            "name": "Workflow Plan Enter",
+            "name": "Workflow Implement Enter",
             "on_success": null,
             "parameters": [],
             "scope": {
               "node_id": null
             },
-            "source": "workflow.plan.enter"
+            "source": "workflow.implement.enter"
           }
         },
         "revision": 82,
         "schema_version": 3,
         "skills": {
-          "default-plan": {
+          "default-implement": {
             "enabled": true,
-            "id": "default-plan",
-            "name": "Plan",
+            "id": "default-implement",
+            "name": "Implement",
             "parameters": [],
-            "prompt": "## Plan\n\nDevelop a plan to achieve the Goal's desired outcome. If the goal outcome is underspecified or is missing details add only just enough detail so that AI agents do not thrash or become confused.\n\n### Outcome\n\nA clear implementation plan that explains the approach and breaks the work into ordered tasks. Begin with a short description of the desired behavior and proposed solution. Use a numbered checklist, such as `Task #1 - What changes and why`. Include dependencies and important design decisions where they help implementation.\n\n### Guardrails\n\n- Read the context that helps explain the Goal and how the existing system works.\n- Look for the underlying cause. Consider whether a missing or misused concept explains the problem, and improve that concept rather than adding fixes for individual symptoms.\n- Give each task enough detail to guide implementation while leaving room for reasonable implementation choices.\n- Keep the plan focused on the desired outcome. Prefer straightforward changes that fit the existing architecture.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
+            "prompt": "## Implement\n\nImplement the plan.\n\n### Outcome\n\nThe plan is implemented in a way that aligns with the project's purpose and architecture. Provide a brief summary organized by plan task: what changed, any important departures from the plan and why, and any unfinished work.\n\n### Guardrails\n\n- Follow established code patterns and put shared behavior in one place. Fix the underlying cause rather than each symptom separately.\n- Keep code focused on one responsibility and preserve stable interfaces where possible. Split mixed responsibilities into separate files. Keep files relatively small, under roughly 1,000 lines where possible.\n- Prefer clear, straightforward code and abstractions that make the behavior easier to understand and maintain.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
             "provenance": "refine-default-v1",
             "role": "task",
             "scope": {
               "node_id": null
             }
           }
+        }
+      },
+      "event_results": {
+        "b874ee377febd78cbcd653999d3408cfc9449e5ef0905c247cdad2595c1795f2": {
+          "candidate_commit": null,
+          "generation": 3,
+          "results": {
+            "default-plan": {
+              "artifacts": {
+                "plan": "Desired behavior: New displays the same dropdown chevron as Node, Reporter, and Tools, and its context menu displays consistent Lucide icons beside all four actions.\n\n1. Task #1 - Reuse the shared dropdown indicator. In src/surfaces/web/static/index.html, add an aria-hidden nav-context-more span after New's label in #rail-new-toggle. Reuse the existing rules in css/base.css and css/navigation.css, including right alignment and hiding the indicator in collapsed desktop navigation. Keep the existing menu semantics and keyboard behavior.\n\n2. Task #2 - Add icons to the New context menu. Use the bundled vendor/lucide/navigation.svg sprite and rail-icon styling: target for New Goal, notebook-pen for New Plan, layers for New Feature, and download for Import. These symbols already exist. Mark SVGs aria-hidden and focusable=false. Preserve labels, order, roles, and data-rail-command bindings. Use existing flex spacing; make only necessary navigation CSS adjustments. Keep popup labels visible when the rail is collapsed.\n\n3. Task #3 - Prepare focused verification for Quality. Update static_rail_new_menu_exposes_shared_creation_commands in src/surfaces/web_server/tests/static_surface/navigation.rs because its current assertions require labels immediately after button opening tags. Preserve its command, label, and ordering checks while allowing icon markup. Quality should run that focused test and the existing New-menu cases in tests/web_navigation_browser.test.js, then visually compare New with Node, Reporter, and Tools in expanded desktop, collapsed desktop, and mobile navigation, across light and dark themes. Confirm icon alignment, readable labels, viewport fit, keyboard dismissal, and activation through both icons and labels."
+              },
+              "binding_id": "default-plan",
+              "evidence": [],
+              "invocation_id": "b874ee377febd78cbcd653999d3408cfc9449e5ef0905c247cdad2595c1795f2",
+              "outcome": "success",
+              "role": "plan",
+              "summary": "The New menu omits the shared chevron markup used by Node, Reporter, and Tools. Its four actions also lack icons. Reuse the existing navigation styles and bundled Lucide sprite for a focused presentation change."
+            }
+          },
+          "round_idx": 0,
+          "source": "workflow.plan.enter",
+          "state": "succeeded"
         }
       },
       "failure_at": "",
@@ -185,6 +207,78 @@
               }
             }
           }
+        },
+        "3:default:workflow.plan.exit": {
+          "events": {
+            "workflow.plan.exit": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.plan.exit",
+              "kind": "system",
+              "name": "Workflow Plan Exit",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.plan.exit"
+            }
+          },
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {}
+        },
+        "3:default:workflow.plan.success": {
+          "events": {},
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {}
+        },
+        "4:default:workflow.implement.enter": {
+          "events": {
+            "workflow.implement.enter": {
+              "bindings": [
+                {
+                  "enabled": true,
+                  "id": "default-implement",
+                  "inputs": {},
+                  "mode": "blocking",
+                  "order": 0,
+                  "overrides": null,
+                  "scope": {
+                    "node_id": null
+                  },
+                  "skill_id": "default-implement"
+                }
+              ],
+              "enabled": true,
+              "id": "workflow.implement.enter",
+              "kind": "system",
+              "name": "Workflow Implement Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.implement.enter"
+            }
+          },
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {
+            "default-implement": {
+              "enabled": true,
+              "id": "default-implement",
+              "name": "Implement",
+              "parameters": [],
+              "prompt": "## Implement\n\nImplement the plan.\n\n### Outcome\n\nThe plan is implemented in a way that aligns with the project's purpose and architecture. Provide a brief summary organized by plan task: what changed, any important departures from the plan and why, and any unfinished work.\n\n### Guardrails\n\n- Follow established code patterns and put shared behavior in one place. Fix the underlying cause rather than each symptom separately.\n- Keep code focused on one responsibility and preserve stable interfaces where possible. Split mixed responsibilities into separate files. Keep files relatively small, under roughly 1,000 lines where possible.\n- Prefer clear, straightforward code and abstractions that make the behavior easier to understand and maintain.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
+              "provenance": "refine-default-v1",
+              "role": "task",
+              "scope": {
+                "node_id": null
+              }
+            }
+          }
         }
       },
       "logs": [],
@@ -243,7 +337,7 @@
       ],
       "prompt": "The new menu item is missing a chevron indicating it is a drop-down. Add the chevron so that it matches the style of the other menu items, including the node, reporter, and tools contexts. Also, add icons (use the same icon pack we use for the other menu items) to the context menu. The goal is consistency.",
       "reporter": "Buddy Williams",
-      "updated": "2026-09-15T16:08:13Z",
+      "updated": "2026-09-15T16:09:18Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-15T16:08:11Z",
         "generation": 2,
@@ -253,9 +347,9 @@
       "workspace_branch": "refine/00000T19EKCJS2DHKCV3DXE001/round-1"
     }
   ],
-  "status": "plan",
+  "status": "implement",
   "target_branch": "main",
-  "updated": "2026-09-15T16:08:13Z",
+  "updated": "2026-09-15T16:09:18Z",
   "workflow_controls": [
     {
       "actor": "operator",
@@ -299,7 +393,17 @@
       "round_idx": 0,
       "to": "plan",
       "workflow_revision": 6
+    },
+    {
+      "at": "2026-09-15T16:09:17.814843639+00:00",
+      "forced": false,
+      "from": "plan",
+      "generation": 4,
+      "node_id": "default",
+      "round_idx": 0,
+      "to": "implement",
+      "workflow_revision": 13
     }
   ],
-  "workflow_revision": 9
+  "workflow_revision": 14
 }
