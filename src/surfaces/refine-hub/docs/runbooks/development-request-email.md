@@ -22,12 +22,15 @@ fields are ignored. A minimal connection is:
   "schema_version": 1,
   "target_root": "/home/buddy/projects/refine-next",
   "address": "goal@getrefine.dev",
-  "allowed_senders": ["person@example.com"]
+  "allowed_senders": ["person@example.com", "@example.org"]
 }
 ```
 
 The canonical target must match before Refine accesses the token or the request
-ledger. Sender matching is case-insensitive. This local connection and its
+ledger. Sender matching is case-insensitive. An entry such as `@example.org`
+allows every address at that exact domain; it does not allow subdomains or
+domains that merely end in `example.org`.
+Individual email addresses continue to match only that address. This local connection and its
 secret are not synchronized through refine-state.
 
 ## Install and run the Skills

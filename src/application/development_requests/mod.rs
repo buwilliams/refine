@@ -234,7 +234,7 @@ impl FileDevelopmentRequestService {
         for email_id in email_ids {
             let raw = fastmail.raw_email(&email_id)?;
             let parsed = parse_email(&raw)?;
-            if !settings.allowed_senders.contains(&parsed.sender) {
+            if !sender_is_trusted(settings, &parsed.sender) {
                 fastmail.mark_processed(&email_id)?;
                 continue;
             }
@@ -486,7 +486,17 @@ fn development_request_goal_name(subject: &str) -> String {
 }
 
 fn sender_is_trusted(settings: &DevelopmentRequestSettings, sender: &str) -> bool {
-    settings.allowed_senders.contains(sender)
+    let sender = sender.to_ascii_lowercase();
+    let domain_rule = sender.split_once('@').and_then(|(local, domain)| {
+        (!local.is_empty() && !domain.is_empty() && !domain.contains('@'))
+            .then(|| format!("@{domain}"))
+    });
+    settings.allowed_senders.iter().any(|allowed| {
+        (!allowed.starts_with('@') && allowed.eq_ignore_ascii_case(&sender))
+            || domain_rule
+                .as_ref()
+                .is_some_and(|domain| allowed.eq_ignore_ascii_case(domain))
+    })
 }
 
 fn validate_recovered_goal(

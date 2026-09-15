@@ -29,6 +29,16 @@ fn settings() -> DevelopmentRequestSettings {
     }
 }
 
+#[test]
+fn domain_sender_rules_require_a_nonempty_local_part_and_one_at_sign() {
+    let mut settings = settings();
+    settings.allowed_senders.insert("@example.org".into());
+    assert!(sender_is_trusted(&settings, "Person@example.org"));
+    for sender in ["@example.org", "a@b@example.org", "example.org", "a@"] {
+        assert!(!sender_is_trusted(&settings, sender), "{sender}");
+    }
+}
+
 fn write_config(runtime_root: &Path, target_root: &Path, allowed_senders: &[&str]) {
     fs::create_dir_all(runtime_root).unwrap();
     fs::write(

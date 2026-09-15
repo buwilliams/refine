@@ -79,6 +79,40 @@ fn assert_backlog_goal(service: &FileDevelopmentRequestService, record: &Develop
 }
 
 #[test]
+fn ingest_allows_exact_domain_and_preserves_individual_sender_rules() {
+    let (root, service) = fixture();
+    let mut settings = settings();
+    settings.allowed_senders.insert("@EXAMPLE.org".into());
+    let mail = IntakeMail::new(
+        &service,
+        &[
+            ("domain-sender", "Test Sender <Person@EXAMPLE.ORG>"),
+            ("colleague", "another@EXAMPLE.ORG"),
+            ("individual", "Buddy@example.com"),
+            ("suffix", "stranger@notexample.org"),
+            ("subdomain", "stranger@sub.example.org"),
+            ("prefix", "stranger@example.org.example.com"),
+            ("other", "stranger@example.com"),
+        ],
+    );
+
+    assert_eq!(service.ingest(&mail, &settings).unwrap(), 7);
+    let acknowledgements = mail.acknowledgements.borrow();
+    for (id, record) in acknowledgements.iter() {
+        assert_eq!(
+            record.is_some(),
+            matches!(id.as_str(), "domain-sender" | "colleague" | "individual"),
+            "unexpected authorization for {id}"
+        );
+    }
+    assert_eq!(service.record_paths().unwrap().len(), 3);
+    let result = service.process_local_records(&mail, &settings).unwrap();
+    assert_eq!(result["goal_ids"].as_array().unwrap().len(), 3);
+    assert_eq!(result["errors"], json!([]));
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
 fn ingest_filters_senders_and_records_accepted_source_before_remote_acknowledgement() {
     let (root, service) = fixture();
     let mail = IntakeMail::new(
