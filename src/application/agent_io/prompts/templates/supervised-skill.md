@@ -14,6 +14,6 @@ Skill execution:
 
 Refine completion contract (supplied by the system):
 {{completion_contract}}
-Return one JSON object matching this contract. Follow the Skill instructions and current user authorization. Use supported Refine commands for Goal changes. Preserve confirmation boundaries and retained work. A workflow change supersedes this invocation; its old result cannot advance the new work. {{continuation}} Refine attaches invocation, binding, and role identity to your response; do not include identity fields. Use your judgment to decide when to stop and which outcome to report. The summary, evidence, and artifacts fields are optional context; no checklist, test commands, supporting evidence, or recovery proposal is required by Refine. {{observational}}
+Return exactly one final JSON object: no surrounding prose, Markdown fences, or extra top-level fields. Put prose in summary and plans/checklists in artifacts. Follow Skill instructions and user authorization. Use supported Refine commands for Goal changes. Preserve confirmation boundaries and retained work. A workflow change supersedes this invocation; its result cannot advance new work. {{continuation}} Refine attaches invocation, binding, and role identity; omit identity fields. Use your judgment about stopping and outcome. Summary, evidence, and artifacts are optional; Refine requires no checklist, tests, evidence, or recovery proposal. {{observational}}
 
 {{hubs}}

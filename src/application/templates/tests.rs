@@ -2,6 +2,8 @@ use super::*;
 use crate::application::agent_io::prompts::PromptTemplate;
 use std::path::PathBuf;
 
+mod completion;
+
 struct Fixture(PathBuf);
 impl Fixture {
     fn new() -> Self {

@@ -292,3 +292,76 @@ fn forced_cancellation_does_not_require_readable_entry_gate_evidence() {
     assert_eq!(before, f.snapshot());
     f.assert_no_candidate();
 }
+
+#[test]
+fn extended_completion_replays_retained_receipt_without_provider_launch() {
+    for outcome in ["success", "failure", "error"] {
+        let f = Fixture::new();
+        let _smoke = SmokeSkill::install(&f.service, &f.temp);
+        let script = f.temp.join("lifecycle-smoke.py");
+        let source = fs::read_to_string(&script).unwrap();
+        fs::write(
+            &script,
+            source.replace(
+                "print(json.dumps(result))\n",
+                &format!("result['outcome'] = '{outcome}'\nresult['checklist'] = [{{'id': 'P1'}}]\nresult['artifacts'] = {{'review': 'retained'}}\nprint('Review complete. ' + json.dumps(result) + ' Done.')\n"),
+            ),
+        )
+        .unwrap();
+        f.gate("workflow.backlog.exit", BindingMode::Blocking);
+        f.request_todo();
+        f.dispatch();
+        let invocation = f.invocation("workflow.backlog.exit");
+        // Stop after the receipt and checkout observation are durable, before
+        // acceptance or operation settlement, as an interrupted worker would.
+        let interrupted = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            f.service.execute(&invocation.id, || {
+                let current = f.service.invocation(&invocation.id)?;
+                if current
+                    .attempts
+                    .last()
+                    .is_some_and(|receipt| receipt["checkout_recorded"] == true)
+                {
+                    std::panic::panic_any("simulated worker interruption after receipt");
+                }
+                Ok(())
+            })
+        }));
+        assert_eq!(
+            interrupted.unwrap_err().downcast_ref::<&str>(),
+            Some(&"simulated worker interruption after receipt")
+        );
+        let retained = f.service.invocation(&invocation.id).unwrap();
+        assert_eq!(retained.state, InvocationState::Running);
+        assert!(retained.results.is_empty());
+        assert_eq!(retained.attempts.len(), 1);
+        assert_eq!(retained.attempts[0]["host_bound_result"], true);
+        let launches = fs::read(invocation.context.cwd.join("launches.txt")).unwrap();
+        let restarted =
+            FileEventService::with_runtime_root(&f.service.refine_dir, f.temp.join("runtime"));
+        let replayed = restarted.execute(&invocation.id, || Ok(())).unwrap();
+        let accepted = replayed.results.values().next().unwrap();
+        assert_eq!(accepted.outcome, outcome);
+        assert_eq!(accepted.invocation_id, invocation.id);
+        assert_eq!(accepted.binding_id, retained.attempts[0]["binding_id"]);
+        assert_eq!(
+            accepted.summary,
+            "Executed in the admitted lifecycle checkout"
+        );
+        assert_eq!(
+            accepted.evidence,
+            [invocation.context.cwd.display().to_string()]
+        );
+        assert_eq!(accepted.artifacts, json!({"review":"retained"}));
+        assert!(replayed.state.terminal());
+        assert_eq!(replayed.attempts, retained.attempts);
+        assert_eq!(
+            restarted.execute(&invocation.id, || Ok(())).unwrap(),
+            replayed
+        );
+        assert_eq!(
+            launches,
+            fs::read(invocation.context.cwd.join("launches.txt")).unwrap()
+        );
+    }
+}
