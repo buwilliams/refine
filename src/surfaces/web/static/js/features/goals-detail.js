@@ -317,6 +317,12 @@ function drawGoalDetail(goal) {
 
   // Review approval remains a separate integration action. Explicit step
   // assignments use the menu below.
+  const primaryStep = {
+    backlog: "todo",
+    review: "done",
+    failed: "todo",
+    cancelled: "failed",
+  }[goal.status] || "todo";
   const workflow = workflowForGoal(goal, latest);
   const forwardBtn = workflow.forward ? `
     <button id="btn-state-forward" data-testid="goal-state-forward">${htmlEscape(workflow.forward.label)}</button>
@@ -340,7 +346,7 @@ function drawGoalDetail(goal) {
       </div>
       <div class="actions" style="margin-bottom:10px" data-testid="goal-workflow-actions">
         <div class="goal-action-group">
-          <button type="button" class="goal-action-primary" data-goal-step="todo" data-testid="goal-step-primary">Todo</button>
+          <button type="button" class="goal-action-primary" data-goal-step="${primaryStep}" data-testid="goal-step-primary">${workflowStatusLabel(primaryStep)}</button>
           <details class="nav-menu goal-action-menu goal-step-menu" data-testid="goal-step-menu"${stepMenuOpen ? " open" : ""}>
             <summary class="btn goal-action-more" aria-label="Set workflow step" data-testid="goal-step-toggle"></summary>
             <div class="nav-menu-panel goal-action-panel">

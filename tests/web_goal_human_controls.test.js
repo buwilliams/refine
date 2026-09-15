@@ -126,6 +126,36 @@ test("every Goal step is selectable and Round deletion uses its inspected revisi
     const count = await page.evaluate(() => { confirmDeletion = false; return requests.length; });
     await page.getByRole("button", { name: "Delete Round 1", exact: true }).click();
     assert.equal(await page.evaluate(() => requests.length), count);
+    // Redraw the same open modal with new status/revision snapshots, as a live
+    // refresh does. The label, move target, and revision must all stay current.
+    const primaryActions = [
+      ["backlog", "todo", "Todo"],
+      ["review", "done", "Done"],
+      ["failed", "todo", "Todo"],
+      ["cancelled", "failed", "Failed"],
+      ...["todo", "plan", "implement", "quality", "governance", "done"].map(status => [status, "todo", "Todo"]),
+    ];
+    for (const [index, [status, target, label]] of primaryActions.entries()) {
+      const revision = 43 + index;
+      await page.evaluate(({ status, revision }) => {
+        goal = { ...goal, status, workflow_revision: revision };
+        drawGoalDetail(goal);
+      }, { status, revision });
+      const primary = page.getByTestId("goal-step-primary");
+      assert.equal(await primary.textContent(), label, `primary label for ${status}`);
+      assert.equal(await primary.getAttribute("data-goal-step"), target);
+      const requestCount = await page.evaluate(() => requests.length);
+      await primary.click();
+      assert.equal(await page.evaluate(() => requests.length), requestCount + 1);
+      const request = await page.evaluate(() => requests.at(-1));
+      assert.equal(request.method, "POST");
+      assert.equal(request.path, "/api/workflow/goals/GOAL1/move");
+      assert.equal(request.body.to, target);
+      assert.equal(request.body.expected_revision, revision);
+      assert.equal(request.body.force, true);
+      assert.deepEqual(await page.locator(".goal-step-menu [data-goal-step]").evaluateAll(buttons => buttons.map(button => button.dataset.goalStep)),
+        ["backlog", "todo", "plan", "implement", "quality", "governance", "review", "done", "failed", "cancelled"]);
+    }
     await page.evaluate(() => {
       bindRoundFormSubmit = realBindRoundFormSubmit;
       computeFailureBanner = realComputeFailureBanner;
