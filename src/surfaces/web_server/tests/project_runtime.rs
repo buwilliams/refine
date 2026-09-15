@@ -634,6 +634,34 @@ fn web_server_runtime_settings_updates_preserve_aged_backlog() {
     assert_eq!(raised.status, 200);
     assert_eq!(raised.body["settings"]["parallel_run_cap"], "3");
 
+    let rejected = server.handle(ApiRequest {
+        method: "PATCH".to_string(),
+        path: "/api/settings".to_string(),
+        body: Some(json!({
+            "parallel_run_cap": 4,
+            "backlog_promote_after_seconds": "0"
+        })),
+    });
+    assert_eq!(rejected.status, 400);
+    assert!(
+        rejected.body["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("unknown setting: backlog_promote_after_seconds")
+    );
+    let readback = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/settings".to_string(),
+        body: None,
+    });
+    assert_eq!(readback.status, 200);
+    assert_eq!(readback.body["settings"]["parallel_run_cap"], "3");
+    assert!(
+        readback.body["settings"]
+            .get("backlog_promote_after_seconds")
+            .is_none()
+    );
+
     assert!(!runtime_root.join("workflow-automation-state.json").exists());
 
     let goal = server.handle(ApiRequest {
