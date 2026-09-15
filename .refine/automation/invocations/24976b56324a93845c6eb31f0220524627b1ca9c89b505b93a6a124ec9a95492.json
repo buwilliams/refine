@@ -475,11 +475,52 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "succeeded",
+  "results": {
+    "default-plan": {
+      "invocation_id": "24976b56324a93845c6eb31f0220524627b1ca9c89b505b93a6a124ec9a95492",
+      "binding_id": "default-plan",
+      "role": "plan",
+      "outcome": "success",
+      "summary": "Accept Skill completions with harmless extra fields while preserving host-bound identity, verdict validation, and rejection of ambiguous output. Clarify prompts so optional planning and review details belong inside the completion contract.\n\n1. [ ] Task #1 - Add regression fixtures. Cover top-level checklist and other extra fields, identity-free reports, matching legacy identities, partial or mismatched identities, invalid outcomes, and malformed known fields. Cover direct, fenced, enveloped, and prose-wrapped JSON, plus two distinct completion objects. The current extractor already accepts prose around one object; prose alone does not establish an extraction bug.\n\n2. [ ] Task #2 - Separate content tolerance from identity validation in src/application/agent_io/contracts/skill_result.rs. Extract the bounded completion value once, then explicitly select the identity path. For host-bound receipts without identity fields, decode tolerant provider content and attach host identity. If any identity field is present, require all three fields and exact matches. Legacy receipts must continue requiring matching identity. Ignore unrelated top-level fields at this application boundary, preserve known context fields, and retain required-field, type, and outcome validation. Keep the persisted model strict. Do not merely remove deny_unknown_fields: that would silently accept mismatched identities through the current report-first fallback. Preserve useful decoding diagnostics instead of replacing report errors with legacy-schema errors.\n\n3. [ ] Task #3 - Resolve only demonstrated envelope defects. Use Task #1 fixtures to verify existing extraction and deduplication. Preserve rejection of genuinely distinct JSON candidates and conflicting envelope fields; do not select the last successful-looking verdict. If a fixture demonstrates that one logical response is counted twice, fix that extraction case while retaining payload, nesting, and envelope limits. The supplied report lacks full raw outputs, so the exact two-candidate failure remains unconfirmed.\n\n4. [ ] Task #4 - Align initial and repair prompts. Update supervised-skill.md and skill-repair.md to request exactly one final JSON object, with prose in summary and structured plans/checklists under artifacts. Keep supporting context optional and the contract generated from SkillReport. Inspect shipped workflow Skill instructions for conflicting output directions; current prompts already omit identity and do not require a checklist.\n\n5. [ ] Task #5 - Verify completion and replay behavior. Extend lifecycle tests to show tolerant reports retain their verdict and context, bind the correct identity, and replay retained receipts without another provider launch. Confirm invalid identities, malformed decisions, and ambiguous results still fail. Run cargo test, cargo fmt --all -- --check, and git diff --check. Keep repair budgets, workflow retry policy, and automatic recovery of previously failed Goals outside this change.",
+      "evidence": [
+        "Both SkillReport and model::automation::SkillResult currently use deny_unknown_fields.",
+        "decode_result currently falls back from SkillReport to SkillResult; existing tests explicitly reject partial or mismatched identity even for host-bound receipts.",
+        "structured_output/extract.rs already supports single JSON values in prose, fences, envelopes, and stringified transport, and rejects multiple distinct candidates.",
+        "completion.rs currently sets max_repairs to zero and uses decode_result for retained receipts and newly produced output."
+      ],
+      "artifacts": null
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "default-plan",
+      "checkout": {
+        "observation": {
+          "branch": "refine/DR545471066EDAC30DDBD3C63E/round-1",
+          "head_commit": "ce3415039279b0822c5aa533f33aca459de99e93",
+          "status_porcelain": []
+        },
+        "tree": "5b4b8099bc1962d7f68b61c71f00867f217edcf5"
+      },
+      "checkout_recorded": true,
+      "diagnostic": null,
+      "host_bound_result": true,
+      "observational_violation": false,
+      "operation_id": null,
+      "process_id": "proc-1789476119150-120195-141",
+      "prompt_bytes": 20098,
+      "provider_session_id": null,
+      "purpose": "work",
+      "raw_output": "{\n  \"outcome\": \"success\",\n  \"summary\": \"Accept Skill completions with harmless extra fields while preserving host-bound identity, verdict validation, and rejection of ambiguous output. Clarify prompts so optional planning and review details belong inside the completion contract.\\n\\n1. [ ] Task #1 - Add regression fixtures. Cover top-level checklist and other extra fields, identity-free reports, matching legacy identities, partial or mismatched identities, invalid outcomes, and malformed known fields. Cover direct, fenced, enveloped, and prose-wrapped JSON, plus two distinct completion objects. The current extractor already accepts prose around one object; prose alone does not establish an extraction bug.\\n\\n2. [ ] Task #2 - Separate content tolerance from identity validation in src/application/agent_io/contracts/skill_result.rs. Extract the bounded completion value once, then explicitly select the identity path. For host-bound receipts without identity fields, decode tolerant provider content and attach host identity. If any identity field is present, require all three fields and exact matches. Legacy receipts must continue requiring matching identity. Ignore unrelated top-level fields at this application boundary, preserve known context fields, and retain required-field, type, and outcome validation. Keep the persisted model strict. Do not merely remove deny_unknown_fields: that would silently accept mismatched identities through the current report-first fallback. Preserve useful decoding diagnostics instead of replacing report errors with legacy-schema errors.\\n\\n3. [ ] Task #3 - Resolve only demonstrated envelope defects. Use Task #1 fixtures to verify existing extraction and deduplication. Preserve rejection of genuinely distinct JSON candidates and conflicting envelope fields; do not select the last successful-looking verdict. If a fixture demonstrates that one logical response is counted twice, fix that extraction case while retaining payload, nesting, and envelope limits. The supplied report lacks full raw outputs, so the exact two-candidate failure remains unconfirmed.\\n\\n4. [ ] Task #4 - Align initial and repair prompts. Update supervised-skill.md and skill-repair.md to request exactly one final JSON object, with prose in summary and structured plans/checklists under artifacts. Keep supporting context optional and the contract generated from SkillReport. Inspect shipped workflow Skill instructions for conflicting output directions; current prompts already omit identity and do not require a checklist.\\n\\n5. [ ] Task #5 - Verify completion and replay behavior. Extend lifecycle tests to show tolerant reports retain their verdict and context, bind the correct identity, and replay retained receipts without another provider launch. Confirm invalid identities, malformed decisions, and ambiguous results still fail. Run cargo test, cargo fmt --all -- --check, and git diff --check. Keep repair budgets, workflow retry policy, and automatic recovery of previously failed Goals outside this change.\",\n  \"evidence\": [\n    \"Both SkillReport and model::automation::SkillResult currently use deny_unknown_fields.\",\n    \"decode_result currently falls back from SkillReport to SkillResult; existing tests explicitly reject partial or mismatched identity even for host-bound receipts.\",\n    \"structured_output/extract.rs already supports single JSON values in prose, fences, envelopes, and stringified transport, and rejects multiple distinct candidates.\",\n    \"completion.rs currently sets max_repairs to zero and uses decode_result for retained receipts and newly produced output.\"\n  ]\n}",
+      "received_at": "2026-09-15T12:42:56.247817838+00:00",
+      "started_at": "2026-09-15T12:41:59.117451192+00:00",
+      "workflow_revision": 2
+    }
+  ],
   "created_at": "2026-09-15T12:41:57.745261957+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-15T12:42:57.544253199+00:00",
   "error": null,
   "action_applied": false
 }
