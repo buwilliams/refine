@@ -1,5 +1,5 @@
 {
-  "id": "363c9f516f00f9431ba772db3166504fd5dab828be0823150208f948de45e93b",
+  "id": "207a8c207c965479a43c768bb7ac440648af421f1785039e0a5b68f98c375110",
   "event": {
     "id": "workflow.quality.enter",
     "name": "Workflow Quality Enter",
@@ -35,7 +35,7 @@
       "repository": "/home/buddy/projects/refine-next",
       "path": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR545471066EDAC30DDBD3C63E-round-1",
       "branch": "refine/DR545471066EDAC30DDBD3C63E/round-1",
-      "commit": null,
+      "commit": "095848579c7b922ea088b96588b99729a74a84f9",
       "allow_rebase": false,
       "registration": {
         "common_dir": "/home/buddy/projects/refine-next/.git",
@@ -48,47 +48,16 @@
     "goal_id": "DR545471066EDAC30DDBD3C63E",
     "round_idx": 0,
     "workflow_revision": 16,
-    "candidate_commit": "37db76f1ff582923ce9c39a65271f387aa1f27e5",
+    "candidate_commit": "095848579c7b922ea088b96588b99729a74a84f9",
     "data": {
-      "context": {
-        "agent_context": {
-          "assembled_at": "2026-09-15T14:52:57Z",
-          "current_round": {
-            "assignee": "buddy.williams@insurity.com",
-            "prompt": "From: Buddy Williams <buddy.williams@insurity.com>\nSubject: Bug Report from Kevin\n\nBody:\nHi, after the update today.  Some goals keep failing.  I had Claude analyze and this is what it concluded.\r\n\r\nRegression: deny_unknown_fields in host-bound Skill completion contract rejects valid agent output\r\n\r\nOffending commit: 25526f7a — \"Bind Skill completion identity in the host instead of model output\" (2026-09-12)\r\nSeverity: High — silently converts previously-tolerated agent completions into hard gate failures, wedging Goals that have otherwise passed their reviews.\r\nArea: src/application/agent_io/contracts/skill_result.rs, src/application/events/completion.rs\r\nReported: 2026-09-14 · node bo2lnxipsapp01 · Refine 4.3.1\r\n\r\nSummary\r\n\r\n25526f7a moved routing identity (invocation_id/binding_id/role) host-side — a good change that removes a class of identity-echo failures. But as a side effect it introduced a new, stricter completion contract (SkillReport) carrying #[serde(deny_unknown_fields)], replacing the tolerant SkillResult::decode path for all new (host_bound) completions. Any completion containing a field outside {outcome, summary, evidence, artifacts} — or any prose-wrapped output the envelope extractor reads as more than one JSON object — is now a hard Serialization error that fails the gate, where it was previously accepted (unknown fields were silently ignored).\r\n\r\nThe agent prompts were not updated to match this narrower shape, so there is now a contract↔prompt mismatch.\r\n\r\nRoot cause\r\n\r\nOld contract (still in src/model/automation.rs:410) — no deny_unknown_fields, so serde ignored extra fields:\r\n\r\npub struct SkillResult {\r\n    pub invocation_id: String,\r\n    pub binding_id: String,\r\n    pub role: String,\r\n    pub outcome: String,\r\n    #[serde(default)] pub summary: String,\r\n    #[serde(default)] pub evidence: Vec<String>,\r\n    #[serde(default)] pub artifacts: Value,\r\n}\r\n\r\nNew contract added by 25526f7a (skill_result.rs) and now used by decode_result(...) for host_bound receipts:\r\n\r\n#[derive(serde::Deserialize, serde::Serialize)]\r\n#[serde(deny_unknown_fields)]          // ← new: any extra field is now fatal\r\npub(crate) struct SkillReport {\r\n    pub outcome: String,\r\n    #[serde(default)] pub summary: String,\r\n    #[serde(default)] pub evidence: Vec<String>,\r\n    #[serde(default)] pub artifacts: Value,\r\n}\r\n\r\ncompletion.rs switched decode from SkillResult::decode(...) to decode_result(output, &id, &binding.id, &role, host_bound), routing all fresh completions through the strict SkillReport.\r\n\r\nNote: the \"reject 2 distinct JSON candidates\" envelope logic itself is older (introduced ~2026-08-15, b1ba2b52/dfdebad4). 25526f7a didn't add that check — it narrowed the accepted object shape, which is what turned real-world agent output fatal.\r\n\r\nSymptoms / evidence\r\n\r\nTwo failure signatures, both traced to this contract:\r\n\r\n1. unknown field 'checklist', expected one of invocation_id, binding_id, role, outcome, summary, evidence, artifacts\r\n   The plan skill instructs agents to produce \"stable checklist IDs,\" so the model emits a top-level checklist field. Pre-25526f7a: ignored. Post: deny_unknown_fields → hard reject at the plan gate.\r\n2. contains 2 distinct JSON candidates; exactly one is required\r\n   The configured agent (claude-opus-4-8) wraps its answer in prose. Captured raw result events from failed quality/governance invocations begin with prose, not JSON:\r\n   - governance: \"Governance review complete. **Outcome: success — no violations found.** …\"\r\n   - plan: \"I've fully analyzed the round. Here is my plan-step result. …\"\r\n     (result_starts_with_json = false in every failed case.) The envelope extractor then finds the prose-embedded JSON plus the object and refuses to disambiguate.\r\n\r\nThe agents are completing the actual reviews correctly — one governance run even self-diagnosed the quality fault as an output_contract_fault and recommended re-running. Only the output envelope is rejected.\r\n\r\nBecause it's probabilistic (1175+ Goals have completed successfully), it presents as intermittent \"flaky harness\" faults; affected Goals exhaust the repair loop and hard-fail.\r\n\r\nImpact\r\n\r\n- Goals that pass constitution/quality/governance can still fail at the gate purely on envelope shape, and land in failed with category plan / workflow / governance_integration.\r\n- Repair loop (structured-output-repair) does not reliably recover it — the model keeps re-emitting prose/extra fields, and max_repairs is not operator-configurable.\r\n- Retrying a failed gate can churn an already-passed stage back to output_contract_fault (observed on Goal 00000T130287HH5HPK5QJ8C014: quality had passed, re-run dragged it back to a contract fault).\r\n\r\nObserved affected Goals (node bo2lnxipsapp01):\r\n- 00000T130287HH5HPK5QJ8C014 (high) — repeated output_contract_fault at quality/governance, 2 distinct JSON candidates.\r\n- 00000T137KN16JMJFY73J8C018 (low) — unknown field 'checklist' at plan, then 2 distinct JSON candidates at implement.\r\n\r\nRecommended fix (upstream)\r\n\r\nPick one; first is lowest-risk:\r\n\r\n1. Make SkillReport decode tolerant of unknown fields — drop #[serde(deny_unknown_fields)], or strip unknown top-level fields host-side before decoding. This restores the pre-25526f7a tolerance while keeping the host-bound identity improvement. (Extra fields like checklist should be ignored or lifted into artifacts, not fatal.)\r\n2. Harden envelope extraction so a single well-formed contract object embedded in prose is accepted rather than rejected as \"2 distinct JSON candidates\" — or strip non-JSON preamble/trailer before parsing.\r\n3. Reconcile the prompts with the contract — the plan skill still asks for checklist IDs; either add checklist to the accepted contract or instruct agents to nest plan/checklist structure under artifacts.\r\n\r\nA combination of (1) + (3) addresses both failure signatures at the source.\r\n\r\n\r\n[cid:insurity-small2_60d9d841-975e-4326-81a1-42eb773307d1.jpg]\r\n\r\nBuddy Williams\r\n\r\nVP & Forward Deployed Engineer\r\n\r\nT +1-860-616-2578\r\n\r\n\r\n\r\n[cid:excellence2026signature(17b0688e-5473-4b74-96eb-a73f633f2c2f)_48407359-d77b-4967-95cd-277a32b50ebc.png]<https://insurity.com/excellence?utm_source=Email-Signature&utm_medium=Email&utm_campaign=Event-Excellence-2026>\r\n\r\n_____________________________________________________________________________________________________\r\n\r\nThe information contained in this e-mail message is intended only for the personal and confidential use of the intended recipient(s). This message may be an attorney-client communication and/or work product and as such is privileged and confidential. If the reader of this message is not the intended recipient or an agent responsible for delivering it to the intended recipient, you are hereby notified that you have received this document in error and that any review, dissemination, distribution, or copying of this message is strictly prohibited. If you have received this communication in error, please notify us immediately by e-mail, and delete the original message.\r\n_____________________________________________________________________________________________________\r\n~~~Insurity~~~",
-            "reporter": "buddy.williams@insurity.com",
-            "round": 1
-          },
-          "goal": {
-            "assignee": "buddy.williams@insurity.com",
-            "id": "DR545471066EDAC30DDBD3C63E",
-            "name": "Bug Report from Kevin",
-            "node_id": "default",
-            "priority": "low",
-            "reporter": "buddy.williams@insurity.com"
-          },
-          "governance": {
-            "configured": false,
-            "constitution": "",
-            "product": "",
-            "rules": []
-          },
-          "guidance_candidates": [],
-          "previous_rounds": [],
-          "version": 1,
-          "workflow_summary": "Refine gives this Goal Agent an isolated worktree, the current Round, and available planning context. Follow the Goal and applicable Skill instructions and use your judgment to decide when to stop. Quality and Governance agents make their own decisions using their Skills before integration and human Review. Refine coordinates workflow transitions and Git actions. Do not directly advance Goal state, approve, merge, or push."
-        },
-        "implementation_report": "workflow.implement.enter:default-implement: Task #1: Completed boundary normalization. Extra provider fields are ignored; host identity, supplied identity validation, outcomes, diagnostics, and persisted-record strictness are preserved.\nTask #2: Preserved supported transports and fixed a demonstrated extractor bug that missed competing stringified results. Equivalent repeated results remain accepted.\nTask #3: Clarified bundled completion guidance and verified rendered prompts, optional context, and authored overrides.\nTask #4: Completed regression coverage, including interrupted receipt replay without another provider launch. No implementation work remains; broader validation belongs to Quality.",
-        "plans": null
-      },
       "event": {},
       "goal": {
         "assignee": "buddy.williams@insurity.com",
-        "base_commit": "d7e38092321b8d16b4cadba7c23057f1a7dc7e73",
+        "base_commit": "38c971d47a022950bb91a730801fa18463a652e6",
         "branch_name": "refine/DR545471066EDAC30DDBD3C63E/round-1",
-        "candidate_commit": "37db76f1ff582923ce9c39a65271f387aa1f27e5",
+        "candidate_commit": "095848579c7b922ea088b96588b99729a74a84f9",
         "created": "2026-09-15T12:41:51Z",
-        "event_generation": 9,
+        "event_generation": 10,
         "feature_id": null,
         "feature_order": null,
         "id": "DR545471066EDAC30DDBD3C63E",
@@ -107,33 +76,34 @@
             "implementation_reported_at": "2026-09-15T15:03:15Z",
             "prompt": "From: Buddy Williams <buddy.williams@insurity.com>\nSubject: Bug Report from Kevin\n\nBody:\nHi, after the update today.  Some goals keep failing.  I had Claude analyze and this is what it concluded.\r\n\r\nRegression: deny_unknown_fields in host-bound Skill completion contract rejects valid agent output\r\n\r\nOffending commit: 25526f7a — \"Bind Skill completion identity in the host instead of model output\" (2026-09-12)\r\nSeverity: High — silently converts previously-tolerated agent completions into hard gate failures, wedging Goals that have otherwise passed their reviews.\r\nArea: src/application/agent_io/contracts/skill_result.rs, src/application/events/completion.rs\r\nReported: 2026-09-14 · node bo2lnxipsapp01 · Refine 4.3.1\r\n\r\nSummary\r\n\r\n25526f7a moved routing identity (invocation_id/binding_id/role) host-side — a good change that removes a class of identity-echo failures. But as a side effect it introduced a new, stricter completion contract (SkillReport) carrying #[serde(deny_unknown_fields)], replacing the tolerant SkillResult::decode path for all new (host_bound) completions. Any completion containing a field outside {outcome, summary, evidence, artifacts} — or any prose-wrapped output the envelope extractor reads as more than one JSON object — is now a hard Serialization error that fails the gate, where it was previously accepted (unknown fields were silently ignored).\r\n\r\nThe agent prompts were not updated to match this narrower shape, so there is now a contract↔prompt mismatch.\r\n\r\nRoot cause\r\n\r\nOld contract (still in src/model/automation.rs:410) — no deny_unknown_fields, so serde ignored extra fields:\r\n\r\npub struct SkillResult {\r\n    pub invocation_id: String,\r\n    pub binding_id: String,\r\n    pub role: String,\r\n    pub outcome: String,\r\n    #[serde(default)] pub summary: String,\r\n    #[serde(default)] pub evidence: Vec<String>,\r\n    #[serde(default)] pub artifacts: Value,\r\n}\r\n\r\nNew contract added by 25526f7a (skill_result.rs) and now used by decode_result(...) for host_bound receipts:\r\n\r\n#[derive(serde::Deserialize, serde::Serialize)]\r\n#[serde(deny_unknown_fields)]          // ← new: any extra field is now fatal\r\npub(crate) struct SkillReport {\r\n    pub outcome: String,\r\n    #[serde(default)] pub summary: String,\r\n    #[serde(default)] pub evidence: Vec<String>,\r\n    #[serde(default)] pub artifacts: Value,\r\n}\r\n\r\ncompletion.rs switched decode from SkillResult::decode(...) to decode_result(output, &id, &binding.id, &role, host_bound), routing all fresh completions through the strict SkillReport.\r\n\r\nNote: the \"reject 2 distinct JSON candidates\" envelope logic itself is older (introduced ~2026-08-15, b1ba2b52/dfdebad4). 25526f7a didn't add that check — it narrowed the accepted object shape, which is what turned real-world agent output fatal.\r\n\r\nSymptoms / evidence\r\n\r\nTwo failure signatures, both traced to this contract:\r\n\r\n1. unknown field 'checklist', expected one of invocation_id, binding_id, role, outcome, summary, evidence, artifacts\r\n   The plan skill instructs agents to produce \"stable checklist IDs,\" so the model emits a top-level checklist field. Pre-25526f7a: ignored. Post: deny_unknown_fields → hard reject at the plan gate.\r\n2. contains 2 distinct JSON candidates; exactly one is required\r\n   The configured agent (claude-opus-4-8) wraps its answer in prose. Captured raw result events from failed quality/governance invocations begin with prose, not JSON:\r\n   - governance: \"Governance review complete. **Outcome: success — no violations found.** …\"\r\n   - plan: \"I've fully analyzed the round. Here is my plan-step result. …\"\r\n     (result_starts_with_json = false in every failed case.) The envelope extractor then finds the prose-embedded JSON plus the object and refuses to disambiguate.\r\n\r\nThe agents are completing the actual reviews correctly — one governance run even self-diagnosed the quality fault as an output_contract_fault and recommended re-running. Only the output envelope is rejected.\r\n\r\nBecause it's probabilistic (1175+ Goals have completed successfully), it presents as intermittent \"flaky harness\" faults; affected Goals exhaust the repair loop and hard-fail.\r\n\r\nImpact\r\n\r\n- Goals that pass constitution/quality/governance can still fail at the gate purely on envelope shape, and land in failed with category plan / workflow / governance_integration.\r\n- Repair loop (structured-output-repair) does not reliably recover it — the model keeps re-emitting prose/extra fields, and max_repairs is not operator-configurable.\r\n- Retrying a failed gate can churn an already-passed stage back to output_contract_fault (observed on Goal 00000T130287HH5HPK5QJ8C014: quality had passed, re-run dragged it back to a contract fault).\r\n\r\nObserved affected Goals (node bo2lnxipsapp01):\r\n- 00000T130287HH5HPK5QJ8C014 (high) — repeated output_contract_fault at quality/governance, 2 distinct JSON candidates.\r\n- 00000T137KN16JMJFY73J8C018 (low) — unknown field 'checklist' at plan, then 2 distinct JSON candidates at implement.\r\n\r\nRecommended fix (upstream)\r\n\r\nPick one; first is lowest-risk:\r\n\r\n1. Make SkillReport decode tolerant of unknown fields — drop #[serde(deny_unknown_fields)], or strip unknown top-level fields host-side before decoding. This restores the pre-25526f7a tolerance while keeping the host-bound identity improvement. (Extra fields like checklist should be ignored or lifted into artifacts, not fatal.)\r\n2. Harden envelope extraction so a single well-formed contract object embedded in prose is accepted rather than rejected as \"2 distinct JSON candidates\" — or strip non-JSON preamble/trailer before parsing.\r\n3. Reconcile the prompts with the contract — the plan skill still asks for checklist IDs; either add checklist to the accepted contract or instruct agents to nest plan/checklist structure under artifacts.\r\n\r\nA combination of (1) + (3) addresses both failure signatures at the source.\r\n\r\n\r\n[cid:insurity-small2_60d9d841-975e-4326-81a1-42eb773307d1.jpg]\r\n\r\nBuddy Williams\r\n\r\nVP & Forward Deployed Engineer\r\n\r\nT +1-860-616-2578\r\n\r\n\r\n\r\n[cid:excellence2026signature(17b0688e-5473-4b74-96eb-a73f633f2c2f)_48407359-d77b-4967-95cd-277a32b50ebc.png]<https://insurity.com/excellence?utm_source=Email-Signature&utm_medium=Email&utm_campaign=Event-Excellence-2026>\r\n\r\n_____________________________________________________________________________________________________\r\n\r\nThe information contained in this e-mail message is intended only for the personal and confidential use of the intended recipient(s). This message may be an attorney-client communication and/or work product and as such is privileged and confidential. If the reader of this message is not the intended recipient or an agent responsible for delivering it to the intended recipient, you are hereby notified that you have received this document in error and that any review, dissemination, distribution, or copying of this message is strictly prohibited. If you have received this communication in error, please notify us immediately by e-mail, and delete the original message.\r\n_____________________________________________________________________________________________________\r\n~~~Insurity~~~",
             "reporter": "buddy.williams@insurity.com",
-            "updated": "2026-09-15T15:03:18Z"
+            "updated": "2026-09-15T15:23:28Z"
           }
         ],
-        "status": "quality",
+        "status": "governance",
         "target_branch": "main",
-        "updated": "2026-09-15T15:03:18Z",
+        "updated": "2026-09-15T15:23:28Z",
         "workflow_context": "",
-        "workflow_revision": 35
+        "workflow_revision": 45
       },
       "system": {
-        "candidate_commit": "37db76f1ff582923ce9c39a65271f387aa1f27e5",
+        "candidate_commit": "095848579c7b922ea088b96588b99729a74a84f9",
         "node_id": "default",
         "project_root": "/home/buddy/projects/refine-next",
-        "refine_executable": "/home/buddy/projects/refine/bin/refine",
         "workflow_step": "quality",
         "workspace": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR545471066EDAC30DDBD3C63E-round-1"
-      }
+      },
+      "verification_only": true
     },
     "metadata": {
-      "behavior": "EventSkill",
-      "event_operation_id": "1a0a59807db635038",
+      "behavior": "WorkflowQuality",
+      "candidate_commit": "095848579c7b922ea088b96588b99729a74a84f9",
+      "event_operation_id": "1a0a5aa90dd63503f",
       "goal_id": "DR545471066EDAC30DDBD3C63E",
-      "kind": "workflow",
+      "kind": "quality",
       "managed_worktree": {
         "allow_rebase": false,
         "branch": "refine/DR545471066EDAC30DDBD3C63E/round-1",
-        "commit": null,
+        "commit": "095848579c7b922ea088b96588b99729a74a84f9",
         "path": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR545471066EDAC30DDBD3C63E-round-1",
         "registration": {
           "common_dir": "/home/buddy/projects/refine-next/.git",
@@ -143,10 +113,12 @@
         "repository": "/home/buddy/projects/refine-next"
       },
       "node_id": "default",
+      "operation_id": "1a0a5aa810263503e",
       "provider": "codex",
       "round_idx": 0,
+      "runtime_root": "/home/buddy/projects/refine/run/8082",
       "started_bindings": {
-        "default-quality": "2026-09-15T15:03:20.376736133+00:00"
+        "default-quality": "2026-09-15T15:23:36.165914119+00:00"
       },
       "target_app_id": "/home/buddy/projects/refine-next",
       "template_snapshot": {
@@ -449,8 +421,8 @@
         }
       },
       "workflow_revision": 16,
-      "workflow_state": "quality",
-      "workflow_step_generation": 9
+      "workflow_state": "governance",
+      "workflow_step_generation": 10
     }
   },
   "bindings": [
@@ -482,62 +454,11 @@
       "parameters": {}
     }
   ],
-  "state": "succeeded",
-  "results": {
-    "default-quality": {
-      "invocation_id": "363c9f516f00f9431ba772db3166504fd5dab828be0823150208f948de45e93b",
-      "binding_id": "default-quality",
-      "role": "quality",
-      "outcome": "success",
-      "summary": "Changed behavior passes. Added fresh-completion gate coverage, expanded transport-limit tests, and corrected two stale test fixtures. Broader repository failures remain documented.",
-      "evidence": [
-        "Verified extra-field tolerance, identity validation, outcome preservation, supported JSON transports, ambiguity rejection, receipt replay, and prompt overrides.",
-        "cargo test --lib application::agent_io:: -- --test-threads=1: 29 passed.",
-        "cargo test --lib application::templates:: -- --test-threads=1: 13 passed.",
-        "Fresh-gate, ordered-event, and malformed-Quality regression tests passed individually.",
-        "Full unit run: 1379 passed, 30 failed, 7 ignored. After corrections and stable-executable reruns, 18 failures passed; the remaining 12 reproduced on the original base.",
-        "Targeted formatting and git diff --check passed. Repository-wide formatting retains existing drift. No live Claude or browser reproduction was performed."
-      ],
-      "artifacts": {
-        "baseline_comparisons": "/tmp/kevin-quality-retests.json",
-        "report": "/tmp/kevin-quality-report.md"
-      }
-    }
-  },
-  "attempts": [
-    {
-      "attempt": 0,
-      "binding_id": "default-quality",
-      "checkout": {
-        "observation": {
-          "branch": "refine/DR545471066EDAC30DDBD3C63E/round-1",
-          "head_commit": "37db76f1ff582923ce9c39a65271f387aa1f27e5",
-          "status_porcelain": [
-            " M src/application/agent_io/contracts/skill_result.rs",
-            " M src/application/events/execution/lifecycle_tests/completion.rs",
-            " M src/application/events/tests.rs",
-            " M src/application/workflow/phases/quality/tests/execution.rs"
-          ]
-        },
-        "tree": "888370e305f9e0a797fb968f537b7f0828710505"
-      },
-      "checkout_recorded": true,
-      "diagnostic": null,
-      "host_bound_result": true,
-      "observational_violation": false,
-      "operation_id": null,
-      "process_id": "proc-1789484600774-406787-2762",
-      "prompt_bytes": 21626,
-      "provider_session_id": null,
-      "purpose": "work",
-      "raw_output": "{\n  \"outcome\": \"success\",\n  \"summary\": \"Changed behavior passes. Added fresh-completion gate coverage, expanded transport-limit tests, and corrected two stale test fixtures. Broader repository failures remain documented.\",\n  \"evidence\": [\n    \"Verified extra-field tolerance, identity validation, outcome preservation, supported JSON transports, ambiguity rejection, receipt replay, and prompt overrides.\",\n    \"cargo test --lib application::agent_io:: -- --test-threads=1: 29 passed.\",\n    \"cargo test --lib application::templates:: -- --test-threads=1: 13 passed.\",\n    \"Fresh-gate, ordered-event, and malformed-Quality regression tests passed individually.\",\n    \"Full unit run: 1379 passed, 30 failed, 7 ignored. After corrections and stable-executable reruns, 18 failures passed; the remaining 12 reproduced on the original base.\",\n    \"Targeted formatting and git diff --check passed. Repository-wide formatting retains existing drift. No live Claude or browser reproduction was performed.\"\n  ],\n  \"artifacts\": {\n    \"report\": \"/tmp/kevin-quality-report.md\",\n    \"baseline_comparisons\": \"/tmp/kevin-quality-retests.json\"\n  }\n}\n",
-      "received_at": "2026-09-15T15:23:19.277785014+00:00",
-      "started_at": "2026-09-15T15:03:20.730215647+00:00",
-      "workflow_revision": 16
-    }
-  ],
-  "created_at": "2026-09-15T15:03:18.794415852+00:00",
-  "completed_at": "2026-09-15T15:23:21.059197521+00:00",
+  "state": "running",
+  "results": {},
+  "attempts": [],
+  "created_at": "2026-09-15T15:23:33.139195259+00:00",
+  "completed_at": null,
   "error": null,
   "action_applied": false
 }
