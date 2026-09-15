@@ -345,10 +345,20 @@ test("New stays below Search and supports keyboard, dismissal, and viewport posi
   } finally { await app.close(); }
 });
 
-for (const mobile of [false, true]) test(`New opens shared creation flows and fresh Plans (${mobile ? "mobile" : "desktop"})`, { skip: SKIP }, async () => {
+for (const layout of ["desktop", "collapsed", "mobile"]) test(`New opens shared creation flows and fresh Plans (${layout})`, { skip: SKIP }, async () => {
+  const mobile = layout === "mobile";
   let starts = 0;
-  const stops = [];
-  const app = await openApp({ fixture(path) {
+  let activeNode = "node-a";
+  const stops = [], activations = [];
+  const nodes = [{ id: "node-a", display_name: "Node A" }, { id: "node-b", display_name: "Node B" }];
+  const app = await openApp({ fixture(path, request) {
+    if (path === "/api/nodes/activate") {
+      activeNode = request.postDataJSON().node_id;
+      activations.push(activeNode);
+      return { ok: true };
+    }
+    if (path === "/api/project/status" || path === "/api/nodes") return { ...apiFixture(path), nodes, active_node_id: activeNode };
+    if (path === "/api/reporters") return { reporters: [{ name: "Reporter" }, { name: "Selected Reporter" }] };
     if (path === "/api/terminal/session") return { id: `plan-${++starts}`, process_id: `process-${starts}`, cwd: "/workspace", provider: "codex" };
     if (path.startsWith("/api/terminal/")) {
       if (path.endsWith("/stop")) stops.push(path);
@@ -362,7 +372,16 @@ for (const mobile of [false, true]) test(`New opens shared creation flows and fr
     if (mobile) await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(app.origin);
     await page.locator("#dash").waitFor();
+    if (mobile) await page.locator("#mobile-rail-toggle").click();
+    await page.locator('[data-topbar-picker="node"] summary').click();
+    await page.getByRole("option", { name: "Node B", exact: true }).click();
+    await page.waitForFunction(() => state.project.active_node_id === "node-b" && !nodeContextSwitchPromise);
+    await page.locator('[data-topbar-picker="reporter"] summary').click();
+    await page.getByRole("option", { name: "Selected Reporter", exact: true }).click();
+    if (mobile) await page.locator("#rail-toggle").click();
+    if (layout === "collapsed") await page.locator("#rail-toggle").click();
     const context = await page.evaluate(() => ({ node: state.project.active_node_id, reporter: state.lastReporter }));
+    assert.deepEqual(context, { node: "node-b", reporter: "Selected Reporter" });
     await page.evaluate(() => {
       window.newCommands = [];
       const original = runCommand;
@@ -387,7 +406,20 @@ for (const mobile of [false, true]) test(`New opens shared creation flows and fr
     await page.getByTestId("new-goal-modal").waitFor();
     assert.equal(await page.getByTestId("new-goal-modal").locator(".js-reporter-name").textContent(), context.reporter);
     assert.equal(await page.getByTestId("new-goal-prompt").evaluate(el => el === document.activeElement), true);
+    const submissions = [];
+    await page.route("**/api/goals", async route => {
+      if (route.request().method() !== "POST") return route.fallback();
+      submissions.push(route.request().postDataJSON());
+      await route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: { message: "Creation temporarily unavailable" } }) });
+    });
+    await page.getByTestId("new-goal-submit").click();
+    await page.getByText("Provide a prompt", { exact: true }).waitFor();
+    assert.deepEqual(submissions, []);
     await page.getByTestId("new-goal-prompt").fill("Keep this draft");
+    await page.getByTestId("new-goal-submit").click();
+    await page.getByText("Creation temporarily unavailable", { exact: true }).waitFor();
+    assert.equal(await page.getByTestId("new-goal-prompt").inputValue(), "Keep this draft");
+    assert.deepEqual(submissions, [{ reporter: "Selected Reporter", prompt: "Keep this draft", priority: "low", duplicate_decision: "" }]);
     await page.keyboard.press("Escape");
     await page.getByTestId("modal-cancel").click();
     assert.equal(await page.getByTestId("new-goal-prompt").inputValue(), "Keep this draft");
@@ -410,6 +442,7 @@ for (const mobile of [false, true]) test(`New opens shared creation flows and fr
     assert.equal(new Set(plans.map(tab => tab.id)).size, 2);
     assert.equal(new Set(plans.map(tab => tab.session)).size, 2);
     assert.deepEqual(stops, []);
+    assert.deepEqual(activations, ["node-b"]);
     assert.deepEqual(await page.evaluate(() => ({ node: state.project.active_node_id, reporter: state.lastReporter })), context);
     assert.deepEqual(await page.evaluate(() => newCommands), ["goal.new", "feature.new", "goal.import", "plan.open", "plan.open"].map(id => ({ id, inert: false, drawer: false, menus: 0 })));
     assert.deepEqual(app.pageErrors, []);
