@@ -245,3 +245,173 @@ test("context menus identify their context, align with their rows, and create a 
     assert.deepEqual(app.pageErrors, []);
   } finally { await app.close(); }
 });
+
+test("New stays below Search and supports keyboard, dismissal, and viewport positioning", { skip: SKIP }, async () => {
+  const writes = [];
+  const app = await openApp({ onRequest(path, request) {
+    if (request.method() === "POST") writes.push(path);
+  }});
+  try {
+    const { page } = app;
+    await page.goto(app.origin);
+    await page.locator("#dash").waitFor();
+    const toggle = page.locator("#rail-new-toggle");
+    const menu = page.locator("#rail-new-menu");
+    const panel = page.getByRole("menu", { name: "New", exact: true });
+    const items = panel.getByRole("menuitem");
+    assert.deepEqual(await page.locator(".rail-global > *").evaluateAll(elements =>
+      elements.map(el => el.id || el.dataset.topbarPicker)),
+    ["btn-command-palette", "rail-new-menu", "node", "reporter"]);
+    assert.deepEqual(await page.locator("[id]").evaluateAll(elements => {
+      const ids = elements.map(el => el.id);
+      return ids.filter((id, index) => ids.indexOf(id) !== index);
+    }), []);
+    assert.equal(await toggle.getAttribute("aria-label"), "New");
+    assert.equal(await toggle.getAttribute("title"), "New");
+    assert.equal(await toggle.locator("use").getAttribute("href"), "/static/vendor/lucide/navigation.svg#plus");
+    await page.locator("#rail-main-section > summary").click();
+    await toggle.focus();
+    await page.keyboard.press("Enter");
+    assert.deepEqual(await items.allTextContents(), ["New Goal", "New Plan", "New Feature", "Import"]);
+    assert.equal(await items.nth(0).evaluate(el => el === document.activeElement), true);
+    for (const [key, index] of [["ArrowDown", 1], ["End", 3], ["ArrowDown", 0], ["ArrowUp", 3], ["Home", 0]]) {
+      await page.keyboard.press(key);
+      assert.equal(await items.nth(index).evaluate(el => el === document.activeElement), true);
+    }
+    assert.notEqual(await items.first().evaluate(el => getComputedStyle(el).outlineStyle), "none");
+    await page.keyboard.press("Escape");
+    assert.equal(await toggle.evaluate(el => el === document.activeElement), true);
+    await page.waitForFunction(() => document.getElementById("rail-new-toggle").getAttribute("aria-expanded") === "false");
+    await page.keyboard.press("Space");
+    await panel.waitFor();
+    await page.keyboard.press("Tab");
+    assert.equal(await menu.getAttribute("open"), null);
+    assert.equal(await page.locator('[data-topbar-picker="node"] summary').evaluate(el => el === document.activeElement), true);
+    // Keyboard opening also excludes a menu opened without a pointer click.
+    await page.evaluate(() => { document.querySelector('[data-topbar-picker="node"]').open = true; });
+    await page.locator('[data-topbar-picker="node"] .nav-menu-panel').waitFor();
+    await toggle.focus();
+    await page.keyboard.press("ArrowUp");
+    assert.equal(await items.last().evaluate(el => el === document.activeElement), true);
+    assert.equal(await page.locator(".navigation-rail .nav-menu[open]").count(), 1);
+    await page.locator("#dash").click({ position: { x: 400, y: 20 } });
+    assert.equal(await menu.getAttribute("open"), null);
+    await page.getByTestId("toolbar-add").click();
+    await toggle.click();
+    assert.equal(await page.locator(".navigation-rail .nav-menu[open]").count(), 1);
+    await page.getByTestId("toolbar-add").click();
+    assert.equal(await menu.getAttribute("open"), null);
+    for (const viewport of [{ width: 1280, height: 800 }, { width: 720, height: 300 }, { width: 320, height: 240 }]) {
+      await page.setViewportSize(viewport);
+      if (viewport.width <= 700) await page.locator("#mobile-rail-toggle").click();
+      else if (viewport.width === 720) await page.locator("#rail-toggle").click();
+      await toggle.click();
+      await page.waitForFunction(() => {
+        const box = document.getElementById("rail-new-options").getBoundingClientRect();
+        return box.width > 0 && box.x >= 0 && box.y >= 0 && box.right <= innerWidth && box.bottom <= innerHeight;
+      });
+      const box = await panel.boundingBox();
+      assert.ok(box.x >= 0 && box.y >= 0 && box.x + box.width <= viewport.width && box.y + box.height <= viewport.height, JSON.stringify(box));
+      assert.equal(await items.last().isVisible(), true);
+      if (viewport.width === 720) {
+        assert.equal(await toggle.locator(".rail-copy").isVisible(), false);
+        await page.locator("#rail-navigation").evaluate(el => { el.scrollTop = 32; });
+        await page.waitForTimeout(50);
+        assert.ok((await panel.boundingBox()).y >= 8);
+      }
+      if (viewport.width <= 700) {
+        await page.setViewportSize({ width: viewport.width, height: 120 });
+        await page.waitForFunction(() => {
+          const panel = document.getElementById("rail-new-options");
+          return panel.scrollHeight > panel.clientHeight && panel.getBoundingClientRect().bottom <= innerHeight;
+        });
+        await items.first().focus();
+        await page.keyboard.press("End");
+        const last = await items.last().boundingBox();
+        assert.ok(last.y >= 0 && last.y + last.height <= 120);
+        await page.setViewportSize(viewport);
+      }
+      await toggle.focus();
+      await page.keyboard.press("Escape");
+      assert.equal(await toggle.evaluate(el => el === document.activeElement), true);
+      if (viewport.width <= 700) {
+        assert.equal(await page.locator("#rail-scrim").isVisible(), true);
+        assert.equal(await page.locator(".workspace").evaluate(el => el.inert), true);
+      }
+    }
+    assert.deepEqual(writes, []);
+    assert.equal(await page.evaluate(() => Object.keys(chatState.tabs).length), 0);
+    assert.deepEqual(app.pageErrors, []);
+  } finally { await app.close(); }
+});
+
+for (const mobile of [false, true]) test(`New opens shared creation flows and fresh Plans (${mobile ? "mobile" : "desktop"})`, { skip: SKIP }, async () => {
+  let starts = 0;
+  const stops = [];
+  const app = await openApp({ fixture(path) {
+    if (path === "/api/terminal/session") return { id: `plan-${++starts}`, process_id: `process-${starts}`, cwd: "/workspace", provider: "codex" };
+    if (path.startsWith("/api/terminal/")) {
+      if (path.endsWith("/stop")) stops.push(path);
+      if (path.endsWith("/status")) return { alive: true };
+      return { ok: true, output: "", entries: [] };
+    }
+    return apiFixture(path);
+  }});
+  try {
+    const { page } = app;
+    if (mobile) await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(app.origin);
+    await page.locator("#dash").waitFor();
+    const context = await page.evaluate(() => ({ node: state.project.active_node_id, reporter: state.lastReporter }));
+    await page.evaluate(() => {
+      window.newCommands = [];
+      const original = runCommand;
+      runCommand = (id, options) => {
+        newCommands.push({ id, inert: document.querySelector(".workspace").inert,
+          drawer: document.getElementById("navigation-rail").classList.contains("mobile-open"),
+          menus: document.querySelectorAll(".navigation-rail .nav-menu[open]").length });
+        return original(id, options);
+      };
+    });
+    async function select(name) {
+      if (mobile) await page.locator("#mobile-rail-toggle").click();
+      await page.locator("#rail-new-toggle").click();
+      const item = page.getByRole("menuitem", { name, exact: true });
+      if (mobile) {
+        await item.focus();
+        await page.keyboard.press(name === "New Plan" ? "Space" : "Enter");
+      } else await item.click();
+      assert.equal(await page.locator("#rail-new-menu").getAttribute("open"), null);
+    }
+    await select("New Goal");
+    await page.getByTestId("new-goal-modal").waitFor();
+    assert.equal(await page.getByTestId("new-goal-modal").locator(".js-reporter-name").textContent(), context.reporter);
+    assert.equal(await page.getByTestId("new-goal-prompt").evaluate(el => el === document.activeElement), true);
+    await page.getByTestId("new-goal-prompt").fill("Keep this draft");
+    await page.keyboard.press("Escape");
+    await page.getByTestId("modal-cancel").click();
+    assert.equal(await page.getByTestId("new-goal-prompt").inputValue(), "Keep this draft");
+    await page.keyboard.press("Escape");
+    await page.getByTestId("modal-ok").click();
+    await select("New Feature");
+    await page.getByTestId("feature-create-modal").waitFor();
+    assert.equal(await page.getByTestId("feature-reporter").inputValue(), context.reporter);
+    await page.getByTestId("feature-modal-close").click();
+    await select("Import");
+    await page.getByTestId("import-modal").waitFor();
+    assert.equal(await page.getByTestId("import-modal").locator(".js-reporter-name").first().textContent(), context.reporter);
+    await page.keyboard.press("Escape");
+    for (let count = 1; count <= 2; count++) {
+      await select("New Plan");
+      await page.waitForFunction(count => Object.values(chatState.tabs).filter(tab => tab.mode === "plan").length === count && terminalStateFor()?.connected, count);
+      assert.equal(starts, count);
+    }
+    const plans = await page.evaluate(() => Object.entries(chatState.tabs).map(([id]) => ({ id, session: terminalStateFor(id)?.sessionId })));
+    assert.equal(new Set(plans.map(tab => tab.id)).size, 2);
+    assert.equal(new Set(plans.map(tab => tab.session)).size, 2);
+    assert.deepEqual(stops, []);
+    assert.deepEqual(await page.evaluate(() => ({ node: state.project.active_node_id, reporter: state.lastReporter })), context);
+    assert.deepEqual(await page.evaluate(() => newCommands), ["goal.new", "feature.new", "goal.import", "plan.open", "plan.open"].map(id => ({ id, inert: false, drawer: false, menus: 0 })));
+    assert.deepEqual(app.pageErrors, []);
+  } finally { await app.close(); }
+});

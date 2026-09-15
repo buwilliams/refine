@@ -32,6 +32,17 @@
         <button id="btn-command-palette" class="rail-row" type="button" data-testid="command-palette-button" aria-label="Search commands">
           <svg class="rail-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="/static/vendor/lucide/navigation.svg#search"></use></svg><span class="rail-copy">Search</span><kbd class="rail-copy" data-command-shortcut>Ctrl+K</kbd>
         </button>
+        <details class="nav-menu" id="rail-new-menu">
+          <summary id="rail-new-toggle" class="rail-row" aria-label="New" title="New" aria-haspopup="menu" aria-expanded="false" aria-controls="rail-new-options">
+            <svg class="rail-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="/static/vendor/lucide/navigation.svg#plus"></use></svg><span class="rail-copy">New</span>
+          </summary>
+          <div id="rail-new-options" class="nav-menu-panel" role="menu" aria-labelledby="rail-new-toggle">
+            <button type="button" class="nav-menu-item nav-control-item" role="menuitem" tabindex="-1" data-rail-command="goal.new">New Goal</button>
+            <button type="button" class="nav-menu-item nav-control-item" role="menuitem" tabindex="-1" data-rail-command="plan.open">New Plan</button>
+            <button type="button" class="nav-menu-item nav-control-item" role="menuitem" tabindex="-1" data-rail-command="feature.new">New Feature</button>
+            <button type="button" class="nav-menu-item nav-control-item" role="menuitem" tabindex="-1" data-rail-command="goal.import">Import</button>
+          </div>
+        </details>
       <details class="nav-menu nav-context-picker" data-topbar-picker="node">
         <summary class="nav-context-summary nav-picker-summary" aria-label="Choose Node" aria-haspopup="listbox">
           <svg class="rail-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="/static/vendor/lucide/navigation.svg#server"></use></svg><span class="nav-picker-copy rail-copy"><span class="nav-picker-label">Node</span><span data-picker-value>Loading…</span></span>

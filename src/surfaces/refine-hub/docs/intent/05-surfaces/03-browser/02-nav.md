@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Refine uses one persistent left rail and one content area. The logo is centered in its own row. The rail contains Search, Node, Reporter, a Tools menu with an always-visible list of open windows, and three independently collapsible sections: Main, Skills, and Hubs. Dashboard has no separate global navigation.
+Refine uses one persistent left rail and one content area. The logo is centered in its own row. The rail contains Search, New, Node, Reporter, a Tools menu with an always-visible list of open windows, and three independently collapsible sections: Main, Skills, and Hubs. Dashboard has no separate global navigation.
 
 ## Behavior
 
@@ -16,6 +16,10 @@ Refine uses one persistent left rail and one content area. The logo is centered 
 - Dashboard and Goals continue carrying shared current/all Node scope in the URL.
 
 ## Creation, management, and support
+
+New is a full-width row immediately below Search and before Node, independent of collapsible sections. Its anchored menu lists New Goal, New Plan, New Feature, and Import in that order. These use the shared creation commands and their current Node, Reporter, validation, retained drafts, and confirmation behavior. Each New Plan selection opens a fresh Planning Agent session through the existing planning flow. Opening or dismissing the menu creates nothing.
+
+New remains accessible by label and hover title in the collapsed rail. The menu stays within the viewport and supports keyboard opening, arrow navigation, Home/End, and visible focus. Escape dismisses it and restores focus to New; outside clicks and selection also dismiss it. Only one rail menu is open at a time. On mobile, selection closes the drawer and releases its focus trap and workspace inert state before the selected flow opens.
 
 The Tools dropdown offers Agent, Agent in Worktree, System, Files, Todo List, Terminal, and Planning Agent. Goal-specific agent and log windows remain available from their existing actions. Repeated agent launches create independent sessions. Opening or closing the Tools dropdown does not hide existing windows. Context menus align to the top of their opening row and shift upward as needed to stay within the viewport. Node and Reporter menus identify their context with a heading; Add Node and Add Reporter open the shared creation flows.
 
