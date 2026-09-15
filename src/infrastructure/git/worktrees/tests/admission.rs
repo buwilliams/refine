@@ -349,6 +349,7 @@ fn goal_agent_rejects_changed_workspace_before_resumed_or_fresh_provider_launch(
     ] {
         let error = run_goal_agent(
             GoalAgentLaunch {
+                refine_dir: None,
                 runtime_root: runtime.clone(),
                 cwd: f.workspace.path.clone(),
                 provider: "uninstalled-provider".into(),
@@ -384,6 +385,7 @@ fn provider_resume_uses_explicit_admitted_cwd_and_rejects_lost_registration() {
     fs::write(bin.join("codex"), "#!/bin/sh\npwd > resumed-cwd\n").unwrap();
     fs::set_permissions(bin.join("codex"), fs::Permissions::from_mode(0o755)).unwrap();
     let service = HostAgentProviderService {
+        refine_dir: None,
         path_override: Some(bin.to_string_lossy().into()),
         runtime_root: Some(f.temp.join("runtime")),
     };

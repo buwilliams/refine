@@ -1,6 +1,31 @@
 use super::*;
 
 impl InProcessWebServer {
+    pub(crate) fn handle_providers_get(&self) -> ApiResponse {
+        let root = require_refine_dir!(self, "read AI providers");
+        let result = self
+            .settings_service(&root)
+            .provider_override()
+            .and_then(|node| {
+                crate::application::agents::providers::response(&root, node.as_deref())
+            });
+        match result {
+            Ok(value) => ApiResponse::json(200, value),
+            Err(error) => error_response(error),
+        }
+    }
+
+    pub(crate) fn handle_providers_save(&self, request: ApiRequest) -> ApiResponse {
+        let root = require_refine_dir!(self, "edit AI providers");
+        match crate::application::agents::providers::save(
+            &root,
+            &request.body.unwrap_or(Value::Null),
+        ) {
+            Ok(_) => self.handle_providers_get(),
+            Err(error) => error_response(error),
+        }
+    }
+
     pub(crate) fn handle_settings_get(&self) -> ApiResponse {
         let refine_dir = require_refine_dir!(self, "read settings");
         match self.settings_service(refine_dir).list_response() {

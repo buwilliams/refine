@@ -143,7 +143,7 @@ impl InProcessWebServer {
         let provider = settings
             .get("agent_cli")
             .and_then(Value::as_str)
-            .unwrap_or("claude")
+            .unwrap_or_default()
             .to_string();
         let target_root = match self.current_target_root() {
             Ok(Some(target_root)) => target_root,
@@ -433,28 +433,7 @@ impl InProcessWebServer {
 }
 
 fn effective_chat_provider(configured: Option<String>) -> Option<String> {
-    let configured = configured
-        .map(|value| value.trim().to_string())
-        .filter(|value| !value.is_empty());
-    let status = provider_status_value().ok()?;
-    let providers = status.get("providers").and_then(Value::as_array);
-    let configured_installed = configured.as_deref().is_some_and(|configured| {
-        providers.into_iter().flatten().any(|provider| {
-            provider.get("name").and_then(Value::as_str) == Some(configured)
-                && provider
-                    .get("installed")
-                    .and_then(Value::as_bool)
-                    .unwrap_or(false)
-        })
-    });
-    if configured_installed {
-        return configured;
-    }
-    status
-        .get("selected_provider")
-        .and_then(Value::as_str)
-        .map(str::to_string)
-        .or(configured)
+    configured.filter(|s| !s.is_empty())
 }
 
 fn chat_queue_path_parts(path: &str) -> Option<(&str, &str)> {

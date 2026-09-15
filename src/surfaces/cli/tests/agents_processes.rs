@@ -21,5 +21,5 @@ fn agent_configure_and_diagnose_use_provider_service() {
         ])
         .unwrap(),
     )
-    .unwrap();
+    .unwrap_err();
 }

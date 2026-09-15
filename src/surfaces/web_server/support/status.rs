@@ -1,6 +1,4 @@
 use std::path::Path;
-use std::sync::{Mutex, OnceLock};
-use std::time::{Duration, Instant};
 
 use serde_json::{Value, json};
 
@@ -12,24 +10,13 @@ pub(in crate::surfaces::web_server) use crate::application::diagnostics::process
 use crate::application::projects::registry::registry_apps_array;
 use crate::application::system::installation::InstallTarget;
 use crate::error::RefineResult;
-use crate::infrastructure::agents::invocation::{AgentProviderService, HostAgentProviderService};
+use crate::infrastructure::agents::invocation::AgentProviderService;
 use crate::infrastructure::observability::metrics::{FileMetricsService, PerformanceQuery};
 use crate::infrastructure::process::subprocess::ManagedProcess;
 use crate::infrastructure::process::supervisor::operations::OperationHandle;
 use crate::model::JsonObject;
 
 use super::super::*;
-use super::*;
-
-const PROVIDER_STATUS_CACHE_TTL: Duration = Duration::from_secs(30);
-
-#[derive(Clone, Debug)]
-struct ProviderStatusCacheEntry {
-    value: Value,
-    refreshed_at: Instant,
-}
-
-static PROVIDER_STATUS_CACHE: OnceLock<Mutex<Option<ProviderStatusCacheEntry>>> = OnceLock::new();
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(in crate::surfaces::web_server) struct RuntimeReconcileSummary {
@@ -125,14 +112,15 @@ pub(in crate::surfaces::web_server) fn provider_id_required() -> ApiResponse {
     )
 }
 
-pub(in crate::surfaces::web_server) fn agent_provider_from_path<'a>(
-    path: &'a str,
+pub(in crate::surfaces::web_server) fn agent_provider_from_path(
+    path: &str,
     suffix: &str,
-) -> Option<&'a str> {
+) -> Option<String> {
     path.strip_prefix("/agents/")
         .and_then(|path| path.strip_suffix(&format!("/{suffix}")))
         .map(str::trim)
         .filter(|provider| !provider.is_empty() && !provider.contains('/'))
+        .map(super::percent_decode)
 }
 
 pub(in crate::surfaces::web_server) fn chat_session_id_required() -> ApiResponse {
@@ -201,69 +189,25 @@ pub(in crate::surfaces::web_server) fn operation_response(
     })
 }
 
-pub(in crate::surfaces::web_server) fn provider_status_response() -> ApiResponse {
-    match provider_status_value() {
-        Ok(value) => ApiResponse::json(200, value),
-        Err(error) => error_response(error),
+impl super::super::InProcessWebServer {
+    pub(in crate::surfaces::web_server) fn provider_status_value(&self) -> RefineResult<Value> {
+        let service = self.agent_provider_service()?;
+        let selected_id = service.selected_provider_id("")?;
+        let providers = service.detect()?;
+        let selected = providers.iter().find(|p| p.name == selected_id);
+        let ok = selected.is_some_and(|p| p.installed);
+        let message = if ok {
+            format!("{selected_id} CLI detected")
+        } else {
+            format!(
+                "Configured AI provider {selected_id} is unavailable; install its executable on this host or edit Settings > Runtime"
+            )
+        };
+        Ok(
+            json!({"ok":ok,"stage":"provider_detection","message":message,
+            "selected_provider":selected_id,"providers":providers}),
+        )
     }
-}
-
-pub(in crate::surfaces::web_server) fn provider_status_response_refresh() -> ApiResponse {
-    match provider_status_value_refresh() {
-        Ok(value) => ApiResponse::json(200, value),
-        Err(error) => error_response(error),
-    }
-}
-
-pub(in crate::surfaces::web_server) fn provider_status_value() -> RefineResult<Value> {
-    cached_provider_status_value(false)
-}
-
-pub(in crate::surfaces::web_server) fn provider_status_value_refresh() -> RefineResult<Value> {
-    cached_provider_status_value(true)
-}
-
-fn cached_provider_status_value(refresh: bool) -> RefineResult<Value> {
-    let cache = PROVIDER_STATUS_CACHE.get_or_init(|| Mutex::new(None));
-    let mut cache = cache.lock().map_err(|_| {
-        crate::error::RefineError::Io("provider status cache lock was poisoned".to_string())
-    })?;
-    if !refresh
-        && let Some(entry) = cache.as_ref()
-        && entry.refreshed_at.elapsed() < PROVIDER_STATUS_CACHE_TTL
-    {
-        return Ok(entry.value.clone());
-    }
-    let value = fresh_provider_status_value()?;
-    *cache = Some(ProviderStatusCacheEntry {
-        value: value.clone(),
-        refreshed_at: Instant::now(),
-    });
-    Ok(value)
-}
-
-fn fresh_provider_status_value() -> RefineResult<Value> {
-    let service = HostAgentProviderService::new();
-    let providers = service.detect()?;
-    let selected = providers
-        .iter()
-        .find(|provider| provider.installed)
-        .or_else(|| providers.iter().find(|provider| provider.name == "claude"));
-    let ok = selected.map(|provider| provider.installed).unwrap_or(false);
-    let message = if ok {
-        selected
-            .map(|provider| format!("{} CLI detected", provider.display_name))
-            .unwrap_or_else(|| "provider detected".to_string())
-    } else {
-        "No supported provider CLI detected on PATH".to_string()
-    };
-    Ok(json!({
-        "ok": ok,
-        "stage": "provider_detection",
-        "message": message,
-        "selected_provider": selected.map(|provider| provider.name.clone()).unwrap_or_else(|| "claude".to_string()),
-        "providers": providers
-    }))
 }
 
 pub(in crate::surfaces::web_server) fn performance_report_value(

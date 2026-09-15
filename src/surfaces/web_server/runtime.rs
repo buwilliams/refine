@@ -90,11 +90,14 @@ impl InProcessWebServer {
         })
     }
 
-    pub(super) fn agent_provider_service(&self) -> HostAgentProviderService {
-        self.runtime_root
+    pub(super) fn agent_provider_service(&self) -> RefineResult<HostAgentProviderService> {
+        let mut service = self
+            .runtime_root
             .as_ref()
             .map(HostAgentProviderService::with_runtime_root)
-            .unwrap_or_default()
+            .unwrap_or_default();
+        service.refine_dir = self.current_refine_dir()?;
+        Ok(service)
     }
 
     pub(super) fn current_git_sync_service(&self) -> RefineResult<Option<FileGitSyncService>> {
@@ -336,7 +339,7 @@ impl InProcessWebServer {
             }
             Err(_) => None,
         };
-        let preflight = provider_status_value().ok().and_then(value_object);
+        let preflight = self.provider_status_value().ok().and_then(value_object);
         Ok(RuntimeProjection {
             supervisor: value_object(process),
             processes,

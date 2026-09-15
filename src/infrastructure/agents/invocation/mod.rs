@@ -34,13 +34,7 @@ pub struct ProviderCapability {
     pub prompt_transport: ProviderPromptCapability,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ProviderPromptCapability {
-    NativeStdin,
-    #[default]
-    InlineOrFile,
-}
+pub use crate::model::providers::ProviderPromptCapability;
 
 /// Provider-native session continuity for interactive Goal Agent launches.
 ///

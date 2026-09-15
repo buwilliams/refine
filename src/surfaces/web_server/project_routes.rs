@@ -67,17 +67,7 @@ pub(in crate::surfaces::web_server) fn configured_provider_from_settings(
                     .map(str::to_string)
             })
         })
-        .or_else(|| {
-            provider_status_value().ok().and_then(|status| {
-                status
-                    .get("selected_provider")
-                    .and_then(Value::as_str)
-                    .map(str::trim)
-                    .filter(|provider| !provider.is_empty())
-                    .map(str::to_string)
-            })
-        })
-        .unwrap_or_else(|| "claude".to_string())
+        .unwrap_or_default()
 }
 
 pub(super) fn dashboard_attention_items(

@@ -2,7 +2,10 @@ use super::*;
 
 impl InProcessWebServer {
     pub(in crate::surfaces::web_server) fn handle_agents(&self) -> ApiResponse {
-        provider_status_response()
+        match self.provider_status_value() {
+            Ok(value) => ApiResponse::json(200, value),
+            Err(error) => error_response(error),
+        }
     }
 
     pub(in crate::surfaces::web_server) fn handle_agent_diagnostics(
@@ -12,7 +15,12 @@ impl InProcessWebServer {
         let Some(provider) = agent_provider_from_path(&request.path, "diagnostics") else {
             return provider_id_required();
         };
-        match HostAgentProviderService::new().diagnose(provider) {
+        match (match self.agent_provider_service() {
+            Ok(service) => service,
+            Err(error) => return error_response(error),
+        })
+        .diagnose(&provider)
+        {
             Ok(diagnostics) => ApiResponse::json(
                 200,
                 json!({
@@ -32,7 +40,12 @@ impl InProcessWebServer {
         let Some(provider) = agent_provider_from_path(&request.path, "configure") else {
             return provider_id_required();
         };
-        match HostAgentProviderService::new().configure(provider) {
+        match (match self.agent_provider_service() {
+            Ok(service) => service,
+            Err(error) => return error_response(error),
+        })
+        .configure(&provider)
+        {
             Ok(()) => ApiResponse::json(
                 200,
                 json!({
@@ -80,7 +93,11 @@ impl InProcessWebServer {
             Ok(prompt) => prompt,
             Err(error) => return error_response(error),
         };
-        match self.agent_provider_service().invoke(ProviderInvocation {
+        match (match self.agent_provider_service() {
+            Ok(service) => service,
+            Err(error) => return error_response(error),
+        })
+        .invoke(ProviderInvocation {
             stall_timeout_seconds: None,
             provider: provider.to_string(),
             prompt: prompt.to_string(),
@@ -106,7 +123,12 @@ impl InProcessWebServer {
                 "agent resume requires session_id".to_string(),
             ));
         };
-        match self.agent_provider_service().resume(provider, session_id) {
+        match (match self.agent_provider_service() {
+            Ok(service) => service,
+            Err(error) => return error_response(error),
+        })
+        .resume(&provider, session_id)
+        {
             Ok(output) => ApiResponse::json(200, json!({"ok": true, "output": output})),
             Err(error) => error_response(error),
         }
@@ -124,7 +146,12 @@ impl InProcessWebServer {
         let Some(provider) = agent_provider_from_path(&request.path, suffix) else {
             return provider_id_required();
         };
-        match HostAgentProviderService::new().authenticate(provider) {
+        match (match self.agent_provider_service() {
+            Ok(service) => service,
+            Err(error) => return error_response(error),
+        })
+        .authenticate(&provider)
+        {
             Ok(()) => ApiResponse::json(
                 200,
                 json!({
@@ -138,7 +165,7 @@ impl InProcessWebServer {
     }
 
     pub(in crate::surfaces::web_server) fn handle_recheck_auth(&self) -> ApiResponse {
-        provider_status_response_refresh()
+        self.handle_agents()
     }
 
     pub(in crate::surfaces::web_server) fn handle_agent_secrets_status(&self) -> ApiResponse {

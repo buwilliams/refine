@@ -690,7 +690,7 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
-    fn interactive_pty_reads_oversized_prompt_from_owned_file() {
+    fn configured_interactive_pty_reads_oversized_prompt_from_owned_file() {
         let root =
             std::env::temp_dir().join(format!("refine-terminal-large-prompt-{}", Uuid::new_v4()));
         let runtime_root = root.join("run");
@@ -707,12 +707,19 @@ mod tests {
         )
         .unwrap();
         fs::set_permissions(&provider, fs::Permissions::from_mode(0o755)).unwrap();
+        let refine_dir = root.join("state");
+        let mut catalog = crate::model::providers::defaults();
+        let mut custom = crate::model::providers::ProviderDefinition::generic("TerminalFixture");
+        custom.executable = provider.to_string_lossy().into_owned();
+        catalog.providers.push(custom);
+        crate::application::agents::providers::save(&refine_dir, &json!(catalog)).unwrap();
         let service = crate::infrastructure::agents::invocation::HostAgentProviderService {
+            refine_dir: Some(refine_dir),
             path_override: Some(bin_dir.display().to_string()),
             runtime_root: Some(runtime_root.clone()),
         };
         let command = service
-            .interactive_command("smoke-ai", &"x".repeat(158_078))
+            .interactive_command("TerminalFixture", &"x".repeat(158_078))
             .unwrap();
         let artifact_path = command
             .prompt_artifact
@@ -725,7 +732,7 @@ mod tests {
                 runtime_root: runtime_root.clone(),
                 cwd: root.clone(),
                 profile: "agent".to_string(),
-                provider: Some("smoke-ai".to_string()),
+                provider: Some("TerminalFixture".to_string()),
                 command: command.binary,
                 args: command.args,
                 metadata: Map::new(),
@@ -796,6 +803,7 @@ mod tests {
         );
         let expected_digest = format!("{:x}", Sha256::digest(prompt.as_bytes()));
         let service = crate::infrastructure::agents::invocation::HostAgentProviderService {
+            refine_dir: None,
             path_override: Some(bin_dir.display().to_string()),
             runtime_root: Some(runtime_root.clone()),
         };

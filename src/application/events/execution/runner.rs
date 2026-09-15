@@ -88,7 +88,19 @@ impl FileEventService {
         }
         let runtime = self.runtime()?;
         #[cfg(test)]
-        if invocation.context.provider != "smoke-ai" {
+        if invocation.context.provider != "smoke-ai"
+            && !std::env::var("REFINE_SMOKE_AI_PATH")
+                .ok()
+                .is_some_and(|fixture| {
+                    crate::infrastructure::storage::providers::ProviderStore::new(&self.refine_dir)
+                        .load()
+                        .ok()
+                        .and_then(|catalog| {
+                            catalog.provider(&invocation.context.provider).ok().cloned()
+                        })
+                        .is_some_and(|provider| provider.executable == fixture)
+                })
+        {
             return Err(RefineError::InvalidInput(
                 "Event tests require an explicit smoke-ai provider fixture".into(),
             ));

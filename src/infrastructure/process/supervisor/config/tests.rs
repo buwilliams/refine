@@ -40,6 +40,15 @@ fn file_settings_service_lists_defaults_and_persists_updates() {
     assert!(updated["settings"].get("paused").is_none());
     assert!(service.path().exists());
     assert!(!refine_dir.join(SETTINGS_FILE).exists());
+    let mut catalog = crate::model::providers::defaults();
+    catalog
+        .providers
+        .push(crate::model::providers::ProviderDefinition::generic(
+            "/opt/refine/custom-agent",
+        ));
+    crate::infrastructure::storage::providers::ProviderStore::new(&service.refine_dir)
+        .save(catalog)
+        .unwrap();
     let generic = service
         .update(&serde_json::json!({"agent_cli": "/opt/refine/custom-agent"}))
         .unwrap();

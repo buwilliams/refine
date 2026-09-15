@@ -590,6 +590,7 @@ pub(super) fn explicit_target_root_path(command: &Commands) -> Option<&PathBuf> 
         Commands::Skills { .. } | Commands::Templates { .. } | Commands::Hub { .. } => None,
         Commands::Config { action } => match action {
             ConfigAction::Show { target_root, .. } => target_root.as_ref(),
+            ConfigAction::Providers { .. } => None,
             ConfigAction::Settings { action } => match action {
                 ConfigSettingsAction::Show { target_root }
                 | ConfigSettingsAction::Set { target_root, .. } => target_root.as_ref(),

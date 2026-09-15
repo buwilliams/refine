@@ -107,6 +107,10 @@ pub const API_GROUPS: &[ApiRouteGroup] = &[
         capability: "sessions, messages, streaming events",
     },
     ApiRouteGroup {
+        prefix: "/providers",
+        capability: "shared CLI provider catalog and effective node selection",
+    },
+    ApiRouteGroup {
         prefix: "/settings",
         capability: "project and runtime settings",
     },

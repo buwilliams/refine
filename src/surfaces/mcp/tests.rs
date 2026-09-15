@@ -309,7 +309,9 @@ fn round_delete_tool_maps_exact_round_and_revision_to_shared_capability() {
 
 #[test]
 fn metrics_refresh_tool_supplies_the_shared_routes_required_json_body() {
-    let response = call(json!({"jsonrpc":"2.0","id":32,"method":"tools/call","params":{"name":"refine_refresh_hub_metrics","arguments":{}}}));
+    let response = call(
+        json!({"jsonrpc":"2.0","id":32,"method":"tools/call","params":{"name":"refine_refresh_hub_metrics","arguments":{}}}),
+    );
     let request = &response["result"]["structuredContent"];
     assert_eq!(request["method"], "POST");
     assert_eq!(request["path"], "/api/hub/metrics/refresh");

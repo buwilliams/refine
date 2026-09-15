@@ -24,9 +24,7 @@ use crate::application::system::source_promotion::{
 use crate::application::workers::{BackgroundWorkerEnsure, FileRunnerWorkerService};
 use crate::application::workflow::WorkflowEngine;
 use crate::error::{RefineError, RefineResult};
-use crate::infrastructure::agents::invocation::{
-    AgentProviderService, HostAgentProviderService, ProviderInvocation,
-};
+use crate::infrastructure::agents::invocation::{AgentProviderService, ProviderInvocation};
 use crate::infrastructure::process::subprocess::FileProcessSupervisor;
 use crate::infrastructure::process::supervisor::lifecycle::BackgroundDaemonConfig;
 use crate::infrastructure::process::supervisor::operations::{

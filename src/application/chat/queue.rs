@@ -158,6 +158,7 @@ impl FileChatService {
 
             let operation = self.register_provider_operation(&record, "invoke")?;
             let provider = HostAgentProviderService {
+                refine_dir: Some(self.refine_dir.clone()),
                 path_override: self.provider_path_override(),
                 runtime_root: Some(self.runtime_root.join("agents")),
             };

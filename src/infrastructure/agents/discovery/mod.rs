@@ -6,6 +6,8 @@ use crate::infrastructure::agents::invocation::{
     ProviderPromptCapability, ProviderSessionContinuity,
 };
 
+use crate::model::providers::{LaunchMode, ProviderDefinition, expand};
+
 #[derive(Clone, Debug)]
 pub(crate) struct ProviderSpec {
     pub(crate) name: String,
@@ -14,201 +16,87 @@ pub(crate) struct ProviderSpec {
     pub(crate) output_format: String,
     pub(crate) supports_resume: bool,
     pub(crate) supports_direct_api: bool,
+    pub(crate) definition: ProviderDefinition,
 }
-
-impl ProviderSpec {
-    pub(crate) fn new(
-        name: &str,
-        display_name: &str,
-        binary: &str,
-        output_format: &str,
-        supports_resume: bool,
-        supports_direct_api: bool,
-    ) -> Self {
+impl From<ProviderDefinition> for ProviderSpec {
+    fn from(definition: ProviderDefinition) -> Self {
         Self {
-            name: name.to_string(),
-            display_name: display_name.to_string(),
-            binary: binary.to_string(),
-            output_format: output_format.to_string(),
-            supports_resume,
-            supports_direct_api,
+            name: definition.id.clone(),
+            display_name: definition.name.clone(),
+            binary: definition.executable.clone(),
+            output_format: definition.output_format.clone(),
+            supports_resume: definition.automated.resume_args.is_some(),
+            supports_direct_api: false,
+            definition,
         }
     }
-
-    pub(crate) fn agent_args(
-        &self,
-        binary_path: &str,
-        prompt: &str,
-        cwd: Option<&Path>,
-    ) -> Vec<String> {
-        match self.name.as_str() {
-            "claude" => vec![
-                binary_path.to_string(),
-                "--print".to_string(),
-                "--output-format=stream-json".to_string(),
-                "--verbose".to_string(),
-                "--dangerously-skip-permissions".to_string(),
-                prompt.to_string(),
-            ],
-            "codex" => {
-                let mut args = vec![
-                    binary_path.to_string(),
-                    "exec".to_string(),
-                    "--dangerously-bypass-approvals-and-sandbox".to_string(),
-                    "--color".to_string(),
-                    "never".to_string(),
-                    "--json".to_string(),
-                ];
-                if let Some(cwd) = cwd {
-                    args.extend(["-C".to_string(), cwd.display().to_string()]);
-                }
-                if !prompt.is_empty() {
-                    args.push("-".to_string());
-                }
-                args
-            }
-            "gemini" => vec![
-                binary_path.to_string(),
-                "--yolo".to_string(),
-                "-p".to_string(),
-                prompt.to_string(),
-            ],
-            "copilot" => {
-                let mut args = vec![
-                    binary_path.to_string(),
-                    "--allow-all".to_string(),
-                    "--output-format".to_string(),
-                    "json".to_string(),
-                    "--no-color".to_string(),
-                    "--no-auto-update".to_string(),
-                ];
-                if let Some(cwd) = cwd {
-                    args.extend(["-C".to_string(), cwd.display().to_string()]);
-                }
-                args.extend(["-p".to_string(), prompt.to_string()]);
-                args
-            }
-            "smoke-ai" => vec![binary_path.to_string(), prompt.to_string()],
-            _ => vec![binary_path.to_string(), prompt.to_string()],
-        }
-    }
-
-    /// Whether the interactive CLI accepts a caller-chosen session identifier,
-    /// which is what lets one workflow step resume another step's session.
+}
+impl ProviderSpec {
     pub(crate) fn supports_interactive_session_continuity(&self) -> bool {
-        self.name == "claude"
+        self.definition.interactive.pin_args.is_some()
+            && self.definition.interactive.resume_args.is_some()
     }
-
     pub(crate) fn interactive_args(
         &self,
         prompt: &str,
         session: Option<&ProviderSessionContinuity>,
     ) -> Vec<String> {
-        let session_args = match (self.name.as_str(), session) {
-            ("claude", Some(ProviderSessionContinuity::Pin(session_id))) => {
-                vec!["--session-id".to_string(), session_id.clone()]
-            }
-            ("claude", Some(ProviderSessionContinuity::Resume(session_id))) => {
-                vec!["--resume".to_string(), session_id.clone()]
-            }
-            _ => Vec::new(),
+        let (pin, resume) = match session {
+            Some(ProviderSessionContinuity::Pin(id)) => (Some(id.as_str()), None),
+            Some(ProviderSessionContinuity::Resume(id)) => (None, Some(id.as_str())),
+            None => (None, None),
         };
-        match self.name.as_str() {
-            "claude" => with_initial_prompt(
-                [
-                    session_args,
-                    vec!["--dangerously-skip-permissions".to_string()],
-                ]
-                .concat(),
-                prompt,
-                false,
-            ),
-            "codex" => with_initial_prompt(
-                vec!["--dangerously-bypass-approvals-and-sandbox".to_string()],
-                prompt,
-                false,
-            ),
-            "gemini" => with_initial_prompt(vec!["--yolo".to_string()], prompt, true),
-            "copilot" => with_initial_prompt(vec!["--allow-all".to_string()], prompt, true),
-            "smoke-ai" => with_initial_prompt(Vec::new(), prompt, false),
-            _ => with_initial_prompt(Vec::new(), prompt, false),
-        }
+        render_args(&self.definition.interactive, prompt, None, pin, resume)
     }
-
     pub(crate) fn chat_args(
         &self,
-        binary_path: &str,
+        binary: &str,
         prompt: &str,
-        session_id: Option<&str>,
+        session: Option<&str>,
         cwd: Option<&Path>,
     ) -> Vec<String> {
-        match self.name.as_str() {
-            "claude" => {
-                let mut args = vec![
-                    binary_path.to_string(),
-                    "--print".to_string(),
-                    "--output-format=stream-json".to_string(),
-                    "--verbose".to_string(),
-                    "--dangerously-skip-permissions".to_string(),
-                ];
-                if let Some(session_id) = session_id {
-                    args.extend(["--resume".to_string(), session_id.to_string()]);
-                }
-                if !prompt.is_empty() {
-                    args.push(prompt.to_string());
-                }
-                args
-            }
-            "codex" if session_id.is_some() => {
-                let mut args = vec![
-                    binary_path.to_string(),
-                    "exec".to_string(),
-                    "resume".to_string(),
-                    "--dangerously-bypass-approvals-and-sandbox".to_string(),
-                    "--json".to_string(),
-                    session_id.unwrap_or_default().to_string(),
-                ];
-                if !prompt.is_empty() {
-                    args.push("-".to_string());
-                }
-                args
-            }
-            "copilot" if session_id.is_some() => {
-                let mut args = vec![
-                    binary_path.to_string(),
-                    "--allow-all".to_string(),
-                    "--output-format".to_string(),
-                    "json".to_string(),
-                    "--no-color".to_string(),
-                    "--no-auto-update".to_string(),
-                ];
-                if let Some(cwd) = cwd {
-                    args.extend(["-C".to_string(), cwd.display().to_string()]);
-                }
-                args.push(format!("--resume={}", session_id.unwrap_or_default()));
-                if !prompt.is_empty() {
-                    args.extend(["-p".to_string(), prompt.to_string()]);
-                }
-                args
-            }
-            _ => self.agent_args(binary_path, prompt, cwd),
-        }
+        std::iter::once(binary.to_string())
+            .chain(render_args(
+                &self.definition.automated,
+                prompt,
+                cwd,
+                None,
+                session,
+            ))
+            .collect()
     }
-
     pub(crate) fn interactive_prompt_capability(&self) -> ProviderPromptCapability {
-        // Every interactive provider receives an initial prompt in argv today,
-        // so built-ins and configured generic CLIs share the file fallback.
-        ProviderPromptCapability::InlineOrFile
+        self.definition.interactive.transport.clone()
     }
-
     pub(crate) fn noninteractive_prompt_capability(&self) -> ProviderPromptCapability {
-        match self.name.as_str() {
-            "codex" => ProviderPromptCapability::NativeStdin,
-            // Claude, Gemini, Copilot, smoke-ai, and configured generic CLIs
-            // put their complete noninteractive prompt in argv.
-            _ => ProviderPromptCapability::InlineOrFile,
-        }
+        self.definition.automated.transport.clone()
     }
+}
+fn render_args(
+    mode: &LaunchMode,
+    context: &str,
+    cwd: Option<&Path>,
+    pin: Option<&str>,
+    resume: Option<&str>,
+) -> Vec<String> {
+    let cwd_text = cwd
+        .map(|p| p.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let render = |a: &String| expand(a, context, &cwd_text, resume.or(pin).unwrap_or_default());
+    let mut args = Vec::new();
+    if pin.is_some() {
+        args.extend(mode.pin_args.iter().flatten().map(&render));
+    }
+    let base = resume.and(mode.resume_args.as_ref()).unwrap_or(&mode.args);
+    args.extend(base.iter().map(&render));
+    // Codex resume intentionally omits cwd flags; other modes can retain them.
+    if cwd.is_some() && (resume.is_none() || mode.cwd_on_resume) {
+        args.extend(mode.cwd_args.iter().map(&render));
+    }
+    if !context.is_empty() {
+        args.extend(mode.context_args.iter().map(&render));
+    }
+    args
 }
 
 pub(crate) fn safe_authorization_command(
@@ -221,17 +109,6 @@ pub(crate) fn safe_authorization_command(
         "{} {mode} [refine-managed-prompt kind={:?} bytes={} sha256={}]",
         binary, transport.kind, transport.utf8_bytes, transport.sha256
     )
-}
-
-fn with_initial_prompt(mut args: Vec<String>, prompt: &str, interactive_flag: bool) -> Vec<String> {
-    if prompt.trim().is_empty() {
-        return args;
-    }
-    if interactive_flag {
-        args.push("-i".to_string());
-    }
-    args.push(prompt.to_string());
-    args
 }
 
 pub(crate) fn find_executable(binary: &str, path_override: Option<&str>) -> Option<PathBuf> {

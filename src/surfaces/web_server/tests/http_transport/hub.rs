@@ -170,20 +170,55 @@ fn hub_uploads_cross_the_real_http_boundary_without_json_byte_arrays() {
 
 #[test]
 fn metrics_hub_hosts_assets_refreshes_and_serves_saved_aggregates() {
-    let temp=unique_temp_dir("http-metrics-hub");
+    let temp = unique_temp_dir("http-metrics-hub");
     fs::create_dir_all(temp.join(".refine")).unwrap();
-    let mut server=server_with_projection(); server.target_root=Some(temp.clone()); server.runtime_root=Some(temp.join("runtime"));
-    let daemon=LocalHttpDaemon::new(server,None);
-    let request=|method:&str,path:&str| HttpRequest { method:method.into(),path:path.into(),headers:BTreeMap::new(),body:if method=="POST" {Some(b"{}".to_vec())}else{None} };
-    for path in ["/hub/sites/refine-metrics/","/hub/sites/refine-metrics/metrics.css","/hub/sites/refine-metrics/metrics.js"] {
-        assert_eq!(daemon.handle_wire_request(request("GET",path)).status,200,"{path}");
+    let mut server = server_with_projection();
+    server.target_root = Some(temp.clone());
+    server.runtime_root = Some(temp.join("runtime"));
+    let daemon = LocalHttpDaemon::new(server, None);
+    let request = |method: &str, path: &str| HttpRequest {
+        method: method.into(),
+        path: path.into(),
+        headers: BTreeMap::new(),
+        body: if method == "POST" {
+            Some(b"{}".to_vec())
+        } else {
+            None
+        },
+    };
+    for path in [
+        "/hub/sites/refine-metrics/",
+        "/hub/sites/refine-metrics/metrics.css",
+        "/hub/sites/refine-metrics/metrics.js",
+    ] {
+        assert_eq!(
+            daemon.handle_wire_request(request("GET", path)).status,
+            200,
+            "{path}"
+        );
     }
-    let before=daemon.handle_wire_request(request("GET","/hub/sites/refine-metrics/data.json"));
-    assert!(serde_json::from_slice::<serde_json::Value>(&before.body).unwrap()["generated_at"].is_null());
-    let refreshed=daemon.handle_wire_request(request("POST","/api/hub/metrics/refresh"));
-    assert_eq!(refreshed.status,200,"{}",String::from_utf8_lossy(&refreshed.body));
-    let saved=daemon.handle_wire_request(request("GET","/hub/sites/refine-metrics/data.json"));
-    assert_eq!(serde_json::from_slice::<serde_json::Value>(&saved.body).unwrap(),serde_json::from_slice::<serde_json::Value>(&refreshed.body).unwrap());
-    assert_eq!(daemon.handle_wire_request(request("POST","/hub/sites/refine-metrics/data.json")).status,400);
+    let before = daemon.handle_wire_request(request("GET", "/hub/sites/refine-metrics/data.json"));
+    assert!(
+        serde_json::from_slice::<serde_json::Value>(&before.body).unwrap()["generated_at"]
+            .is_null()
+    );
+    let refreshed = daemon.handle_wire_request(request("POST", "/api/hub/metrics/refresh"));
+    assert_eq!(
+        refreshed.status,
+        200,
+        "{}",
+        String::from_utf8_lossy(&refreshed.body)
+    );
+    let saved = daemon.handle_wire_request(request("GET", "/hub/sites/refine-metrics/data.json"));
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&saved.body).unwrap(),
+        serde_json::from_slice::<serde_json::Value>(&refreshed.body).unwrap()
+    );
+    assert_eq!(
+        daemon
+            .handle_wire_request(request("POST", "/hub/sites/refine-metrics/data.json"))
+            .status,
+        400
+    );
     fs::remove_dir_all(temp).unwrap();
 }

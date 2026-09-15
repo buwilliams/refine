@@ -9,6 +9,17 @@ fn events_skills_and_runtime_command_trees_parse_and_retired_editors_are_rejecte
     for args in [
         vec!["refine", "config", "show"],
         vec!["refine", "config", "show", "skills"],
+        vec!["refine", "config", "providers", "show"],
+        vec!["refine", "config", "providers", "select"],
+        vec!["refine", "config", "providers", "select", "CustomAgent"],
+        vec![
+            "refine",
+            "config",
+            "providers",
+            "save",
+            "--file",
+            "providers.json",
+        ],
         vec![
             "refine",
             "config",
@@ -97,7 +108,7 @@ fn config_help_documents_scope_boundary_and_catalogs_every_family() {
         .iter()
         .map(|command| command["name"].as_str().unwrap())
         .collect::<Vec<_>>();
-    assert_eq!(names, ["show", "settings"]);
+    assert_eq!(names, ["show", "settings", "providers"]);
 }
 
 #[test]
@@ -134,7 +145,18 @@ fn config_target_root_adapter_uses_shared_services_and_returns_saved_readback() 
         .into_config(),
     )
     .unwrap();
-    assert_eq!(all["skills"]["items"].as_array().unwrap().len(), 4);
+    let skills = all["skills"]["items"].as_array().unwrap();
+    for id in [
+        "default-plan",
+        "default-implement",
+        "default-quality",
+        "default-governance",
+    ] {
+        assert!(
+            skills.iter().any(|skill| skill["id"] == id),
+            "missing {id}: {all}"
+        );
+    }
     assert!(all.get("events").is_none());
     assert!(all.get("governance").is_none());
     fs::remove_dir_all(root).unwrap();

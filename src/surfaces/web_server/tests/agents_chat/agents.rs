@@ -272,17 +272,12 @@ fn web_server_reports_provider_diagnostics_for_agents_and_recheck() {
         path: "/api/agents/configured-generic-agent/diagnostics".to_string(),
         body: None,
     });
-    assert_eq!(generic.status, 200);
-    assert_eq!(generic.body["provider"], "configured-generic-agent");
+    assert_eq!(generic.status, 400);
     assert!(
-        generic.body["diagnostics"]
-            .as_array()
+        generic.body["error"]["message"]
+            .as_str()
             .unwrap()
-            .iter()
-            .any(|entry| entry
-                .as_str()
-                .unwrap_or("")
-                .contains("configured-generic-agent CLI not found"))
+            .contains("not configured")
     );
 
     let recheck = server.handle(ApiRequest {

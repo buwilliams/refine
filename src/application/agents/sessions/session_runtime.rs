@@ -438,6 +438,15 @@ where
         // auth failure reads as an opaque non-zero exit, which is what made this
         // look like a capacity or liveness problem instead of a config one.
         let detail = crate::infrastructure::process::agent_env::auth_failure_hint(&output)
+            .or_else(|| {
+                // A configured executable can exist while its interpreter is missing.
+                // Preserve the ownership launcher's diagnostic instead of hiding it
+                // behind its generic exit code.
+                strip_terminal_control(&output)
+                    .lines()
+                    .find(|line| line.starts_with("ownership launch handshake:"))
+                    .map(str::to_string)
+            })
             .map(|hint| format!("; {hint}"))
             .unwrap_or_default();
         return Err(RefineError::Degraded(format!(

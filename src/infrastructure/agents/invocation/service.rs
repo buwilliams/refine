@@ -26,6 +26,7 @@ struct ProviderLaunchRequest<'a> {
 pub struct HostAgentProviderService {
     pub path_override: Option<String>,
     pub runtime_root: Option<PathBuf>,
+    pub refine_dir: Option<PathBuf>,
 }
 
 impl HostAgentProviderService {
@@ -44,67 +45,52 @@ impl HostAgentProviderService {
         reap_orphan_prompt_artifacts(&self.prompt_runtime_root()?)
     }
 
-    fn spec(provider: &str) -> Option<ProviderSpec> {
-        let provider = provider.trim();
-        if provider.is_empty() || provider.as_bytes().contains(&0) {
-            return None;
-        }
-        match provider {
-            "claude" => Some(ProviderSpec::new(
-                "claude",
-                "Claude Code",
-                "claude",
-                "claude_json",
-                true,
-                false,
-            )),
-            "codex" => Some(ProviderSpec::new(
-                "codex",
-                "OpenAI Codex",
-                "codex",
-                "codex_json",
-                true,
-                false,
-            )),
-            "gemini" => Some(ProviderSpec::new(
-                "gemini", "Gemini", "gemini", "plain", false, false,
-            )),
-            "copilot" => Some(ProviderSpec::new(
-                "copilot",
-                "GitHub Copilot",
-                "copilot",
-                "copilot_json",
-                false,
-                false,
-            )),
-            "smoke-ai" => Some(ProviderSpec::new(
-                "smoke-ai", "Smoke AI", "smoke-ai", "plain", false, false,
-            )),
-            _ => Some(ProviderSpec::new(
-                provider, provider, provider, "plain", false, false,
-            )),
+    pub fn with_refine_dir(mut self, refine_dir: impl Into<PathBuf>) -> Self {
+        self.refine_dir = Some(refine_dir.into());
+        self
+    }
+
+    pub fn selected_provider_id(&self, explicit: &str) -> RefineResult<String> {
+        self.spec(explicit).map(|p| p.name)
+    }
+
+    fn catalog(&self) -> RefineResult<crate::model::providers::ProviderCatalog> {
+        match &self.refine_dir {
+            Some(root) => {
+                crate::infrastructure::storage::providers::ProviderStore::new(root).load()
+            }
+            None => Ok(crate::model::providers::defaults()),
         }
     }
 
-    fn specs() -> Vec<ProviderSpec> {
-        ["claude", "codex", "gemini", "copilot", "smoke-ai"]
-            .into_iter()
-            .filter_map(Self::spec)
-            .collect()
+    fn spec(&self, provider: &str) -> RefineResult<ProviderSpec> {
+        let catalog = self.catalog()?;
+        let node = if let Some(root) = &self.refine_dir {
+            let settings = match &self.runtime_root {
+                Some(runtime) => crate::infrastructure::process::supervisor::config::FileSettingsService::with_active_root(root, runtime),
+                None => crate::infrastructure::process::supervisor::config::FileSettingsService::new(root),
+            };
+            settings.provider_override()?
+        } else {
+            None
+        };
+        crate::application::agents::providers::resolve(&catalog, Some(provider), node.as_deref())
+            .map(Into::into)
     }
 
     fn detect_spec(&self, spec: ProviderSpec) -> ProviderCapability {
-        let smoke_ai_binary = (spec.name == "smoke-ai")
+        let smoke_ai_binary = (spec.name == "smoke-ai" && spec.binary == "smoke-ai")
             .then(|| self.smoke_ai_binary(&spec))
             .flatten();
         let binary = smoke_ai_binary
             .clone()
             .unwrap_or_else(|| spec.binary.to_string());
-        let path = if spec.name == "smoke-ai" && smoke_ai_binary.is_none() {
-            None
-        } else {
-            find_executable(&binary, self.path_override.as_deref())
-        };
+        let path =
+            if spec.name == "smoke-ai" && spec.binary == "smoke-ai" && smoke_ai_binary.is_none() {
+                None
+            } else {
+                find_executable(&binary, self.path_override.as_deref())
+            };
         ProviderCapability {
             name: spec.name.to_string(),
             display_name: spec.display_name.to_string(),
@@ -135,8 +121,7 @@ impl HostAgentProviderService {
     }
 
     fn resolve_binary_for_provider(&self, provider: &str) -> RefineResult<(ProviderSpec, String)> {
-        let spec = Self::spec(provider)
-            .ok_or_else(|| RefineError::InvalidInput(format!("unknown provider {provider}")))?;
+        let spec = self.spec(provider)?;
         let capability = self.detect_spec(spec.clone());
         let Some(path) = capability.path.or_else(|| {
             if capability.installed {
@@ -146,8 +131,8 @@ impl HostAgentProviderService {
             }
         }) else {
             return Err(RefineError::Degraded(format!(
-                "{} CLI was not found on PATH",
-                capability.display_name
+                "{} CLI executable {:?} was not found; install it on this host or edit Settings > Runtime",
+                capability.display_name, capability.binary
             )));
         };
         Ok((spec, path))
@@ -207,8 +192,9 @@ impl HostAgentProviderService {
 
     /// Whether the provider's interactive CLI can pin and resume a
     /// caller-chosen session, allowing workflow steps to share one session.
-    pub fn provider_supports_interactive_session_continuity(provider: &str) -> bool {
-        Self::spec(provider).is_some_and(|spec| spec.supports_interactive_session_continuity())
+    pub fn provider_supports_interactive_session_continuity(&self, provider: &str) -> bool {
+        self.spec(provider)
+            .is_ok_and(|spec| spec.supports_interactive_session_continuity())
     }
 
     fn prepare_provider_launch(
@@ -258,7 +244,21 @@ impl HostAgentProviderService {
             display_name: spec.display_name.to_string(),
             args,
             binary,
-            stdin: prepared.stdin,
+            stdin: if request.interactive {
+                prepared.stdin
+            } else {
+                spec.definition.automated.stdin.as_deref().map(|template| {
+                    crate::model::providers::expand(
+                        template,
+                        &prepared.delivered_prompt,
+                        &request
+                            .cwd
+                            .map(|p| p.to_string_lossy().into_owned())
+                            .unwrap_or_default(),
+                        request.session_id.unwrap_or_default(),
+                    )
+                })
+            },
             prompt_transport: prepared.metadata.clone(),
             prompt_artifact: prepared.artifact,
             authorization_command,
@@ -550,29 +550,27 @@ impl HostAgentProviderService {
 
 impl AgentProviderService for HostAgentProviderService {
     fn detect(&self) -> RefineResult<Vec<ProviderCapability>> {
-        Ok(Self::specs()
+        Ok(self
+            .catalog()?
+            .providers
             .into_iter()
+            .map(ProviderSpec::from)
             .map(|spec| self.detect_spec(spec))
             .collect())
     }
 
     fn configure(&self, provider: &str) -> RefineResult<()> {
-        Self::spec(provider)
-            .map(|_| ())
-            .ok_or_else(|| RefineError::InvalidInput(format!("unknown provider {provider}")))
+        self.spec(provider).map(|_| ())
     }
 
     fn authenticate(&self, provider: &str) -> RefineResult<()> {
-        let capability = self
-            .detect_spec(Self::spec(provider).ok_or_else(|| {
-                RefineError::InvalidInput(format!("unknown provider {provider}"))
-            })?);
+        let capability = self.detect_spec(self.spec(provider)?);
         if capability.installed {
             Ok(())
         } else {
             Err(RefineError::Degraded(format!(
-                "{} CLI was not found on PATH",
-                capability.display_name
+                "{} CLI executable {:?} was not found; install it on this host or edit Settings > Runtime",
+                capability.display_name, capability.binary
             )))
         }
     }
@@ -587,10 +585,7 @@ impl AgentProviderService for HostAgentProviderService {
     }
 
     fn diagnose(&self, provider: &str) -> RefineResult<Vec<String>> {
-        let capability = self
-            .detect_spec(Self::spec(provider).ok_or_else(|| {
-                RefineError::InvalidInput(format!("unknown provider {provider}"))
-            })?);
+        let capability = self.detect_spec(self.spec(provider)?);
         if capability.installed {
             Ok(vec![format!(
                 "{} CLI found at {}",

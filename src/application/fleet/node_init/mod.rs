@@ -112,7 +112,10 @@ pub fn initialize_worker(options: WorkerInitOptions) -> RefineResult<serde_json:
                     record(&mut steps, "verify_git_version", false, &error.to_string());
                 }
             }
-            match HostAgentProviderService::new().detect() {
+            match HostAgentProviderService::new()
+                .with_refine_dir(&refine_dir)
+                .detect()
+            {
                 Ok(capabilities) => {
                     let installed = capabilities
                         .iter()

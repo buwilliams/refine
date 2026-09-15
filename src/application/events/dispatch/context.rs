@@ -24,7 +24,7 @@ impl FileEventService {
             .get("agent_cli")
             .and_then(Value::as_str)
             .filter(|s| !s.is_empty())
-            .unwrap_or("claude")
+            .unwrap_or_default()
             .to_string();
         let goal_id = body
             .get("goal_id")

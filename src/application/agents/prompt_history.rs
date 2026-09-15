@@ -74,19 +74,34 @@ mod tests {
     use super::*;
     #[test]
     fn history_preserves_full_prompts_and_isolates_goals_projects_and_rounds() {
-        let root = std::env::temp_dir().join(format!("refine-prompt-history-{}",uuid::Uuid::new_v4()));
+        let root =
+            std::env::temp_dir().join(format!("refine-prompt-history-{}", uuid::Uuid::new_v4()));
         let history = FileProcessSupervisor::new(&root).process_history_dir();
         std::fs::create_dir_all(&history).unwrap();
-        let prompt = format!("<script>not HTML</script> {{skill}}\n{}", "Full context 世界\n".repeat(10000));
-        for (id,goal,target,text) in [("recorded","GOAL1","/project",Some(prompt.as_str())),("old","GOAL1","/project",None),("other-goal","GOAL2","/project",Some("Hidden")),("other-project","GOAL1","/other",Some("Hidden"))] {
+        let prompt = format!(
+            "<script>not HTML</script> {{skill}}\n{}",
+            "Full context 世界\n".repeat(10000)
+        );
+        for (id, goal, target, text) in [
+            ("recorded", "GOAL1", "/project", Some(prompt.as_str())),
+            ("old", "GOAL1", "/project", None),
+            ("other-goal", "GOAL2", "/project", Some("Hidden")),
+            ("other-project", "GOAL1", "/other", Some("Hidden")),
+        ] {
             let process = json!({"id":id,"owner":"agent","pid":null,"state":"exited","label":"Plan","started_at":"2026-09-14T00:00:00Z","details":json!({"goal_id":goal,"target_app_id":target,"round_idx":1,"rendered_prompt":text}).to_string()});
-            std::fs::write(history.join(format!("{id}.json")),serde_json::to_vec(&process).unwrap()).unwrap();
+            std::fs::write(
+                history.join(format!("{id}.json")),
+                serde_json::to_vec(&process).unwrap(),
+            )
+            .unwrap();
         }
-        let result = goal_prompts(&root,Path::new("/project"),"GOAL1").unwrap();
-        let items = result["items"].as_array().unwrap(); assert_eq!(items.len(),2);
-        let recorded = items.iter().find(|item|item["id"]=="recorded").unwrap();
-        assert_eq!(recorded["prompt"],prompt); assert_eq!(recorded["round_idx"],1);
-        assert!(items.iter().find(|item|item["id"]=="old").unwrap()["prompt"].is_null());
+        let result = goal_prompts(&root, Path::new("/project"), "GOAL1").unwrap();
+        let items = result["items"].as_array().unwrap();
+        assert_eq!(items.len(), 2);
+        let recorded = items.iter().find(|item| item["id"] == "recorded").unwrap();
+        assert_eq!(recorded["prompt"], prompt);
+        assert_eq!(recorded["round_idx"], 1);
+        assert!(items.iter().find(|item| item["id"] == "old").unwrap()["prompt"].is_null());
         std::fs::remove_dir_all(root).unwrap();
     }
 }

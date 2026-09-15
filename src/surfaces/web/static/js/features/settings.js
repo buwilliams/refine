@@ -156,7 +156,8 @@ async function loadSettingsSurfaceData() {
     activeNodeLabel,
     processes: processes || {},
     source: source || {},
-    cli: (settings.agent_cli || "claude").toLowerCase(),
+    providers: s.providers || {},
+    cli: s.providers?.node_override || "",
     projectApps,
     currentProject,
     projectRegistryEnabled: project.registry_enabled !== false,
@@ -892,7 +893,7 @@ function renderSettingsTabBody(surface, slug, data) {
     }
     if (surface === SETTINGS_SURFACES.settings && slug === "runtime") {
       return renderDetachedNodeConfig(
-        renderNodeRuntimeConfigSections(data.s || {}, data.activeNodeLabel, data.cli || "claude"),
+        renderNodeRuntimeConfigSections(data.s || {}, data.activeNodeLabel, data.cli || "", data.providers),
       );
     }
     return renderSettingsNoProjectTab(surface.title);
@@ -923,7 +924,7 @@ function renderSettingsTabBody(surface, slug, data) {
       });
     }
     if (slug === "runtime") {
-      return renderNodeRuntimeConfigSections(data.s, data.activeNodeLabel, data.cli);
+      return renderNodeRuntimeConfigSections(data.s, data.activeNodeLabel, data.cli, data.providers);
     }
   }
   if (slug === "hubs") return renderHubsSettings(data.hub);
@@ -989,7 +990,7 @@ function bindSettingsTabBody(surface, slug, data) {
       bindSettingsNodesTab();
     }
     else if (slug === "target-app") bindNodeApplicationConfigControls();
-    else if (slug === "runtime") bindNodeRuntimeConfigControls();
+    else if (slug === "runtime") bindNodeRuntimeConfigControls(data.providers);
 
   }
   if (slug === "hubs") bindHubsSettings();

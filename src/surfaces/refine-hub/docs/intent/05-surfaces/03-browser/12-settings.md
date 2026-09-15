@@ -46,3 +46,7 @@ Settings should avoid overfetching and avoid hiding invalid states. If Refine is
 Future settings should become more inferential. Agents should be able to inspect the project, propose target-app lifecycle instructions and deterministic checks, explain tradeoffs, and safely update configuration with evidence.
 
 The surface should move toward guided configuration and reviewable changes, not a growing form full of disconnected knobs.
+
+### Runtime AI providers
+
+Runtime separates **AI provider for this node** from **Shared AI providers**. The node selector includes **Use system default**. Shared definitions expose a stable ID, display name, executable, ordered JSON argument arrays, automated and interactive modes, and advanced transport, session, and output settings. Provider drafts survive Runtime refreshes and failed saves; catalog revisions prevent overwriting another editor's changes. Installation and authentication remain host responsibilities. See [Configure AI providers](../../../ai-providers.md).

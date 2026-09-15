@@ -69,6 +69,7 @@ fn fixture(mode: &str, extra: Value) -> (PathBuf, GoalAgentLaunch, Env) {
         metadata.insert("implementation_phase".into(), json!("plan"));
     }
     let launch = GoalAgentLaunch {
+        refine_dir: None,
         runtime_root: root.join("runtime"),
         cwd: root.clone(),
         provider: "smoke-ai".into(),

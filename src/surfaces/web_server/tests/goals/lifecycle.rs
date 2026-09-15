@@ -210,6 +210,7 @@ fn web_server_open_agent_attaches_to_the_workflow_goal_agent() {
         metadata.insert("goal_id".to_string(), json!("GOAL1"));
         run_goal_agent(
             GoalAgentLaunch {
+                refine_dir: None,
                 provider_session: None,
                 runtime_root: runtime_for_thread,
                 cwd: app_for_thread,
@@ -799,6 +800,7 @@ fn browser_terminal_stop_fails_the_goal_after_stopping_its_local_agent() {
         metadata.insert("workflow_state".to_string(), json!("in-progress"));
         run_goal_agent(
             GoalAgentLaunch {
+                refine_dir: None,
                 provider_session: None,
                 runtime_root: runtime_for_thread,
                 cwd: workspace_path,

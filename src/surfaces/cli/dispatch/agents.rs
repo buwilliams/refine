@@ -126,7 +126,7 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
 
 #[cfg(not(test))]
 pub(super) fn dispatch_agent_daemon(action: AgentAction) -> RefineResult<()> {
-    let action = match action {
+    let mut action = match action {
         AgentAction::Open {
             goal_id,
             profile,
@@ -134,6 +134,22 @@ pub(super) fn dispatch_agent_daemon(action: AgentAction) -> RefineResult<()> {
         } => return attach_agent(profile, goal_id.as_deref(), prompt.as_deref()),
         action => action,
     };
+    if let AgentAction::Configure { provider }
+    | AgentAction::Auth { provider }
+    | AgentAction::Diagnose { provider }
+    | AgentAction::Invoke { provider, .. }
+    | AgentAction::Resume { provider, .. } = &mut action
+        && provider.is_empty()
+    {
+        let selection = daemon_json("GET", "/providers", None)?;
+        *provider = selection
+            .get("effective_provider")
+            .and_then(Value::as_str)
+            .ok_or_else(|| {
+                RefineError::InvalidInput("daemon returned no effective AI provider".into())
+            })?
+            .to_string();
+    }
     let response = match action {
         AgentAction::Open { .. } => unreachable!("handled before daemon dispatch"),
         AgentAction::Detect => daemon_json("GET", "/agents", None)?,

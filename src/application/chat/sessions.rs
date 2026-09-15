@@ -76,7 +76,9 @@ impl FileChatService {
             template_snapshot: None,
             id: new_chat_id(),
             mode: mode.unwrap_or(attachment_mode).trim().to_string(),
-            provider: provider.unwrap_or("claude").trim().to_string(),
+            provider: crate::application::agents::providers::resolve(
+                &crate::infrastructure::storage::providers::ProviderStore::new(&self.refine_dir).load()?,
+                provider, crate::infrastructure::process::supervisor::config::FileSettingsService::with_active_root(&self.refine_dir, &self.runtime_root).provider_override()?.as_deref())?.id,
             provider_session_id: None,
             attachment,
             worktree: None,
