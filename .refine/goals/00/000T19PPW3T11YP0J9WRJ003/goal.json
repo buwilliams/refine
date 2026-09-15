@@ -3,10 +3,30 @@
   "branch_name": "refine/00000T19PPW3T11YP0J9WRJ003/round-1",
   "candidate_commit": "c0cd3b1f70ce5843b729a8193c75c943c326d91b",
   "created": "2026-09-15T20:51:35Z",
-  "event_generation": 6,
+  "event_generation": 7,
   "feature_id": null,
   "feature_order": null,
   "id": "00000T19PPW3T11YP0J9WRJ003",
+  "integration_history": [
+    {
+      "complete": true,
+      "generation": 6,
+      "integration": {
+        "candidate_commit": "c0cd3b1f70ce5843b729a8193c75c943c326d91b",
+        "integrated_at": "2026-09-15T20:58:27.761396629+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n .../docs/intent/05-surfaces/03-browser/08-goal.md  |  2 +-\n .../web/static/js/features/goals-detail.js         |  8 ++-\n tests/web_goal_human_controls.test.js              | 79 ++++++++++++++++++++--\n 3 files changed, 83 insertions(+), 6 deletions(-)",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "34635cd62aa9f45feec2d2adb92913dab0daac09"
+      },
+      "round_idx": 0
+    }
+  ],
   "name": "The Goal Modal for the Workflow Step Action currently shows the Todo as the defa",
   "node_id": "default",
   "notes": [],
@@ -46,49 +66,23 @@
       "created": "2026-09-15T20:51:35Z",
       "event_configuration": {
         "events": {
-          "workflow.governance.enter": {
-            "bindings": [
-              {
-                "enabled": true,
-                "id": "default-governance",
-                "inputs": {},
-                "mode": "blocking",
-                "order": 0,
-                "overrides": null,
-                "scope": {
-                  "node_id": null
-                },
-                "skill_id": "default-governance"
-              }
-            ],
+          "workflow.governance.exit": {
+            "bindings": [],
             "enabled": true,
-            "id": "workflow.governance.enter",
+            "id": "workflow.governance.exit",
             "kind": "system",
-            "name": "Workflow Governance Enter",
+            "name": "Workflow Governance Exit",
             "on_success": null,
             "parameters": [],
             "scope": {
               "node_id": null
             },
-            "source": "workflow.governance.enter"
+            "source": "workflow.governance.exit"
           }
         },
         "revision": 82,
         "schema_version": 3,
-        "skills": {
-          "default-governance": {
-            "enabled": true,
-            "id": "default-governance",
-            "name": "Governance",
-            "parameters": [],
-            "prompt": "## Governance\n\nVerify that the implementation meets the user-defined Goal, fits the system architecture, and serves the project's purpose.\n\n### Outcome\n\nA clear assessment of whether the implementation satisfies all three. Begin with the verdict, then briefly explain how the work meets the Goal, fits the architecture, and supports the project's purpose, using concrete evidence from the implementation and Quality results. For each gap, describe what falls short, why it matters, and the recommended correction. Separate necessary corrections from optional improvements.\n\n### Guardrails\n\n- Read the context that helps explain the user's Goal, the system architecture, and the project's purpose.\n- Compare the implementation with the user's desired outcome as well as the plan. Completing the plan and passing tests alone do not establish that the Goal is met.\n- Look for clear responsibilities, shared behavior implemented in one place, and interfaces that remain easy to use and maintain.\n- Judge design choices by how they serve the project. Allow sound approaches that differ from personal preference.\n- Group related issues by their underlying cause so the next step can address them together.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
-            "provenance": "refine-default-v1",
-            "role": "task",
-            "scope": {
-              "node_id": null
-            }
-          }
-        }
+        "skills": {}
       },
       "event_results": {
         "417ec4da795780c4ea5d7ba15747bdaba066d93d00d58e30e0e3cff0865c4fa4": {
@@ -136,6 +130,28 @@
           },
           "round_idx": 0,
           "source": "workflow.plan.enter",
+          "state": "succeeded"
+        },
+        "6a596d6a880f642d65bf87e6ab5773bcee6424366a6f1e2c7e17b9254eb3aae6": {
+          "candidate_commit": "c0cd3b1f70ce5843b729a8193c75c943c326d91b",
+          "generation": 6,
+          "results": {
+            "default-governance": {
+              "artifacts": null,
+              "binding_id": "default-governance",
+              "evidence": [
+                "Candidate c0cd3b1f70ce5843b729a8193c75c943c326d91b: goals-detail.js derives the primary label and target together on each redraw and retains the shared revision-checked move handler.",
+                "Recorded Quality result for this candidate: 49 tests passed, covering mappings, fallbacks, refreshes, dropdown availability, rejected moves, and successful retry. HTTP transport was mocked; live backend integration was not exercised.",
+                "Reviewed the recorded plan, Goal surface intent, and surface architecture principles. Candidate diff whitespace checks passed."
+              ],
+              "invocation_id": "6a596d6a880f642d65bf87e6ab5773bcee6424366a6f1e2c7e17b9254eb3aae6",
+              "outcome": "success",
+              "role": "governance",
+              "summary": "PASS. The implementation satisfies the Goal: Backlog → Todo, Review → Done, Failed → Todo, and Cancelled → Failed. It follows the plan and preserves Todo for unspecified statuses. Architectural responsibilities remain clear: the browser selects a presentation default while the existing shared workflow endpoint performs the change; Review approval remains a separate integration action. This makes the next action easier to discover while preserving explicit user control and recovery behavior. No necessary corrections or optional improvements identified.\n\n"
+            }
+          },
+          "round_idx": 0,
+          "source": "workflow.governance.enter",
           "state": "succeeded"
         },
         "d001385de20f72035a52bad526ef889593e2fc98721cdf72fa6e7af177965e4d": {
@@ -473,8 +489,82 @@
               }
             }
           }
+        },
+        "6:default:workflow.governance.exit": {
+          "events": {
+            "workflow.governance.exit": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.governance.exit",
+              "kind": "system",
+              "name": "Workflow Governance Exit",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.governance.exit"
+            }
+          },
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {}
+        },
+        "6:default:workflow.governance.success": {
+          "events": {},
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {}
+        },
+        "7:default:workflow.review.enter": {
+          "events": {
+            "workflow.review.enter": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.review.enter",
+              "kind": "system",
+              "name": "Workflow Review Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.review.enter"
+            }
+          },
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {}
         }
       },
+      "governance_candidate_commit": "c0cd3b1f70ce5843b729a8193c75c943c326d91b",
+      "governance_checked_at": "2026-09-15T20:58:20Z",
+      "governance_details": {
+        "candidate_commit": "c0cd3b1f70ce5843b729a8193c75c943c326d91b",
+        "configured": true,
+        "failed_actions": [],
+        "phase": "post_implementation",
+        "skill_results": [
+          {
+            "artifacts": null,
+            "binding_id": "workflow.governance.enter:default-governance",
+            "evidence": [
+              "Candidate c0cd3b1f70ce5843b729a8193c75c943c326d91b: goals-detail.js derives the primary label and target together on each redraw and retains the shared revision-checked move handler.",
+              "Recorded Quality result for this candidate: 49 tests passed, covering mappings, fallbacks, refreshes, dropdown availability, rejected moves, and successful retry. HTTP transport was mocked; live backend integration was not exercised.",
+              "Reviewed the recorded plan, Goal surface intent, and surface architecture principles. Candidate diff whitespace checks passed."
+            ],
+            "invocation_id": "6a596d6a880f642d65bf87e6ab5773bcee6424366a6f1e2c7e17b9254eb3aae6",
+            "outcome": "success",
+            "role": "governance",
+            "summary": "PASS. The implementation satisfies the Goal: Backlog → Todo, Review → Done, Failed → Todo, and Cancelled → Failed. It follows the plan and preserves Todo for unspecified statuses. Architectural responsibilities remain clear: the browser selects a presentation default while the existing shared workflow endpoint performs the change; Review approval remains a separate integration action. This makes the next action easier to discover while preserving explicit user control and recovery behavior. No necessary corrections or optional improvements identified.\n\n"
+          }
+        ],
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T19PPW3T11YP0J9WRJ003-round-1"
+      },
+      "governance_message": "Governance checks passed.",
+      "governance_recovery_analysis": null,
+      "governance_recovery_round_prompt": null,
+      "governance_rule_actions": [],
       "implementation_report": "workflow.implement.enter:default-implement: Task #1: Primary action now derives its label and target from current status: Backlog → Todo, Review → Done, Failed → Todo, Cancelled → Failed; other statuses default to Todo.\nTask #2: Updated the Goal surface intent document.\nTask #3: Browser verification passed for all mappings, fallback statuses, refreshed revisions, dropdown availability, and Review → Done using the move endpoint.\nNo implementation departures or unfinished work. Tests used the existing Playwright installation via NODE_PATH.",
       "implementation_reported_at": "2026-09-15T20:54:35Z",
       "logs": [],
@@ -643,19 +733,34 @@
       ],
       "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "updated": "2026-09-15T20:57:17Z",
+      "rule_state": "passed",
+      "updated": "2026-09-15T20:58:21Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-15T20:51:37Z",
         "generation": 2,
         "round_idx": 0,
         "workflow_revision": 2
       },
+      "workflow_git_remote": "origin",
+      "workflow_integration": {
+        "candidate_commit": "c0cd3b1f70ce5843b729a8193c75c943c326d91b",
+        "integrated_at": "2026-09-15T20:58:27.761396629+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n .../docs/intent/05-surfaces/03-browser/08-goal.md  |  2 +-\n .../web/static/js/features/goals-detail.js         |  8 ++-\n tests/web_goal_human_controls.test.js              | 79 ++++++++++++++++++++--\n 3 files changed, 83 insertions(+), 6 deletions(-)",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "34635cd62aa9f45feec2d2adb92913dab0daac09"
+      },
       "workspace_branch": "refine/00000T19PPW3T11YP0J9WRJ003/round-1"
     }
   ],
-  "status": "governance",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-09-15T20:57:17Z",
+  "updated": "2026-09-15T20:58:30Z",
   "workflow_controls": [
     {
       "actor": "operator",
@@ -729,7 +834,17 @@
       "round_idx": 0,
       "to": "governance",
       "workflow_revision": 30
+    },
+    {
+      "at": "2026-09-15T20:58:30.026209030+00:00",
+      "forced": false,
+      "from": "governance",
+      "generation": 7,
+      "node_id": "default",
+      "round_idx": 0,
+      "to": "review",
+      "workflow_revision": 39
     }
   ],
-  "workflow_revision": 31
+  "workflow_revision": 39
 }

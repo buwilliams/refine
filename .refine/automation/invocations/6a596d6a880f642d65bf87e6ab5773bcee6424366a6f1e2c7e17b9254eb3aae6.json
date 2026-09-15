@@ -481,11 +481,51 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "succeeded",
+  "results": {
+    "default-governance": {
+      "invocation_id": "6a596d6a880f642d65bf87e6ab5773bcee6424366a6f1e2c7e17b9254eb3aae6",
+      "binding_id": "default-governance",
+      "role": "governance",
+      "outcome": "success",
+      "summary": "PASS. The implementation satisfies the Goal: Backlog → Todo, Review → Done, Failed → Todo, and Cancelled → Failed. It follows the plan and preserves Todo for unspecified statuses. Architectural responsibilities remain clear: the browser selects a presentation default while the existing shared workflow endpoint performs the change; Review approval remains a separate integration action. This makes the next action easier to discover while preserving explicit user control and recovery behavior. No necessary corrections or optional improvements identified.\n\n",
+      "evidence": [
+        "Candidate c0cd3b1f70ce5843b729a8193c75c943c326d91b: goals-detail.js derives the primary label and target together on each redraw and retains the shared revision-checked move handler.",
+        "Recorded Quality result for this candidate: 49 tests passed, covering mappings, fallbacks, refreshes, dropdown availability, rejected moves, and successful retry. HTTP transport was mocked; live backend integration was not exercised.",
+        "Reviewed the recorded plan, Goal surface intent, and surface architecture principles. Candidate diff whitespace checks passed."
+      ],
+      "artifacts": null
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "default-governance",
+      "checkout": {
+        "observation": {
+          "branch": "refine/00000T19PPW3T11YP0J9WRJ003/round-1",
+          "head_commit": "c0cd3b1f70ce5843b729a8193c75c943c326d91b",
+          "status_porcelain": []
+        },
+        "tree": "4d0181b0f767be1eaeb3507c4c9dfecbb1305b2e"
+      },
+      "checkout_recorded": true,
+      "diagnostic": null,
+      "host_bound_result": true,
+      "observational_violation": false,
+      "operation_id": null,
+      "process_id": "proc-1789505840200-1014481-27833",
+      "prompt_bytes": 7302,
+      "provider_session_id": null,
+      "purpose": "work",
+      "raw_output": "{\n  \"outcome\": \"success\",\n  \"evidence\": [\n    \"Candidate c0cd3b1f70ce5843b729a8193c75c943c326d91b: goals-detail.js derives the primary label and target together on each redraw and retains the shared revision-checked move handler.\",\n    \"Recorded Quality result for this candidate: 49 tests passed, covering mappings, fallbacks, refreshes, dropdown availability, rejected moves, and successful retry. HTTP transport was mocked; live backend integration was not exercised.\",\n    \"Reviewed the recorded plan, Goal surface intent, and surface architecture principles. Candidate diff whitespace checks passed.\"\n  ],\n  \"summary\": \"PASS. The implementation satisfies the Goal: Backlog → Todo, Review → Done, Failed → Todo, and Cancelled → Failed. It follows the plan and preserves Todo for unspecified statuses. Architectural responsibilities remain clear: the browser selects a presentation default while the existing shared workflow endpoint performs the change; Review approval remains a separate integration action. This makes the next action easier to discover while preserving explicit user control and recovery behavior. No necessary corrections or optional improvements identified.\\n\\n\"\n}",
+      "received_at": "2026-09-15T20:58:17.241772161+00:00",
+      "started_at": "2026-09-15T20:57:20.157736349+00:00",
+      "workflow_revision": 2
+    }
+  ],
   "created_at": "2026-09-15T20:57:18.395632409+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-15T20:58:19.705948473+00:00",
   "error": null,
   "action_applied": false
 }
