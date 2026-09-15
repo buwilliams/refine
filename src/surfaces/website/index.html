@@ -114,12 +114,12 @@
       <section id="compare" class="section compare-section" aria-labelledby="compare-title">
         <div class="section-heading">
           <p class="eyebrow">Why Refine</p>
-          <h2 id="compare-title">The management layer, compared.</h2>
+          <h2 id="compare-title">Ways to coordinate software delivery.</h2>
           <p>
-            Running an agent by hand works for one task. Wrapping agents in loops scales the
-            effort but not the oversight, and local orchestrators stop at the edge of one
-            machine. Refine keeps the agents you already use and adds the management layer the
-            rest are missing.
+            Direct agents means using a coding agent without an added orchestration platform;
+            capabilities vary by agent. Blitzy specializes in autonomous software development.
+            n8n connects tools through general-purpose workflows and AI automation. Refine
+            coordinates software delivery around your existing repositories and installed agents.
           </p>
         </div>
         <div class="compare-scroll" tabindex="0" role="region" aria-label="Comparison of agent workflows">
@@ -127,79 +127,83 @@
             <thead>
               <tr>
                 <th scope="col">Capability</th>
-                <th scope="col">Agents directly</th>
-                <th scope="col">Agent Loops</th>
-                <th scope="col">Conductor</th>
+                <th scope="col">Direct agents</th>
+                <th scope="col"><a href="https://blitzy.com/">Blitzy</a></th>
+                <th scope="col"><a href="https://n8n.io/">n8n</a></th>
                 <th scope="col" class="compare-refine">Refine</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <th scope="row">Works with the agents you already use</th>
-                <td><span class="mark yes">✓</span></td>
-                <td><span class="mark yes">✓</span></td>
-                <td><span class="mark yes">✓</span> Claude Code, Codex, Cursor</td>
-                <td class="compare-refine"><span class="mark yes">✓</span></td>
+                <th scope="row">Primary purpose</th>
+                <td>Coding tasks directed through your chosen agent</td>
+                <td>Autonomous modernization, refactoring, and feature development</td>
+                <td>General-purpose workflow and AI automation, including development integrations and templates</td>
+                <td class="compare-refine">Coordinate teams and agent fleets delivering software</td>
               </tr>
               <tr>
-                <th scope="row">Durable workflow state, request through review</th>
-                <td>Chat history</td>
-                <td>Log files</td>
-                <td>Per-workspace tasks</td>
-                <td class="compare-refine"><span class="mark yes">✓</span> Goals and Features</td>
+                <th scope="row">Source and license</th>
+                <td>Depends on the agent</td>
+                <td>Commercial platform with proprietary technology</td>
+                <td>Source-available / fair-code; Sustainable Use and Enterprise licenses</td>
+                <td class="compare-refine">MIT open source</td>
               </tr>
               <tr>
-                <th scope="row">Product feedback from non-engineers</th>
-                <td><span class="mark no">—</span></td>
-                <td><span class="mark no">—</span></td>
-                <td><span class="mark no">—</span></td>
-                <td class="compare-refine"><span class="mark yes">✓</span> Anyone can file a Goal</td>
+                <th scope="row">Deployment and local work</th>
+                <td>Local or hosted, depending on the agent</td>
+                <td>Blitzy cloud, customer VPC, or custom on-premises options, depending on engagement</td>
+                <td>Self-hosted or managed cloud</td>
+                <td class="compare-refine">Local-first repositories and runtime; model hosting depends on your agent</td>
               </tr>
               <tr>
-                <th scope="row">Coordination across repositories and branches</th>
-                <td>Manual</td>
-                <td>Scripts you maintain</td>
-                <td>Branch worktrees</td>
-                <td class="compare-refine"><span class="mark yes">✓</span> Built in</td>
+                <th scope="row">Bring your own software (BYOT)</th>
+                <td>Work with repositories your agent can access</td>
+                <td>Understands and extends existing codebases, or builds new products</td>
+                <td>Connect existing systems through integrations, APIs, and custom code</td>
+                <td class="compare-refine">Work in your existing software projects with your tools and Git history</td>
               </tr>
               <tr>
-                <th scope="row">Scale across machines</th>
-                <td>One terminal</td>
-                <td>SSH scripts you maintain</td>
-                <td>One Mac</td>
-                <td class="compare-refine"><span class="mark yes">✓</span> Node fleet</td>
+                <th scope="row">Bring your own agent (BYOA)</th>
+                <td>Choose and operate the coding agent yourself</td>
+                <td>Blitzy orchestrates its specialized agents across foundation models</td>
+                <td>Choose models for workflow agents; connect external clients through MCP</td>
+                <td class="compare-refine">Supervise supported installed coding-agent CLIs</td>
               </tr>
               <tr>
-                <th scope="row">Live process visibility</th>
-                <td><span class="mark no">—</span></td>
-                <td>Ad hoc</td>
-                <td>Workspace list</td>
-                <td class="compare-refine"><span class="mark yes">✓</span> Process management</td>
+                <th scope="row">Agent access and orchestration surfaces</th>
+                <td>The agent’s own terminal, editor, or web interface</td>
+                <td>Platform for submitting requirements and reviewing specifications and delivery</td>
+                <td>Visual workflow editor, API, and MCP access to build and run workflows</td>
+                <td class="compare-refine">Agent-first access through CLI and MCP; API and browser share application behavior</td>
               </tr>
               <tr>
-                <th scope="row">Human review before merge</th>
-                <td>If you remember</td>
-                <td>Easily skipped</td>
-                <td><span class="mark yes">✓</span> Diff review</td>
-                <td class="compare-refine"><span class="mark yes">✓</span> Review gate in the workflow</td>
+                <th scope="row">Delivery workflow and review</th>
+                <td>Agent features plus your team’s testing and review process</td>
+                <td>Specification approval, code generation, validation, and handoff for team review</td>
+                <td>Custom workflows with human approvals; development steps use integrations and templates</td>
+                <td class="compare-refine">Durable Goals and Rounds; configurable Skills, Quality, Governance, and Review</td>
               </tr>
               <tr>
-                <th scope="row">Governance tied to product intent</th>
-                <td>Prompt by prompt</td>
-                <td>Hardcoded prompts</td>
-                <td>Prompt by prompt</td>
-                <td class="compare-refine"><span class="mark yes">✓</span> Durable, editable context</td>
-              </tr>
-              <tr>
-                <th scope="row">Always-on MCP endpoint</th>
-                <td><span class="mark no">—</span></td>
-                <td><span class="mark no">—</span></td>
-                <td><span class="mark no">—</span></td>
-                <td class="compare-refine"><span class="mark yes">✓</span> <code>/mcp</code></td>
+                <th scope="row">Coordination and recovery</th>
+                <td>Session and resume features vary; you coordinate work across agents</td>
+                <td>Long-running multi-agent development with shared codebase context and a remaining-work handoff</td>
+                <td>Workflow execution visibility, logs, and step reruns</td>
+                <td class="compare-refine">Git worktree isolation, node coordination, and retained execution evidence for recovery</td>
               </tr>
             </tbody>
           </table>
         </div>
+        <p class="compare-sources">
+          Sources checked <time datetime="2026-09-15">2026-09-15</time>:
+          <a href="https://blitzy.com/">Blitzy product and deployment options</a>;
+          <a href="https://n8n.io/">n8n product</a>,
+          <a href="https://github.com/n8n-io/n8n/blob/master/README.md#license">license</a>,
+          <a href="https://n8n.io/integrations/github/">GitHub integrations</a>, and
+          <a href="https://docs.n8n.io/connect/connect-to-n8n-mcp-server">MCP documentation</a>;
+          <a href="/docs">Refine Hub</a> and
+          <a href="https://github.com/buwilliams/refine">source</a>.
+          Product descriptions reflect published capabilities, not independent performance testing.
+        </p>
       </section>
 
       <section id="product" class="section product-section" aria-labelledby="product-title">
