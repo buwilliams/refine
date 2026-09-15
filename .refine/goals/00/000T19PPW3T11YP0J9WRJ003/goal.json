@@ -1,7 +1,7 @@
 {
   "base_commit": "9c7363164d582fac14e5076b24efdc47ec5f9461",
   "branch_name": "refine/00000T19PPW3T11YP0J9WRJ003/round-1",
-  "candidate_commit": "0d59c513ee7f24e1d943046ac12f8a69e0d7692c",
+  "candidate_commit": "c0cd3b1f70ce5843b729a8193c75c943c326d91b",
   "created": "2026-09-15T20:51:35Z",
   "event_generation": 5,
   "feature_id": null,
@@ -136,6 +136,29 @@
           },
           "round_idx": 0,
           "source": "workflow.plan.enter",
+          "state": "succeeded"
+        },
+        "d001385de20f72035a52bad526ef889593e2fc98721cdf72fa6e7af177965e4d": {
+          "candidate_commit": "0d59c513ee7f24e1d943046ac12f8a69e0d7692c",
+          "generation": 5,
+          "results": {
+            "default-quality": {
+              "artifacts": null,
+              "binding_id": "default-quality",
+              "evidence": [
+                "Updated tests/web_goal_human_controls.test.js with rejection-and-retry coverage.",
+                "NODE_PATH=/home/buddy/projects/refine/node_modules node --test tests/web_goal_human_controls.test.js tests/web_goal_cancel.test.js tests/web_goal_detail_diagnostics.test.js tests/web_goal_step_tabs.test.js tests/web_workflow_selection.test.js tests/web_screen_render.test.js — 49 passed.",
+                "git diff --check — passed.",
+                "Initial test invocation could not resolve Playwright; rerun succeeded using the existing shared installation through NODE_PATH."
+              ],
+              "invocation_id": "d001385de20f72035a52bad526ef889593e2fc98721cdf72fa6e7af177965e4d",
+              "outcome": "success",
+              "role": "quality",
+              "summary": "Quality passed: 49 tests passed, with no failures or skips. Verified all four primary-action mappings, Todo fallbacks, refreshed targets and revisions, all dropdown steps, and Review → Done using the move endpoint. Extended browser coverage for rejected moves and successful retry after refresh. No implementation fixes needed. Browser transport was mocked; live backend integration was not exercised."
+            }
+          },
+          "round_idx": 0,
+          "source": "workflow.quality.enter",
           "state": "succeeded"
         }
       },
@@ -437,8 +460,26 @@
         }
       ],
       "prompt": "The Goal Modal for the Workflow Step Action currently shows the Todo as the default option, but it really should show the next logical action based on the current workflow step:\nBacklog > Todo\nReview > Done\nFailed > Todo\nCancelled > Failed",
+      "quality_agent_report": "workflow.quality.enter:default-quality: Quality passed: 49 tests passed, with no failures or skips. Verified all four primary-action mappings, Todo fallbacks, refreshed targets and revisions, all dropdown steps, and Review → Done using the move endpoint. Extended browser coverage for rejected moves and successful retry after refresh. No implementation fixes needed. Browser transport was mocked; live backend integration was not exercised.",
+      "quality_candidate_commit": "c0cd3b1f70ce5843b729a8193c75c943c326d91b",
+      "quality_skill_results": [
+        {
+          "artifacts": null,
+          "binding_id": "workflow.quality.enter:default-quality",
+          "evidence": [
+            "Updated tests/web_goal_human_controls.test.js with rejection-and-retry coverage.",
+            "NODE_PATH=/home/buddy/projects/refine/node_modules node --test tests/web_goal_human_controls.test.js tests/web_goal_cancel.test.js tests/web_goal_detail_diagnostics.test.js tests/web_goal_step_tabs.test.js tests/web_workflow_selection.test.js tests/web_screen_render.test.js — 49 passed.",
+            "git diff --check — passed.",
+            "Initial test invocation could not resolve Playwright; rerun succeeded using the existing shared installation through NODE_PATH."
+          ],
+          "invocation_id": "d001385de20f72035a52bad526ef889593e2fc98721cdf72fa6e7af177965e4d",
+          "outcome": "success",
+          "role": "quality",
+          "summary": "Quality passed: 49 tests passed, with no failures or skips. Verified all four primary-action mappings, Todo fallbacks, refreshed targets and revisions, all dropdown steps, and Review → Done using the move endpoint. Extended browser coverage for rejected moves and successful retry after refresh. No implementation fixes needed. Browser transport was mocked; live backend integration was not exercised."
+        }
+      ],
       "reporter": "Buddy Williams",
-      "updated": "2026-09-15T20:54:37Z",
+      "updated": "2026-09-15T20:57:05Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-15T20:51:37Z",
         "generation": 2,
@@ -450,7 +491,7 @@
   ],
   "status": "quality",
   "target_branch": "main",
-  "updated": "2026-09-15T20:54:37Z",
+  "updated": "2026-09-15T20:57:05Z",
   "workflow_controls": [
     {
       "actor": "operator",
@@ -516,5 +557,5 @@
       "workflow_revision": 20
     }
   ],
-  "workflow_revision": 21
+  "workflow_revision": 25
 }
