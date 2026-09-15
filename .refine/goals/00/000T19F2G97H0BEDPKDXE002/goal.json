@@ -3,7 +3,7 @@
   "branch_name": "refine/00000T19F2G97H0BEDPKDXE002/round-1",
   "candidate_commit": null,
   "created": "2026-09-15T16:24:40Z",
-  "event_generation": 3,
+  "event_generation": 4,
   "feature_id": null,
   "feature_order": null,
   "id": "00000T19F2G97H0BEDPKDXE002",
@@ -46,11 +46,11 @@
       "created": "2026-09-15T16:24:40Z",
       "event_configuration": {
         "events": {
-          "workflow.plan.enter": {
+          "workflow.implement.enter": {
             "bindings": [
               {
                 "enabled": true,
-                "id": "default-plan",
+                "id": "default-implement",
                 "inputs": {},
                 "mode": "blocking",
                 "order": 0,
@@ -58,36 +58,64 @@
                 "scope": {
                   "node_id": null
                 },
-                "skill_id": "default-plan"
+                "skill_id": "default-implement"
               }
             ],
             "enabled": true,
-            "id": "workflow.plan.enter",
+            "id": "workflow.implement.enter",
             "kind": "system",
-            "name": "Workflow Plan Enter",
+            "name": "Workflow Implement Enter",
             "on_success": null,
             "parameters": [],
             "scope": {
               "node_id": null
             },
-            "source": "workflow.plan.enter"
+            "source": "workflow.implement.enter"
           }
         },
         "revision": 82,
         "schema_version": 3,
         "skills": {
-          "default-plan": {
+          "default-implement": {
             "enabled": true,
-            "id": "default-plan",
-            "name": "Plan",
+            "id": "default-implement",
+            "name": "Implement",
             "parameters": [],
-            "prompt": "## Plan\n\nDevelop a plan to achieve the Goal's desired outcome. If the goal outcome is underspecified or is missing details add only just enough detail so that AI agents do not thrash or become confused.\n\n### Outcome\n\nA clear implementation plan that explains the approach and breaks the work into ordered tasks. Begin with a short description of the desired behavior and proposed solution. Use a numbered checklist, such as `Task #1 - What changes and why`. Include dependencies and important design decisions where they help implementation.\n\n### Guardrails\n\n- Read the context that helps explain the Goal and how the existing system works.\n- Look for the underlying cause. Consider whether a missing or misused concept explains the problem, and improve that concept rather than adding fixes for individual symptoms.\n- Give each task enough detail to guide implementation while leaving room for reasonable implementation choices.\n- Keep the plan focused on the desired outcome. Prefer straightforward changes that fit the existing architecture.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
+            "prompt": "## Implement\n\nImplement the plan.\n\n### Outcome\n\nThe plan is implemented in a way that aligns with the project's purpose and architecture. Provide a brief summary organized by plan task: what changed, any important departures from the plan and why, and any unfinished work.\n\n### Guardrails\n\n- Follow established code patterns and put shared behavior in one place. Fix the underlying cause rather than each symptom separately.\n- Keep code focused on one responsibility and preserve stable interfaces where possible. Split mixed responsibilities into separate files. Keep files relatively small, under roughly 1,000 lines where possible.\n- Prefer clear, straightforward code and abstractions that make the behavior easier to understand and maintain.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
             "provenance": "refine-default-v1",
             "role": "task",
             "scope": {
               "node_id": null
             }
           }
+        }
+      },
+      "event_results": {
+        "f4ab5d8908943f085185228228d31399df53ce748c2ddadae8c86586e6f8418d": {
+          "candidate_commit": null,
+          "generation": 3,
+          "results": {
+            "default-plan": {
+              "artifacts": {
+                "plan": "Visitors should understand how Direct agents, Blitzy, n8n, and Refine approach software delivery. Replace the existing comparison’s categories and assumptions with concise, sourced descriptions that explain Refine’s open-source, local-first orchestration of users’ software and agents.\n\n1. [ ] Task #1 - Define the comparison around each product’s operating model.\n   Use the research below to finalize short cell descriptions. Define Direct agents as using a coding agent without an added orchestration platform; capabilities vary by agent. Describe Blitzy as purpose-built autonomous software development covering existing-code modernization, refactoring, and feature development. Describe n8n as general-purpose workflow and AI automation with software-development integrations and templates. Describe Refine as software-delivery coordination around existing repositories and supported installed agents. Use descriptive text instead of unsupported yes/no judgments. Distinguish choosing models, connecting external agents, and supervising installed coding agents.\n\n2. [ ] Task #2 - Rewrite the comparison section in src/surfaces/website/index.html.\n   Depends on Task #1. Set the product columns, in order, to Direct agents, Blitzy, n8n, and Refine; link Blitzy and n8n to their official sites. Replace the introduction’s claims about loops, single-machine orchestrators, and missing management capabilities. Use approximately eight rows: primary purpose; source/license; deployment and local work; bring your own software (BYOT); bring your own agent (BYOA); agent access and orchestration surfaces; delivery workflow and review; coordination and recovery.\n   Make Refine’s cells concrete: MIT open source; local repositories and runtime; existing software projects; supported installed agent CLIs; shared CLI/API/MCP/browser behavior; durable Goals and Rounds with configurable Skills, Quality, Governance, and Review; Git worktree isolation, node coordination, and retained execution evidence. Check final capability wording against current implementation and Hub documentation, rather than treating future design intent as shipped behavior.\n   Credit Blitzy’s existing-code support, specialized multi-agent development, validation, and enterprise deployment options. Credit n8n’s source availability, self-hosting, integrations, custom workflows, human approvals, and MCP. Explain differences in what each coordinates without claiming those capabilities are unique to Refine. For undocumented competitor capabilities, qualify or omit the claim rather than asserting absence.\n\n3. [ ] Task #3 - Add compact sourcing and preserve the table’s usability.\n   Depends on Task #2. Add a short source note with official product/documentation links and the research date, 2026-09-15. Identify n8n as source-available/fair-code using its published license description. Keep competitor performance statistics and prices outside this comparison. Preserve semantic column and row headers, the keyboard-focusable horizontal scroll region, and the highlighted Refine column. Adjust src/surfaces/website/assets/site.css only where the longer descriptions need wrapping, link focus styling, or spacing. Preserve the n8n brand casing if the existing uppercase header styling would obscure it.\n\n4. [ ] Task #4 - Hand off focused validation to Quality.\n   Depends on Task #3. Preview through `/home/buddy/projects/refine/bin/refine website --static-root <worktree> --port <available-port>`. Quality should inspect desktop and narrow-screen rendering, keyboard scrolling and links, readable cell alignment, and the four requested product headings. Confirm Agent Loops and Conductor and their associated assumptions are removed from the comparison. Verify source links and trace material claims to the research or current Refine behavior. This is a static website content change; use focused checks and existing applicable checks without introducing a new test framework."
+              },
+              "binding_id": "default-plan",
+              "evidence": [
+                "The existing comparison is in src/surfaces/website/index.html:114 onward. Its introduction and nine rows assume the old categories. Styling already provides horizontal overflow and an 860px minimum table width in src/surfaces/website/assets/site.css.",
+                "Refine grounding: LICENSE confirms MIT; src/surfaces/refine-hub/overview.md describes agent fleets and Skills; docs/intent/03-application/01-agents/09-agent-first-orchestration.md explains shared orchestration responsibilities; docs/intent/05-surfaces/06-mcp.md describes the local MCP adapter. These documentation paths are under src/surfaces/refine-hub.",
+                "Blitzy advertises modernization, refactoring, new features, existing-code understanding, specialized agents, and tested delivery. Deployment offerings include cloud VPC, customer VPC, and custom on-premises options. These are vendor claims, not independently tested results. [Blitzy product overview](https://blitzy.com/).",
+                "n8n describes visual workflows with custom code, self-hosted or cloud deployment, model flexibility, human approvals, and execution visibility. [n8n product overview](https://n8n.io/). Its repository identifies its licensing as fair-code/source-available under Sustainable Use and Enterprise licenses. [n8n README](https://github.com/n8n-io/n8n/blob/master/README.md).",
+                "n8n has software-development integrations and templates, including GitHub PR automation. [GitHub integrations](https://n8n.io/integrations/github/). Its built-in MCP server supports discovering, executing, creating, and editing workflows. [Official MCP documentation source](https://github.com/n8n-io/n8n-docs/blob/main/docs/connect/connect-to-n8n-mcp-server.md)."
+              ],
+              "invocation_id": "f4ab5d8908943f085185228228d31399df53ce748c2ddadae8c86586e6f8418d",
+              "outcome": "success",
+              "role": "plan",
+              "summary": "Plan ready for Implement. The central change is a factual comparison of operating models, with explicit BYOT, BYOA, licensing, local operation, and shared surfaces. Research confirms substantial overlapping capabilities, so a header-only replacement would leave misleading claims. No files or workflow state were changed. Prior memory helped locate the website assets; paths and styling were verified in this worktree.\n\n"
+            }
+          },
+          "round_idx": 0,
+          "source": "workflow.plan.enter",
+          "state": "succeeded"
         }
       },
       "failure_at": "",
@@ -185,6 +213,78 @@
               }
             }
           }
+        },
+        "3:default:workflow.plan.exit": {
+          "events": {
+            "workflow.plan.exit": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.plan.exit",
+              "kind": "system",
+              "name": "Workflow Plan Exit",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.plan.exit"
+            }
+          },
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {}
+        },
+        "3:default:workflow.plan.success": {
+          "events": {},
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {}
+        },
+        "4:default:workflow.implement.enter": {
+          "events": {
+            "workflow.implement.enter": {
+              "bindings": [
+                {
+                  "enabled": true,
+                  "id": "default-implement",
+                  "inputs": {},
+                  "mode": "blocking",
+                  "order": 0,
+                  "overrides": null,
+                  "scope": {
+                    "node_id": null
+                  },
+                  "skill_id": "default-implement"
+                }
+              ],
+              "enabled": true,
+              "id": "workflow.implement.enter",
+              "kind": "system",
+              "name": "Workflow Implement Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.implement.enter"
+            }
+          },
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {
+            "default-implement": {
+              "enabled": true,
+              "id": "default-implement",
+              "name": "Implement",
+              "parameters": [],
+              "prompt": "## Implement\n\nImplement the plan.\n\n### Outcome\n\nThe plan is implemented in a way that aligns with the project's purpose and architecture. Provide a brief summary organized by plan task: what changed, any important departures from the plan and why, and any unfinished work.\n\n### Guardrails\n\n- Follow established code patterns and put shared behavior in one place. Fix the underlying cause rather than each symptom separately.\n- Keep code focused on one responsibility and preserve stable interfaces where possible. Split mixed responsibilities into separate files. Keep files relatively small, under roughly 1,000 lines where possible.\n- Prefer clear, straightforward code and abstractions that make the behavior easier to understand and maintain.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
+              "provenance": "refine-default-v1",
+              "role": "task",
+              "scope": {
+                "node_id": null
+              }
+            }
+          }
         }
       },
       "logs": [],
@@ -243,7 +343,7 @@
       ],
       "prompt": "Update the website surface comparison table from: agents directly, agent loops, conductor, and Refine to: direct agents, Blitzy (https://blitzy.com), n8n (https://n8n.io/), and Refine. This removes agent loops and conductor.\n\nYou'll need to research Blitzy and n8n. I think n8n is generic, with workflows designed for software development, while Blitzy is purpose-built for software development modernization, though they have moved into feature development.\n\nSome of the key attributes of Refine are that it is open-source, local-first, built for BYOT (bring your own software), BYOA (bring your own agent), and agent-first orchestration through surfaces, though I suspect you'll find more differentiators.",
       "reporter": "Buddy Williams",
-      "updated": "2026-09-15T16:24:45Z",
+      "updated": "2026-09-15T16:26:49Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-15T16:24:41Z",
         "generation": 2,
@@ -253,9 +353,9 @@
       "workspace_branch": "refine/00000T19F2G97H0BEDPKDXE002/round-1"
     }
   ],
-  "status": "plan",
+  "status": "implement",
   "target_branch": "main",
-  "updated": "2026-09-15T16:24:45Z",
+  "updated": "2026-09-15T16:26:49Z",
   "workflow_controls": [
     {
       "actor": "operator",
@@ -299,7 +399,17 @@
       "round_idx": 0,
       "to": "plan",
       "workflow_revision": 6
+    },
+    {
+      "at": "2026-09-15T16:26:48.671904716+00:00",
+      "forced": false,
+      "from": "plan",
+      "generation": 4,
+      "node_id": "default",
+      "round_idx": 0,
+      "to": "implement",
+      "workflow_revision": 13
     }
   ],
-  "workflow_revision": 9
+  "workflow_revision": 14
 }

@@ -1,10 +1,10 @@
 {
-  "id": "f4ab5d8908943f085185228228d31399df53ce748c2ddadae8c86586e6f8418d",
+  "id": "157791d75e7cf9cd30118426ae69a4ece165696798a58323daf79a7d51b67b10",
   "event": {
-    "id": "workflow.plan.enter",
-    "name": "Workflow Plan Enter",
+    "id": "workflow.implement.enter",
+    "name": "Workflow Implement Enter",
     "kind": "system",
-    "source": "workflow.plan.enter",
+    "source": "workflow.implement.enter",
     "enabled": true,
     "scope": {
       "node_id": null
@@ -12,8 +12,8 @@
     "parameters": [],
     "bindings": [
       {
-        "id": "default-plan",
-        "skill_id": "default-plan",
+        "id": "default-implement",
+        "skill_id": "default-implement",
         "enabled": true,
         "mode": "blocking",
         "order": 0,
@@ -51,31 +51,52 @@
     "candidate_commit": null,
     "data": {
       "context": {
-        "assembled_at": "2026-09-15T16:24:44Z",
-        "current_round": {
-          "assignee": "Buddy Williams",
-          "prompt": "Update the website surface comparison table from: agents directly, agent loops, conductor, and Refine to: direct agents, Blitzy (https://blitzy.com), n8n (https://n8n.io/), and Refine. This removes agent loops and conductor.\n\nYou'll need to research Blitzy and n8n. I think n8n is generic, with workflows designed for software development, while Blitzy is purpose-built for software development modernization, though they have moved into feature development.\n\nSome of the key attributes of Refine are that it is open-source, local-first, built for BYOT (bring your own software), BYOA (bring your own agent), and agent-first orchestration through surfaces, though I suspect you'll find more differentiators.",
-          "reporter": "Buddy Williams",
-          "round": 1
+        "agent_context": {
+          "assembled_at": "2026-09-15T16:24:44Z",
+          "current_round": {
+            "assignee": "Buddy Williams",
+            "prompt": "Update the website surface comparison table from: agents directly, agent loops, conductor, and Refine to: direct agents, Blitzy (https://blitzy.com), n8n (https://n8n.io/), and Refine. This removes agent loops and conductor.\n\nYou'll need to research Blitzy and n8n. I think n8n is generic, with workflows designed for software development, while Blitzy is purpose-built for software development modernization, though they have moved into feature development.\n\nSome of the key attributes of Refine are that it is open-source, local-first, built for BYOT (bring your own software), BYOA (bring your own agent), and agent-first orchestration through surfaces, though I suspect you'll find more differentiators.",
+            "reporter": "Buddy Williams",
+            "round": 1
+          },
+          "goal": {
+            "assignee": "Buddy Williams",
+            "id": "00000T19F2G97H0BEDPKDXE002",
+            "name": "Update the website surface comparison table from: agents directly, agent loops",
+            "node_id": "default",
+            "priority": "low",
+            "reporter": "Buddy Williams"
+          },
+          "governance": {
+            "configured": false,
+            "constitution": "",
+            "product": "",
+            "rules": []
+          },
+          "guidance_candidates": [],
+          "previous_rounds": [],
+          "version": 1,
+          "workflow_summary": "Refine gives this Goal Agent an isolated worktree, the current Round, and available planning context. Follow the Goal and applicable Skill instructions and use your judgment to decide when to stop. Quality and Governance agents make their own decisions using their Skills before integration and human Review. Refine coordinates workflow transitions and Git actions. Do not directly advance Goal state, approve, merge, or push."
         },
-        "goal": {
-          "assignee": "Buddy Williams",
-          "id": "00000T19F2G97H0BEDPKDXE002",
-          "name": "Update the website surface comparison table from: agents directly, agent loops",
-          "node_id": "default",
-          "priority": "low",
-          "reporter": "Buddy Williams"
-        },
-        "governance": {
-          "configured": false,
-          "constitution": "",
-          "product": "",
-          "rules": []
-        },
-        "guidance_candidates": [],
-        "previous_rounds": [],
-        "version": 1,
-        "workflow_summary": "Refine gives this Goal Agent an isolated worktree, the current Round, and available planning context. Follow the Goal and applicable Skill instructions and use your judgment to decide when to stop. Quality and Governance agents make their own decisions using their Skills before integration and human Review. Refine coordinates workflow transitions and Git actions. Do not directly advance Goal state, approve, merge, or push."
+        "plans": [
+          {
+            "artifacts": {
+              "plan": "Visitors should understand how Direct agents, Blitzy, n8n, and Refine approach software delivery. Replace the existing comparison’s categories and assumptions with concise, sourced descriptions that explain Refine’s open-source, local-first orchestration of users’ software and agents.\n\n1. [ ] Task #1 - Define the comparison around each product’s operating model.\n   Use the research below to finalize short cell descriptions. Define Direct agents as using a coding agent without an added orchestration platform; capabilities vary by agent. Describe Blitzy as purpose-built autonomous software development covering existing-code modernization, refactoring, and feature development. Describe n8n as general-purpose workflow and AI automation with software-development integrations and templates. Describe Refine as software-delivery coordination around existing repositories and supported installed agents. Use descriptive text instead of unsupported yes/no judgments. Distinguish choosing models, connecting external agents, and supervising installed coding agents.\n\n2. [ ] Task #2 - Rewrite the comparison section in src/surfaces/website/index.html.\n   Depends on Task #1. Set the product columns, in order, to Direct agents, Blitzy, n8n, and Refine; link Blitzy and n8n to their official sites. Replace the introduction’s claims about loops, single-machine orchestrators, and missing management capabilities. Use approximately eight rows: primary purpose; source/license; deployment and local work; bring your own software (BYOT); bring your own agent (BYOA); agent access and orchestration surfaces; delivery workflow and review; coordination and recovery.\n   Make Refine’s cells concrete: MIT open source; local repositories and runtime; existing software projects; supported installed agent CLIs; shared CLI/API/MCP/browser behavior; durable Goals and Rounds with configurable Skills, Quality, Governance, and Review; Git worktree isolation, node coordination, and retained execution evidence. Check final capability wording against current implementation and Hub documentation, rather than treating future design intent as shipped behavior.\n   Credit Blitzy’s existing-code support, specialized multi-agent development, validation, and enterprise deployment options. Credit n8n’s source availability, self-hosting, integrations, custom workflows, human approvals, and MCP. Explain differences in what each coordinates without claiming those capabilities are unique to Refine. For undocumented competitor capabilities, qualify or omit the claim rather than asserting absence.\n\n3. [ ] Task #3 - Add compact sourcing and preserve the table’s usability.\n   Depends on Task #2. Add a short source note with official product/documentation links and the research date, 2026-09-15. Identify n8n as source-available/fair-code using its published license description. Keep competitor performance statistics and prices outside this comparison. Preserve semantic column and row headers, the keyboard-focusable horizontal scroll region, and the highlighted Refine column. Adjust src/surfaces/website/assets/site.css only where the longer descriptions need wrapping, link focus styling, or spacing. Preserve the n8n brand casing if the existing uppercase header styling would obscure it.\n\n4. [ ] Task #4 - Hand off focused validation to Quality.\n   Depends on Task #3. Preview through `/home/buddy/projects/refine/bin/refine website --static-root <worktree> --port <available-port>`. Quality should inspect desktop and narrow-screen rendering, keyboard scrolling and links, readable cell alignment, and the four requested product headings. Confirm Agent Loops and Conductor and their associated assumptions are removed from the comparison. Verify source links and trace material claims to the research or current Refine behavior. This is a static website content change; use focused checks and existing applicable checks without introducing a new test framework."
+            },
+            "binding_id": "default-plan",
+            "evidence": [
+              "The existing comparison is in src/surfaces/website/index.html:114 onward. Its introduction and nine rows assume the old categories. Styling already provides horizontal overflow and an 860px minimum table width in src/surfaces/website/assets/site.css.",
+              "Refine grounding: LICENSE confirms MIT; src/surfaces/refine-hub/overview.md describes agent fleets and Skills; docs/intent/03-application/01-agents/09-agent-first-orchestration.md explains shared orchestration responsibilities; docs/intent/05-surfaces/06-mcp.md describes the local MCP adapter. These documentation paths are under src/surfaces/refine-hub.",
+              "Blitzy advertises modernization, refactoring, new features, existing-code understanding, specialized agents, and tested delivery. Deployment offerings include cloud VPC, customer VPC, and custom on-premises options. These are vendor claims, not independently tested results. [Blitzy product overview](https://blitzy.com/).",
+              "n8n describes visual workflows with custom code, self-hosted or cloud deployment, model flexibility, human approvals, and execution visibility. [n8n product overview](https://n8n.io/). Its repository identifies its licensing as fair-code/source-available under Sustainable Use and Enterprise licenses. [n8n README](https://github.com/n8n-io/n8n/blob/master/README.md).",
+              "n8n has software-development integrations and templates, including GitHub PR automation. [GitHub integrations](https://n8n.io/integrations/github/). Its built-in MCP server supports discovering, executing, creating, and editing workflows. [Official MCP documentation source](https://github.com/n8n-io/n8n-docs/blob/main/docs/connect/connect-to-n8n-mcp-server.md)."
+            ],
+            "invocation_id": "f4ab5d8908943f085185228228d31399df53ce748c2ddadae8c86586e6f8418d",
+            "outcome": "success",
+            "role": "plan",
+            "summary": "Plan ready for Implement. The central change is a factual comparison of operating models, with explicit BYOT, BYOA, licensing, local operation, and shared surfaces. Research confirms substantial overlapping capabilities, so a header-only replacement would leave misleading claims. No files or workflow state were changed. Prior memory helped locate the website assets; paths and styling were verified in this worktree.\n\n"
+          }
+        ]
       },
       "event": {},
       "goal": {
@@ -84,7 +105,7 @@
         "branch_name": "refine/00000T19F2G97H0BEDPKDXE002/round-1",
         "candidate_commit": null,
         "created": "2026-09-15T16:24:40Z",
-        "event_generation": 3,
+        "event_generation": 4,
         "feature_id": null,
         "feature_order": null,
         "id": "00000T19F2G97H0BEDPKDXE002",
@@ -101,26 +122,26 @@
             "failure_message": "",
             "prompt": "Update the website surface comparison table from: agents directly, agent loops, conductor, and Refine to: direct agents, Blitzy (https://blitzy.com), n8n (https://n8n.io/), and Refine. This removes agent loops and conductor.\n\nYou'll need to research Blitzy and n8n. I think n8n is generic, with workflows designed for software development, while Blitzy is purpose-built for software development modernization, though they have moved into feature development.\n\nSome of the key attributes of Refine are that it is open-source, local-first, built for BYOT (bring your own software), BYOA (bring your own agent), and agent-first orchestration through surfaces, though I suspect you'll find more differentiators.",
             "reporter": "Buddy Williams",
-            "updated": "2026-09-15T16:24:45Z"
+            "updated": "2026-09-15T16:26:49Z"
           }
         ],
-        "status": "plan",
+        "status": "implement",
         "target_branch": "main",
-        "updated": "2026-09-15T16:24:45Z",
-        "workflow_revision": 9
+        "updated": "2026-09-15T16:26:49Z",
+        "workflow_revision": 14
       },
       "system": {
         "candidate_commit": null,
         "node_id": "default",
         "project_root": "/home/buddy/projects/refine-next",
         "refine_executable": "/home/buddy/projects/refine/bin/refine",
-        "workflow_step": "plan",
+        "workflow_step": "implement",
         "workspace": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T19F2G97H0BEDPKDXE002-round-1"
       }
     },
     "metadata": {
       "behavior": "EventSkill",
-      "event_operation_id": "1a0a5e2996addd45c",
+      "event_operation_id": "1a0a5e47c62ddd45d",
       "goal_id": "00000T19F2G97H0BEDPKDXE002",
       "kind": "workflow",
       "managed_worktree": {
@@ -139,7 +160,7 @@
       "provider": "codex",
       "round_idx": 0,
       "started_bindings": {
-        "default-plan": "2026-09-15T16:24:46.959068184+00:00"
+        "default-implement": "2026-09-15T16:26:50.533116830+00:00"
       },
       "target_app_id": "/home/buddy/projects/refine-next",
       "template_snapshot": {
@@ -442,15 +463,15 @@
         }
       },
       "workflow_revision": 2,
-      "workflow_state": "plan",
-      "workflow_step_generation": 3
+      "workflow_state": "implement",
+      "workflow_step_generation": 4
     }
   },
   "bindings": [
     {
       "binding": {
-        "id": "default-plan",
-        "skill_id": "default-plan",
+        "id": "default-implement",
+        "skill_id": "default-implement",
         "enabled": true,
         "mode": "blocking",
         "order": 0,
@@ -461,10 +482,10 @@
         "inputs": {}
       },
       "skill": {
-        "id": "default-plan",
-        "name": "Plan",
-        "prompt": "## Plan\n\nDevelop a plan to achieve the Goal's desired outcome. If the goal outcome is underspecified or is missing details add only just enough detail so that AI agents do not thrash or become confused.\n\n### Outcome\n\nA clear implementation plan that explains the approach and breaks the work into ordered tasks. Begin with a short description of the desired behavior and proposed solution. Use a numbered checklist, such as `Task #1 - What changes and why`. Include dependencies and important design decisions where they help implementation.\n\n### Guardrails\n\n- Read the context that helps explain the Goal and how the existing system works.\n- Look for the underlying cause. Consider whether a missing or misused concept explains the problem, and improve that concept rather than adding fixes for individual symptoms.\n- Give each task enough detail to guide implementation while leaving room for reasonable implementation choices.\n- Keep the plan focused on the desired outcome. Prefer straightforward changes that fit the existing architecture.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
-        "role": "plan",
+        "id": "default-implement",
+        "name": "Implement",
+        "prompt": "## Implement\n\nImplement the plan.\n\n### Outcome\n\nThe plan is implemented in a way that aligns with the project's purpose and architecture. Provide a brief summary organized by plan task: what changed, any important departures from the plan and why, and any unfinished work.\n\n### Guardrails\n\n- Follow established code patterns and put shared behavior in one place. Fix the underlying cause rather than each symptom separately.\n- Keep code focused on one responsibility and preserve stable interfaces where possible. Split mixed responsibilities into separate files. Keep files relatively small, under roughly 1,000 lines where possible.\n- Prefer clear, straightforward code and abstractions that make the behavior easier to understand and maintain.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
+        "role": "implement",
         "enabled": true,
         "scope": {
           "node_id": null
@@ -475,55 +496,11 @@
       "parameters": {}
     }
   ],
-  "state": "succeeded",
-  "results": {
-    "default-plan": {
-      "invocation_id": "f4ab5d8908943f085185228228d31399df53ce748c2ddadae8c86586e6f8418d",
-      "binding_id": "default-plan",
-      "role": "plan",
-      "outcome": "success",
-      "summary": "Plan ready for Implement. The central change is a factual comparison of operating models, with explicit BYOT, BYOA, licensing, local operation, and shared surfaces. Research confirms substantial overlapping capabilities, so a header-only replacement would leave misleading claims. No files or workflow state were changed. Prior memory helped locate the website assets; paths and styling were verified in this worktree.\n\n",
-      "evidence": [
-        "The existing comparison is in src/surfaces/website/index.html:114 onward. Its introduction and nine rows assume the old categories. Styling already provides horizontal overflow and an 860px minimum table width in src/surfaces/website/assets/site.css.",
-        "Refine grounding: LICENSE confirms MIT; src/surfaces/refine-hub/overview.md describes agent fleets and Skills; docs/intent/03-application/01-agents/09-agent-first-orchestration.md explains shared orchestration responsibilities; docs/intent/05-surfaces/06-mcp.md describes the local MCP adapter. These documentation paths are under src/surfaces/refine-hub.",
-        "Blitzy advertises modernization, refactoring, new features, existing-code understanding, specialized agents, and tested delivery. Deployment offerings include cloud VPC, customer VPC, and custom on-premises options. These are vendor claims, not independently tested results. [Blitzy product overview](https://blitzy.com/).",
-        "n8n describes visual workflows with custom code, self-hosted or cloud deployment, model flexibility, human approvals, and execution visibility. [n8n product overview](https://n8n.io/). Its repository identifies its licensing as fair-code/source-available under Sustainable Use and Enterprise licenses. [n8n README](https://github.com/n8n-io/n8n/blob/master/README.md).",
-        "n8n has software-development integrations and templates, including GitHub PR automation. [GitHub integrations](https://n8n.io/integrations/github/). Its built-in MCP server supports discovering, executing, creating, and editing workflows. [Official MCP documentation source](https://github.com/n8n-io/n8n-docs/blob/main/docs/connect/connect-to-n8n-mcp-server.md)."
-      ],
-      "artifacts": {
-        "plan": "Visitors should understand how Direct agents, Blitzy, n8n, and Refine approach software delivery. Replace the existing comparison’s categories and assumptions with concise, sourced descriptions that explain Refine’s open-source, local-first orchestration of users’ software and agents.\n\n1. [ ] Task #1 - Define the comparison around each product’s operating model.\n   Use the research below to finalize short cell descriptions. Define Direct agents as using a coding agent without an added orchestration platform; capabilities vary by agent. Describe Blitzy as purpose-built autonomous software development covering existing-code modernization, refactoring, and feature development. Describe n8n as general-purpose workflow and AI automation with software-development integrations and templates. Describe Refine as software-delivery coordination around existing repositories and supported installed agents. Use descriptive text instead of unsupported yes/no judgments. Distinguish choosing models, connecting external agents, and supervising installed coding agents.\n\n2. [ ] Task #2 - Rewrite the comparison section in src/surfaces/website/index.html.\n   Depends on Task #1. Set the product columns, in order, to Direct agents, Blitzy, n8n, and Refine; link Blitzy and n8n to their official sites. Replace the introduction’s claims about loops, single-machine orchestrators, and missing management capabilities. Use approximately eight rows: primary purpose; source/license; deployment and local work; bring your own software (BYOT); bring your own agent (BYOA); agent access and orchestration surfaces; delivery workflow and review; coordination and recovery.\n   Make Refine’s cells concrete: MIT open source; local repositories and runtime; existing software projects; supported installed agent CLIs; shared CLI/API/MCP/browser behavior; durable Goals and Rounds with configurable Skills, Quality, Governance, and Review; Git worktree isolation, node coordination, and retained execution evidence. Check final capability wording against current implementation and Hub documentation, rather than treating future design intent as shipped behavior.\n   Credit Blitzy’s existing-code support, specialized multi-agent development, validation, and enterprise deployment options. Credit n8n’s source availability, self-hosting, integrations, custom workflows, human approvals, and MCP. Explain differences in what each coordinates without claiming those capabilities are unique to Refine. For undocumented competitor capabilities, qualify or omit the claim rather than asserting absence.\n\n3. [ ] Task #3 - Add compact sourcing and preserve the table’s usability.\n   Depends on Task #2. Add a short source note with official product/documentation links and the research date, 2026-09-15. Identify n8n as source-available/fair-code using its published license description. Keep competitor performance statistics and prices outside this comparison. Preserve semantic column and row headers, the keyboard-focusable horizontal scroll region, and the highlighted Refine column. Adjust src/surfaces/website/assets/site.css only where the longer descriptions need wrapping, link focus styling, or spacing. Preserve the n8n brand casing if the existing uppercase header styling would obscure it.\n\n4. [ ] Task #4 - Hand off focused validation to Quality.\n   Depends on Task #3. Preview through `/home/buddy/projects/refine/bin/refine website --static-root <worktree> --port <available-port>`. Quality should inspect desktop and narrow-screen rendering, keyboard scrolling and links, readable cell alignment, and the four requested product headings. Confirm Agent Loops and Conductor and their associated assumptions are removed from the comparison. Verify source links and trace material claims to the research or current Refine behavior. This is a static website content change; use focused checks and existing applicable checks without introducing a new test framework."
-      }
-    }
-  },
-  "attempts": [
-    {
-      "attempt": 0,
-      "binding_id": "default-plan",
-      "checkout": {
-        "observation": {
-          "branch": "refine/00000T19F2G97H0BEDPKDXE002/round-1",
-          "head_commit": "168a3ee441505c98ae37cf584db2613575b1c206",
-          "status_porcelain": []
-        },
-        "tree": "f362e9c6691b2bf39b674ab6b42111fab0cf0912"
-      },
-      "checkout_recorded": true,
-      "diagnostic": null,
-      "host_bound_result": true,
-      "observational_violation": false,
-      "operation_id": null,
-      "process_id": "proc-1789489487311-908613-3280",
-      "prompt_bytes": 6720,
-      "provider_session_id": null,
-      "purpose": "work",
-      "raw_output": "{\n  \"outcome\": \"success\",\n  \"artifacts\": {\n    \"plan\": \"Visitors should understand how Direct agents, Blitzy, n8n, and Refine approach software delivery. Replace the existing comparison’s categories and assumptions with concise, sourced descriptions that explain Refine’s open-source, local-first orchestration of users’ software and agents.\\n\\n1. [ ] Task #1 - Define the comparison around each product’s operating model.\\n   Use the research below to finalize short cell descriptions. Define Direct agents as using a coding agent without an added orchestration platform; capabilities vary by agent. Describe Blitzy as purpose-built autonomous software development covering existing-code modernization, refactoring, and feature development. Describe n8n as general-purpose workflow and AI automation with software-development integrations and templates. Describe Refine as software-delivery coordination around existing repositories and supported installed agents. Use descriptive text instead of unsupported yes/no judgments. Distinguish choosing models, connecting external agents, and supervising installed coding agents.\\n\\n2. [ ] Task #2 - Rewrite the comparison section in src/surfaces/website/index.html.\\n   Depends on Task #1. Set the product columns, in order, to Direct agents, Blitzy, n8n, and Refine; link Blitzy and n8n to their official sites. Replace the introduction’s claims about loops, single-machine orchestrators, and missing management capabilities. Use approximately eight rows: primary purpose; source/license; deployment and local work; bring your own software (BYOT); bring your own agent (BYOA); agent access and orchestration surfaces; delivery workflow and review; coordination and recovery.\\n   Make Refine’s cells concrete: MIT open source; local repositories and runtime; existing software projects; supported installed agent CLIs; shared CLI/API/MCP/browser behavior; durable Goals and Rounds with configurable Skills, Quality, Governance, and Review; Git worktree isolation, node coordination, and retained execution evidence. Check final capability wording against current implementation and Hub documentation, rather than treating future design intent as shipped behavior.\\n   Credit Blitzy’s existing-code support, specialized multi-agent development, validation, and enterprise deployment options. Credit n8n’s source availability, self-hosting, integrations, custom workflows, human approvals, and MCP. Explain differences in what each coordinates without claiming those capabilities are unique to Refine. For undocumented competitor capabilities, qualify or omit the claim rather than asserting absence.\\n\\n3. [ ] Task #3 - Add compact sourcing and preserve the table’s usability.\\n   Depends on Task #2. Add a short source note with official product/documentation links and the research date, 2026-09-15. Identify n8n as source-available/fair-code using its published license description. Keep competitor performance statistics and prices outside this comparison. Preserve semantic column and row headers, the keyboard-focusable horizontal scroll region, and the highlighted Refine column. Adjust src/surfaces/website/assets/site.css only where the longer descriptions need wrapping, link focus styling, or spacing. Preserve the n8n brand casing if the existing uppercase header styling would obscure it.\\n\\n4. [ ] Task #4 - Hand off focused validation to Quality.\\n   Depends on Task #3. Preview through `/home/buddy/projects/refine/bin/refine website --static-root <worktree> --port <available-port>`. Quality should inspect desktop and narrow-screen rendering, keyboard scrolling and links, readable cell alignment, and the four requested product headings. Confirm Agent Loops and Conductor and their associated assumptions are removed from the comparison. Verify source links and trace material claims to the research or current Refine behavior. This is a static website content change; use focused checks and existing applicable checks without introducing a new test framework.\"\n  },\n  \"evidence\": [\n    \"The existing comparison is in src/surfaces/website/index.html:114 onward. Its introduction and nine rows assume the old categories. Styling already provides horizontal overflow and an 860px minimum table width in src/surfaces/website/assets/site.css.\",\n    \"Refine grounding: LICENSE confirms MIT; src/surfaces/refine-hub/overview.md describes agent fleets and Skills; docs/intent/03-application/01-agents/09-agent-first-orchestration.md explains shared orchestration responsibilities; docs/intent/05-surfaces/06-mcp.md describes the local MCP adapter. These documentation paths are under src/surfaces/refine-hub.\",\n    \"Blitzy advertises modernization, refactoring, new features, existing-code understanding, specialized agents, and tested delivery. Deployment offerings include cloud VPC, customer VPC, and custom on-premises options. These are vendor claims, not independently tested results. [Blitzy product overview](https://blitzy.com/).\",\n    \"n8n describes visual workflows with custom code, self-hosted or cloud deployment, model flexibility, human approvals, and execution visibility. [n8n product overview](https://n8n.io/). Its repository identifies its licensing as fair-code/source-available under Sustainable Use and Enterprise licenses. [n8n README](https://github.com/n8n-io/n8n/blob/master/README.md).\",\n    \"n8n has software-development integrations and templates, including GitHub PR automation. [GitHub integrations](https://n8n.io/integrations/github/). Its built-in MCP server supports discovering, executing, creating, and editing workflows. [Official MCP documentation source](https://github.com/n8n-io/n8n-docs/blob/main/docs/connect/connect-to-n8n-mcp-server.md).\"\n  ],\n  \"summary\": \"Plan ready for Implement. The central change is a factual comparison of operating models, with explicit BYOT, BYOA, licensing, local operation, and shared surfaces. Research confirms substantial overlapping capabilities, so a header-only replacement would leave misleading claims. No files or workflow state were changed. Prior memory helped locate the website assets; paths and styling were verified in this worktree.\\n\\n\"\n}",
-      "received_at": "2026-09-15T16:26:46.091135053+00:00",
-      "started_at": "2026-09-15T16:24:47.281332928+00:00",
-      "workflow_revision": 2
-    }
-  ],
-  "created_at": "2026-09-15T16:24:45.831180043+00:00",
-  "completed_at": "2026-09-15T16:26:47.381868175+00:00",
+  "state": "running",
+  "results": {},
+  "attempts": [],
+  "created_at": "2026-09-15T16:26:49.475319734+00:00",
+  "completed_at": null,
   "error": null,
   "action_applied": false
 }
