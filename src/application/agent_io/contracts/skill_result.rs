@@ -95,6 +95,16 @@ pub(crate) fn decode_result(
                             | "artifacts"
                     )
                 });
+                // Providers may return structured supporting evidence. Preserve
+                // each value as compact JSON text while keeping strings verbatim
+                // and the persisted Vec<String> schema strict. Non-arrays still fail.
+                if let Some(Value::Array(evidence)) = object.get_mut("evidence") {
+                    for entry in evidence {
+                        if !entry.is_string() {
+                            *entry = Value::String(entry.to_string());
+                        }
+                    }
+                }
                 // Any supplied identity selects the legacy path: all three
                 // fields must deserialize and match, even for new receipts.
                 if host_bound && !identity.iter().any(|(key, _)| object.contains_key(*key)) {
@@ -186,41 +196,68 @@ mod tests {
     }
     #[test]
     fn provider_extensions_are_tolerated_across_completion_transports() {
-        for host_bound in [false, true] {
-            let mut value = json!({"outcome":"failure","summary":"Found a defect",
-                "evidence":["check failed"],"artifacts":{"checklist":[{"id":"P1"}],
+        for outcome in ["success", "failure", "error"] {
+            for host_bound in [false, true] {
+                let mut value = json!({"outcome":outcome,"summary":"Observed result",
+                "evidence":["check\nreported", {"id":"P1","note":"did X"},
+                    ["nested", {"result":{"outcome":"failure"}}], 42, 1.5, true, false, null,
+                    "{\"outcome\":\"error\"}"],"artifacts":{"checklist":[{"id":"P1"}],
                     "result":{"outcome":"success"},"quoted":r#"{"outcome":"error"}"#},
                 "checklist":[{"id":"ignored"}],"extra":{"nested":true}});
-            if !host_bound {
-                value["invocation_id"] = json!("i");
-                value["binding_id"] = json!("b");
-                value["role"] = json!("quality");
+                if !host_bound {
+                    value["invocation_id"] = json!("i");
+                    value["binding_id"] = json!("b");
+                    value["role"] = json!("quality");
+                }
+                let raw = value.to_string();
+                for output in [
+                    raw.clone(),
+                    format!("```json\n{raw}\n```"),
+                    format!("Review complete. {raw} Done."),
+                    json!({"result":value}).to_string(),
+                    json!({"skill_result":raw}).to_string(),
+                    serde_json::to_string(&raw).unwrap(),
+                    format!(
+                        "Review complete. {} Done.",
+                        serde_json::to_string(&raw).unwrap()
+                    ),
+                    format!("Review complete. ```json\n{raw}\n``` Done."),
+                    format!("Repeated response: {raw} then {raw}"),
+                ] {
+                    let result = decode_result(&output, "i", "b", "quality", host_bound).unwrap();
+                    result.validate("i", "b", "quality").unwrap();
+                    assert_eq!(result.outcome, outcome);
+                    assert_eq!(result.summary, "Observed result");
+                    let original = value["evidence"].as_array().unwrap();
+                    assert_eq!(result.evidence.len(), original.len());
+                    for (actual, expected) in result.evidence.iter().zip(original) {
+                        if let Some(expected) = expected.as_str() {
+                            assert_eq!(actual, expected);
+                        } else {
+                            assert_eq!(serde_json::from_str::<Value>(actual).unwrap(), *expected);
+                            assert_eq!(*actual, expected.to_string());
+                        }
+                    }
+                    assert_eq!(result.artifacts, value["artifacts"]);
+                }
+                // Tolerance belongs to provider ingestion, not persisted records.
+                assert!(serde_json::from_value::<SkillResult>(value).is_err());
             }
-            let raw = value.to_string();
-            for output in [
-                raw.clone(),
-                format!("```json\n{raw}\n```"),
-                format!("Review complete. {raw} Done."),
-                json!({"result":value}).to_string(),
-                json!({"skill_result":raw}).to_string(),
-                serde_json::to_string(&raw).unwrap(),
-                format!(
-                    "Review complete. {} Done.",
-                    serde_json::to_string(&raw).unwrap()
-                ),
-                format!("Review complete. ```json\n{raw}\n``` Done."),
-                format!("Repeated response: {raw} then {raw}"),
-            ] {
-                let result = decode_result(&output, "i", "b", "quality", host_bound).unwrap();
-                result.validate("i", "b", "quality").unwrap();
-                assert_eq!(result.outcome, "failure");
-                assert_eq!(result.summary, "Found a defect");
-                assert_eq!(result.evidence, ["check failed"]);
-                assert_eq!(result.artifacts, value["artifacts"]);
-            }
-            // Tolerance belongs to provider ingestion, not persisted records.
-            assert!(serde_json::from_value::<SkillResult>(value).is_err());
         }
+    }
+
+    #[test]
+    fn object_evidence_is_accepted_only_at_provider_ingestion() {
+        let raw = r#"{"outcome":"success","summary":"...","evidence":[{"id":"P1","note":"did X"}],"artifacts":{}}"#;
+        let result = decode_result(raw, "i", "b", "implement", true).unwrap();
+        assert_eq!(result.evidence, [r#"{"id":"P1","note":"did X"}"#]);
+        let mut persisted = serde_json::to_value(&result).unwrap();
+        assert!(serde_json::from_value::<SkillResult>(persisted.clone()).is_ok());
+        persisted["evidence"] = json!([{"id":"P1","note":"did X"}]);
+        assert!(serde_json::from_value::<SkillResult>(persisted).is_err());
+        let minimal =
+            decode_result(r#"{"outcome":"success"}"#, "i", "b", "implement", true).unwrap();
+        assert!(minimal.evidence.is_empty());
     }
 
     #[test]
@@ -234,7 +271,10 @@ mod tests {
             ),
             ("summary", json!([]), "summary"),
             ("evidence", json!("check passed"), "evidence"),
-            ("evidence", json!([42]), "evidence[0]"),
+            ("evidence", json!({"note":"check passed"}), "evidence"),
+            ("evidence", json!(42), "evidence"),
+            ("evidence", json!(true), "evidence"),
+            ("evidence", json!(null), "evidence"),
         ] {
             for host_bound in [false, true] {
                 let mut report = json!({"outcome":"success","checklist":[]});
@@ -286,6 +326,10 @@ mod tests {
                 r#"Review: {"outcome":"success","checklist":[1]} Final: {"outcome":"success","checklist":[2]}"#,
                 "2 distinct JSON candidates",
             ),
+            (
+                r#"Review: {"outcome":"success","evidence":[42]} Final: {"outcome":"success","evidence":["42"]}"#,
+                "2 distinct JSON candidates",
+            ),
         ] {
             let error = decode_result(raw, "i", "b", "quality", true)
                 .unwrap_err()
@@ -304,6 +348,7 @@ mod tests {
             nested = json!([nested]);
         }
         let deep = json!({"outcome":"success", "extra":nested});
+        let deep_evidence = json!({"outcome":"success", "evidence":[nested]});
         let mut wrapped = json!({"outcome":"success", "checklist":[]});
         for _ in 0..options.max_layers {
             wrapped = json!({"result":wrapped});
@@ -317,6 +362,7 @@ mod tests {
         for (output, diagnostic) in [
             (oversized.to_string(), "maximum payload size"),
             (deep.to_string(), "maximum JSON nesting depth"),
+            (deep_evidence.to_string(), "maximum JSON nesting depth"),
             (
                 wrapped.to_string(),
                 "completion-envelope or stringification layers",

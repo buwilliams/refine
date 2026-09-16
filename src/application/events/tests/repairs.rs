@@ -236,23 +236,163 @@ print(json.dumps(contract))
 
 #[cfg(unix)]
 #[test]
+fn structured_evidence_preserves_verdict_and_gate_without_another_provider_call() {
+    let _env = crate::infrastructure::agents::invocation::smoke_ai_env_lock()
+        .lock()
+        .unwrap_or_else(|p| p.into_inner());
+    for outcome in ["success", "failure", "error"] {
+        let fixture = Fixture::new();
+        let _restore = provider(
+            &fixture,
+            &format!(
+                r#"
+import json,sys,pathlib
+prompt=' '.join(sys.argv[1:])
+result=json.JSONDecoder().raw_decode(prompt.split('Refine completion contract (supplied by the system):\n',1)[1])[0]
+result['outcome']='{outcome}'
+result['evidence']=[{{'id':'P1','note':'did X'}}, 'unchanged', 42, None]
+with pathlib.Path('work-count').open('a') as f: f.write('work\n')
+print(json.dumps(result))
+"#
+            ),
+        );
+        let service = fixture.service();
+        let invocation = prepared(&fixture, "workflow.implement.enter");
+        let completed = service.execute(&invocation.id, || Ok(())).unwrap();
+        assert_eq!(
+            completed.state,
+            match outcome {
+                "success" => InvocationState::Succeeded,
+                "failure" => InvocationState::Failed,
+                _ => InvocationState::Error,
+            },
+            "{completed:?}"
+        );
+        assert_eq!(
+            completed.gate_assessment(),
+            match outcome {
+                "success" => GateAssessment::Satisfied,
+                "failure" => GateAssessment::Finding,
+                _ => GateAssessment::Fault,
+            }
+        );
+        assert_eq!(completed.attempts.len(), 1);
+        assert!(completed.attempts[0]["diagnostic"].is_null());
+        let persisted = service.invocation(&invocation.id).unwrap();
+        let result = &persisted.results[&invocation.bindings[0].binding.id];
+        assert_eq!(result.outcome, outcome);
+        assert_eq!(
+            result.evidence,
+            [r#"{"id":"P1","note":"did X"}"#, "unchanged", "42", "null"]
+        );
+        let raw: serde_json::Value =
+            serde_json::from_str(persisted.attempts[0]["raw_output"].as_str().unwrap()).unwrap();
+        assert_eq!(
+            raw["evidence"],
+            json!([{"id":"P1","note":"did X"}, "unchanged", 42, null])
+        );
+        assert_eq!(
+            service.execute(&invocation.id, || Ok(())).unwrap(),
+            completed
+        );
+        assert_eq!(
+            std::fs::read_to_string(fixture.0.join("work-count")).unwrap(),
+            "work\n"
+        );
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn retained_structured_evidence_redecodes_old_rejections_without_a_provider_call() {
+    let _env = crate::infrastructure::agents::invocation::smoke_ai_env_lock()
+        .lock()
+        .unwrap_or_else(|p| p.into_inner());
+    for host_bound in [false, true] {
+        for outcome in ["success", "failure", "error"] {
+            let fixture = Fixture::new();
+            let checkout = Fixture::new();
+            checkout.repository();
+            let _restore = provider(
+                &fixture,
+                "import pathlib\npathlib.Path('unexpected-provider-call').touch()\nraise SystemExit(1)",
+            );
+            let service = fixture.service();
+            let mut invocation = prepared(&fixture, "workflow.implement.enter");
+            invocation.context.cwd = checkout.0.clone();
+            invocation.context.target_root = checkout.0.clone();
+            let binding = &invocation.bindings[0];
+            let mut report = json!({"outcome":outcome,
+                "evidence":[{"id":"P1","note":"completed work"}]});
+            if !host_bound {
+                report["invocation_id"] = json!(invocation.id);
+                report["binding_id"] = json!(binding.binding.id);
+                report["role"] = json!(binding.skill.role);
+            }
+            let raw = report.to_string();
+            let checkout_receipt = super::super::completion::observe(
+                &FileGitWorktreeService::new(&checkout.0),
+                &checkout.0,
+            )
+            .unwrap();
+            let mut receipt = json!({"binding_id":binding.binding.id,"attempt":0,
+                "process_id":"completed-provider","raw_output":raw,
+                "purpose":"work","checkout_recorded":true,"checkout":checkout_receipt,
+                "diagnostic":"evidence[0]: invalid type: map, expected a string"});
+            // Legacy receipts omit the host-binding marker entirely.
+            if host_bound {
+                receipt["host_bound_result"] = json!(true);
+            }
+            invocation.attempts.push(receipt);
+            service.save_invocation(&invocation).unwrap();
+
+            let completed = service.execute(&invocation.id, || Ok(())).unwrap();
+            assert_eq!(
+                completed.gate_assessment(),
+                match outcome {
+                    "success" => GateAssessment::Satisfied,
+                    "failure" => GateAssessment::Finding,
+                    _ => GateAssessment::Fault,
+                },
+                "{completed:?}"
+            );
+            let persisted = service.invocation(&invocation.id).unwrap();
+            assert_eq!(persisted.attempts.len(), 1);
+            assert_eq!(persisted.attempts[0]["raw_output"], raw);
+            assert!(persisted.attempts[0]["diagnostic"].is_null());
+            let result = &persisted.results[&binding.binding.id];
+            assert_eq!(result.outcome, outcome);
+            assert_eq!(result.evidence, [r#"{"id":"P1","note":"completed work"}"#]);
+            assert!(!checkout.0.join("unexpected-provider-call").exists());
+        }
+    }
+}
+
+#[cfg(unix)]
+#[test]
 fn restart_accepts_a_durable_provider_receipt_before_launching_more_work() {
     let _env = crate::infrastructure::agents::invocation::smoke_ai_env_lock()
         .lock()
         .unwrap_or_else(|p| p.into_inner());
     let fixture = Fixture::new();
+    let checkout = Fixture::new();
+    checkout.repository();
     let _restore = provider(
         &fixture,
         r#"
 import json,sys,pathlib
 prompt=' '.join(sys.argv[1:])
 result=json.JSONDecoder().raw_decode(prompt.split('Refine completion contract (supplied by the system):\n',1)[1])[0]
+result['evidence']=[{'id':'P1','note':'did X'}]
 with pathlib.Path('work-count').open('a') as f: f.write('work\n')
 print(json.dumps(result))
 "#,
     );
     let service = fixture.service();
     let mut invocation = prepared(&fixture, "workflow.plan.enter");
+    invocation.context.cwd = checkout.0.clone();
+    invocation.context.target_root = checkout.0.clone();
+    service.save_invocation(&invocation).unwrap();
     let binding = invocation.bindings[0].clone();
     let contract = crate::application::agent_io::contracts::skill_result::report_contract();
     let prompt = format!("Refine completion contract (supplied by the system):\n{contract}");
@@ -265,7 +405,7 @@ print(json.dumps(result))
         &contract,
         &Default::default(),
         Some(10),
-        true,
+        false,
         &|| {
             calls.set(calls.get() + 1);
             if calls.get() > 1 {
@@ -281,14 +421,65 @@ print(json.dumps(result))
     let retained = service.invocation(&invocation.id).unwrap();
     assert_eq!(retained.attempts.len(), 1);
     assert!(retained.results.is_empty());
+    assert!(retained.attempts[0]["checkout"].is_object());
+    let raw = retained.attempts[0]["raw_output"].clone();
+    let parsed: serde_json::Value = serde_json::from_str(raw.as_str().unwrap()).unwrap();
+    assert_eq!(parsed["evidence"], json!([{"id":"P1","note":"did X"}]));
+    for changed_checkout in [false, true] {
+        if changed_checkout {
+            std::fs::write(checkout.0.join("later-edit"), "changed after receipt").unwrap();
+        }
+        let mut replay = service.invocation(&invocation.id).unwrap();
+        let error = super::super::completion::run(
+            &service,
+            &mut replay,
+            &binding,
+            &prompt,
+            &contract,
+            &Default::default(),
+            Some(10),
+            false,
+            &|| {
+                if changed_checkout {
+                    Ok(())
+                } else {
+                    Err(crate::error::RefineError::Conflict(
+                        "authority revoked".into(),
+                    ))
+                }
+            },
+        )
+        .unwrap_err();
+        assert!(
+            error.to_string().contains(if changed_checkout {
+                "Retained completion checkout changed"
+            } else {
+                "authority revoked"
+            }),
+            "{error}"
+        );
+        assert_eq!(
+            service.invocation(&invocation.id).unwrap().attempts,
+            retained.attempts
+        );
+        if changed_checkout {
+            std::fs::remove_file(checkout.0.join("later-edit")).unwrap();
+        }
+    }
     let resumed = fixture
         .service()
         .execute(&invocation.id, || Ok(()))
         .unwrap();
     assert_eq!(resumed.state, InvocationState::Succeeded, "{resumed:?}");
     assert_eq!(resumed.attempts.len(), 1);
+    assert_eq!(resumed.gate_assessment(), GateAssessment::Satisfied);
+    assert_eq!(resumed.attempts[0]["raw_output"], raw);
     assert_eq!(
-        std::fs::read_to_string(fixture.0.join("work-count")).unwrap(),
+        resumed.results[&binding.binding.id].evidence,
+        [r#"{"id":"P1","note":"did X"}"#]
+    );
+    assert_eq!(
+        std::fs::read_to_string(checkout.0.join("work-count")).unwrap(),
         "work\n"
     );
 }
