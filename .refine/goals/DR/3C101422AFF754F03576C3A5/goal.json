@@ -3,10 +3,30 @@
   "branch_name": "refine/DR3C101422AFF754F03576C3A5/round-1",
   "candidate_commit": "8a01818414199b2d3c5ce62fc13586bf8c44003e",
   "created": "2026-09-16T12:13:41Z",
-  "event_generation": 6,
+  "event_generation": 7,
   "feature_id": null,
   "feature_order": null,
   "id": "DR3C101422AFF754F03576C3A5",
+  "integration_history": [
+    {
+      "complete": true,
+      "generation": 6,
+      "integration": {
+        "candidate_commit": "8a01818414199b2d3c5ce62fc13586bf8c44003e",
+        "integrated_at": "2026-09-16T12:45:47.584791447+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n src/application/agent_io/contracts/skill_result.rs | 110 ++++++++----\n src/application/events/tests/repairs.rs            | 195 ++++++++++++++++++++-\n 2 files changed, 271 insertions(+), 34 deletions(-)",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "95a05284ea9f7b5c9ef545b093581c6bc0ad69ec"
+      },
+      "round_idx": 0
+    }
+  ],
   "name": "Bug: evidence[0]: invalid type: map output-contract fault survives the 4.3.2 unknown-field fix",
   "node_id": "default",
   "notes": [],
@@ -46,51 +66,55 @@
       "created": "2026-09-16T12:13:41Z",
       "event_configuration": {
         "events": {
-          "workflow.governance.enter": {
-            "bindings": [
-              {
-                "enabled": true,
-                "id": "default-governance",
-                "inputs": {},
-                "mode": "blocking",
-                "order": 0,
-                "overrides": null,
-                "scope": {
-                  "node_id": null
-                },
-                "skill_id": "default-governance"
-              }
-            ],
+          "workflow.governance.exit": {
+            "bindings": [],
             "enabled": true,
-            "id": "workflow.governance.enter",
+            "id": "workflow.governance.exit",
             "kind": "system",
-            "name": "Workflow Governance Enter",
+            "name": "Workflow Governance Exit",
             "on_success": null,
             "parameters": [],
             "scope": {
               "node_id": null
             },
-            "source": "workflow.governance.enter"
+            "source": "workflow.governance.exit"
           }
         },
         "revision": 86,
         "schema_version": 3,
-        "skills": {
-          "default-governance": {
-            "enabled": true,
-            "id": "default-governance",
-            "name": "Governance",
-            "parameters": [],
-            "prompt": "{{templates.purpose}}\n\n{{templates.architecture}}\n\n## Governance\n\nVerify that the implementation meets the user-defined Goal, fits the system architecture, and serves the project's purpose.\n\n### Outcome\n\nA clear assessment of whether the implementation satisfies all three. Begin with the verdict, then briefly explain how the work meets the Goal, fits the architecture, and supports the project's purpose, using concrete evidence from the implementation and Quality results. For each gap, describe what falls short, why it matters, and the recommended correction. Separate necessary corrections from optional improvements.\n\n### Guardrails\n\n- Read the context that helps explain the user's Goal, the system architecture, and the project's purpose.\n- Compare the implementation with the user's desired outcome as well as the plan. Completing the plan and passing tests alone do not establish that the Goal is met.\n- Look for clear responsibilities, shared behavior implemented in one place, and interfaces that remain easy to use and maintain.\n- Judge design choices by how they serve the project. Allow sound approaches that differ from personal preference.\n- Group related issues by their underlying cause so the next step can address them together.",
-            "provenance": "refine-default-v1",
-            "role": "task",
-            "scope": {
-              "node_id": null
-            }
-          }
-        }
+        "skills": {}
       },
       "event_results": {
+        "19c19838f49c9cf5bc722812b16941f9511d3fbdabd2513b4a1f6ab0c9b7df3d": {
+          "candidate_commit": "8a01818414199b2d3c5ce62fc13586bf8c44003e",
+          "generation": 6,
+          "results": {
+            "default-governance": {
+              "artifacts": {
+                "necessary_corrections": [],
+                "optional_improvements": [
+                  "Address the documented baseline suite failures separately to restore a reliable full-suite signal."
+                ],
+                "validation_limit": "Runtime tests used deterministic provider fixtures; no live-provider session was exercised."
+              },
+              "binding_id": "default-governance",
+              "evidence": [
+                "Reviewed both changed files, the persisted plan, and Quality results for the current candidate.",
+                "Normalization preserves existing strings and ordering. Identity validation, ambiguity rejection, transport bounds, and rejection of non-array evidence remain intact.",
+                "Completion regressions cover fresh and retained responses, success/failure/error verdicts, preserved raw output, checkout and authority checks, and no additional provider calls.",
+                "Inspected Quality logs confirming 30 agent-I/O tests and 91 event tests passed. Candidate diff whitespace checks passed.",
+                "The full suite was not clean: 1412 passed, 12 failed, 7 ignored. Quality rechecks and baseline evidence support classifying the remaining failures as unrelated to this change."
+              ],
+              "invocation_id": "19c19838f49c9cf5bc722812b16941f9511d3fbdabd2513b4a1f6ab0c9b7df3d",
+              "outcome": "success",
+              "role": "governance",
+              "summary": "Pass. Candidate 8a01818414199b2d3c5ce62fc13586bf8c44003e meets the Goal and plan, fits Refine’s architecture, and supports reliable agent workflows. The shared application decoder converts structured evidence entries into compact JSON strings, preventing the reported completion rejection while preserving evidence content, verdicts, and strict persisted types. No necessary corrections found."
+            }
+          },
+          "round_idx": 0,
+          "source": "workflow.governance.enter",
+          "state": "succeeded"
+        },
         "912ca0b8b9d248cb7625f1d6860485f1d940e5593231409bc75adadbd5e03a41": {
           "candidate_commit": null,
           "generation": 4,
@@ -550,8 +574,90 @@
               }
             }
           }
+        },
+        "6:default:workflow.governance.exit": {
+          "events": {
+            "workflow.governance.exit": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.governance.exit",
+              "kind": "system",
+              "name": "Workflow Governance Exit",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.governance.exit"
+            }
+          },
+          "revision": 86,
+          "schema_version": 3,
+          "skills": {}
+        },
+        "6:default:workflow.governance.success": {
+          "events": {},
+          "revision": 86,
+          "schema_version": 3,
+          "skills": {}
+        },
+        "7:default:workflow.review.enter": {
+          "events": {
+            "workflow.review.enter": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.review.enter",
+              "kind": "system",
+              "name": "Workflow Review Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.review.enter"
+            }
+          },
+          "revision": 86,
+          "schema_version": 3,
+          "skills": {}
         }
       },
+      "governance_candidate_commit": "8a01818414199b2d3c5ce62fc13586bf8c44003e",
+      "governance_checked_at": "2026-09-16T12:45:43Z",
+      "governance_details": {
+        "candidate_commit": "8a01818414199b2d3c5ce62fc13586bf8c44003e",
+        "configured": true,
+        "failed_actions": [],
+        "phase": "post_implementation",
+        "skill_results": [
+          {
+            "artifacts": {
+              "necessary_corrections": [],
+              "optional_improvements": [
+                "Address the documented baseline suite failures separately to restore a reliable full-suite signal."
+              ],
+              "validation_limit": "Runtime tests used deterministic provider fixtures; no live-provider session was exercised."
+            },
+            "binding_id": "workflow.governance.enter:default-governance",
+            "evidence": [
+              "Reviewed both changed files, the persisted plan, and Quality results for the current candidate.",
+              "Normalization preserves existing strings and ordering. Identity validation, ambiguity rejection, transport bounds, and rejection of non-array evidence remain intact.",
+              "Completion regressions cover fresh and retained responses, success/failure/error verdicts, preserved raw output, checkout and authority checks, and no additional provider calls.",
+              "Inspected Quality logs confirming 30 agent-I/O tests and 91 event tests passed. Candidate diff whitespace checks passed.",
+              "The full suite was not clean: 1412 passed, 12 failed, 7 ignored. Quality rechecks and baseline evidence support classifying the remaining failures as unrelated to this change."
+            ],
+            "invocation_id": "19c19838f49c9cf5bc722812b16941f9511d3fbdabd2513b4a1f6ab0c9b7df3d",
+            "outcome": "success",
+            "role": "governance",
+            "summary": "Pass. Candidate 8a01818414199b2d3c5ce62fc13586bf8c44003e meets the Goal and plan, fits Refine’s architecture, and supports reliable agent workflows. The shared application decoder converts structured evidence entries into compact JSON strings, preventing the reported completion rejection while preserving evidence content, verdicts, and strict persisted types. No necessary corrections found."
+          }
+        ],
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR3C101422AFF754F03576C3A5-round-1"
+      },
+      "governance_message": "Governance checks passed.",
+      "governance_recovery_analysis": null,
+      "governance_recovery_round_prompt": null,
+      "governance_rule_actions": [],
       "implementation_report": "workflow.implement.enter:default-implement: Implemented all four plan tasks. No implementation departures or unfinished work; full-suite failures are documented for Quality.",
       "implementation_reported_at": "2026-09-16T12:39:00Z",
       "logs": [],
@@ -743,19 +849,34 @@
       ],
       "quality_state": "passed",
       "reporter": "Kevin Xiong",
-      "updated": "2026-09-16T12:44:29Z",
+      "rule_state": "passed",
+      "updated": "2026-09-16T12:45:44Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-16T12:17:20Z",
         "generation": 2,
         "round_idx": 0,
         "workflow_revision": 3
       },
+      "workflow_git_remote": "origin",
+      "workflow_integration": {
+        "candidate_commit": "8a01818414199b2d3c5ce62fc13586bf8c44003e",
+        "integrated_at": "2026-09-16T12:45:47.584791447+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n src/application/agent_io/contracts/skill_result.rs | 110 ++++++++----\n src/application/events/tests/repairs.rs            | 195 ++++++++++++++++++++-\n 2 files changed, 271 insertions(+), 34 deletions(-)",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "95a05284ea9f7b5c9ef545b093581c6bc0ad69ec"
+      },
       "workspace_branch": "refine/DR3C101422AFF754F03576C3A5/round-1"
     }
   ],
-  "status": "governance",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-09-16T12:44:29Z",
+  "updated": "2026-09-16T12:45:50Z",
   "workflow_context": "",
   "workflow_controls": [
     {
@@ -848,7 +969,17 @@
       "round_idx": 0,
       "to": "governance",
       "workflow_revision": 31
+    },
+    {
+      "at": "2026-09-16T12:45:50.168939642+00:00",
+      "forced": false,
+      "from": "governance",
+      "generation": 7,
+      "node_id": "default",
+      "round_idx": 0,
+      "to": "review",
+      "workflow_revision": 40
     }
   ],
-  "workflow_revision": 32
+  "workflow_revision": 40
 }

@@ -482,11 +482,59 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "succeeded",
+  "results": {
+    "default-governance": {
+      "invocation_id": "19c19838f49c9cf5bc722812b16941f9511d3fbdabd2513b4a1f6ab0c9b7df3d",
+      "binding_id": "default-governance",
+      "role": "governance",
+      "outcome": "success",
+      "summary": "Pass. Candidate 8a01818414199b2d3c5ce62fc13586bf8c44003e meets the Goal and plan, fits Refine’s architecture, and supports reliable agent workflows. The shared application decoder converts structured evidence entries into compact JSON strings, preventing the reported completion rejection while preserving evidence content, verdicts, and strict persisted types. No necessary corrections found.",
+      "evidence": [
+        "Reviewed both changed files, the persisted plan, and Quality results for the current candidate.",
+        "Normalization preserves existing strings and ordering. Identity validation, ambiguity rejection, transport bounds, and rejection of non-array evidence remain intact.",
+        "Completion regressions cover fresh and retained responses, success/failure/error verdicts, preserved raw output, checkout and authority checks, and no additional provider calls.",
+        "Inspected Quality logs confirming 30 agent-I/O tests and 91 event tests passed. Candidate diff whitespace checks passed.",
+        "The full suite was not clean: 1412 passed, 12 failed, 7 ignored. Quality rechecks and baseline evidence support classifying the remaining failures as unrelated to this change."
+      ],
+      "artifacts": {
+        "necessary_corrections": [],
+        "optional_improvements": [
+          "Address the documented baseline suite failures separately to restore a reliable full-suite signal."
+        ],
+        "validation_limit": "Runtime tests used deterministic provider fixtures; no live-provider session was exercised."
+      }
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "default-governance",
+      "checkout": {
+        "observation": {
+          "branch": "refine/DR3C101422AFF754F03576C3A5/round-1",
+          "head_commit": "8a01818414199b2d3c5ce62fc13586bf8c44003e",
+          "status_porcelain": []
+        },
+        "tree": "b01552080676c7b9de1efc63504249c9abf5bf2d"
+      },
+      "checkout_recorded": true,
+      "diagnostic": null,
+      "host_bound_result": true,
+      "observational_violation": false,
+      "operation_id": null,
+      "process_id": "proc-1789562671103-1596-7598",
+      "prompt_bytes": 15757,
+      "provider_session_id": null,
+      "purpose": "work",
+      "raw_output": "{\n  \"outcome\": \"success\",\n  \"summary\": \"Pass. Candidate 8a01818414199b2d3c5ce62fc13586bf8c44003e meets the Goal and plan, fits Refine’s architecture, and supports reliable agent workflows. The shared application decoder converts structured evidence entries into compact JSON strings, preventing the reported completion rejection while preserving evidence content, verdicts, and strict persisted types. No necessary corrections found.\",\n  \"evidence\": [\n    \"Reviewed both changed files, the persisted plan, and Quality results for the current candidate.\",\n    \"Normalization preserves existing strings and ordering. Identity validation, ambiguity rejection, transport bounds, and rejection of non-array evidence remain intact.\",\n    \"Completion regressions cover fresh and retained responses, success/failure/error verdicts, preserved raw output, checkout and authority checks, and no additional provider calls.\",\n    \"Inspected Quality logs confirming 30 agent-I/O tests and 91 event tests passed. Candidate diff whitespace checks passed.\",\n    \"The full suite was not clean: 1412 passed, 12 failed, 7 ignored. Quality rechecks and baseline evidence support classifying the remaining failures as unrelated to this change.\"\n  ],\n  \"artifacts\": {\n    \"necessary_corrections\": [],\n    \"optional_improvements\": [\n      \"Address the documented baseline suite failures separately to restore a reliable full-suite signal.\"\n    ],\n    \"validation_limit\": \"Runtime tests used deterministic provider fixtures; no live-provider session was exercised.\"\n  }\n}\n",
+      "received_at": "2026-09-16T12:45:41.426848662+00:00",
+      "started_at": "2026-09-16T12:44:31.066247650+00:00",
+      "workflow_revision": 3
+    }
+  ],
   "created_at": "2026-09-16T12:44:29.597180060+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-16T12:45:42.765237262+00:00",
   "error": null,
   "action_applied": false
 }
