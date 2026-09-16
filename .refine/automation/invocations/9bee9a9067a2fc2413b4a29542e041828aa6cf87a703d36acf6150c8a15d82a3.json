@@ -482,11 +482,52 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "succeeded",
+  "results": {
+    "default-governance": {
+      "invocation_id": "9bee9a9067a2fc2413b4a29542e041828aa6cf87a703d36acf6150c8a15d82a3",
+      "binding_id": "default-governance",
+      "role": "governance",
+      "outcome": "success",
+      "summary": "Passed. The always-visible Failed tab meets the Goal by gathering failure investigation evidence in one place, prioritizing recorded causes and distinguishing supporting diagnostics from historical failures. The implementation fits the architecture as a read-only browser projection that reuses existing evidence and navigation helpers. It supports Refine's purpose by making agent failures easier to inspect while preserving workflow ownership and retained history. Quality evidence and independent checks support acceptance. No necessary corrections or optional improvements identified.\n\n",
+      "evidence": [
+        "Reviewed candidate 07c90d91f32d40a70f0998c5c617b0f96471a28a against the Goal, recorded plan, and Quality results.",
+        "goals-failures.js consolidates recorded causes, Event/Skill errors, plan and gate diagnostics, warning/error logs, and labelled historical evidence.",
+        "Independent verification: 21 tests passed with zero failures or skips using Quality's recorded Playwright setup. Coverage includes keyboard navigation, refresh persistence, Round isolation, escaping, and narrow-screen layout.",
+        "git diff --check passed; worktree remains unchanged."
+      ],
+      "artifacts": null
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "default-governance",
+      "checkout": {
+        "observation": {
+          "branch": "refine/00000T1ARYE9B1JAXBPW2TT001/round-1",
+          "head_commit": "07c90d91f32d40a70f0998c5c617b0f96471a28a",
+          "status_porcelain": []
+        },
+        "tree": "4e740f9c723bfdd063a9e079cc902833460925f0"
+      },
+      "checkout_recorded": true,
+      "diagnostic": null,
+      "host_bound_result": true,
+      "observational_violation": false,
+      "operation_id": null,
+      "process_id": "proc-1789578041821-1596-54782",
+      "prompt_bytes": 6643,
+      "provider_session_id": null,
+      "purpose": "work",
+      "raw_output": "{\n  \"outcome\": \"success\",\n  \"evidence\": [\n    \"Reviewed candidate 07c90d91f32d40a70f0998c5c617b0f96471a28a against the Goal, recorded plan, and Quality results.\",\n    \"goals-failures.js consolidates recorded causes, Event/Skill errors, plan and gate diagnostics, warning/error logs, and labelled historical evidence.\",\n    \"Independent verification: 21 tests passed with zero failures or skips using Quality's recorded Playwright setup. Coverage includes keyboard navigation, refresh persistence, Round isolation, escaping, and narrow-screen layout.\",\n    \"git diff --check passed; worktree remains unchanged.\"\n  ],\n  \"summary\": \"Passed. The always-visible Failed tab meets the Goal by gathering failure investigation evidence in one place, prioritizing recorded causes and distinguishing supporting diagnostics from historical failures. The implementation fits the architecture as a read-only browser projection that reuses existing evidence and navigation helpers. It supports Refine's purpose by making agent failures easier to inspect while preserving workflow ownership and retained history. Quality evidence and independent checks support acceptance. No necessary corrections or optional improvements identified.\\n\\n\"\n}",
+      "received_at": "2026-09-16T17:02:06.614019070+00:00",
+      "started_at": "2026-09-16T17:00:41.778905005+00:00",
+      "workflow_revision": 2
+    }
+  ],
   "created_at": "2026-09-16T17:00:40.338462463+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-16T17:02:08.163011222+00:00",
   "error": null,
   "action_applied": false
 }

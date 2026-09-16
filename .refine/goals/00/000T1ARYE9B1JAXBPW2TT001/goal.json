@@ -3,10 +3,30 @@
   "branch_name": "refine/00000T1ARYE9B1JAXBPW2TT001/round-1",
   "candidate_commit": "07c90d91f32d40a70f0998c5c617b0f96471a28a",
   "created": "2026-09-16T16:48:14Z",
-  "event_generation": 6,
+  "event_generation": 7,
   "feature_id": null,
   "feature_order": null,
   "id": "00000T1ARYE9B1JAXBPW2TT001",
+  "integration_history": [
+    {
+      "complete": true,
+      "generation": 6,
+      "integration": {
+        "candidate_commit": "07c90d91f32d40a70f0998c5c617b0f96471a28a",
+        "integrated_at": "2026-09-16T17:02:15.019739181+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n .../docs/intent/05-surfaces/03-browser/08-goal.md  |   6 +-\n src/surfaces/web/static/css/goals.css              |   6 +-\n src/surfaces/web/static/index.html                 |   1 +\n .../web/static/js/features/goals-detail.js         |  60 +-------\n .../web/static/js/features/goals-failures.js       | 158 ++++++++++++++++++++\n tests/web_goal_detail_diagnostics.test.js          | 163 +++++++++++++++++++++\n tests/web_goal_human_controls.test.js              |   3 +-\n tests/web_goal_step_tabs.test.js                   |  74 +++++++++-\n 8 files changed, 406 insertions(+), 65 deletions(-)\n create mode 100644 src/surfaces/web/static/js/features/goals-failures.js",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "15763b99582dea2629d52b9d38fc252b2b2c4af3"
+      },
+      "round_idx": 0
+    }
+  ],
   "name": "Goal modal > Round > Flat tabs needs a new tab for Failed, which gathers the inf",
   "node_id": "default",
   "notes": [],
@@ -46,49 +66,23 @@
       "created": "2026-09-16T16:48:14Z",
       "event_configuration": {
         "events": {
-          "workflow.governance.enter": {
-            "bindings": [
-              {
-                "enabled": true,
-                "id": "default-governance",
-                "inputs": {},
-                "mode": "blocking",
-                "order": 0,
-                "overrides": null,
-                "scope": {
-                  "node_id": null
-                },
-                "skill_id": "default-governance"
-              }
-            ],
+          "workflow.governance.exit": {
+            "bindings": [],
             "enabled": true,
-            "id": "workflow.governance.enter",
+            "id": "workflow.governance.exit",
             "kind": "system",
-            "name": "Workflow Governance Enter",
+            "name": "Workflow Governance Exit",
             "on_success": null,
             "parameters": [],
             "scope": {
               "node_id": null
             },
-            "source": "workflow.governance.enter"
+            "source": "workflow.governance.exit"
           }
         },
         "revision": 86,
         "schema_version": 3,
-        "skills": {
-          "default-governance": {
-            "enabled": true,
-            "id": "default-governance",
-            "name": "Governance",
-            "parameters": [],
-            "prompt": "{{templates.purpose}}\n\n{{templates.architecture}}\n\n## Governance\n\nVerify that the implementation meets the user-defined Goal, fits the system architecture, and serves the project's purpose.\n\n### Outcome\n\nA clear assessment of whether the implementation satisfies all three. Begin with the verdict, then briefly explain how the work meets the Goal, fits the architecture, and supports the project's purpose, using concrete evidence from the implementation and Quality results. For each gap, describe what falls short, why it matters, and the recommended correction. Separate necessary corrections from optional improvements.\n\n### Guardrails\n\n- Read the context that helps explain the user's Goal, the system architecture, and the project's purpose.\n- Compare the implementation with the user's desired outcome as well as the plan. Completing the plan and passing tests alone do not establish that the Goal is met.\n- Look for clear responsibilities, shared behavior implemented in one place, and interfaces that remain easy to use and maintain.\n- Judge design choices by how they serve the project. Allow sound approaches that differ from personal preference.\n- Group related issues by their underlying cause so the next step can address them together.",
-            "provenance": "refine-default-v1",
-            "role": "task",
-            "scope": {
-              "node_id": null
-            }
-          }
-        }
+        "skills": {}
       },
       "event_results": {
         "8b38f0eb12c661df6c6f46376246392db523c8051661a068fc3bd3d7f929f764": {
@@ -121,6 +115,29 @@
           },
           "round_idx": 0,
           "source": "workflow.quality.enter",
+          "state": "succeeded"
+        },
+        "9bee9a9067a2fc2413b4a29542e041828aa6cf87a703d36acf6150c8a15d82a3": {
+          "candidate_commit": "07c90d91f32d40a70f0998c5c617b0f96471a28a",
+          "generation": 6,
+          "results": {
+            "default-governance": {
+              "artifacts": null,
+              "binding_id": "default-governance",
+              "evidence": [
+                "Reviewed candidate 07c90d91f32d40a70f0998c5c617b0f96471a28a against the Goal, recorded plan, and Quality results.",
+                "goals-failures.js consolidates recorded causes, Event/Skill errors, plan and gate diagnostics, warning/error logs, and labelled historical evidence.",
+                "Independent verification: 21 tests passed with zero failures or skips using Quality's recorded Playwright setup. Coverage includes keyboard navigation, refresh persistence, Round isolation, escaping, and narrow-screen layout.",
+                "git diff --check passed; worktree remains unchanged."
+              ],
+              "invocation_id": "9bee9a9067a2fc2413b4a29542e041828aa6cf87a703d36acf6150c8a15d82a3",
+              "outcome": "success",
+              "role": "governance",
+              "summary": "Passed. The always-visible Failed tab meets the Goal by gathering failure investigation evidence in one place, prioritizing recorded causes and distinguishing supporting diagnostics from historical failures. The implementation fits the architecture as a read-only browser projection that reuses existing evidence and navigation helpers. It supports Refine's purpose by making agent failures easier to inspect while preserving workflow ownership and retained history. Quality evidence and independent checks support acceptance. No necessary corrections or optional improvements identified.\n\n"
+            }
+          },
+          "round_idx": 0,
+          "source": "workflow.governance.enter",
           "state": "succeeded"
         },
         "b73b034218784a5efddfc71c3dca1b5857ac06259561ef0f68c203dc2b4d9bf3": {
@@ -493,8 +510,83 @@
               }
             }
           }
+        },
+        "6:default:workflow.governance.exit": {
+          "events": {
+            "workflow.governance.exit": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.governance.exit",
+              "kind": "system",
+              "name": "Workflow Governance Exit",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.governance.exit"
+            }
+          },
+          "revision": 86,
+          "schema_version": 3,
+          "skills": {}
+        },
+        "6:default:workflow.governance.success": {
+          "events": {},
+          "revision": 86,
+          "schema_version": 3,
+          "skills": {}
+        },
+        "7:default:workflow.review.enter": {
+          "events": {
+            "workflow.review.enter": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.review.enter",
+              "kind": "system",
+              "name": "Workflow Review Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.review.enter"
+            }
+          },
+          "revision": 86,
+          "schema_version": 3,
+          "skills": {}
         }
       },
+      "governance_candidate_commit": "07c90d91f32d40a70f0998c5c617b0f96471a28a",
+      "governance_checked_at": "2026-09-16T17:02:08Z",
+      "governance_details": {
+        "candidate_commit": "07c90d91f32d40a70f0998c5c617b0f96471a28a",
+        "configured": true,
+        "failed_actions": [],
+        "phase": "post_implementation",
+        "skill_results": [
+          {
+            "artifacts": null,
+            "binding_id": "workflow.governance.enter:default-governance",
+            "evidence": [
+              "Reviewed candidate 07c90d91f32d40a70f0998c5c617b0f96471a28a against the Goal, recorded plan, and Quality results.",
+              "goals-failures.js consolidates recorded causes, Event/Skill errors, plan and gate diagnostics, warning/error logs, and labelled historical evidence.",
+              "Independent verification: 21 tests passed with zero failures or skips using Quality's recorded Playwright setup. Coverage includes keyboard navigation, refresh persistence, Round isolation, escaping, and narrow-screen layout.",
+              "git diff --check passed; worktree remains unchanged."
+            ],
+            "invocation_id": "9bee9a9067a2fc2413b4a29542e041828aa6cf87a703d36acf6150c8a15d82a3",
+            "outcome": "success",
+            "role": "governance",
+            "summary": "Passed. The always-visible Failed tab meets the Goal by gathering failure investigation evidence in one place, prioritizing recorded causes and distinguishing supporting diagnostics from historical failures. The implementation fits the architecture as a read-only browser projection that reuses existing evidence and navigation helpers. It supports Refine's purpose by making agent failures easier to inspect while preserving workflow ownership and retained history. Quality evidence and independent checks support acceptance. No necessary corrections or optional improvements identified.\n\n"
+          }
+        ],
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T1ARYE9B1JAXBPW2TT001-round-1"
+      },
+      "governance_message": "Governance checks passed.",
+      "governance_recovery_analysis": null,
+      "governance_recovery_round_prompt": null,
+      "governance_rule_actions": [],
       "implementation_report": "workflow.implement.enter:default-implement: Implemented the Failed investigation tab. Recorded causes lead; supporting diagnostics and historical evidence remain clearly distinguished. Ready for Quality.",
       "implementation_reported_at": "2026-09-16T16:57:12Z",
       "logs": [],
@@ -672,19 +764,34 @@
       ],
       "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "updated": "2026-09-16T17:00:39Z",
+      "rule_state": "passed",
+      "updated": "2026-09-16T17:02:09Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-16T16:48:24Z",
         "generation": 2,
         "round_idx": 0,
         "workflow_revision": 2
       },
+      "workflow_git_remote": "origin",
+      "workflow_integration": {
+        "candidate_commit": "07c90d91f32d40a70f0998c5c617b0f96471a28a",
+        "integrated_at": "2026-09-16T17:02:15.019739181+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n .../docs/intent/05-surfaces/03-browser/08-goal.md  |   6 +-\n src/surfaces/web/static/css/goals.css              |   6 +-\n src/surfaces/web/static/index.html                 |   1 +\n .../web/static/js/features/goals-detail.js         |  60 +-------\n .../web/static/js/features/goals-failures.js       | 158 ++++++++++++++++++++\n tests/web_goal_detail_diagnostics.test.js          | 163 +++++++++++++++++++++\n tests/web_goal_human_controls.test.js              |   3 +-\n tests/web_goal_step_tabs.test.js                   |  74 +++++++++-\n 8 files changed, 406 insertions(+), 65 deletions(-)\n create mode 100644 src/surfaces/web/static/js/features/goals-failures.js",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "15763b99582dea2629d52b9d38fc252b2b2c4af3"
+      },
       "workspace_branch": "refine/00000T1ARYE9B1JAXBPW2TT001/round-1"
     }
   ],
-  "status": "governance",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-09-16T17:00:39Z",
+  "updated": "2026-09-16T17:02:17Z",
   "workflow_context": "",
   "workflow_controls": [
     {
@@ -777,7 +884,17 @@
       "round_idx": 0,
       "to": "governance",
       "workflow_revision": 30
+    },
+    {
+      "at": "2026-09-16T17:02:17.419985363+00:00",
+      "forced": false,
+      "from": "governance",
+      "generation": 7,
+      "node_id": "default",
+      "round_idx": 0,
+      "to": "review",
+      "workflow_revision": 39
     }
   ],
-  "workflow_revision": 31
+  "workflow_revision": 39
 }
