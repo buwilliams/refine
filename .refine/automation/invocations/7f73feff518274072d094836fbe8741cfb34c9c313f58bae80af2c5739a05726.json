@@ -493,11 +493,231 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "succeeded",
+  "results": {
+    "default-plan": {
+      "invocation_id": "7f73feff518274072d094836fbe8741cfb34c9c313f58bae80af2c5739a05726",
+      "binding_id": "default-plan",
+      "role": "plan",
+      "outcome": "success",
+      "summary": "Plan ready for implementation. Preserve and reconcile Round 1 into the current providers.json implementation, complete bounded paid admission before fallback, and integrate durable selection and continuation across every launch path. P1-P8 remain traceable, with explicit Settings UX and complete-harness validation requirements.\n\n",
+      "evidence": [
+        "Read-only refine goal show recovered Round 1's recorded P1-P8 plan and partial implementation report; current Goal is in Round 2 Plan.",
+        "Current worktree is clean at 7912ec52bfe76387f2587988dc4b99d0fbcf0ca6. Inspected current provider model, application service, ProviderStore, invocation, Event/chat consumers, synchronization, and public documentation.",
+        "Inspected Round 1's tracked modifications and untracked additions, retained catalog/selection/attempt code, Git budget authority, budget model, and paid-launch guard. Historical HEAD remains 9c7363164d582fac14e5076b24efdc47ec5f9461.",
+        "Read target/provider-checks/validation.json and referenced logs in the retained Round 1 worktree. Its full run reports 1395 passed, 29 failed, 7 ignored and stopped during unit testing. Its three settings tests do not establish rendered-browser layout quality.",
+        "Inspected settings_providers.js, neighboring Settings editors, shared modal and CSS patterns, actual-browser provider tests, browser prerequisites, and tests/test_all.rs plus xtask harness stages.",
+        "No source edits, test runs, or workflow mutations were performed during this planning step."
+      ],
+      "artifacts": {
+        "plan": {
+          "checklist": [
+            {
+              "description": "Task #1 - Recover retained work without losing either implementation.",
+              "details": [
+                "Recheck the workflow-owned implementation workspace and base before editing. Round 1 remains at 9c7363164d582fac14e5076b24efdc47ec5f9461 with tracked modifications and untracked additions; its branch tip alone does not contain the implementation.",
+                "Inventory and preserve the retained diff, untracked source files, recorded P1-P8 plan, failure, event results, and validation logs. Recover useful source changes into the new admitted workspace through the supported recovery lifecycle; leave the historical worktree intact.",
+                "Compare retained changes against current main by capability. Resolve overlaps deliberately, especially model/providers.rs versus model/providers/, catalog storage, node settings, invocation, synchronization, and browser configuration.",
+                "Use the existing providers.json catalog, ProviderStore, application provider services, and public config/API surfaces as the authoritative foundation. Adapt useful retained capabilities instead of installing providers/config.json as a second live catalog."
+              ],
+              "id": "R0",
+              "verification": [
+                "Record which retained files or capabilities were recovered, adapted, or superseded by current functionality.",
+                "Confirm historical work and evidence remain intact and edits are confined to the current workflow workspace."
+              ]
+            },
+            {
+              "depends_on": [
+                "R0"
+              ],
+              "description": "Task #2 - Reconcile provider, policy, budget, and attempt concepts in Model.",
+              "details": [
+                "Extend stable provider configuration IDs independently of executable names. Preserve current launch-template semantics while adding explicit argument/stdin/private-file transport, local credential references, selectable output adapters, optional availability probes, and optional interactive/continuation capabilities.",
+                "Represent provider-or-policy selection explicitly. Preserve precedence: explicit invocation, optional node override, system default. An explicit provider remains pinned; policy selection permits fallback.",
+                "Keep provider configuration identity separate from account/capacity identity, credential/session scope, and shared spending-pool identity.",
+                "Define normalized availability, selection evidence, immutable definition revision or snapshot, integer monetary amounts, currency, accounting periods, enforceable attempt limits, and attempt lifecycle facts. Separate capacity exhaustion from task failure and Quality/Governance verdicts.",
+                "Validate references, templates, duplicate IDs, incompatible capabilities, malformed adapters, monetary overflow, and paid configurations without a bounded charge contract."
+              ],
+              "id": "P1",
+              "verification": [
+                "Demonstrate two configurations of one executable with distinct argv and credential references.",
+                "Test invalid definitions and policies, explicit-provider pinning, and unambiguous provider/policy references."
+              ]
+            },
+            {
+              "depends_on": [
+                "P1"
+              ],
+              "description": "Task #3 - Complete shared persistence, migration, and inheritance.",
+              "details": [
+                "Keep application-owned validation and revision-checked saves over the canonical system catalog. Extend node-reference checks to policy, default, and budget references using consistent locking.",
+                "Migrate existing providers.json definitions, built-ins, custom executable paths, and saved node selections without changing effective behavior or enabling paid fallback. Preserve current virtual-default adoption behavior so fresh nodes do not overwrite remote configuration.",
+                "Provide an idempotent compatibility conversion for retained-format provider configuration if encountered. If both formats contain conflicting authored data, report the conflict rather than silently choosing or maintaining both as authorities.",
+                "Store only an optional node selection. Clearing it restores inheritance; unrelated settings updates and node copying must not convert the current effective default into a permanent override.",
+                "Complete bootstrap, fleet migration, synchronization, and conflict reporting. Keep credential values, local availability caches, and process recovery records outside synchronized configuration; ordinary state synchronization must never create spending authority."
+              ],
+              "id": "P2",
+              "verification": [
+                "Test fresh bootstrap, existing catalogs, custom paths, interrupted/repeated migration, and two-node adoption and conflicts.",
+                "Verify inherited nodes follow later system-default changes, explicit overrides remain stable, and referenced definitions cannot be deleted."
+              ]
+            },
+            {
+              "depends_on": [
+                "P2"
+              ],
+              "description": "Task #4 - Complete execution from pinned provider definitions.",
+              "details": [
+                "Reconcile retained invocation, credential, transport, output-adapter, and redaction code with current launch services. Pass a pinned definition into execution rather than resolving it again after admission.",
+                "Execute distinct argv elements directly without shell parsing or recursive template expansion. Preserve current context/cwd/session template behavior and built-in compatibility; provide explicit private-file transport alongside existing large-context fallback.",
+                "Resolve credential references locally at launch, including managed interactive and detached paths. Preserve CLI-managed authentication. Missing capabilities or references produce actionable diagnostics before spawn.",
+                "Retain prompt-size checks, private artifact permissions and cleanup, admitted cwd validation, supervised process ownership, and secret redaction across streaming output, errors, process metadata, and exports.",
+                "Normalize text, session, capacity, and usage output through built-in or configurable adapters. Malformed or missing usage remains unknown; estimates cannot authorize spending."
+              ],
+              "id": "P3",
+              "verification": [
+                "Use fake executables to assert exact argv, stdin, private-file content, cwd, and local environment, including spaces, Unicode, and literal template-like input.",
+                "Exercise built-in and custom providers, interactive launches, detached launches, resume capability errors, missing credentials, and secret exclusion."
+              ]
+            },
+            {
+              "depends_on": [
+                "P3"
+              ],
+              "description": "Task #5 - Complete paid admission before enabling paid execution.",
+              "details": [
+                "Wrap the retained GitBudgetAuthority and budget arithmetic in one application-owned admission and settlement service. Audit its compare-and-swap publication, acknowledgement recovery, retry, and budget-edit behavior before reuse.",
+                "Persist an attempt ID and pinned launch terms before reserving. Require confirmed publication of a reservation on the authoritative budget ref before any paid process starts. All providers and nodes sharing a pool consume the same allowance.",
+                "Require a launch-enforced maximum or a documented bounded charge contract covering the entire attempt. Interactive sessions, continuations, repairs, and probes that can incur charges must have bounded admission too; unsupported paid modes fail before launch.",
+                "Make reserve and settle idempotent. Reconcile crashes and lost acknowledgements using the same attempt identity and process receipts, preventing duplicate launch or duplicate spending. Release unused allowance only with evidence supporting the final charge or proof that execution never occurred.",
+                "Keep full reservations for unknown usage and potentially running processes. Do not reclaim by timeout. Handle cancellation, rollover, currency changes, limit reductions, and conflicting budget terms conservatively against published obligations.",
+                "Unavailable spending authority blocks new paid admission while subscription work remains available. Replace the retained blanket paid-launch guard only when every paid spawn path requires successful admission."
+              ],
+              "id": "P5",
+              "verification": [
+                "Race independent nodes for the final allowance and prove total admitted maximums stay within the pool.",
+                "Test lost acknowledgements, contention, duplicate IDs, crashes before/after spawn, unknown usage, settlement conflicts, cancellation, rollover, and budget edits.",
+                "Audit and test explicit invocation, resume, interactive sessions, repairs, and maintenance for admission bypasses."
+              ]
+            },
+            {
+              "depends_on": [
+                "P3",
+                "P5"
+              ],
+              "description": "Task #6 - Complete subscription-first decisions and recoverable capacity waits.",
+              "details": [
+                "Consolidate current providers::resolve and retained provider_selection behavior into one shared application service that returns the selected definition, selection source, revision, reason, observations, and admission requirements.",
+                "Evaluate subscription candidates in configured order using bounded probes or controlled attempts. Scope observations to the relevant node/account/configuration, retain retry times, and bound repeated launches.",
+                "Use paid fallback only when explicitly configured and admitted. After cooldown, recheck subscriptions and return to a recovered subscription at the next attempt boundary without interrupting useful running work.",
+                "Preserve whether selection was inherited, explicitly pinned, or policy-driven; an already resolved provider ID must not accidentally turn an inherited policy into a permanent pin.",
+                "Represent capacity waits as durable, recoverably scheduled work with a next-check time. Release worker and checkout locks while waiting. Ordinary task failures and verification verdicts follow existing workflow behavior."
+              ],
+              "id": "P4",
+              "verification": [
+                "Test ordering, unknown capacity, probe timeout, exhaustion, no fallback, unavailable budget authority, cooldown, recovery, and explicit pinning.",
+                "Prove task failures and failed Quality/Governance results do not trigger provider shopping."
+              ]
+            },
+            {
+              "depends_on": [
+                "P4",
+                "P5"
+              ],
+              "description": "Task #7 - Integrate every launch and preserve progress across switches.",
+              "details": [
+                "Route Event/Skill execution and completion repair, managed and interactive sessions, chat, direct invoke/resume, and maintenance through the common decision/admission path. Audit HostAgentProviderService callers and direct agent_cli reads.",
+                "Link each durable attempt to its owning invocation and existing history, recording provider/configuration revision, selection source and reason, availability evidence, reservation, process receipt, usage, and outcome. Avoid synthetic revision-zero evidence when a catalog decision exists.",
+                "Before replacement, confirm the previous process tree has exited through existing supervisor receipts. Retain the admitted worktree and edited files; build a handoff from the request, completed artifacts, retained output, and unfinished work.",
+                "Resume native sessions only when provider configuration and credential/session scope are compatible. Otherwise launch a fresh session with the handoff. Interactive replacement occurs only at a supported attempt boundary.",
+                "Preserve authority checks before launch, replacement, result acceptance, and settlement. Restart recovery must reconcile attempts and reservations without replaying accepted results; cancellation, supersession, and late completion must not advance newer workflow work."
+              ],
+              "id": "P6",
+              "verification": [
+                "Use a fake subscription provider that edits files and then exhausts capacity; confirm fallback receives the handoff and preserves those edits.",
+                "Test daemon restart during reservation, execution, and switching; incompatible sessions; cancellation; supersession; and late completion.",
+                "Verify all launch families produce linked, durable attempt evidence."
+              ]
+            },
+            {
+              "depends_on": [
+                "P2",
+                "P6"
+              ],
+              "description": "Task #8 - Finish configuration and attempt visibility using standard Settings interactions.",
+              "details": [
+                "Extend existing config/agent/node CLI and API services for definitions, policies, budget selection, system defaults, optional node overrides, local reference diagnostics, and effective-selection preview. Preview must not reserve funds or launch a paid request.",
+                "Improve settings_providers.js within the established Runtime Settings layout. Reuse neighboring Skills/Templates/Nodes lists, form-row controls, common.css tokens, automationModal focus handling, button variants, action placement, and responsive sizing.",
+                "Provide a scannable provider list with obvious add/edit actions. Clearly separate shared definitions/defaults from this node's override and show the effective provider or policy with a straightforward restore-inheritance action.",
+                "Replace routine JSON textareas with labeled inputs, selects, checkboxes, and ordered argument rows. Keep each argv element distinct. Put advanced transport, credential references, output adapters, availability, and continuation controls in expandable sections without removing configurable capabilities.",
+                "Expose ordered subscriptions, opt-in paid fallback, shared pool, currency/period, and bounded attempt cost in understandable controls. Show capability and credential-reference errors beside their fields and provide clear save/cancel/loading/success feedback.",
+                "Keep drafts outside periodic pane refresh. Preserve them through validation errors, failed saves, and stale revisions. Offer refresh-and-review/reapply conflict resolution against the latest catalog without overwriting concurrent changes. Apply project/node context safeguards to requests and responses.",
+                "Extend Goal, Skill, and process views with actual attempt decisions and spending facts, distinguishing reserved, confirmed, and unknown amounts without exposing credential values."
+              ],
+              "id": "P7",
+              "verification": [
+                "Run actual browser add/edit flows, two variants of one CLI, system-default changes, node override set/clear, policy reordering, paid fallback/budget configuration, invalid input, and stale-revision resolution.",
+                "Test draft preservation across refresh and context changes, keyboard navigation, labels, focus trapping, Escape, and focus restoration.",
+                "Capture and inspect provider list/editor and neighboring Settings at desktop and narrow widths; retain screenshots and browser results."
+              ]
+            },
+            {
+              "depends_on": [
+                "P6",
+                "P7"
+              ],
+              "description": "Task #9 - Validate the complete feature and document its guarantees.",
+              "details": [
+                "Build deterministic fake-provider integration coverage for subscription exhaustion → configured paid fallback → subscription recovery across a daemon restart, asserting preserved files, attributable attempts, and spending settlement. Use no real credentials or paid requests.",
+                "Cover concurrent nodes, every paid entry point, session compatibility, inherited default changes, bootstrap/migration, built-in/custom compatibility, and secret exclusion from state, APIs, logs, metadata, and evidence.",
+                "Run focused checks during development, then the required cargo test and cargo test -- --full sequentially. The full harness includes unit/doc tests, static/API checks, browser tests, Cargo integrations, smoke-ai, CLI, fleet SSH, full workflow, and multi-instance synchronization; completion requires reaching the later stages.",
+                "Use isolated test runtime/state/ports and avoid overlapping compilation against the same artifacts. Investigate inherited REFINE_WORKFLOW_INCARNATION, REFINE_LAUNCH_EXECUTABLE, and REFINE_LAUNCH_MODE contamination in test children without altering the active workflow environment.",
+                "For unresolved failures, compare the exact tests against an unchanged base under equivalent environment, prerequisites, and compilation isolation. Fix blockers or document evidence-backed workarounds that preserve required checks. A skipped browser suite or early harness exit is incomplete validation.",
+                "Update Agents, Settings, persistence intent, ai-providers documentation, and the provider runbook with two configurations of one CLI, migration, inheritance, credentials, bounded paid execution, budget authority/recovery, and troubleshooting.",
+                "Finish with a concise P1-P8 report mapping implementation and tests to each requirement, exact commands and outcomes, prerequisites, screenshot/log paths, baseline comparisons, and remaining gaps. Leave transitions, candidate integration, approval, merge, and push to Refine."
+              ],
+              "id": "P8",
+              "verification": [
+                "Retain a machine-readable validation report and referenced logs for the final source state.",
+                "Demonstrate the complete restart scenario and shared-budget race, with actual browser evidence.",
+                "Report incomplete work explicitly rather than treating focused passes as feature completion."
+              ]
+            }
+          ],
+          "summary": "Complete configurable CLI providers and subscription-first selection with explicitly configured paid fallback, shared spending limits, automatic subscription recovery, preserved work, and attributable attempts. Extend the catalog already on main, reconcile useful Round 1 changes into it, and route every launch through one application-owned decision and admission service. The provider requirements define scope; the chevron title is stale."
+        }
+      }
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "default-plan",
+      "checkout": {
+        "observation": {
+          "branch": "refine/00000T19EJ0CNGHM85RBDXE000/round-2-execution-3174439c-676c-4e57-8f51-18796370638f",
+          "head_commit": "7912ec52bfe76387f2587988dc4b99d0fbcf0ca6",
+          "status_porcelain": []
+        },
+        "tree": "8ac8f8b020c54d5fa8a8cffbd20a57886e98832c"
+      },
+      "checkout_recorded": true,
+      "diagnostic": null,
+      "host_bound_result": true,
+      "observational_violation": false,
+      "operation_id": null,
+      "process_id": "proc-1789561868171-1596-4295",
+      "prompt_bytes": 25946,
+      "provider_session_id": null,
+      "purpose": "work",
+      "raw_output": "{\n  \"outcome\": \"success\",\n  \"artifacts\": {\n    \"plan\": {\n      \"summary\": \"Complete configurable CLI providers and subscription-first selection with explicitly configured paid fallback, shared spending limits, automatic subscription recovery, preserved work, and attributable attempts. Extend the catalog already on main, reconcile useful Round 1 changes into it, and route every launch through one application-owned decision and admission service. The provider requirements define scope; the chevron title is stale.\",\n      \"checklist\": [\n        {\n          \"id\": \"R0\",\n          \"description\": \"Task #1 - Recover retained work without losing either implementation.\",\n          \"details\": [\n            \"Recheck the workflow-owned implementation workspace and base before editing. Round 1 remains at 9c7363164d582fac14e5076b24efdc47ec5f9461 with tracked modifications and untracked additions; its branch tip alone does not contain the implementation.\",\n            \"Inventory and preserve the retained diff, untracked source files, recorded P1-P8 plan, failure, event results, and validation logs. Recover useful source changes into the new admitted workspace through the supported recovery lifecycle; leave the historical worktree intact.\",\n            \"Compare retained changes against current main by capability. Resolve overlaps deliberately, especially model/providers.rs versus model/providers/, catalog storage, node settings, invocation, synchronization, and browser configuration.\",\n            \"Use the existing providers.json catalog, ProviderStore, application provider services, and public config/API surfaces as the authoritative foundation. Adapt useful retained capabilities instead of installing providers/config.json as a second live catalog.\"\n          ],\n          \"verification\": [\n            \"Record which retained files or capabilities were recovered, adapted, or superseded by current functionality.\",\n            \"Confirm historical work and evidence remain intact and edits are confined to the current workflow workspace.\"\n          ]\n        },\n        {\n          \"id\": \"P1\",\n          \"description\": \"Task #2 - Reconcile provider, policy, budget, and attempt concepts in Model.\",\n          \"depends_on\": [\"R0\"],\n          \"details\": [\n            \"Extend stable provider configuration IDs independently of executable names. Preserve current launch-template semantics while adding explicit argument/stdin/private-file transport, local credential references, selectable output adapters, optional availability probes, and optional interactive/continuation capabilities.\",\n            \"Represent provider-or-policy selection explicitly. Preserve precedence: explicit invocation, optional node override, system default. An explicit provider remains pinned; policy selection permits fallback.\",\n            \"Keep provider configuration identity separate from account/capacity identity, credential/session scope, and shared spending-pool identity.\",\n            \"Define normalized availability, selection evidence, immutable definition revision or snapshot, integer monetary amounts, currency, accounting periods, enforceable attempt limits, and attempt lifecycle facts. Separate capacity exhaustion from task failure and Quality/Governance verdicts.\",\n            \"Validate references, templates, duplicate IDs, incompatible capabilities, malformed adapters, monetary overflow, and paid configurations without a bounded charge contract.\"\n          ],\n          \"verification\": [\n            \"Demonstrate two configurations of one executable with distinct argv and credential references.\",\n            \"Test invalid definitions and policies, explicit-provider pinning, and unambiguous provider/policy references.\"\n          ]\n        },\n        {\n          \"id\": \"P2\",\n          \"description\": \"Task #3 - Complete shared persistence, migration, and inheritance.\",\n          \"depends_on\": [\"P1\"],\n          \"details\": [\n            \"Keep application-owned validation and revision-checked saves over the canonical system catalog. Extend node-reference checks to policy, default, and budget references using consistent locking.\",\n            \"Migrate existing providers.json definitions, built-ins, custom executable paths, and saved node selections without changing effective behavior or enabling paid fallback. Preserve current virtual-default adoption behavior so fresh nodes do not overwrite remote configuration.\",\n            \"Provide an idempotent compatibility conversion for retained-format provider configuration if encountered. If both formats contain conflicting authored data, report the conflict rather than silently choosing or maintaining both as authorities.\",\n            \"Store only an optional node selection. Clearing it restores inheritance; unrelated settings updates and node copying must not convert the current effective default into a permanent override.\",\n            \"Complete bootstrap, fleet migration, synchronization, and conflict reporting. Keep credential values, local availability caches, and process recovery records outside synchronized configuration; ordinary state synchronization must never create spending authority.\"\n          ],\n          \"verification\": [\n            \"Test fresh bootstrap, existing catalogs, custom paths, interrupted/repeated migration, and two-node adoption and conflicts.\",\n            \"Verify inherited nodes follow later system-default changes, explicit overrides remain stable, and referenced definitions cannot be deleted.\"\n          ]\n        },\n        {\n          \"id\": \"P3\",\n          \"description\": \"Task #4 - Complete execution from pinned provider definitions.\",\n          \"depends_on\": [\"P2\"],\n          \"details\": [\n            \"Reconcile retained invocation, credential, transport, output-adapter, and redaction code with current launch services. Pass a pinned definition into execution rather than resolving it again after admission.\",\n            \"Execute distinct argv elements directly without shell parsing or recursive template expansion. Preserve current context/cwd/session template behavior and built-in compatibility; provide explicit private-file transport alongside existing large-context fallback.\",\n            \"Resolve credential references locally at launch, including managed interactive and detached paths. Preserve CLI-managed authentication. Missing capabilities or references produce actionable diagnostics before spawn.\",\n            \"Retain prompt-size checks, private artifact permissions and cleanup, admitted cwd validation, supervised process ownership, and secret redaction across streaming output, errors, process metadata, and exports.\",\n            \"Normalize text, session, capacity, and usage output through built-in or configurable adapters. Malformed or missing usage remains unknown; estimates cannot authorize spending.\"\n          ],\n          \"verification\": [\n            \"Use fake executables to assert exact argv, stdin, private-file content, cwd, and local environment, including spaces, Unicode, and literal template-like input.\",\n            \"Exercise built-in and custom providers, interactive launches, detached launches, resume capability errors, missing credentials, and secret exclusion.\"\n          ]\n        },\n        {\n          \"id\": \"P5\",\n          \"description\": \"Task #5 - Complete paid admission before enabling paid execution.\",\n          \"depends_on\": [\"P3\"],\n          \"details\": [\n            \"Wrap the retained GitBudgetAuthority and budget arithmetic in one application-owned admission and settlement service. Audit its compare-and-swap publication, acknowledgement recovery, retry, and budget-edit behavior before reuse.\",\n            \"Persist an attempt ID and pinned launch terms before reserving. Require confirmed publication of a reservation on the authoritative budget ref before any paid process starts. All providers and nodes sharing a pool consume the same allowance.\",\n            \"Require a launch-enforced maximum or a documented bounded charge contract covering the entire attempt. Interactive sessions, continuations, repairs, and probes that can incur charges must have bounded admission too; unsupported paid modes fail before launch.\",\n            \"Make reserve and settle idempotent. Reconcile crashes and lost acknowledgements using the same attempt identity and process receipts, preventing duplicate launch or duplicate spending. Release unused allowance only with evidence supporting the final charge or proof that execution never occurred.\",\n            \"Keep full reservations for unknown usage and potentially running processes. Do not reclaim by timeout. Handle cancellation, rollover, currency changes, limit reductions, and conflicting budget terms conservatively against published obligations.\",\n            \"Unavailable spending authority blocks new paid admission while subscription work remains available. Replace the retained blanket paid-launch guard only when every paid spawn path requires successful admission.\"\n          ],\n          \"verification\": [\n            \"Race independent nodes for the final allowance and prove total admitted maximums stay within the pool.\",\n            \"Test lost acknowledgements, contention, duplicate IDs, crashes before/after spawn, unknown usage, settlement conflicts, cancellation, rollover, and budget edits.\",\n            \"Audit and test explicit invocation, resume, interactive sessions, repairs, and maintenance for admission bypasses.\"\n          ]\n        },\n        {\n          \"id\": \"P4\",\n          \"description\": \"Task #6 - Complete subscription-first decisions and recoverable capacity waits.\",\n          \"depends_on\": [\"P3\", \"P5\"],\n          \"details\": [\n            \"Consolidate current providers::resolve and retained provider_selection behavior into one shared application service that returns the selected definition, selection source, revision, reason, observations, and admission requirements.\",\n            \"Evaluate subscription candidates in configured order using bounded probes or controlled attempts. Scope observations to the relevant node/account/configuration, retain retry times, and bound repeated launches.\",\n            \"Use paid fallback only when explicitly configured and admitted. After cooldown, recheck subscriptions and return to a recovered subscription at the next attempt boundary without interrupting useful running work.\",\n            \"Preserve whether selection was inherited, explicitly pinned, or policy-driven; an already resolved provider ID must not accidentally turn an inherited policy into a permanent pin.\",\n            \"Represent capacity waits as durable, recoverably scheduled work with a next-check time. Release worker and checkout locks while waiting. Ordinary task failures and verification verdicts follow existing workflow behavior.\"\n          ],\n          \"verification\": [\n            \"Test ordering, unknown capacity, probe timeout, exhaustion, no fallback, unavailable budget authority, cooldown, recovery, and explicit pinning.\",\n            \"Prove task failures and failed Quality/Governance results do not trigger provider shopping.\"\n          ]\n        },\n        {\n          \"id\": \"P6\",\n          \"description\": \"Task #7 - Integrate every launch and preserve progress across switches.\",\n          \"depends_on\": [\"P4\", \"P5\"],\n          \"details\": [\n            \"Route Event/Skill execution and completion repair, managed and interactive sessions, chat, direct invoke/resume, and maintenance through the common decision/admission path. Audit HostAgentProviderService callers and direct agent_cli reads.\",\n            \"Link each durable attempt to its owning invocation and existing history, recording provider/configuration revision, selection source and reason, availability evidence, reservation, process receipt, usage, and outcome. Avoid synthetic revision-zero evidence when a catalog decision exists.\",\n            \"Before replacement, confirm the previous process tree has exited through existing supervisor receipts. Retain the admitted worktree and edited files; build a handoff from the request, completed artifacts, retained output, and unfinished work.\",\n            \"Resume native sessions only when provider configuration and credential/session scope are compatible. Otherwise launch a fresh session with the handoff. Interactive replacement occurs only at a supported attempt boundary.\",\n            \"Preserve authority checks before launch, replacement, result acceptance, and settlement. Restart recovery must reconcile attempts and reservations without replaying accepted results; cancellation, supersession, and late completion must not advance newer workflow work.\"\n          ],\n          \"verification\": [\n            \"Use a fake subscription provider that edits files and then exhausts capacity; confirm fallback receives the handoff and preserves those edits.\",\n            \"Test daemon restart during reservation, execution, and switching; incompatible sessions; cancellation; supersession; and late completion.\",\n            \"Verify all launch families produce linked, durable attempt evidence.\"\n          ]\n        },\n        {\n          \"id\": \"P7\",\n          \"description\": \"Task #8 - Finish configuration and attempt visibility using standard Settings interactions.\",\n          \"depends_on\": [\"P2\", \"P6\"],\n          \"details\": [\n            \"Extend existing config/agent/node CLI and API services for definitions, policies, budget selection, system defaults, optional node overrides, local reference diagnostics, and effective-selection preview. Preview must not reserve funds or launch a paid request.\",\n            \"Improve settings_providers.js within the established Runtime Settings layout. Reuse neighboring Skills/Templates/Nodes lists, form-row controls, common.css tokens, automationModal focus handling, button variants, action placement, and responsive sizing.\",\n            \"Provide a scannable provider list with obvious add/edit actions. Clearly separate shared definitions/defaults from this node's override and show the effective provider or policy with a straightforward restore-inheritance action.\",\n            \"Replace routine JSON textareas with labeled inputs, selects, checkboxes, and ordered argument rows. Keep each argv element distinct. Put advanced transport, credential references, output adapters, availability, and continuation controls in expandable sections without removing configurable capabilities.\",\n            \"Expose ordered subscriptions, opt-in paid fallback, shared pool, currency/period, and bounded attempt cost in understandable controls. Show capability and credential-reference errors beside their fields and provide clear save/cancel/loading/success feedback.\",\n            \"Keep drafts outside periodic pane refresh. Preserve them through validation errors, failed saves, and stale revisions. Offer refresh-and-review/reapply conflict resolution against the latest catalog without overwriting concurrent changes. Apply project/node context safeguards to requests and responses.\",\n            \"Extend Goal, Skill, and process views with actual attempt decisions and spending facts, distinguishing reserved, confirmed, and unknown amounts without exposing credential values.\"\n          ],\n          \"verification\": [\n            \"Run actual browser add/edit flows, two variants of one CLI, system-default changes, node override set/clear, policy reordering, paid fallback/budget configuration, invalid input, and stale-revision resolution.\",\n            \"Test draft preservation across refresh and context changes, keyboard navigation, labels, focus trapping, Escape, and focus restoration.\",\n            \"Capture and inspect provider list/editor and neighboring Settings at desktop and narrow widths; retain screenshots and browser results.\"\n          ]\n        },\n        {\n          \"id\": \"P8\",\n          \"description\": \"Task #9 - Validate the complete feature and document its guarantees.\",\n          \"depends_on\": [\"P6\", \"P7\"],\n          \"details\": [\n            \"Build deterministic fake-provider integration coverage for subscription exhaustion → configured paid fallback → subscription recovery across a daemon restart, asserting preserved files, attributable attempts, and spending settlement. Use no real credentials or paid requests.\",\n            \"Cover concurrent nodes, every paid entry point, session compatibility, inherited default changes, bootstrap/migration, built-in/custom compatibility, and secret exclusion from state, APIs, logs, metadata, and evidence.\",\n            \"Run focused checks during development, then the required cargo test and cargo test -- --full sequentially. The full harness includes unit/doc tests, static/API checks, browser tests, Cargo integrations, smoke-ai, CLI, fleet SSH, full workflow, and multi-instance synchronization; completion requires reaching the later stages.\",\n            \"Use isolated test runtime/state/ports and avoid overlapping compilation against the same artifacts. Investigate inherited REFINE_WORKFLOW_INCARNATION, REFINE_LAUNCH_EXECUTABLE, and REFINE_LAUNCH_MODE contamination in test children without altering the active workflow environment.\",\n            \"For unresolved failures, compare the exact tests against an unchanged base under equivalent environment, prerequisites, and compilation isolation. Fix blockers or document evidence-backed workarounds that preserve required checks. A skipped browser suite or early harness exit is incomplete validation.\",\n            \"Update Agents, Settings, persistence intent, ai-providers documentation, and the provider runbook with two configurations of one CLI, migration, inheritance, credentials, bounded paid execution, budget authority/recovery, and troubleshooting.\",\n            \"Finish with a concise P1-P8 report mapping implementation and tests to each requirement, exact commands and outcomes, prerequisites, screenshot/log paths, baseline comparisons, and remaining gaps. Leave transitions, candidate integration, approval, merge, and push to Refine.\"\n          ],\n          \"verification\": [\n            \"Retain a machine-readable validation report and referenced logs for the final source state.\",\n            \"Demonstrate the complete restart scenario and shared-budget race, with actual browser evidence.\",\n            \"Report incomplete work explicitly rather than treating focused passes as feature completion.\"\n          ]\n        }\n      ]\n    }\n  },\n  \"evidence\": [\n    \"Read-only refine goal show recovered Round 1's recorded P1-P8 plan and partial implementation report; current Goal is in Round 2 Plan.\",\n    \"Current worktree is clean at 7912ec52bfe76387f2587988dc4b99d0fbcf0ca6. Inspected current provider model, application service, ProviderStore, invocation, Event/chat consumers, synchronization, and public documentation.\",\n    \"Inspected Round 1's tracked modifications and untracked additions, retained catalog/selection/attempt code, Git budget authority, budget model, and paid-launch guard. Historical HEAD remains 9c7363164d582fac14e5076b24efdc47ec5f9461.\",\n    \"Read target/provider-checks/validation.json and referenced logs in the retained Round 1 worktree. Its full run reports 1395 passed, 29 failed, 7 ignored and stopped during unit testing. Its three settings tests do not establish rendered-browser layout quality.\",\n    \"Inspected settings_providers.js, neighboring Settings editors, shared modal and CSS patterns, actual-browser provider tests, browser prerequisites, and tests/test_all.rs plus xtask harness stages.\",\n    \"No source edits, test runs, or workflow mutations were performed during this planning step.\"\n  ],\n  \"summary\": \"Plan ready for implementation. Preserve and reconcile Round 1 into the current providers.json implementation, complete bounded paid admission before fallback, and integrate durable selection and continuation across every launch path. P1-P8 remain traceable, with explicit Settings UX and complete-harness validation requirements.\\n\\n\"\n}",
+      "received_at": "2026-09-16T12:34:41.583738033+00:00",
+      "started_at": "2026-09-16T12:31:08.109887996+00:00",
+      "workflow_revision": 40
+    }
+  ],
   "created_at": "2026-09-16T12:31:05.728642285+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-16T12:34:43.225932984+00:00",
   "error": null,
   "action_applied": false
 }
