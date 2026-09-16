@@ -499,11 +499,81 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "failed",
+  "results": {
+    "default-quality": {
+      "invocation_id": "58864fa61fa03e784490f9a6deff4d0e907e5e7ca3b0b9d4f15aa60f73d0af28",
+      "binding_id": "default-quality",
+      "role": "quality",
+      "outcome": "failure",
+      "summary": "Quality cannot pass: maintenance continuation remains incomplete. Corrections, tests, visual evidence, and the detailed P1–P8 report are retained. No workflow transition or integration was performed.\n",
+      "evidence": [
+        "target/quality-provider-checks/quality-report.json",
+        "target/quality-provider-checks/maintenance-capacity-final.log",
+        "target/quality-provider-checks/affected-validation.json",
+        "target/quality-provider-checks/integration.log",
+        "target/quality-provider-checks/checks-final.log",
+        "target/quality-provider-checks/screenshots/"
+      ],
+      "artifacts": {
+        "blocker": "Detached maintenance marks a capacity-exhausted operation interrupted instead of continuing with the next policy provider. The failing regression and retained files remain available.",
+        "corrections": [
+          "Interactive working-directory arguments, including native resume.",
+          "Event/Skill capacity interruption and recovery.",
+          "Chat, daemon-cleanup, and terminal-browser fixture races.",
+          "Additional browser coverage for editing selection policies."
+        ],
+        "validation": {
+          "browser": "385 passed; zero skips",
+          "focused_rust": "34 passed",
+          "formatting_and_whitespace": "Passed",
+          "integration": "54 passed",
+          "required_commands": "cargo test and cargo test -- --full ran but failed. Corrected failures were rechecked separately; maintenance continuation still fails. Rerun both complete commands after resolving it."
+        }
+      }
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "default-quality",
+      "checkout": {
+        "observation": {
+          "branch": "refine/00000T19EJ0CNGHM85RBDXE000/round-2-execution-3174439c-676c-4e57-8f51-18796370638f",
+          "head_commit": "fede3fdc680bc66a3438b059c4302def951a0667",
+          "status_porcelain": [
+            " M src/application/agents/sessions/provider_tests.rs",
+            " M src/application/chat/tests/queue.rs",
+            " M src/application/events/execution/runner.rs",
+            " M src/application/events/tests/repairs.rs",
+            " M src/application/system/source_promotion/agent_tests.rs",
+            " M src/infrastructure/agents/discovery/mod.rs",
+            " M src/infrastructure/agents/invocation/service.rs",
+            " M src/infrastructure/process/supervisor/operations/recovery.rs",
+            " M src/surfaces/cli/tests/system/daemon.rs",
+            " M tests/support/terminal-clipboard-browser.js",
+            " M tests/web_settings_providers_browser.test.js"
+          ]
+        },
+        "tree": "3fc31616e1fe0abd44939ff12a49423b842b21d4"
+      },
+      "checkout_recorded": true,
+      "diagnostic": null,
+      "host_bound_result": true,
+      "observational_violation": false,
+      "operation_id": null,
+      "process_id": "proc-1789571655014-1596-38835",
+      "prompt_bytes": 26598,
+      "provider_session_id": null,
+      "purpose": "work",
+      "raw_output": "{\n  \"outcome\": \"failure\",\n  \"evidence\": [\n    \"target/quality-provider-checks/quality-report.json\",\n    \"target/quality-provider-checks/maintenance-capacity-final.log\",\n    \"target/quality-provider-checks/affected-validation.json\",\n    \"target/quality-provider-checks/integration.log\",\n    \"target/quality-provider-checks/checks-final.log\",\n    \"target/quality-provider-checks/screenshots/\"\n  ],\n  \"artifacts\": {\n    \"blocker\": \"Detached maintenance marks a capacity-exhausted operation interrupted instead of continuing with the next policy provider. The failing regression and retained files remain available.\",\n    \"corrections\": [\n      \"Interactive working-directory arguments, including native resume.\",\n      \"Event/Skill capacity interruption and recovery.\",\n      \"Chat, daemon-cleanup, and terminal-browser fixture races.\",\n      \"Additional browser coverage for editing selection policies.\"\n    ],\n    \"validation\": {\n      \"focused_rust\": \"34 passed\",\n      \"integration\": \"54 passed\",\n      \"browser\": \"385 passed; zero skips\",\n      \"formatting_and_whitespace\": \"Passed\",\n      \"required_commands\": \"cargo test and cargo test -- --full ran but failed. Corrected failures were rechecked separately; maintenance continuation still fails. Rerun both complete commands after resolving it.\"\n    }\n  },\n  \"summary\": \"Quality cannot pass: maintenance continuation remains incomplete. Corrections, tests, visual evidence, and the detailed P1–P8 report are retained. No workflow transition or integration was performed.\\n\"\n}",
+      "received_at": "2026-09-16T15:48:04.539157482+00:00",
+      "started_at": "2026-09-16T15:14:14.978157912+00:00",
+      "workflow_revision": 40
+    }
+  ],
   "created_at": "2026-09-16T15:14:13.600299956+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-16T15:48:06.177794487+00:00",
   "error": null,
   "action_applied": false
 }
