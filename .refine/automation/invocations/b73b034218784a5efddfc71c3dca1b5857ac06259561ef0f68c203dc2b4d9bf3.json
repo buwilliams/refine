@@ -1,10 +1,10 @@
 {
-  "id": "d22e01cb86eb66d8267f0fde6ba4c73d6f7228847544e263bb09b09576320cfb",
+  "id": "b73b034218784a5efddfc71c3dca1b5857ac06259561ef0f68c203dc2b4d9bf3",
   "event": {
-    "id": "workflow.plan.enter",
-    "name": "Workflow Plan Enter",
+    "id": "workflow.implement.enter",
+    "name": "Workflow Implement Enter",
     "kind": "system",
-    "source": "workflow.plan.enter",
+    "source": "workflow.implement.enter",
     "enabled": true,
     "scope": {
       "node_id": null
@@ -12,8 +12,8 @@
     "parameters": [],
     "bindings": [
       {
-        "id": "default-plan",
-        "skill_id": "default-plan",
+        "id": "default-implement",
+        "skill_id": "default-implement",
         "enabled": true,
         "mode": "blocking",
         "order": 0,
@@ -51,31 +51,51 @@
     "candidate_commit": null,
     "data": {
       "context": {
-        "assembled_at": "2026-09-16T16:48:26Z",
-        "current_round": {
-          "assignee": "Buddy Williams",
-          "prompt": "Goal modal > Round > Flat tabs needs a new tab for Failed, which gathers the information about the failure. Right now, it is too hard to investigate why goals fail.",
-          "reporter": "Buddy Williams",
-          "round": 1
+        "agent_context": {
+          "assembled_at": "2026-09-16T16:48:26Z",
+          "current_round": {
+            "assignee": "Buddy Williams",
+            "prompt": "Goal modal > Round > Flat tabs needs a new tab for Failed, which gathers the information about the failure. Right now, it is too hard to investigate why goals fail.",
+            "reporter": "Buddy Williams",
+            "round": 1
+          },
+          "goal": {
+            "assignee": "Buddy Williams",
+            "id": "00000T1ARYE9B1JAXBPW2TT001",
+            "name": "Goal modal > Round > Flat tabs needs a new tab for Failed, which gathers the inf",
+            "node_id": "default",
+            "priority": "low",
+            "reporter": "Buddy Williams"
+          },
+          "governance": {
+            "configured": false,
+            "constitution": "",
+            "product": "",
+            "rules": []
+          },
+          "guidance_candidates": [],
+          "previous_rounds": [],
+          "version": 1,
+          "workflow_summary": "Refine gives this Goal Agent an isolated worktree, the current Round, and available planning context. Follow the Goal and applicable Skill instructions and use your judgment to decide when to stop. Quality and Governance agents make their own decisions using their Skills before integration and human Review. Refine coordinates workflow transitions and Git actions. Do not directly advance Goal state, approve, merge, or push."
         },
-        "goal": {
-          "assignee": "Buddy Williams",
-          "id": "00000T1ARYE9B1JAXBPW2TT001",
-          "name": "Goal modal > Round > Flat tabs needs a new tab for Failed, which gathers the inf",
-          "node_id": "default",
-          "priority": "low",
-          "reporter": "Buddy Williams"
-        },
-        "governance": {
-          "configured": false,
-          "constitution": "",
-          "product": "",
-          "rules": []
-        },
-        "guidance_candidates": [],
-        "previous_rounds": [],
-        "version": 1,
-        "workflow_summary": "Refine gives this Goal Agent an isolated worktree, the current Round, and available planning context. Follow the Goal and applicable Skill instructions and use your judgment to decide when to stop. Quality and Governance agents make their own decisions using their Skills before integration and human Review. Refine coordinates workflow transitions and Git actions. Do not directly advance Goal state, approve, merge, or push."
+        "plans": [
+          {
+            "artifacts": {
+              "plan": "Add an always-visible Failed tab to each Round’s flat tab row. It should gather the recorded failure reason, supporting diagnostics, and retained failure history so users can investigate from one place. Implement this as a read-only view of existing Goal detail data; no new workflow state or persistence is needed.\n\n1. [ ] Task #1 - Assemble Round-scoped failure evidence. In src/surfaces/web/static/js/features/goals-detail.js, add a shared collector using the existing failure-summary and retained-evidence helpers. Prefer failure_message, failure_category, and failure_at for the recorded cause. Include failed/error Event and Skill results, implementation-plan failures, relevant Quality/Governance diagnostics, and warning/error logs with their structured details. Preserve recorded step, timestamp, invocation, and candidate context when available. Logs are supporting evidence, not proof of the cause. A failed Round without a recorded reason should explicitly say that the reason is unavailable.\n\n2. [ ] Task #2 - Preserve the distinction between current failure and history. Build on Task #1 to include failure_history, prior_attempts, and retained candidate-refresh evidence. Label previous executions clearly and deduplicate repeated records using recorded identities where available. Scope everything to the selected Round; only the latest Round may use the current Goal status. After a retry, retained errors must remain inspectable without claiming that the current execution has failed. Do not attach an unrelated latest log’s details to an older recorded failure.\n\n3. [ ] Task #3 - Add and render the Failed tab. After Tasks #1–2, insert Failed after Governance and before Prompts in renderRound. Lead with the recorded cause, then supporting diagnostics and labelled historical failures. Provide a clear empty state when no failure evidence exists. Reuse the accessible tab bindings and preserve the current Plan/Request default and explicit selections across refreshes. Keep Activity’s complete chronology and existing workflow-step artifacts available. Render diagnostic text safely, wrap long output, and retain the modal’s existing scrolling behavior without nested tabs or disclosure panels. Extend goals.css only where needed for the new panel.\n\n4. [ ] Task #4 - Verify failure investigation and tab behavior. Extend tests/web_goal_detail_diagnostics.test.js and tests/web_goal_step_tabs.test.js. Cover explicit failure metadata, legacy log fallback, Skill contract errors, integration failure after passing gates, absent diagnostics, retry history and deduplication, and isolation between Rounds. Exercise tab order, keyboard navigation, refresh persistence, empty states, escaped structured evidence, and narrow-screen layout. Run the focused suites with node --test tests/web_goal_detail_diagnostics.test.js tests/web_goal_step_tabs.test.js; report browser skips explicitly and run adjacent Goal-detail checks affected by shared-helper changes.\n\n5. [ ] Task #5 - Update the Goal surface contract. Update src/surfaces/refine-hub/docs/intent/05-surfaces/03-browser/08-goal.md to describe Failed as the consolidated investigation view, its position and empty state, and the distinction between current and historical evidence. Reconcile the existing Activity descriptions with the implemented behavior."
+            },
+            "binding_id": "default-plan",
+            "evidence": [
+              "renderRound currently provides Request, Plan, Implement, Quality, Governance, Prompts, and Activity; renderRoundHistory places the failure summary inside Activity.",
+              "Existing browser helpers already render failure summaries, structured diagnostics, Skill results, and retained execution evidence.",
+              "src/application/work_items/service/round_helpers.rs retains failure_history and prior_attempts and attaches Round-scoped latest log fields.",
+              "Read-only CLI inspection confirmed this Goal remains in Plan on the expected isolated worktree. No files or workflow state were changed."
+            ],
+            "invocation_id": "d22e01cb86eb66d8267f0fde6ba4c73d6f7228847544e263bb09b09576320cfb",
+            "outcome": "success",
+            "role": "plan",
+            "summary": "The underlying issue is scattered presentation of existing failure evidence. The plan adds a consolidated Failed tab while preserving Round boundaries, retry history, and current navigation behavior.\n\n"
+          }
+        ]
       },
       "event": {},
       "goal": {
@@ -84,7 +104,7 @@
         "branch_name": "refine/00000T1ARYE9B1JAXBPW2TT001/round-1",
         "candidate_commit": null,
         "created": "2026-09-16T16:48:14Z",
-        "event_generation": 3,
+        "event_generation": 4,
         "feature_id": null,
         "feature_order": null,
         "id": "00000T1ARYE9B1JAXBPW2TT001",
@@ -101,27 +121,27 @@
             "failure_message": "",
             "prompt": "Goal modal > Round > Flat tabs needs a new tab for Failed, which gathers the information about the failure. Right now, it is too hard to investigate why goals fail.",
             "reporter": "Buddy Williams",
-            "updated": "2026-09-16T16:48:26Z"
+            "updated": "2026-09-16T16:50:34Z"
           }
         ],
-        "status": "plan",
+        "status": "implement",
         "target_branch": "main",
-        "updated": "2026-09-16T16:48:26Z",
+        "updated": "2026-09-16T16:50:34Z",
         "workflow_context": "",
-        "workflow_revision": 9
+        "workflow_revision": 14
       },
       "system": {
         "candidate_commit": null,
         "node_id": "default",
         "project_root": "/home/buddy/projects/refine-next",
         "refine_executable": "/home/buddy/projects/refine/bin/refine",
-        "workflow_step": "plan",
+        "workflow_step": "implement",
         "workspace": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T1ARYE9B1JAXBPW2TT001-round-1"
       }
     },
     "metadata": {
       "behavior": "EventSkill",
-      "event_operation_id": "1a0ab1ea50463c15",
+      "event_operation_id": "1a0ab2099ae63c16",
       "goal_id": "00000T1ARYE9B1JAXBPW2TT001",
       "kind": "workflow",
       "managed_worktree": {
@@ -140,7 +160,7 @@
       "provider": "codex",
       "round_idx": 0,
       "started_bindings": {
-        "default-plan": "2026-09-16T16:48:28.179814956+00:00"
+        "default-implement": "2026-09-16T16:50:36.411863132+00:00"
       },
       "target_app_id": "/home/buddy/projects/refine-next",
       "template_snapshot": {
@@ -443,15 +463,15 @@
         }
       },
       "workflow_revision": 2,
-      "workflow_state": "plan",
-      "workflow_step_generation": 3
+      "workflow_state": "implement",
+      "workflow_step_generation": 4
     }
   },
   "bindings": [
     {
       "binding": {
-        "id": "default-plan",
-        "skill_id": "default-plan",
+        "id": "default-implement",
+        "skill_id": "default-implement",
         "enabled": true,
         "mode": "blocking",
         "order": 0,
@@ -462,10 +482,10 @@
         "inputs": {}
       },
       "skill": {
-        "id": "default-plan",
-        "name": "Plan",
-        "prompt": "{{templates.purpose}}\n\n{{templates.architecture}}\n\n## Plan\n\nDevelop a plan to achieve the Goal's desired outcome. If the goal outcome is underspecified or is missing details add only just enough detail so that AI agents do not thrash or become confused.\n\n### Outcome\n\nA clear implementation plan that explains the approach and breaks the work into ordered tasks. Begin with a short description of the desired behavior and proposed solution. Use a numbered checklist, such as `Task #1 - What changes and why`. Include dependencies and important design decisions where they help implementation.\n\n### Guardrails\n\n- Read the context that helps explain the Goal and how the existing system works.\n- Look for the underlying cause. Consider whether a missing or misused concept explains the problem, and improve that concept rather than adding fixes for individual symptoms.\n- Give each task enough detail to guide implementation while leaving room for reasonable implementation choices.\n- Keep the plan focused on the desired outcome. Prefer straightforward changes that fit the existing architecture.",
-        "role": "plan",
+        "id": "default-implement",
+        "name": "Implement",
+        "prompt": "{{templates.purpose}}\n\n{{templates.architecture}}\n\n## Implement\n\nImplement the plan.\n\n### Outcome\n\nThe plan is implemented in a way that aligns with the project's purpose and architecture. Provide a brief summary organized by plan task: what changed, any important departures from the plan and why, and any unfinished work.\n\n### Guardrails\n\n- Follow established code patterns and put shared behavior in one place. Fix the underlying cause rather than each symptom separately.\n- Keep code focused on one responsibility and preserve stable interfaces where possible. Split mixed responsibilities into separate files. Keep files relatively small, under roughly 1,000 lines where possible.\n- Prefer clear, straightforward code and abstractions that make the behavior easier to understand and maintain.\n",
+        "role": "implement",
         "enabled": true,
         "scope": {
           "node_id": null
@@ -476,54 +496,11 @@
       "parameters": {}
     }
   ],
-  "state": "succeeded",
-  "results": {
-    "default-plan": {
-      "invocation_id": "d22e01cb86eb66d8267f0fde6ba4c73d6f7228847544e263bb09b09576320cfb",
-      "binding_id": "default-plan",
-      "role": "plan",
-      "outcome": "success",
-      "summary": "The underlying issue is scattered presentation of existing failure evidence. The plan adds a consolidated Failed tab while preserving Round boundaries, retry history, and current navigation behavior.\n\n",
-      "evidence": [
-        "renderRound currently provides Request, Plan, Implement, Quality, Governance, Prompts, and Activity; renderRoundHistory places the failure summary inside Activity.",
-        "Existing browser helpers already render failure summaries, structured diagnostics, Skill results, and retained execution evidence.",
-        "src/application/work_items/service/round_helpers.rs retains failure_history and prior_attempts and attaches Round-scoped latest log fields.",
-        "Read-only CLI inspection confirmed this Goal remains in Plan on the expected isolated worktree. No files or workflow state were changed."
-      ],
-      "artifacts": {
-        "plan": "Add an always-visible Failed tab to each Round’s flat tab row. It should gather the recorded failure reason, supporting diagnostics, and retained failure history so users can investigate from one place. Implement this as a read-only view of existing Goal detail data; no new workflow state or persistence is needed.\n\n1. [ ] Task #1 - Assemble Round-scoped failure evidence. In src/surfaces/web/static/js/features/goals-detail.js, add a shared collector using the existing failure-summary and retained-evidence helpers. Prefer failure_message, failure_category, and failure_at for the recorded cause. Include failed/error Event and Skill results, implementation-plan failures, relevant Quality/Governance diagnostics, and warning/error logs with their structured details. Preserve recorded step, timestamp, invocation, and candidate context when available. Logs are supporting evidence, not proof of the cause. A failed Round without a recorded reason should explicitly say that the reason is unavailable.\n\n2. [ ] Task #2 - Preserve the distinction between current failure and history. Build on Task #1 to include failure_history, prior_attempts, and retained candidate-refresh evidence. Label previous executions clearly and deduplicate repeated records using recorded identities where available. Scope everything to the selected Round; only the latest Round may use the current Goal status. After a retry, retained errors must remain inspectable without claiming that the current execution has failed. Do not attach an unrelated latest log’s details to an older recorded failure.\n\n3. [ ] Task #3 - Add and render the Failed tab. After Tasks #1–2, insert Failed after Governance and before Prompts in renderRound. Lead with the recorded cause, then supporting diagnostics and labelled historical failures. Provide a clear empty state when no failure evidence exists. Reuse the accessible tab bindings and preserve the current Plan/Request default and explicit selections across refreshes. Keep Activity’s complete chronology and existing workflow-step artifacts available. Render diagnostic text safely, wrap long output, and retain the modal’s existing scrolling behavior without nested tabs or disclosure panels. Extend goals.css only where needed for the new panel.\n\n4. [ ] Task #4 - Verify failure investigation and tab behavior. Extend tests/web_goal_detail_diagnostics.test.js and tests/web_goal_step_tabs.test.js. Cover explicit failure metadata, legacy log fallback, Skill contract errors, integration failure after passing gates, absent diagnostics, retry history and deduplication, and isolation between Rounds. Exercise tab order, keyboard navigation, refresh persistence, empty states, escaped structured evidence, and narrow-screen layout. Run the focused suites with node --test tests/web_goal_detail_diagnostics.test.js tests/web_goal_step_tabs.test.js; report browser skips explicitly and run adjacent Goal-detail checks affected by shared-helper changes.\n\n5. [ ] Task #5 - Update the Goal surface contract. Update src/surfaces/refine-hub/docs/intent/05-surfaces/03-browser/08-goal.md to describe Failed as the consolidated investigation view, its position and empty state, and the distinction between current and historical evidence. Reconcile the existing Activity descriptions with the implemented behavior."
-      }
-    }
-  },
-  "attempts": [
-    {
-      "attempt": 0,
-      "binding_id": "default-plan",
-      "checkout": {
-        "observation": {
-          "branch": "refine/00000T1ARYE9B1JAXBPW2TT001/round-1",
-          "head_commit": "95a05284ea9f7b5c9ef545b093581c6bc0ad69ec",
-          "status_porcelain": []
-        },
-        "tree": "b01552080676c7b9de1efc63504249c9abf5bf2d"
-      },
-      "checkout_recorded": true,
-      "diagnostic": null,
-      "host_bound_result": true,
-      "observational_violation": false,
-      "operation_id": null,
-      "process_id": "proc-1789577308511-1596-52778",
-      "prompt_bytes": 5651,
-      "provider_session_id": null,
-      "purpose": "work",
-      "raw_output": "{\n  \"outcome\": \"success\",\n  \"artifacts\": {\n    \"plan\": \"Add an always-visible Failed tab to each Round’s flat tab row. It should gather the recorded failure reason, supporting diagnostics, and retained failure history so users can investigate from one place. Implement this as a read-only view of existing Goal detail data; no new workflow state or persistence is needed.\\n\\n1. [ ] Task #1 - Assemble Round-scoped failure evidence. In src/surfaces/web/static/js/features/goals-detail.js, add a shared collector using the existing failure-summary and retained-evidence helpers. Prefer failure_message, failure_category, and failure_at for the recorded cause. Include failed/error Event and Skill results, implementation-plan failures, relevant Quality/Governance diagnostics, and warning/error logs with their structured details. Preserve recorded step, timestamp, invocation, and candidate context when available. Logs are supporting evidence, not proof of the cause. A failed Round without a recorded reason should explicitly say that the reason is unavailable.\\n\\n2. [ ] Task #2 - Preserve the distinction between current failure and history. Build on Task #1 to include failure_history, prior_attempts, and retained candidate-refresh evidence. Label previous executions clearly and deduplicate repeated records using recorded identities where available. Scope everything to the selected Round; only the latest Round may use the current Goal status. After a retry, retained errors must remain inspectable without claiming that the current execution has failed. Do not attach an unrelated latest log’s details to an older recorded failure.\\n\\n3. [ ] Task #3 - Add and render the Failed tab. After Tasks #1–2, insert Failed after Governance and before Prompts in renderRound. Lead with the recorded cause, then supporting diagnostics and labelled historical failures. Provide a clear empty state when no failure evidence exists. Reuse the accessible tab bindings and preserve the current Plan/Request default and explicit selections across refreshes. Keep Activity’s complete chronology and existing workflow-step artifacts available. Render diagnostic text safely, wrap long output, and retain the modal’s existing scrolling behavior without nested tabs or disclosure panels. Extend goals.css only where needed for the new panel.\\n\\n4. [ ] Task #4 - Verify failure investigation and tab behavior. Extend tests/web_goal_detail_diagnostics.test.js and tests/web_goal_step_tabs.test.js. Cover explicit failure metadata, legacy log fallback, Skill contract errors, integration failure after passing gates, absent diagnostics, retry history and deduplication, and isolation between Rounds. Exercise tab order, keyboard navigation, refresh persistence, empty states, escaped structured evidence, and narrow-screen layout. Run the focused suites with node --test tests/web_goal_detail_diagnostics.test.js tests/web_goal_step_tabs.test.js; report browser skips explicitly and run adjacent Goal-detail checks affected by shared-helper changes.\\n\\n5. [ ] Task #5 - Update the Goal surface contract. Update src/surfaces/refine-hub/docs/intent/05-surfaces/03-browser/08-goal.md to describe Failed as the consolidated investigation view, its position and empty state, and the distinction between current and historical evidence. Reconcile the existing Activity descriptions with the implemented behavior.\"\n  },\n  \"evidence\": [\n    \"renderRound currently provides Request, Plan, Implement, Quality, Governance, Prompts, and Activity; renderRoundHistory places the failure summary inside Activity.\",\n    \"Existing browser helpers already render failure summaries, structured diagnostics, Skill results, and retained execution evidence.\",\n    \"src/application/work_items/service/round_helpers.rs retains failure_history and prior_attempts and attaches Round-scoped latest log fields.\",\n    \"Read-only CLI inspection confirmed this Goal remains in Plan on the expected isolated worktree. No files or workflow state were changed.\"\n  ],\n  \"summary\": \"The underlying issue is scattered presentation of existing failure evidence. The plan adds a consolidated Failed tab while preserving Round boundaries, retry history, and current navigation behavior.\\n\\n\"\n}",
-      "received_at": "2026-09-16T16:50:31.462326017+00:00",
-      "started_at": "2026-09-16T16:48:28.470561656+00:00",
-      "workflow_revision": 2
-    }
-  ],
-  "created_at": "2026-09-16T16:48:27.008266717+00:00",
-  "completed_at": "2026-09-16T16:50:32.850099837+00:00",
+  "state": "running",
+  "results": {},
+  "attempts": [],
+  "created_at": "2026-09-16T16:50:35.216356643+00:00",
+  "completed_at": null,
   "error": null,
   "action_applied": false
 }
