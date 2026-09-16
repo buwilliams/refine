@@ -240,7 +240,7 @@ fn structured_evidence_preserves_verdict_and_gate_without_another_provider_call(
     let _env = crate::infrastructure::agents::invocation::smoke_ai_env_lock()
         .lock()
         .unwrap_or_else(|p| p.into_inner());
-    for outcome in ["success", "failure"] {
+    for outcome in ["success", "failure", "error"] {
         let fixture = Fixture::new();
         let _restore = provider(
             &fixture,
@@ -261,19 +261,19 @@ print(json.dumps(result))
         let completed = service.execute(&invocation.id, || Ok(())).unwrap();
         assert_eq!(
             completed.state,
-            if outcome == "success" {
-                InvocationState::Succeeded
-            } else {
-                InvocationState::Failed
+            match outcome {
+                "success" => InvocationState::Succeeded,
+                "failure" => InvocationState::Failed,
+                _ => InvocationState::Error,
             },
             "{completed:?}"
         );
         assert_eq!(
             completed.gate_assessment(),
-            if outcome == "success" {
-                GateAssessment::Satisfied
-            } else {
-                GateAssessment::Finding
+            match outcome {
+                "success" => GateAssessment::Satisfied,
+                "failure" => GateAssessment::Finding,
+                _ => GateAssessment::Fault,
             }
         );
         assert_eq!(completed.attempts.len(), 1);
@@ -299,6 +299,72 @@ print(json.dumps(result))
             std::fs::read_to_string(fixture.0.join("work-count")).unwrap(),
             "work\n"
         );
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn retained_structured_evidence_redecodes_old_rejections_without_a_provider_call() {
+    let _env = crate::infrastructure::agents::invocation::smoke_ai_env_lock()
+        .lock()
+        .unwrap_or_else(|p| p.into_inner());
+    for host_bound in [false, true] {
+        for outcome in ["success", "failure", "error"] {
+            let fixture = Fixture::new();
+            let checkout = Fixture::new();
+            checkout.repository();
+            let _restore = provider(
+                &fixture,
+                "import pathlib\npathlib.Path('unexpected-provider-call').touch()\nraise SystemExit(1)",
+            );
+            let service = fixture.service();
+            let mut invocation = prepared(&fixture, "workflow.implement.enter");
+            invocation.context.cwd = checkout.0.clone();
+            invocation.context.target_root = checkout.0.clone();
+            let binding = &invocation.bindings[0];
+            let mut report = json!({"outcome":outcome,
+                "evidence":[{"id":"P1","note":"completed work"}]});
+            if !host_bound {
+                report["invocation_id"] = json!(invocation.id);
+                report["binding_id"] = json!(binding.binding.id);
+                report["role"] = json!(binding.skill.role);
+            }
+            let raw = report.to_string();
+            let checkout_receipt = super::super::completion::observe(
+                &FileGitWorktreeService::new(&checkout.0),
+                &checkout.0,
+            )
+            .unwrap();
+            let mut receipt = json!({"binding_id":binding.binding.id,"attempt":0,
+                "process_id":"completed-provider","raw_output":raw,
+                "purpose":"work","checkout_recorded":true,"checkout":checkout_receipt,
+                "diagnostic":"evidence[0]: invalid type: map, expected a string"});
+            // Legacy receipts omit the host-binding marker entirely.
+            if host_bound {
+                receipt["host_bound_result"] = json!(true);
+            }
+            invocation.attempts.push(receipt);
+            service.save_invocation(&invocation).unwrap();
+
+            let completed = service.execute(&invocation.id, || Ok(())).unwrap();
+            assert_eq!(
+                completed.gate_assessment(),
+                match outcome {
+                    "success" => GateAssessment::Satisfied,
+                    "failure" => GateAssessment::Finding,
+                    _ => GateAssessment::Fault,
+                },
+                "{completed:?}"
+            );
+            let persisted = service.invocation(&invocation.id).unwrap();
+            assert_eq!(persisted.attempts.len(), 1);
+            assert_eq!(persisted.attempts[0]["raw_output"], raw);
+            assert!(persisted.attempts[0]["diagnostic"].is_null());
+            let result = &persisted.results[&binding.binding.id];
+            assert_eq!(result.outcome, outcome);
+            assert_eq!(result.evidence, [r#"{"id":"P1","note":"completed work"}"#]);
+            assert!(!checkout.0.join("unexpected-provider-call").exists());
+        }
     }
 }
 
