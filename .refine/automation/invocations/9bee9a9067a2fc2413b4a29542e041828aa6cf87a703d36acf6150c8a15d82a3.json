@@ -1,10 +1,10 @@
 {
-  "id": "8b38f0eb12c661df6c6f46376246392db523c8051661a068fc3bd3d7f929f764",
+  "id": "9bee9a9067a2fc2413b4a29542e041828aa6cf87a703d36acf6150c8a15d82a3",
   "event": {
-    "id": "workflow.quality.enter",
-    "name": "Workflow Quality Enter",
+    "id": "workflow.governance.enter",
+    "name": "Workflow Governance Enter",
     "kind": "system",
-    "source": "workflow.quality.enter",
+    "source": "workflow.governance.enter",
     "enabled": true,
     "scope": {
       "node_id": null
@@ -12,8 +12,8 @@
     "parameters": [],
     "bindings": [
       {
-        "id": "default-quality",
-        "skill_id": "default-quality",
+        "id": "default-governance",
+        "skill_id": "default-governance",
         "enabled": true,
         "mode": "blocking",
         "order": 0,
@@ -48,64 +48,43 @@
     "goal_id": "00000T1ARYE9B1JAXBPW2TT001",
     "round_idx": 0,
     "workflow_revision": 2,
-    "candidate_commit": "2132d879b57ce1fd756175bcf77fc079e9fcbed0",
+    "candidate_commit": "07c90d91f32d40a70f0998c5c617b0f96471a28a",
     "data": {
       "context": {
-        "agent_context": {
-          "assembled_at": "2026-09-16T16:48:26Z",
-          "current_round": {
-            "assignee": "Buddy Williams",
-            "prompt": "Goal modal > Round > Flat tabs needs a new tab for Failed, which gathers the information about the failure. Right now, it is too hard to investigate why goals fail.",
-            "reporter": "Buddy Williams",
-            "round": 1
-          },
-          "goal": {
-            "assignee": "Buddy Williams",
-            "id": "00000T1ARYE9B1JAXBPW2TT001",
-            "name": "Goal modal > Round > Flat tabs needs a new tab for Failed, which gathers the inf",
-            "node_id": "default",
-            "priority": "low",
-            "reporter": "Buddy Williams"
-          },
-          "governance": {
-            "configured": false,
-            "constitution": "",
-            "product": "",
-            "rules": []
-          },
-          "guidance_candidates": [],
-          "previous_rounds": [],
-          "version": 1,
-          "workflow_summary": "Refine gives this Goal Agent an isolated worktree, the current Round, and available planning context. Follow the Goal and applicable Skill instructions and use your judgment to decide when to stop. Quality and Governance agents make their own decisions using their Skills before integration and human Review. Refine coordinates workflow transitions and Git actions. Do not directly advance Goal state, approve, merge, or push."
+        "assembled_at": "2026-09-16T16:48:26Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "Goal modal > Round > Flat tabs needs a new tab for Failed, which gathers the information about the failure. Right now, it is too hard to investigate why goals fail.",
+          "reporter": "Buddy Williams",
+          "round": 1
         },
-        "implementation_report": "workflow.implement.enter:default-implement: Implemented the Failed investigation tab. Recorded causes lead; supporting diagnostics and historical evidence remain clearly distinguished. Ready for Quality.",
-        "plans": [
-          {
-            "artifacts": {
-              "plan": "Add an always-visible Failed tab to each Round’s flat tab row. It should gather the recorded failure reason, supporting diagnostics, and retained failure history so users can investigate from one place. Implement this as a read-only view of existing Goal detail data; no new workflow state or persistence is needed.\n\n1. [ ] Task #1 - Assemble Round-scoped failure evidence. In src/surfaces/web/static/js/features/goals-detail.js, add a shared collector using the existing failure-summary and retained-evidence helpers. Prefer failure_message, failure_category, and failure_at for the recorded cause. Include failed/error Event and Skill results, implementation-plan failures, relevant Quality/Governance diagnostics, and warning/error logs with their structured details. Preserve recorded step, timestamp, invocation, and candidate context when available. Logs are supporting evidence, not proof of the cause. A failed Round without a recorded reason should explicitly say that the reason is unavailable.\n\n2. [ ] Task #2 - Preserve the distinction between current failure and history. Build on Task #1 to include failure_history, prior_attempts, and retained candidate-refresh evidence. Label previous executions clearly and deduplicate repeated records using recorded identities where available. Scope everything to the selected Round; only the latest Round may use the current Goal status. After a retry, retained errors must remain inspectable without claiming that the current execution has failed. Do not attach an unrelated latest log’s details to an older recorded failure.\n\n3. [ ] Task #3 - Add and render the Failed tab. After Tasks #1–2, insert Failed after Governance and before Prompts in renderRound. Lead with the recorded cause, then supporting diagnostics and labelled historical failures. Provide a clear empty state when no failure evidence exists. Reuse the accessible tab bindings and preserve the current Plan/Request default and explicit selections across refreshes. Keep Activity’s complete chronology and existing workflow-step artifacts available. Render diagnostic text safely, wrap long output, and retain the modal’s existing scrolling behavior without nested tabs or disclosure panels. Extend goals.css only where needed for the new panel.\n\n4. [ ] Task #4 - Verify failure investigation and tab behavior. Extend tests/web_goal_detail_diagnostics.test.js and tests/web_goal_step_tabs.test.js. Cover explicit failure metadata, legacy log fallback, Skill contract errors, integration failure after passing gates, absent diagnostics, retry history and deduplication, and isolation between Rounds. Exercise tab order, keyboard navigation, refresh persistence, empty states, escaped structured evidence, and narrow-screen layout. Run the focused suites with node --test tests/web_goal_detail_diagnostics.test.js tests/web_goal_step_tabs.test.js; report browser skips explicitly and run adjacent Goal-detail checks affected by shared-helper changes.\n\n5. [ ] Task #5 - Update the Goal surface contract. Update src/surfaces/refine-hub/docs/intent/05-surfaces/03-browser/08-goal.md to describe Failed as the consolidated investigation view, its position and empty state, and the distinction between current and historical evidence. Reconcile the existing Activity descriptions with the implemented behavior."
-            },
-            "binding_id": "default-plan",
-            "evidence": [
-              "renderRound currently provides Request, Plan, Implement, Quality, Governance, Prompts, and Activity; renderRoundHistory places the failure summary inside Activity.",
-              "Existing browser helpers already render failure summaries, structured diagnostics, Skill results, and retained execution evidence.",
-              "src/application/work_items/service/round_helpers.rs retains failure_history and prior_attempts and attaches Round-scoped latest log fields.",
-              "Read-only CLI inspection confirmed this Goal remains in Plan on the expected isolated worktree. No files or workflow state were changed."
-            ],
-            "invocation_id": "d22e01cb86eb66d8267f0fde6ba4c73d6f7228847544e263bb09b09576320cfb",
-            "outcome": "success",
-            "role": "plan",
-            "summary": "The underlying issue is scattered presentation of existing failure evidence. The plan adds a consolidated Failed tab while preserving Round boundaries, retry history, and current navigation behavior.\n\n"
-          }
-        ]
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000T1ARYE9B1JAXBPW2TT001",
+          "name": "Goal modal > Round > Flat tabs needs a new tab for Failed, which gathers the inf",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": false,
+          "constitution": "",
+          "product": "",
+          "rules": []
+        },
+        "guidance_candidates": [],
+        "previous_rounds": [],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree, the current Round, and available planning context. Follow the Goal and applicable Skill instructions and use your judgment to decide when to stop. Quality and Governance agents make their own decisions using their Skills before integration and human Review. Refine coordinates workflow transitions and Git actions. Do not directly advance Goal state, approve, merge, or push."
       },
       "event": {},
       "goal": {
         "assignee": "Buddy Williams",
         "base_commit": "95a05284ea9f7b5c9ef545b093581c6bc0ad69ec",
         "branch_name": "refine/00000T1ARYE9B1JAXBPW2TT001/round-1",
-        "candidate_commit": "2132d879b57ce1fd756175bcf77fc079e9fcbed0",
+        "candidate_commit": "07c90d91f32d40a70f0998c5c617b0f96471a28a",
         "created": "2026-09-16T16:48:14Z",
-        "event_generation": 5,
+        "event_generation": 6,
         "feature_id": null,
         "feature_order": null,
         "id": "00000T1ARYE9B1JAXBPW2TT001",
@@ -123,28 +102,32 @@
             "implementation_report": "workflow.implement.enter:default-implement: Implemented the Failed investigation tab. Recorded causes lead; supporting diagnostics and historical evidence remain clearly distinguished. Ready for Quality.",
             "implementation_reported_at": "2026-09-16T16:57:12Z",
             "prompt": "Goal modal > Round > Flat tabs needs a new tab for Failed, which gathers the information about the failure. Right now, it is too hard to investigate why goals fail.",
+            "quality_agent_report": "workflow.quality.enter:default-quality: Quality passed. Failure causes, supporting diagnostics, retry history, deduplication, and tab behavior have meaningful passing coverage. Added three edge-case tests; no implementation corrections were needed. Ready for Governance.\n\n",
+            "quality_candidate_commit": "07c90d91f32d40a70f0998c5c617b0f96471a28a",
+            "quality_message": "Quality Skills reported success.",
+            "quality_state": "passed",
             "reporter": "Buddy Williams",
-            "updated": "2026-09-16T16:57:14Z"
+            "updated": "2026-09-16T17:00:39Z"
           }
         ],
-        "status": "quality",
+        "status": "governance",
         "target_branch": "main",
-        "updated": "2026-09-16T16:57:14Z",
+        "updated": "2026-09-16T17:00:39Z",
         "workflow_context": "",
-        "workflow_revision": 21
+        "workflow_revision": 31
       },
       "system": {
-        "candidate_commit": "2132d879b57ce1fd756175bcf77fc079e9fcbed0",
+        "candidate_commit": "07c90d91f32d40a70f0998c5c617b0f96471a28a",
         "node_id": "default",
         "project_root": "/home/buddy/projects/refine-next",
         "refine_executable": "/home/buddy/projects/refine/bin/refine",
-        "workflow_step": "quality",
+        "workflow_step": "governance",
         "workspace": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T1ARYE9B1JAXBPW2TT001-round-1"
       }
     },
     "metadata": {
       "behavior": "EventSkill",
-      "event_operation_id": "1a0ab26b17463c17",
+      "event_operation_id": "1a0ab29d57d63c19",
       "goal_id": "00000T1ARYE9B1JAXBPW2TT001",
       "kind": "workflow",
       "managed_worktree": {
@@ -163,7 +146,7 @@
       "provider": "codex",
       "round_idx": 0,
       "started_bindings": {
-        "default-quality": "2026-09-16T16:57:15.631056757+00:00"
+        "default-governance": "2026-09-16T17:00:41.495195491+00:00"
       },
       "target_app_id": "/home/buddy/projects/refine-next",
       "template_snapshot": {
@@ -466,15 +449,15 @@
         }
       },
       "workflow_revision": 2,
-      "workflow_state": "quality",
-      "workflow_step_generation": 5
+      "workflow_state": "governance",
+      "workflow_step_generation": 6
     }
   },
   "bindings": [
     {
       "binding": {
-        "id": "default-quality",
-        "skill_id": "default-quality",
+        "id": "default-governance",
+        "skill_id": "default-governance",
         "enabled": true,
         "mode": "blocking",
         "order": 0,
@@ -485,10 +468,10 @@
         "inputs": {}
       },
       "skill": {
-        "id": "default-quality",
-        "name": "Quality",
-        "prompt": "{{templates.purpose}}\n\n{{templates.architecture}}\n\n## Quality\n\nTest the implementation. Create and groom tests to cover the behavior described in the plan.\n\n### Outcome\n\nMeaningful tests cover the changed behavior and pass. Provide a brief report of the behavior tested, tests added or updated, commands run and their results, and any remaining failures or gaps. Include runtime or browser test results where useful. These results support Governance's verification of the work.\n\n### Guardrails\n\n- Test observable behavior, including relevant failure cases and effects on existing functionality. Tests should catch defects rather than mirror the implementation.\n- Keep useful tests, update tests for changed behavior, and remove obsolete or meaningless tests.\n- Investigate failures, correct problems in the implementation or tests, and rerun affected tests.\n- Choose tests suited to the change. Expand coverage when failures or affected behavior call for it.",
-        "role": "quality",
+        "id": "default-governance",
+        "name": "Governance",
+        "prompt": "{{templates.purpose}}\n\n{{templates.architecture}}\n\n## Governance\n\nVerify that the implementation meets the user-defined Goal, fits the system architecture, and serves the project's purpose.\n\n### Outcome\n\nA clear assessment of whether the implementation satisfies all three. Begin with the verdict, then briefly explain how the work meets the Goal, fits the architecture, and supports the project's purpose, using concrete evidence from the implementation and Quality results. For each gap, describe what falls short, why it matters, and the recommended correction. Separate necessary corrections from optional improvements.\n\n### Guardrails\n\n- Read the context that helps explain the user's Goal, the system architecture, and the project's purpose.\n- Compare the implementation with the user's desired outcome as well as the plan. Completing the plan and passing tests alone do not establish that the Goal is met.\n- Look for clear responsibilities, shared behavior implemented in one place, and interfaces that remain easy to use and maintain.\n- Judge design choices by how they serve the project. Allow sound approaches that differ from personal preference.\n- Group related issues by their underlying cause so the next step can address them together.",
+        "role": "governance",
         "enabled": true,
         "scope": {
           "node_id": null
@@ -499,63 +482,11 @@
       "parameters": {}
     }
   ],
-  "state": "succeeded",
-  "results": {
-    "default-quality": {
-      "invocation_id": "8b38f0eb12c661df6c6f46376246392db523c8051661a068fc3bd3d7f929f764",
-      "binding_id": "default-quality",
-      "role": "quality",
-      "outcome": "success",
-      "summary": "Quality passed. Failure causes, supporting diagnostics, retry history, deduplication, and tab behavior have meaningful passing coverage. Added three edge-case tests; no implementation corrections were needed. Ready for Governance.\n\n",
-      "evidence": [
-        "Focused suites: NODE_PATH=/tmp/refine-provider-browser/node_modules node --test tests/web_goal_detail_diagnostics.test.js tests/web_goal_step_tabs.test.js — 20 passed, zero failures or skips.",
-        "Focused and adjacent suites, including human controls, cancellation, transfer, log tail, and screen rendering — 68 passed before the three additional tests; zero failures or skips.",
-        "Browser checks passed for tab order, keyboard navigation, refresh persistence, Round isolation, escaped diagnostics, and 375px/1280px layouts.",
-        "git diff --check and node --check for goals-failures.js and goals-detail.js passed."
-      ],
-      "artifacts": {
-        "limitations": "Browser tests exercised production static assets with fixture APIs. The initial browser skips were resolved using the existing Playwright installation. No remaining failures in the selected checks.",
-        "tests_added": {
-          "tests/web_goal_detail_diagnostics.test.js": [
-            "Partial recorded failure metadata cannot borrow an unrelated log's reason or timestamp.",
-            "Logs without IDs deduplicate across retry snapshots and latest-log projections.",
-            "Passing current and retained gates leave Failed empty."
-          ]
-        }
-      }
-    }
-  },
-  "attempts": [
-    {
-      "attempt": 0,
-      "binding_id": "default-quality",
-      "checkout": {
-        "observation": {
-          "branch": "refine/00000T1ARYE9B1JAXBPW2TT001/round-1",
-          "head_commit": "2132d879b57ce1fd756175bcf77fc079e9fcbed0",
-          "status_porcelain": [
-            " M tests/web_goal_detail_diagnostics.test.js"
-          ]
-        },
-        "tree": "4e740f9c723bfdd063a9e079cc902833460925f0"
-      },
-      "checkout_recorded": true,
-      "diagnostic": null,
-      "host_bound_result": true,
-      "observational_violation": false,
-      "operation_id": null,
-      "process_id": "proc-1789577835888-1596-54149",
-      "prompt_bytes": 10472,
-      "provider_session_id": null,
-      "purpose": "work",
-      "raw_output": "{\n  \"outcome\": \"success\",\n  \"evidence\": [\n    \"Focused suites: NODE_PATH=/tmp/refine-provider-browser/node_modules node --test tests/web_goal_detail_diagnostics.test.js tests/web_goal_step_tabs.test.js — 20 passed, zero failures or skips.\",\n    \"Focused and adjacent suites, including human controls, cancellation, transfer, log tail, and screen rendering — 68 passed before the three additional tests; zero failures or skips.\",\n    \"Browser checks passed for tab order, keyboard navigation, refresh persistence, Round isolation, escaped diagnostics, and 375px/1280px layouts.\",\n    \"git diff --check and node --check for goals-failures.js and goals-detail.js passed.\"\n  ],\n  \"artifacts\": {\n    \"tests_added\": {\n      \"tests/web_goal_detail_diagnostics.test.js\": [\n        \"Partial recorded failure metadata cannot borrow an unrelated log's reason or timestamp.\",\n        \"Logs without IDs deduplicate across retry snapshots and latest-log projections.\",\n        \"Passing current and retained gates leave Failed empty.\"\n      ]\n    },\n    \"limitations\": \"Browser tests exercised production static assets with fixture APIs. The initial browser skips were resolved using the existing Playwright installation. No remaining failures in the selected checks.\"\n  },\n  \"summary\": \"Quality passed. Failure causes, supporting diagnostics, retry history, deduplication, and tab behavior have meaningful passing coverage. Added three edge-case tests; no implementation corrections were needed. Ready for Governance.\\n\\n\"\n}",
-      "received_at": "2026-09-16T17:00:33.175668583+00:00",
-      "started_at": "2026-09-16T16:57:15.855447715+00:00",
-      "workflow_revision": 2
-    }
-  ],
-  "created_at": "2026-09-16T16:57:14.523459347+00:00",
-  "completed_at": "2026-09-16T17:00:34.992174899+00:00",
+  "state": "running",
+  "results": {},
+  "attempts": [],
+  "created_at": "2026-09-16T17:00:40.338462463+00:00",
+  "completed_at": null,
   "error": null,
   "action_applied": false
 }
