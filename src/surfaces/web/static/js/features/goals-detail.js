@@ -932,6 +932,7 @@ function renderRound(rnd, idx, isLatest, prevRoundOpen = {}, prevPlanHistoryOpen
     request: `<div class="round-request" data-testid="goal-round-detail-prompt">${htmlEscape(rnd.prompt || "")}</div>`,
     ...Object.fromEntries(GOAL_AUTOMATED_STEPS.map(step => [step,
       renderRoundStep(rnd, idx, step, goal, prevPlanHistoryOpen)])),
+    failed: renderRoundFailures(goal, rnd, isLatest),
     prompts: renderGoalPrompts(goal.id, idx),
     activity: renderRoundHistory(goal, rnd, idx, isLatest),
   };
@@ -1087,74 +1088,17 @@ function renderRoundStep(round, idx, step, goal = {}, prevPlanHistoryOpen = {}) 
 
 function renderRoundHistory(goal, round, idx, isLatest) {
   const logs = round.logs || [];
-  const errors = logs.filter(log => log.severity === "error");
-  const historyRound = { ...round, latest_error_log: round.latest_error_log || errors.at(-1) };
-  const roundGoal = { ...goal, status: isLatest ? goal.status : (round.failure_message || errors.length) ? "failed" : "done",
+  const roundGoal = { ...goal, status: isLatest ? goal.status : round.failure_message ? "failed" : "done",
     workflow_controls: (goal.workflow_controls || []).filter(control => control.source_round === idx + 1),
     pending_workflow_outcome: isLatest ? goal.pending_workflow_outcome : null };
   const notice = isLatest ? computeFeatureBlockingNotice(goal) : null;
   return `<div class="round-history" data-testid="goal-round-history">
-    ${renderFailureSummary(roundGoal, historyRound)}
     ${notice ? `<p class="muted small">${htmlEscape(notice.message)}</p>` : ""}
     ${renderQualitySummary(round)}
     ${renderGovernanceSummary(round)}
     ${typeof renderWorkflowOutcome === "function" ? renderWorkflowOutcome(roundGoal) : ""}
     ${renderRoundLogEntries(logs)}
   </div>`;
-}
-
-// A Goal can fail after every gate it reached passed — an integration that
-// found the branch tip moved, for one — so the reason appears first above
-// the gate summaries rather than being inferred from them.
-function goalFailureEvidence(goal, round) {
-  if (!round) return null;
-  const stateBoundary = latestStateBoundary(round);
-  // Failure transitions are normally logged immediately after their cause, so
-  // a strict post-transition boundary would discard the error users need.
-  // The latest error is already scoped to this round by the backend.
-  const errorLog = goal?.status === "failed"
-    ? round.latest_error_log || null
-    : currentRoundLog(round.latest_error_log, stateBoundary);
-  const workflowLog = currentRoundLog(round.latest_workflow_log, stateBoundary);
-  const fallbackLog = currentRoundLog(
-    round.latest_log?.severity && round.latest_log.severity !== "info"
-      ? round.latest_log
-      : null,
-    stateBoundary,
-  );
-  const log = errorLog || workflowLog || fallbackLog;
-  const message = round.failure_message || log?.message || "";
-  if (!message || (goal?.status !== "failed" && !round.failure_message)) return null;
-  return {
-    category: round.failure_category || log?.category || "workflow",
-    message,
-    at: round.failure_at || log?.datetime || "",
-    log_details: log?.details || null,
-  };
-}
-
-function renderFailureSummary(goal, round) {
-  const failure = goalFailureEvidence(goal, round);
-  if (!failure) {
-    return "";
-  }
-  // Keep the complete recorded message, but lead with the contract's explicit
-  // cause when its invocation metadata otherwise buries that cause.
-  const contractCause = failure.message.startsWith("Skill output contract failed:")
-    ? failure.message.match(/;\s*(Skill result[^;]+)$/)?.[1]
-    : null;
-  const headline = contractCause || failure.message;
-  return `
-    <div class="round-diagnostic" data-testid="goal-failure-summary">
-      <h3>Why this Round failed</h3>
-      <p class="round-failure-reason" data-testid="goal-failure-message">${htmlEscape(headline)}</p>
-      <div class="row" style="gap:8px;flex-wrap:wrap">
-        ${failure.category ? `<span class="status-pill failed" data-testid="goal-failure-category">${htmlEscape(failure.category)}</span>` : ""}
-        ${failure.at ? `<span class="muted small" data-testid="goal-failure-at">${fmtTime(failure.at)}</span>` : ""}
-      </div>
-      ${contractCause ? `<p class="muted small">The Skill result was rejected, so it could not authorize the workflow gate.</p><p class="round-recorded-error">${htmlEscape(failure.message)}</p>` : ""}
-      ${failure.log_details ? `<pre class="round-evidence" data-testid="goal-failure-details">${htmlEscape(diagnosticDetailsText(failure.log_details))}</pre>` : ""}
-    </div>`;
 }
 
 function renderGovernanceSummary(round) {

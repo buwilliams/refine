@@ -39,7 +39,7 @@ test("flat workflow tabs put each step's artifacts before its own activity and p
   try {
     const { page } = app;
     const tabs = page.locator('.round-tabs [role="tab"]');
-    assert.deepEqual(await tabs.allTextContents(), ["Request", "Plan", "Implement", "Quality", "Governance", "Prompts", "Activity"]);
+    assert.deepEqual(await tabs.allTextContents(), ["Request", "Plan", "Implement", "Quality", "Governance", "Failed", "Prompts", "Activity"]);
     assert.equal(await page.locator('[data-round-tab="plan"]').getAttribute("aria-selected"), "true");
     for (const step of steps) {
       await page.locator(`[data-round-tab="${step}"]`).click();
@@ -102,6 +102,78 @@ test("retained artifacts stay labelled and deduplicated; empty steps and manual 
     for (const step of steps) {
       assert.match(await page.locator(`[data-round-panel="${step}"]`).innerText(), new RegExp(`No ${step[0].toUpperCase() + step.slice(1)} activity`));
     }
+    assert.deepEqual(app.pageErrors, []);
+  } finally { await app.close(); }
+});
+
+test("Failed tab supports investigation, keyboard navigation, refreshes, and narrow screens", { skip: SKIP }, async () => {
+  const goal = fixtureGoal();
+  goal.status = "failed";
+  Object.assign(goal.rounds[0], { failure_category: "integration", failure_message: "Branch tip moved <candidate>",
+    failure_at: time(40), quality_state: "passed", rule_state: "passed" });
+  goal.rounds[0].logs.push({ datetime: time(40), severity: "error", message: "Integration details",
+    details: { stderr: "<script>unsafe()</script>\n".repeat(60), candidate_commit: "a".repeat(256) } });
+  const app = await openGoal(goal);
+  try {
+    const { page } = app;
+    await page.locator('[data-round-tab="governance"]').click();
+    await page.keyboard.press("ArrowRight");
+    const tab = page.locator('[data-round-tab="failed"]');
+    const panel = page.locator('[data-round-panel="failed"]');
+    assert.equal(await tab.getAttribute("aria-selected"), "true");
+    assert.equal(await tab.getAttribute("aria-controls"), await panel.getAttribute("id"));
+    assert.equal(await panel.getAttribute("aria-labelledby"), await tab.getAttribute("id"));
+    assert.equal(await panel.isVisible(), true);
+    assert.match(await panel.innerText(), /Branch tip moved <candidate>/);
+    assert.match(await panel.innerText(), /Integration details/);
+    assert.match(await panel.innerText(), /<script>unsafe\(\)<\/script>/);
+    assert.equal(await panel.locator('script, details, [role="tablist"]').count(), 0);
+    for (const width of [375, 1280]) {
+      await page.setViewportSize({ width, height: 900 });
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+      for (const element of await panel.locator(".round-failures, pre").all()) {
+        const style = await element.evaluate(el => ({ overflow: getComputedStyle(el).overflowY,
+          maxHeight: getComputedStyle(el).maxHeight, fits: el.scrollWidth <= el.clientWidth + 1 }));
+        assert.equal(style.overflow, "visible");
+        assert.equal(style.maxHeight, "none");
+        assert.equal(style.fits, true);
+      }
+    }
+    await page.evaluate(goal => drawGoalDetail(goal), goal);
+    assert.equal(await panel.isVisible(), true);
+    await tab.focus();
+    await page.keyboard.press("ArrowRight");
+    assert.equal(await page.locator('[data-round-panel="prompts"]').isVisible(), true);
+    await page.keyboard.press("ArrowLeft");
+    assert.equal(await panel.isVisible(), true);
+    const failed = structuredClone(goal.rounds[0]);
+    goal.status = "implement";
+    Object.assign(goal.rounds[0], { failure_message: "", failure_category: "", failure_at: "", prior_attempts: [failed] });
+    await page.evaluate(goal => drawGoalDetail(goal), goal);
+    assert.equal(await panel.isVisible(), true);
+    assert.match(await panel.innerText(), /No current failure is recorded/);
+    assert.match(await panel.innerText(), /Historical failures and diagnostics/);
+    assert.match(await panel.innerText(), /Previous execution/);
+    assert.deepEqual(app.pageErrors, []);
+  } finally { await app.close(); }
+});
+
+test("Failed is always visible with an empty state and keeps evidence within each Round", { skip: SKIP }, async () => {
+  const goal = fixtureGoal();
+  goal.status = "failed";
+  goal.rounds.unshift({ prompt: "Earlier request", created: "2026-09-12T12:00:00Z", logs: [] });
+  goal.rounds[1].failure_message = "Latest Round failure";
+  const app = await openGoal(goal);
+  try {
+    const { page } = app;
+    const rounds = page.getByTestId("goal-round");
+    await rounds.first().getByTestId("goal-round-summary").click();
+    assert.equal(await rounds.first().locator('[data-round-tab="request"]').getAttribute("aria-selected"), "true");
+    await rounds.first().locator('[data-round-tab="failed"]').click();
+    assert.match(await rounds.first().getByRole("tabpanel").innerText(), /No failure evidence/);
+    assert.doesNotMatch(await rounds.first().getByRole("tabpanel").innerText(), /Latest Round failure/);
+    await rounds.last().locator('[data-round-tab="failed"]').click();
+    assert.match(await rounds.last().getByRole("tabpanel").innerText(), /Latest Round failure/);
     assert.deepEqual(app.pageErrors, []);
   } finally { await app.close(); }
 });
