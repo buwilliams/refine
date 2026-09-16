@@ -1,9 +1,9 @@
 {
   "base_commit": "7912ec52bfe76387f2587988dc4b99d0fbcf0ca6",
   "branch_name": "refine/DREA674C85503D17388FC14E44/round-1",
-  "candidate_commit": null,
+  "candidate_commit": "18b3e3d2951d3c99801aee7efea1d6bdd56a2430",
   "created": "2026-09-16T12:13:41Z",
-  "event_generation": 4,
+  "event_generation": 5,
   "feature_id": null,
   "feature_order": null,
   "id": "DREA674C85503D17388FC14E44",
@@ -46,11 +46,11 @@
       "created": "2026-09-16T12:13:41Z",
       "event_configuration": {
         "events": {
-          "workflow.implement.enter": {
+          "workflow.quality.enter": {
             "bindings": [
               {
                 "enabled": true,
-                "id": "default-implement",
+                "id": "default-quality",
                 "inputs": {},
                 "mode": "blocking",
                 "order": 0,
@@ -58,30 +58,30 @@
                 "scope": {
                   "node_id": null
                 },
-                "skill_id": "default-implement"
+                "skill_id": "default-quality"
               }
             ],
             "enabled": true,
-            "id": "workflow.implement.enter",
+            "id": "workflow.quality.enter",
             "kind": "system",
-            "name": "Workflow Implement Enter",
+            "name": "Workflow Quality Enter",
             "on_success": null,
             "parameters": [],
             "scope": {
               "node_id": null
             },
-            "source": "workflow.implement.enter"
+            "source": "workflow.quality.enter"
           }
         },
         "revision": 82,
         "schema_version": 3,
         "skills": {
-          "default-implement": {
+          "default-quality": {
             "enabled": true,
-            "id": "default-implement",
-            "name": "Implement",
+            "id": "default-quality",
+            "name": "Quality",
             "parameters": [],
-            "prompt": "## Implement\n\nImplement the plan.\n\n### Outcome\n\nThe plan is implemented in a way that aligns with the project's purpose and architecture. Provide a brief summary organized by plan task: what changed, any important departures from the plan and why, and any unfinished work.\n\n### Guardrails\n\n- Follow established code patterns and put shared behavior in one place. Fix the underlying cause rather than each symptom separately.\n- Keep code focused on one responsibility and preserve stable interfaces where possible. Split mixed responsibilities into separate files. Keep files relatively small, under roughly 1,000 lines where possible.\n- Prefer clear, straightforward code and abstractions that make the behavior easier to understand and maintain.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
+            "prompt": "## Quality\n\nTest the implementation. Create and groom tests to cover the behavior described in the plan.\n\n### Outcome\n\nMeaningful tests cover the changed behavior and pass. Provide a brief report of the behavior tested, tests added or updated, commands run and their results, and any remaining failures or gaps. Include runtime or browser test results where useful. These results support Governance's verification of the work.\n\n### Guardrails\n\n- Test observable behavior, including relevant failure cases and effects on existing functionality. Tests should catch defects rather than mirror the implementation.\n- Keep useful tests, update tests for changed behavior, and remove obsolete or meaningless tests.\n- Investigate failures, correct problems in the implementation or tests, and rerun affected tests.\n- Choose tests suited to the change. Expand coverage when failures or affected behavior call for it.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
             "provenance": "refine-default-v1",
             "role": "task",
             "scope": {
@@ -91,6 +91,46 @@
         }
       },
       "event_results": {
+        "aeb3c3527ed65ebbea904d6378de11d838e96446054063bc213344d9e293ffcf": {
+          "candidate_commit": null,
+          "generation": 4,
+          "results": {
+            "default-implement": {
+              "artifacts": {
+                "tasks": [
+                  {
+                    "result": "decode_result now converts non-string evidence array elements to compact JSON strings, preserving order, content, existing strings, artifacts, identity validation, and strict persisted schemas.",
+                    "task": 1
+                  },
+                  {
+                    "result": "Added mixed-type evidence coverage across completion transports and identity modes. Verified strict persisted deserialization and unchanged malformed-container, ambiguity, and transport-limit rejection.",
+                    "task": 2
+                  },
+                  {
+                    "result": "Added a passing provider regression verifying normalized evidence, retained raw output and checkout edits, exactly one provider invocation, and durable result reuse.",
+                    "task": 3
+                  }
+                ],
+                "validation": {
+                  "formatting": "cargo fmt --all -- --check and git diff --check passed.",
+                  "log": "/tmp/refine-DREA674-evidence-unit.log",
+                  "relevant_tests": "All seven decoder tests, the new completion regression, and the existing malformed-report retention test passed.",
+                  "unit_suite": "cargo test -- --unit: 1413 passed, 11 failed, 7 ignored.",
+                  "unrelated_failures": "Failures concern chat cleanup, two state-sync assertions, two process assertions, Jira recovery, release-version expectations, and four static UI assertions. Chat passed in isolation; both sync failures and the capture failure reproduced. An unchanged baseline was not rebuilt."
+                }
+              },
+              "binding_id": "default-implement",
+              "evidence": [],
+              "invocation_id": "aeb3c3527ed65ebbea904d6378de11d838e96446054063bc213344d9e293ffcf",
+              "outcome": "success",
+              "role": "implement",
+              "summary": "Implemented all three plan tasks. No implementation departures or unfinished work. Completion repair remains disabled as planned. Relevant regressions pass; the full unit suite has unrelated failures requiring Quality review."
+            }
+          },
+          "round_idx": 0,
+          "source": "workflow.implement.enter",
+          "state": "succeeded"
+        },
         "ddbaab9d55204eb1ded40881a140d23d8615daafb2a19846560cf2ee7eb5206d": {
           "candidate_commit": null,
           "generation": 3,
@@ -305,8 +345,82 @@
               }
             }
           }
+        },
+        "4:default:workflow.implement.exit": {
+          "events": {
+            "workflow.implement.exit": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.implement.exit",
+              "kind": "system",
+              "name": "Workflow Implement Exit",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.implement.exit"
+            }
+          },
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {}
+        },
+        "4:default:workflow.implement.success": {
+          "events": {},
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {}
+        },
+        "5:default:workflow.quality.enter": {
+          "events": {
+            "workflow.quality.enter": {
+              "bindings": [
+                {
+                  "enabled": true,
+                  "id": "default-quality",
+                  "inputs": {},
+                  "mode": "blocking",
+                  "order": 0,
+                  "overrides": null,
+                  "scope": {
+                    "node_id": null
+                  },
+                  "skill_id": "default-quality"
+                }
+              ],
+              "enabled": true,
+              "id": "workflow.quality.enter",
+              "kind": "system",
+              "name": "Workflow Quality Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.quality.enter"
+            }
+          },
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {
+            "default-quality": {
+              "enabled": true,
+              "id": "default-quality",
+              "name": "Quality",
+              "parameters": [],
+              "prompt": "## Quality\n\nTest the implementation. Create and groom tests to cover the behavior described in the plan.\n\n### Outcome\n\nMeaningful tests cover the changed behavior and pass. Provide a brief report of the behavior tested, tests added or updated, commands run and their results, and any remaining failures or gaps. Include runtime or browser test results where useful. These results support Governance's verification of the work.\n\n### Guardrails\n\n- Test observable behavior, including relevant failure cases and effects on existing functionality. Tests should catch defects rather than mirror the implementation.\n- Keep useful tests, update tests for changed behavior, and remove obsolete or meaningless tests.\n- Investigate failures, correct problems in the implementation or tests, and rerun affected tests.\n- Choose tests suited to the change. Expand coverage when failures or affected behavior call for it.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
+              "provenance": "refine-default-v1",
+              "role": "task",
+              "scope": {
+                "node_id": null
+              }
+            }
+          }
         }
       },
+      "implementation_report": "workflow.implement.enter:default-implement: Implemented all three plan tasks. No implementation departures or unfinished work. Completion repair remains disabled as planned. Relevant regressions pass; the full unit suite has unrelated failures requiring Quality review.",
+      "implementation_reported_at": "2026-09-16T12:35:59Z",
       "logs": [],
       "prior_attempts": [
         {
@@ -363,7 +477,7 @@
       ],
       "prompt": "From: Kevin Xiong <kevin.xiong@insurity.com>\nSubject: fix evidence coercion in decode_result, not just unknown-field stripping\n\nBody:\nRequest: fix evidence coercion in decode_result, not just unknown-field stripping\r\n\r\nWhere: src/application/agent_io/contracts/skill_result.rs, in decode_result's normalization callback (the a4e27372 object.retain(...) block).\r\n\r\nCurrent behavior: the callback strips unknown top-level keys, then decodes into SkillReport { evidence: Vec<String>, … } with #[serde(deny_unknown_fields)]. If the model emits evidence as an array of objects (e.g. [{\"id\":\"P1\",\"note\":\"…\"}]), retain keeps the evidence key but doesn't touch its contents, so the strict decode fails: evidence[0]: invalid type: map, expected a string. A completed agent turn is discarded.\r\n\r\nAsk: extend the same normalization boundary to coerce evidence elements before the strict decode — e.g., for each non-string element, serde_json::to_string(elem) it (or lift object-valued entries into artifacts). Sketch, right after the existing object.retain(...):\r\n\r\nif let Some(Value::Array(items)) = object.get_mut(\"evidence\") {\r\n    for item in items.iter_mut() {\r\n        if !item.is_string() {\r\n            *item = Value::String(serde_json::to_string(item).unwrap_or_default());\r\n        }\r\n    }\r\n}\r\n\r\nEven better: route a still-malformed completion through the existing structured-output-repair loop instead of hard-failing, so a bad envelope gets one corrective re-prompt rather than throwing away a successful turn.\r\n\r\nWhy code, not a client template: the supervised-skill template workaround (forcing evidence = strings) is per-node, must be re-applied after config regen / state-sync, doesn't exist on 4.2.0, and depends on the model obeying the instruction. A coercion in decode_result is deterministic, fleet-wide, and needs no per-node config. This is the same class of tolerance a4e27372 already established for unknown fields — just applied to evidence element types too.\r\n\r\nImpact: without it, long successful implement/quality/governance turns are silently lost on a JSON-shape technicality (observed: goal 00000T12G5WS… lost ~1h of work — auth fix + 23 e2e runs — at the reporting step).\r\n\r\n[cid:insurity-small2_60d9d841-975e-4326-81a1-42eb773307d1.jpg]\r\n\r\nKevin Xiong\r\n\r\nSenior Developer\r\n\r\nT 860-616-7842\r\n\r\n\r\n\r\n[cid:excellence2026signature(17b0688e-5473-4b74-96eb-a73f633f2c2f)_48407359-d77b-4967-95cd-277a32b50ebc.png]<https://insurity.com/excellence?utm_source=Email-Signature&utm_medium=Email&utm_campaign=Event-Excellence-2026>\r\n\r\n_____________________________________________________________________________________________________\r\n\r\nThe information contained in this e-mail message is intended only for the personal and confidential use of the intended recipient(s). This message may be an attorney-client communication and/or work product and as such is privileged and confidential. If the reader of this message is not the intended recipient or an agent responsible for delivering it to the intended recipient, you are hereby notified that you have received this document in error and that any review, dissemination, distribution, or copying of this message is strictly prohibited. If you have received this communication in error, please notify us immediately by e-mail, and delete the original message.\r\n_____________________________________________________________________________________________________\r\n~~~Insurity~~~",
       "reporter": "Kevin Xiong",
-      "updated": "2026-09-16T12:17:03Z",
+      "updated": "2026-09-16T12:36:02Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-16T12:15:46Z",
         "generation": 2,
@@ -373,9 +487,9 @@
       "workspace_branch": "refine/DREA674C85503D17388FC14E44/round-1"
     }
   ],
-  "status": "implement",
+  "status": "quality",
   "target_branch": "main",
-  "updated": "2026-09-16T12:17:03Z",
+  "updated": "2026-09-16T12:36:02Z",
   "workflow_context": "",
   "workflow_controls": [
     {
@@ -448,7 +562,17 @@
       "round_idx": 0,
       "to": "implement",
       "workflow_revision": 14
+    },
+    {
+      "at": "2026-09-16T12:36:01.522468028+00:00",
+      "forced": false,
+      "from": "implement",
+      "generation": 5,
+      "node_id": "default",
+      "round_idx": 0,
+      "to": "quality",
+      "workflow_revision": 21
     }
   ],
-  "workflow_revision": 15
+  "workflow_revision": 22
 }
