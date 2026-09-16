@@ -3,7 +3,7 @@
   "branch_name": "refine/00000T19EJ0CNGHM85RBDXE000/round-2-execution-3174439c-676c-4e57-8f51-18796370638f",
   "candidate_commit": null,
   "created": "2026-09-15T16:06:39Z",
-  "event_generation": 15,
+  "event_generation": 16,
   "feature_id": null,
   "feature_order": null,
   "id": "00000T19EJ0CNGHM85RBDXE000",
@@ -627,6 +627,26 @@
               }
             }
           }
+        },
+        "16:default:workflow.backlog.enter": {
+          "events": {
+            "workflow.backlog.enter": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.backlog.enter",
+              "kind": "system",
+              "name": "Workflow Backlog Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.backlog.enter"
+            }
+          },
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {}
         }
       },
       "logs": [],
@@ -758,9 +778,9 @@
       ]
     }
   ],
-  "status": "plan",
+  "status": "backlog",
   "target_branch": "main",
-  "updated": "2026-09-16T12:29:09Z",
+  "updated": "2026-09-16T12:30:22Z",
   "workflow_context": "",
   "workflow_controls": [
     {
@@ -794,6 +814,39 @@
       "request_id": "0b89862f-b425-41bd-a25b-725254317317",
       "source_round": 2,
       "to": "plan"
+    },
+    {
+      "at": "2026-09-16T12:30:22Z",
+      "decision": true,
+      "forced": true,
+      "from": "plan",
+      "generation": 16,
+      "integration_performed": false,
+      "integration_requested": false,
+      "overridden_requirements": [
+        "transition_policy",
+        "workflow_evidence_gates"
+      ],
+      "previous_attempt": {
+        "claimed_at": "2026-09-16T12:29:06Z",
+        "generation": 13,
+        "round_idx": 1,
+        "workflow_revision": 30
+      },
+      "request": {
+        "actor": "Buddy Williams",
+        "context": "",
+        "expected_revision": 37,
+        "force": true,
+        "invocation_id": null,
+        "reason": "User requested provider configuration UX requirements in Round 2; park for amendment before returning to Todo",
+        "request_id": "c4d49857-4ce1-40b9-83e7-75a6d3ed318f",
+        "to": "backlog"
+      },
+      "request_id": "c4d49857-4ce1-40b9-83e7-75a6d3ed318f",
+      "retained_candidate": null,
+      "source_round": 2,
+      "to": "backlog"
     }
   ],
   "workflow_events": [
@@ -953,7 +1006,18 @@
       "supersedes_execution": true,
       "to": "plan",
       "workflow_revision": 35
+    },
+    {
+      "at": "2026-09-16T12:30:22.449446976+00:00",
+      "forced": true,
+      "from": "plan",
+      "generation": 16,
+      "node_id": "default",
+      "round_idx": 1,
+      "supersedes_execution": true,
+      "to": "backlog",
+      "workflow_revision": 38
     }
   ],
-  "workflow_revision": 37
+  "workflow_revision": 38
 }
