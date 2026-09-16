@@ -1,0 +1,85 @@
+{
+  "base_commit": null,
+  "branch_name": null,
+  "candidate_commit": null,
+  "created": "2026-09-16T12:30:41Z",
+  "event_generation": 1,
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000T1AHJMNN00AGHY02TT000",
+  "name": "The Changes screen table shows status \"Review\" but the goal is actually \"Done\"",
+  "node_id": "default",
+  "notes": [],
+  "pending_event_dispatches": {},
+  "priority": "low",
+  "reporter": "Buddy Williams",
+  "rounds": [
+    {
+      "agent_context": null,
+      "assignee": "Buddy Williams",
+      "created": "2026-09-16T12:30:41Z",
+      "failure_at": "",
+      "failure_category": "",
+      "failure_message": "",
+      "gate_configurations": {
+        "1:default:workflow.backlog.enter": {
+          "events": {
+            "workflow.backlog.enter": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.backlog.enter",
+              "kind": "system",
+              "name": "Workflow Backlog Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.backlog.enter"
+            }
+          },
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {}
+        }
+      },
+      "governance_candidate_commit": "",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "guidance_decision": null,
+      "implementation_plan": null,
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "prompt": "The Changes screen table shows status \"Review\" but the goal is actually \"Done\"",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-09-16T12:30:41Z",
+      "workflow_attempt_authority": null,
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
+    }
+  ],
+  "status": "backlog",
+  "target_branch": null,
+  "updated": "2026-09-16T12:30:41Z",
+  "workflow_events": [
+    {
+      "at": "2026-09-16T12:30:41.002935827+00:00",
+      "forced": false,
+      "from": null,
+      "generation": 1,
+      "node_id": "default",
+      "round_idx": 0,
+      "to": "backlog",
+      "workflow_revision": 1
+    }
+  ],
+  "workflow_revision": 1
+}
