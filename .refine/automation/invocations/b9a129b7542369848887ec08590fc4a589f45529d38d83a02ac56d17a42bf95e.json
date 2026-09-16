@@ -520,11 +520,60 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "succeeded",
+  "results": {
+    "default-quality": {
+      "invocation_id": "b9a129b7542369848887ec08590fc4a589f45529d38d83a02ac56d17a42bf95e",
+      "binding_id": "default-quality",
+      "role": "quality",
+      "outcome": "success",
+      "summary": "The planned behavior passes Quality testing. Added boundary coverage; no implementation corrections were needed. The full suite remains affected by verified pre-existing failures in persistence sync, process supervision, release workers, and web assertions. Completion repair remains disabled as planned.\n\n",
+      "evidence": [
+        "All 44 focused tests pass: mixed evidence normalization, transport formats, strict persisted schemas, identity validation, malformed containers, retained checkout changes, raw-response preservation, and completion reuse without another provider launch.",
+        "Added regression cases proving normalization cannot conceal ambiguous completions or bypass evidence nesting limits.",
+        "cargo test -- --unit: 1395 passed, 29 failed, 7 ignored. Concurrent compilation replaced the running executable and disrupted child-launch tests.",
+        "Clean rerun of all 29 failures plus both focused groups: 63 passed, 10 failed. Every remaining failure reproduces on base commit 7912ec52. The intermittent chat cleanup failure also reproduces in the base chat group.",
+        "cargo fmt --all -- --check and git diff --check pass."
+      ],
+      "artifacts": {
+        "clean_rerun_command": "/tmp/refine-evidence-quality-rerun-command.txt",
+        "clean_rerun_log": "/tmp/refine-evidence-quality-rerun.log",
+        "full_suite_log": "/tmp/refine-evidence-quality-unit.log",
+        "report": "/tmp/refine-evidence-quality-baseline-report.json"
+      }
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "default-quality",
+      "checkout": {
+        "observation": {
+          "branch": "refine/DREA674C85503D17388FC14E44/round-1",
+          "head_commit": "18b3e3d2951d3c99801aee7efea1d6bdd56a2430",
+          "status_porcelain": [
+            " M src/application/agent_io/contracts/skill_result.rs"
+          ]
+        },
+        "tree": "f67a8cd89edd7ed113f9175dba58f89f2b5c3c9b"
+      },
+      "checkout_recorded": true,
+      "diagnostic": null,
+      "host_bound_result": true,
+      "observational_violation": false,
+      "operation_id": null,
+      "process_id": "proc-1789562164621-1596-5492",
+      "prompt_bytes": 16511,
+      "provider_session_id": null,
+      "purpose": "work",
+      "raw_output": "{\n  \"outcome\": \"success\",\n  \"evidence\": [\n    \"All 44 focused tests pass: mixed evidence normalization, transport formats, strict persisted schemas, identity validation, malformed containers, retained checkout changes, raw-response preservation, and completion reuse without another provider launch.\",\n    \"Added regression cases proving normalization cannot conceal ambiguous completions or bypass evidence nesting limits.\",\n    \"cargo test -- --unit: 1395 passed, 29 failed, 7 ignored. Concurrent compilation replaced the running executable and disrupted child-launch tests.\",\n    \"Clean rerun of all 29 failures plus both focused groups: 63 passed, 10 failed. Every remaining failure reproduces on base commit 7912ec52. The intermittent chat cleanup failure also reproduces in the base chat group.\",\n    \"cargo fmt --all -- --check and git diff --check pass.\"\n  ],\n  \"artifacts\": {\n    \"report\": \"/tmp/refine-evidence-quality-baseline-report.json\",\n    \"full_suite_log\": \"/tmp/refine-evidence-quality-unit.log\",\n    \"clean_rerun_log\": \"/tmp/refine-evidence-quality-rerun.log\",\n    \"clean_rerun_command\": \"/tmp/refine-evidence-quality-rerun-command.txt\"\n  },\n  \"summary\": \"The planned behavior passes Quality testing. Added boundary coverage; no implementation corrections were needed. The full suite remains affected by verified pre-existing failures in persistence sync, process supervision, release workers, and web assertions. Completion repair remains disabled as planned.\\n\\n\"\n}",
+      "received_at": "2026-09-16T12:51:42.863478889+00:00",
+      "started_at": "2026-09-16T12:36:04.574673590+00:00",
+      "workflow_revision": 3
+    }
+  ],
   "created_at": "2026-09-16T12:36:02.723714393+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-16T12:51:42.137980057+00:00",
   "error": null,
   "action_applied": false
 }
