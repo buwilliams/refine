@@ -1,6 +1,6 @@
 {
   "schema_version": 3,
-  "revision": 85,
+  "revision": 86,
   "skills": {
     "default-governance": {
       "id": "default-governance",
@@ -41,7 +41,7 @@
     "default-quality": {
       "id": "default-quality",
       "name": "Quality",
-      "prompt": "## Quality\n\nTest the implementation. Create and groom tests to cover the behavior described in the plan.\n\n### Outcome\n\nMeaningful tests cover the changed behavior and pass. Provide a brief report of the behavior tested, tests added or updated, commands run and their results, and any remaining failures or gaps. Include runtime or browser test results where useful. These results support Governance's verification of the work.\n\n### Guardrails\n\n- Test observable behavior, including relevant failure cases and effects on existing functionality. Tests should catch defects rather than mirror the implementation.\n- Keep useful tests, update tests for changed behavior, and remove obsolete or meaningless tests.\n- Investigate failures, correct problems in the implementation or tests, and rerun affected tests.\n- Choose tests suited to the change. Expand coverage when failures or affected behavior call for it.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
+      "prompt": "{{templates.purpose}}\n\n{{templates.architecture}}\n\n## Quality\n\nTest the implementation. Create and groom tests to cover the behavior described in the plan.\n\n### Outcome\n\nMeaningful tests cover the changed behavior and pass. Provide a brief report of the behavior tested, tests added or updated, commands run and their results, and any remaining failures or gaps. Include runtime or browser test results where useful. These results support Governance's verification of the work.\n\n### Guardrails\n\n- Test observable behavior, including relevant failure cases and effects on existing functionality. Tests should catch defects rather than mirror the implementation.\n- Keep useful tests, update tests for changed behavior, and remove obsolete or meaningless tests.\n- Investigate failures, correct problems in the implementation or tests, and rerun affected tests.\n- Choose tests suited to the change. Expand coverage when failures or affected behavior call for it.",
       "role": "task",
       "enabled": true,
       "scope": {
