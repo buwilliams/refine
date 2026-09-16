@@ -44,6 +44,7 @@ test("Goal actions follow current status, retain every step, and recover from re
       window.modalConfirm = async () => confirmDeletion;
     });
     await page.addScriptTag({ path: path.join(__dirname, "../src/surfaces/web/static/js/features/goals-prompts.js") });
+    await page.addScriptTag({ path: path.join(__dirname, "../src/surfaces/web/static/js/features/goals-failures.js") });
     await page.addScriptTag({ path: path.join(__dirname, "../src/surfaces/web/static/js/features/goals-detail.js") });
     await page.addScriptTag({ path: path.join(__dirname, "../src/surfaces/web/static/js/features/workflow-controls.js") });
     await page.evaluate(() => {
@@ -72,7 +73,7 @@ test("Goal actions follow current status, retain every step, and recover from re
     assert.equal(await activity.locator("details").count(), 0);
     assert.match(await activity.textContent(), /Retry after repair/);
     assert.match(await activity.textContent(), /Full diagnostic evidence/);
-    assert.equal(await activity.locator("h3").first().textContent(), "Why this Round failed");
+    assert.equal(await activity.getByTestId("goal-failure-summary").count(), 0);
     for (const element of await activity.locator(".round-history, .round-log, pre").all()) {
       const style = await element.evaluate(el => ({ overflow: getComputedStyle(el).overflowY, maxHeight: getComputedStyle(el).maxHeight, fits: el.scrollWidth <= el.clientWidth + 1 }));
       assert.equal(style.overflow, "visible");

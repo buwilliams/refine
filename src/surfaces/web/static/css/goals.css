@@ -435,9 +435,9 @@
 
 .round-plan-text { white-space: pre-wrap; line-height: 1.6; }
 
-.round-history { overflow-wrap: anywhere; }
+.round-history, .round-failures { overflow-wrap: anywhere; }
 .round-history > .round-diagnostic + .round-diagnostic { margin-top: 24px; }
-.round-history pre {
+.round-history pre, .round-failures pre {
   max-height: none;
   overflow: visible;
   white-space: pre-wrap;
@@ -453,3 +453,5 @@
 .round-step-activity { margin-top: 24px; }
 .round-step-artifact + .round-step-artifact, .round-step-result + .round-step-result { margin-top: 24px; }
 .round-step-result > h4 { margin-top: 16px; }
+
+.round-failure-section, .round-failure-diagnostic + .round-failure-diagnostic { margin-top: 24px; }
