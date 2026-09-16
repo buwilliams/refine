@@ -1,10 +1,10 @@
 {
-  "id": "ddbaab9d55204eb1ded40881a140d23d8615daafb2a19846560cf2ee7eb5206d",
+  "id": "aeb3c3527ed65ebbea904d6378de11d838e96446054063bc213344d9e293ffcf",
   "event": {
-    "id": "workflow.plan.enter",
-    "name": "Workflow Plan Enter",
+    "id": "workflow.implement.enter",
+    "name": "Workflow Implement Enter",
     "kind": "system",
-    "source": "workflow.plan.enter",
+    "source": "workflow.implement.enter",
     "enabled": true,
     "scope": {
       "node_id": null
@@ -12,8 +12,8 @@
     "parameters": [],
     "bindings": [
       {
-        "id": "default-plan",
-        "skill_id": "default-plan",
+        "id": "default-implement",
+        "skill_id": "default-implement",
         "enabled": true,
         "mode": "blocking",
         "order": 0,
@@ -51,31 +51,72 @@
     "candidate_commit": null,
     "data": {
       "context": {
-        "assembled_at": "2026-09-16T12:15:48Z",
-        "current_round": {
-          "assignee": "Kevin Xiong",
-          "prompt": "From: Kevin Xiong <kevin.xiong@insurity.com>\nSubject: fix evidence coercion in decode_result, not just unknown-field stripping\n\nBody:\nRequest: fix evidence coercion in decode_result, not just unknown-field stripping\r\n\r\nWhere: src/application/agent_io/contracts/skill_result.rs, in decode_result's normalization callback (the a4e27372 object.retain(...) block).\r\n\r\nCurrent behavior: the callback strips unknown top-level keys, then decodes into SkillReport { evidence: Vec<String>, … } with #[serde(deny_unknown_fields)]. If the model emits evidence as an array of objects (e.g. [{\"id\":\"P1\",\"note\":\"…\"}]), retain keeps the evidence key but doesn't touch its contents, so the strict decode fails: evidence[0]: invalid type: map, expected a string. A completed agent turn is discarded.\r\n\r\nAsk: extend the same normalization boundary to coerce evidence elements before the strict decode — e.g., for each non-string element, serde_json::to_string(elem) it (or lift object-valued entries into artifacts). Sketch, right after the existing object.retain(...):\r\n\r\nif let Some(Value::Array(items)) = object.get_mut(\"evidence\") {\r\n    for item in items.iter_mut() {\r\n        if !item.is_string() {\r\n            *item = Value::String(serde_json::to_string(item).unwrap_or_default());\r\n        }\r\n    }\r\n}\r\n\r\nEven better: route a still-malformed completion through the existing structured-output-repair loop instead of hard-failing, so a bad envelope gets one corrective re-prompt rather than throwing away a successful turn.\r\n\r\nWhy code, not a client template: the supervised-skill template workaround (forcing evidence = strings) is per-node, must be re-applied after config regen / state-sync, doesn't exist on 4.2.0, and depends on the model obeying the instruction. A coercion in decode_result is deterministic, fleet-wide, and needs no per-node config. This is the same class of tolerance a4e27372 already established for unknown fields — just applied to evidence element types too.\r\n\r\nImpact: without it, long successful implement/quality/governance turns are silently lost on a JSON-shape technicality (observed: goal 00000T12G5WS… lost ~1h of work — auth fix + 23 e2e runs — at the reporting step).\r\n\r\n[cid:insurity-small2_60d9d841-975e-4326-81a1-42eb773307d1.jpg]\r\n\r\nKevin Xiong\r\n\r\nSenior Developer\r\n\r\nT 860-616-7842\r\n\r\n\r\n\r\n[cid:excellence2026signature(17b0688e-5473-4b74-96eb-a73f633f2c2f)_48407359-d77b-4967-95cd-277a32b50ebc.png]<https://insurity.com/excellence?utm_source=Email-Signature&utm_medium=Email&utm_campaign=Event-Excellence-2026>\r\n\r\n_____________________________________________________________________________________________________\r\n\r\nThe information contained in this e-mail message is intended only for the personal and confidential use of the intended recipient(s). This message may be an attorney-client communication and/or work product and as such is privileged and confidential. If the reader of this message is not the intended recipient or an agent responsible for delivering it to the intended recipient, you are hereby notified that you have received this document in error and that any review, dissemination, distribution, or copying of this message is strictly prohibited. If you have received this communication in error, please notify us immediately by e-mail, and delete the original message.\r\n_____________________________________________________________________________________________________\r\n~~~Insurity~~~",
-          "reporter": "Kevin Xiong",
-          "round": 1
+        "agent_context": {
+          "assembled_at": "2026-09-16T12:15:48Z",
+          "current_round": {
+            "assignee": "Kevin Xiong",
+            "prompt": "From: Kevin Xiong <kevin.xiong@insurity.com>\nSubject: fix evidence coercion in decode_result, not just unknown-field stripping\n\nBody:\nRequest: fix evidence coercion in decode_result, not just unknown-field stripping\r\n\r\nWhere: src/application/agent_io/contracts/skill_result.rs, in decode_result's normalization callback (the a4e27372 object.retain(...) block).\r\n\r\nCurrent behavior: the callback strips unknown top-level keys, then decodes into SkillReport { evidence: Vec<String>, … } with #[serde(deny_unknown_fields)]. If the model emits evidence as an array of objects (e.g. [{\"id\":\"P1\",\"note\":\"…\"}]), retain keeps the evidence key but doesn't touch its contents, so the strict decode fails: evidence[0]: invalid type: map, expected a string. A completed agent turn is discarded.\r\n\r\nAsk: extend the same normalization boundary to coerce evidence elements before the strict decode — e.g., for each non-string element, serde_json::to_string(elem) it (or lift object-valued entries into artifacts). Sketch, right after the existing object.retain(...):\r\n\r\nif let Some(Value::Array(items)) = object.get_mut(\"evidence\") {\r\n    for item in items.iter_mut() {\r\n        if !item.is_string() {\r\n            *item = Value::String(serde_json::to_string(item).unwrap_or_default());\r\n        }\r\n    }\r\n}\r\n\r\nEven better: route a still-malformed completion through the existing structured-output-repair loop instead of hard-failing, so a bad envelope gets one corrective re-prompt rather than throwing away a successful turn.\r\n\r\nWhy code, not a client template: the supervised-skill template workaround (forcing evidence = strings) is per-node, must be re-applied after config regen / state-sync, doesn't exist on 4.2.0, and depends on the model obeying the instruction. A coercion in decode_result is deterministic, fleet-wide, and needs no per-node config. This is the same class of tolerance a4e27372 already established for unknown fields — just applied to evidence element types too.\r\n\r\nImpact: without it, long successful implement/quality/governance turns are silently lost on a JSON-shape technicality (observed: goal 00000T12G5WS… lost ~1h of work — auth fix + 23 e2e runs — at the reporting step).\r\n\r\n[cid:insurity-small2_60d9d841-975e-4326-81a1-42eb773307d1.jpg]\r\n\r\nKevin Xiong\r\n\r\nSenior Developer\r\n\r\nT 860-616-7842\r\n\r\n\r\n\r\n[cid:excellence2026signature(17b0688e-5473-4b74-96eb-a73f633f2c2f)_48407359-d77b-4967-95cd-277a32b50ebc.png]<https://insurity.com/excellence?utm_source=Email-Signature&utm_medium=Email&utm_campaign=Event-Excellence-2026>\r\n\r\n_____________________________________________________________________________________________________\r\n\r\nThe information contained in this e-mail message is intended only for the personal and confidential use of the intended recipient(s). This message may be an attorney-client communication and/or work product and as such is privileged and confidential. If the reader of this message is not the intended recipient or an agent responsible for delivering it to the intended recipient, you are hereby notified that you have received this document in error and that any review, dissemination, distribution, or copying of this message is strictly prohibited. If you have received this communication in error, please notify us immediately by e-mail, and delete the original message.\r\n_____________________________________________________________________________________________________\r\n~~~Insurity~~~",
+            "reporter": "Kevin Xiong",
+            "round": 1
+          },
+          "goal": {
+            "assignee": "Kevin Xiong",
+            "id": "DREA674C85503D17388FC14E44",
+            "name": "fix evidence coercion in decode_result, not just unknown-field stripping",
+            "node_id": "default",
+            "priority": "low",
+            "reporter": "Kevin Xiong"
+          },
+          "governance": {
+            "configured": false,
+            "constitution": "",
+            "product": "",
+            "rules": []
+          },
+          "guidance_candidates": [],
+          "previous_rounds": [],
+          "version": 1,
+          "workflow_summary": "Refine gives this Goal Agent an isolated worktree, the current Round, and available planning context. Follow the Goal and applicable Skill instructions and use your judgment to decide when to stop. Quality and Governance agents make their own decisions using their Skills before integration and human Review. Refine coordinates workflow transitions and Git actions. Do not directly advance Goal state, approve, merge, or push."
         },
-        "goal": {
-          "assignee": "Kevin Xiong",
-          "id": "DREA674C85503D17388FC14E44",
-          "name": "fix evidence coercion in decode_result, not just unknown-field stripping",
-          "node_id": "default",
-          "priority": "low",
-          "reporter": "Kevin Xiong"
-        },
-        "governance": {
-          "configured": false,
-          "constitution": "",
-          "product": "",
-          "rules": []
-        },
-        "guidance_candidates": [],
-        "previous_rounds": [],
-        "version": 1,
-        "workflow_summary": "Refine gives this Goal Agent an isolated worktree, the current Round, and available planning context. Follow the Goal and applicable Skill instructions and use your judgment to decide when to stop. Quality and Governance agents make their own decisions using their Skills before integration and human Review. Refine coordinates workflow transitions and Git actions. Do not directly advance Goal state, approve, merge, or push."
+        "plans": [
+          {
+            "artifacts": {
+              "plan": [
+                {
+                  "details": "In src/application/agent_io/contracts/skill_result.rs, extend decode_result's normalization callback immediately after object.retain(...). When evidence is an array, preserve existing strings and replace each non-string element with its compact JSON serialization. Preserve element order and nested content; use Value::to_string() rather than an empty-string fallback. Leave artifacts untouched. Missing evidence continues to default to an empty array; non-array evidence remains invalid. Keep SkillReport and persisted SkillResult schemas strict, and preserve identity binding, outcome validation, transport limits, and candidate ambiguity rejection.",
+                  "task": "Task #1 - Normalize evidence at the existing ingestion boundary"
+                },
+                {
+                  "depends_on": [
+                    1
+                  ],
+                  "details": "Extend the decoder tests with the reported object entry {\"id\":\"P1\",\"note\":\"…\"} and mixed arrays containing strings, objects, arrays, numbers, booleans, and null. Check unchanged strings and order, and parse serialized entries back to confirm content preservation. Exercise host-bound and explicit legacy identities through the existing direct, fenced, wrapped, and stringified transport fixtures. Replace the existing evidence:[42] rejection case with acceptance coverage. Retain malformed-container, invalid-outcome, identity-mismatch, ambiguity, and bounded-transport tests. Assert direct persisted SkillResult deserialization still rejects non-string evidence.",
+                  "task": "Task #2 - Cover normalization and unchanged rejection boundaries"
+                },
+                {
+                  "depends_on": [
+                    1,
+                    2
+                  ],
+                  "details": "Extend src/application/events/tests/repairs.rs using the existing fake-provider fixtures: return structured evidence after making a legitimate checkout change, then verify the completion succeeds with normalized evidence, the original raw response remains retained, the checkout change survives, and only one provider invocation occurs. Re-executing the completed invocation must reuse its result. Keep malformed_report_retains_dirty_candidate_without_a_repair_launch passing. Run the repository unit suite with cargo test -- --unit, plus cargo fmt --all -- --check and git diff --check; report any unrelated baseline failures separately.",
+                  "task": "Task #3 - Verify completion acceptance without repeating work"
+                }
+              ]
+            },
+            "binding_id": "default-plan",
+            "evidence": [
+              "decode_result currently strips unknown top-level fields but leaves evidence elements unchanged before deserializing SkillResult.evidence: Vec<String>.",
+              "The existing malformed_content_keeps_actionable_diagnostics test explicitly expects evidence:[42] to fail at evidence[0].",
+              "src/application/events/completion.rs uses run_with_repair with RepairPolicy { max_repairs: 0 }; event tests and the consistency contract explicitly preserve malformed output without provider repairs.",
+              "Planning inspection only; no files or workflow state changed, and no tests were run.",
+              ""
+            ],
+            "invocation_id": "ddbaab9d55204eb1ded40881a140d23d8615daafb2a19846560cf2ee7eb5206d",
+            "outcome": "success",
+            "role": "plan",
+            "summary": "Accept completed Skill reports whose evidence arrays contain structured JSON by converting non-string entries into compact JSON strings before strict decoding. Keep normalization at the provider-ingestion boundary, preserving evidence content, verdicts, identity validation, and strict persisted schemas. The optional corrective re-prompt is deferred: this checkout explicitly disables completion repairs and tests that malformed reports retain work without another provider launch."
+          }
+        ]
       },
       "event": {},
       "goal": {
@@ -84,7 +125,7 @@
         "branch_name": "refine/DREA674C85503D17388FC14E44/round-1",
         "candidate_commit": null,
         "created": "2026-09-16T12:13:41Z",
-        "event_generation": 3,
+        "event_generation": 4,
         "feature_id": null,
         "feature_order": null,
         "id": "DREA674C85503D17388FC14E44",
@@ -101,27 +142,27 @@
             "failure_message": "",
             "prompt": "From: Kevin Xiong <kevin.xiong@insurity.com>\nSubject: fix evidence coercion in decode_result, not just unknown-field stripping\n\nBody:\nRequest: fix evidence coercion in decode_result, not just unknown-field stripping\r\n\r\nWhere: src/application/agent_io/contracts/skill_result.rs, in decode_result's normalization callback (the a4e27372 object.retain(...) block).\r\n\r\nCurrent behavior: the callback strips unknown top-level keys, then decodes into SkillReport { evidence: Vec<String>, … } with #[serde(deny_unknown_fields)]. If the model emits evidence as an array of objects (e.g. [{\"id\":\"P1\",\"note\":\"…\"}]), retain keeps the evidence key but doesn't touch its contents, so the strict decode fails: evidence[0]: invalid type: map, expected a string. A completed agent turn is discarded.\r\n\r\nAsk: extend the same normalization boundary to coerce evidence elements before the strict decode — e.g., for each non-string element, serde_json::to_string(elem) it (or lift object-valued entries into artifacts). Sketch, right after the existing object.retain(...):\r\n\r\nif let Some(Value::Array(items)) = object.get_mut(\"evidence\") {\r\n    for item in items.iter_mut() {\r\n        if !item.is_string() {\r\n            *item = Value::String(serde_json::to_string(item).unwrap_or_default());\r\n        }\r\n    }\r\n}\r\n\r\nEven better: route a still-malformed completion through the existing structured-output-repair loop instead of hard-failing, so a bad envelope gets one corrective re-prompt rather than throwing away a successful turn.\r\n\r\nWhy code, not a client template: the supervised-skill template workaround (forcing evidence = strings) is per-node, must be re-applied after config regen / state-sync, doesn't exist on 4.2.0, and depends on the model obeying the instruction. A coercion in decode_result is deterministic, fleet-wide, and needs no per-node config. This is the same class of tolerance a4e27372 already established for unknown fields — just applied to evidence element types too.\r\n\r\nImpact: without it, long successful implement/quality/governance turns are silently lost on a JSON-shape technicality (observed: goal 00000T12G5WS… lost ~1h of work — auth fix + 23 e2e runs — at the reporting step).\r\n\r\n[cid:insurity-small2_60d9d841-975e-4326-81a1-42eb773307d1.jpg]\r\n\r\nKevin Xiong\r\n\r\nSenior Developer\r\n\r\nT 860-616-7842\r\n\r\n\r\n\r\n[cid:excellence2026signature(17b0688e-5473-4b74-96eb-a73f633f2c2f)_48407359-d77b-4967-95cd-277a32b50ebc.png]<https://insurity.com/excellence?utm_source=Email-Signature&utm_medium=Email&utm_campaign=Event-Excellence-2026>\r\n\r\n_____________________________________________________________________________________________________\r\n\r\nThe information contained in this e-mail message is intended only for the personal and confidential use of the intended recipient(s). This message may be an attorney-client communication and/or work product and as such is privileged and confidential. If the reader of this message is not the intended recipient or an agent responsible for delivering it to the intended recipient, you are hereby notified that you have received this document in error and that any review, dissemination, distribution, or copying of this message is strictly prohibited. If you have received this communication in error, please notify us immediately by e-mail, and delete the original message.\r\n_____________________________________________________________________________________________________\r\n~~~Insurity~~~",
             "reporter": "Kevin Xiong",
-            "updated": "2026-09-16T12:15:48Z"
+            "updated": "2026-09-16T12:17:03Z"
           }
         ],
-        "status": "plan",
+        "status": "implement",
         "target_branch": "main",
-        "updated": "2026-09-16T12:15:48Z",
+        "updated": "2026-09-16T12:17:03Z",
         "workflow_context": "",
-        "workflow_revision": 10
+        "workflow_revision": 15
       },
       "system": {
         "candidate_commit": null,
         "node_id": "default",
         "project_root": "/home/buddy/projects/refine-next",
         "refine_executable": "/home/buddy/projects/refine/bin/refine",
-        "workflow_step": "plan",
+        "workflow_step": "implement",
         "workspace": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DREA674C85503D17388FC14E44-round-1"
       }
     },
     "metadata": {
       "behavior": "EventSkill",
-      "event_operation_id": "1a0aa250a3863c3",
+      "event_operation_id": "1a0aa262f3563c4",
       "goal_id": "DREA674C85503D17388FC14E44",
       "kind": "workflow",
       "managed_worktree": {
@@ -140,7 +181,7 @@
       "provider": "codex",
       "round_idx": 0,
       "started_bindings": {
-        "default-plan": "2026-09-16T12:15:50.113145876+00:00"
+        "default-implement": "2026-09-16T12:17:05.086136230+00:00"
       },
       "target_app_id": "/home/buddy/projects/refine-next",
       "template_snapshot": {
@@ -443,15 +484,15 @@
         }
       },
       "workflow_revision": 3,
-      "workflow_state": "plan",
-      "workflow_step_generation": 3
+      "workflow_state": "implement",
+      "workflow_step_generation": 4
     }
   },
   "bindings": [
     {
       "binding": {
-        "id": "default-plan",
-        "skill_id": "default-plan",
+        "id": "default-implement",
+        "skill_id": "default-implement",
         "enabled": true,
         "mode": "blocking",
         "order": 0,
@@ -462,10 +503,10 @@
         "inputs": {}
       },
       "skill": {
-        "id": "default-plan",
-        "name": "Plan",
-        "prompt": "## Plan\n\nDevelop a plan to achieve the Goal's desired outcome. If the goal outcome is underspecified or is missing details add only just enough detail so that AI agents do not thrash or become confused.\n\n### Outcome\n\nA clear implementation plan that explains the approach and breaks the work into ordered tasks. Begin with a short description of the desired behavior and proposed solution. Use a numbered checklist, such as `Task #1 - What changes and why`. Include dependencies and important design decisions where they help implementation.\n\n### Guardrails\n\n- Read the context that helps explain the Goal and how the existing system works.\n- Look for the underlying cause. Consider whether a missing or misused concept explains the problem, and improve that concept rather than adding fixes for individual symptoms.\n- Give each task enough detail to guide implementation while leaving room for reasonable implementation choices.\n- Keep the plan focused on the desired outcome. Prefer straightforward changes that fit the existing architecture.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
-        "role": "plan",
+        "id": "default-implement",
+        "name": "Implement",
+        "prompt": "## Implement\n\nImplement the plan.\n\n### Outcome\n\nThe plan is implemented in a way that aligns with the project's purpose and architecture. Provide a brief summary organized by plan task: what changed, any important departures from the plan and why, and any unfinished work.\n\n### Guardrails\n\n- Follow established code patterns and put shared behavior in one place. Fix the underlying cause rather than each symptom separately.\n- Keep code focused on one responsibility and preserve stable interfaces where possible. Split mixed responsibilities into separate files. Keep files relatively small, under roughly 1,000 lines where possible.\n- Prefer clear, straightforward code and abstractions that make the behavior easier to understand and maintain.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
+        "role": "implement",
         "enabled": true,
         "scope": {
           "node_id": null
@@ -476,75 +517,11 @@
       "parameters": {}
     }
   ],
-  "state": "succeeded",
-  "results": {
-    "default-plan": {
-      "invocation_id": "ddbaab9d55204eb1ded40881a140d23d8615daafb2a19846560cf2ee7eb5206d",
-      "binding_id": "default-plan",
-      "role": "plan",
-      "outcome": "success",
-      "summary": "Accept completed Skill reports whose evidence arrays contain structured JSON by converting non-string entries into compact JSON strings before strict decoding. Keep normalization at the provider-ingestion boundary, preserving evidence content, verdicts, identity validation, and strict persisted schemas. The optional corrective re-prompt is deferred: this checkout explicitly disables completion repairs and tests that malformed reports retain work without another provider launch.",
-      "evidence": [
-        "decode_result currently strips unknown top-level fields but leaves evidence elements unchanged before deserializing SkillResult.evidence: Vec<String>.",
-        "The existing malformed_content_keeps_actionable_diagnostics test explicitly expects evidence:[42] to fail at evidence[0].",
-        "src/application/events/completion.rs uses run_with_repair with RepairPolicy { max_repairs: 0 }; event tests and the consistency contract explicitly preserve malformed output without provider repairs.",
-        "Planning inspection only; no files or workflow state changed, and no tests were run.",
-        ""
-      ],
-      "artifacts": {
-        "plan": [
-          {
-            "details": "In src/application/agent_io/contracts/skill_result.rs, extend decode_result's normalization callback immediately after object.retain(...). When evidence is an array, preserve existing strings and replace each non-string element with its compact JSON serialization. Preserve element order and nested content; use Value::to_string() rather than an empty-string fallback. Leave artifacts untouched. Missing evidence continues to default to an empty array; non-array evidence remains invalid. Keep SkillReport and persisted SkillResult schemas strict, and preserve identity binding, outcome validation, transport limits, and candidate ambiguity rejection.",
-            "task": "Task #1 - Normalize evidence at the existing ingestion boundary"
-          },
-          {
-            "depends_on": [
-              1
-            ],
-            "details": "Extend the decoder tests with the reported object entry {\"id\":\"P1\",\"note\":\"…\"} and mixed arrays containing strings, objects, arrays, numbers, booleans, and null. Check unchanged strings and order, and parse serialized entries back to confirm content preservation. Exercise host-bound and explicit legacy identities through the existing direct, fenced, wrapped, and stringified transport fixtures. Replace the existing evidence:[42] rejection case with acceptance coverage. Retain malformed-container, invalid-outcome, identity-mismatch, ambiguity, and bounded-transport tests. Assert direct persisted SkillResult deserialization still rejects non-string evidence.",
-            "task": "Task #2 - Cover normalization and unchanged rejection boundaries"
-          },
-          {
-            "depends_on": [
-              1,
-              2
-            ],
-            "details": "Extend src/application/events/tests/repairs.rs using the existing fake-provider fixtures: return structured evidence after making a legitimate checkout change, then verify the completion succeeds with normalized evidence, the original raw response remains retained, the checkout change survives, and only one provider invocation occurs. Re-executing the completed invocation must reuse its result. Keep malformed_report_retains_dirty_candidate_without_a_repair_launch passing. Run the repository unit suite with cargo test -- --unit, plus cargo fmt --all -- --check and git diff --check; report any unrelated baseline failures separately.",
-            "task": "Task #3 - Verify completion acceptance without repeating work"
-          }
-        ]
-      }
-    }
-  },
-  "attempts": [
-    {
-      "attempt": 0,
-      "binding_id": "default-plan",
-      "checkout": {
-        "observation": {
-          "branch": "refine/DREA674C85503D17388FC14E44/round-1",
-          "head_commit": "7912ec52bfe76387f2587988dc4b99d0fbcf0ca6",
-          "status_porcelain": []
-        },
-        "tree": "8ac8f8b020c54d5fa8a8cffbd20a57886e98832c"
-      },
-      "checkout_recorded": true,
-      "diagnostic": null,
-      "host_bound_result": true,
-      "observational_violation": false,
-      "operation_id": null,
-      "process_id": "proc-1789560950499-1596-354",
-      "prompt_bytes": 12377,
-      "provider_session_id": null,
-      "purpose": "work",
-      "raw_output": "{\n  \"outcome\": \"success\",\n  \"summary\": \"Accept completed Skill reports whose evidence arrays contain structured JSON by converting non-string entries into compact JSON strings before strict decoding. Keep normalization at the provider-ingestion boundary, preserving evidence content, verdicts, identity validation, and strict persisted schemas. The optional corrective re-prompt is deferred: this checkout explicitly disables completion repairs and tests that malformed reports retain work without another provider launch.\",\n  \"artifacts\": {\n    \"plan\": [\n      {\n        \"task\": \"Task #1 - Normalize evidence at the existing ingestion boundary\",\n        \"details\": \"In src/application/agent_io/contracts/skill_result.rs, extend decode_result's normalization callback immediately after object.retain(...). When evidence is an array, preserve existing strings and replace each non-string element with its compact JSON serialization. Preserve element order and nested content; use Value::to_string() rather than an empty-string fallback. Leave artifacts untouched. Missing evidence continues to default to an empty array; non-array evidence remains invalid. Keep SkillReport and persisted SkillResult schemas strict, and preserve identity binding, outcome validation, transport limits, and candidate ambiguity rejection.\"\n      },\n      {\n        \"task\": \"Task #2 - Cover normalization and unchanged rejection boundaries\",\n        \"depends_on\": [1],\n        \"details\": \"Extend the decoder tests with the reported object entry {\\\"id\\\":\\\"P1\\\",\\\"note\\\":\\\"…\\\"} and mixed arrays containing strings, objects, arrays, numbers, booleans, and null. Check unchanged strings and order, and parse serialized entries back to confirm content preservation. Exercise host-bound and explicit legacy identities through the existing direct, fenced, wrapped, and stringified transport fixtures. Replace the existing evidence:[42] rejection case with acceptance coverage. Retain malformed-container, invalid-outcome, identity-mismatch, ambiguity, and bounded-transport tests. Assert direct persisted SkillResult deserialization still rejects non-string evidence.\"\n      },\n      {\n        \"task\": \"Task #3 - Verify completion acceptance without repeating work\",\n        \"depends_on\": [1, 2],\n        \"details\": \"Extend src/application/events/tests/repairs.rs using the existing fake-provider fixtures: return structured evidence after making a legitimate checkout change, then verify the completion succeeds with normalized evidence, the original raw response remains retained, the checkout change survives, and only one provider invocation occurs. Re-executing the completed invocation must reuse its result. Keep malformed_report_retains_dirty_candidate_without_a_repair_launch passing. Run the repository unit suite with cargo test -- --unit, plus cargo fmt --all -- --check and git diff --check; report any unrelated baseline failures separately.\"\n      }\n    ]\n  },\n  \"evidence\": [\n    \"decode_result currently strips unknown top-level fields but leaves evidence elements unchanged before deserializing SkillResult.evidence: Vec<String>.\",\n    \"The existing malformed_content_keeps_actionable_diagnostics test explicitly expects evidence:[42] to fail at evidence[0].\",\n    \"src/application/events/completion.rs uses run_with_repair with RepairPolicy { max_repairs: 0 }; event tests and the consistency contract explicitly preserve malformed output without provider repairs.\",\n    \"Planning inspection only; no files or workflow state changed, and no tests were run.\",\n    \"\"\n  ]\n}",
-      "received_at": "2026-09-16T12:17:00.641540553+00:00",
-      "started_at": "2026-09-16T12:15:50.457041194+00:00",
-      "workflow_revision": 3
-    }
-  ],
-  "created_at": "2026-09-16T12:15:48.879408081+00:00",
-  "completed_at": "2026-09-16T12:17:01.924397653+00:00",
+  "state": "running",
+  "results": {},
+  "attempts": [],
+  "created_at": "2026-09-16T12:17:03.966156539+00:00",
+  "completed_at": null,
   "error": null,
   "action_applied": false
 }
