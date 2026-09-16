@@ -12,11 +12,11 @@
   "notes": [],
   "pending_event_dispatches": {},
   "priority": "low",
-  "reporter": "kevin.xiong@insurity.com",
+  "reporter": "Kevin Xiong",
   "rounds": [
     {
       "agent_context": null,
-      "assignee": "kevin.xiong@insurity.com",
+      "assignee": "Kevin Xiong",
       "created": "2026-09-16T12:13:41Z",
       "failure_at": "",
       "failure_category": "",
@@ -58,7 +58,7 @@
       "quality_details": "",
       "quality_message": "",
       "quality_state": "unclassified",
-      "reporter": "kevin.xiong@insurity.com",
+      "reporter": "Kevin Xiong",
       "rule_state": "unclassified",
       "updated": "2026-09-16T12:13:41Z",
       "workflow_attempt_authority": null,
@@ -81,5 +81,5 @@
       "workflow_revision": 1
     }
   ],
-  "workflow_revision": 1
+  "workflow_revision": 2
 }
