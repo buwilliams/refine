@@ -1,9 +1,9 @@
 {
-  "base_commit": "9c7363164d582fac14e5076b24efdc47ec5f9461",
-  "branch_name": "refine/00000T19EJ0CNGHM85RBDXE000/round-1",
+  "base_commit": "7912ec52bfe76387f2587988dc4b99d0fbcf0ca6",
+  "branch_name": "refine/00000T19EJ0CNGHM85RBDXE000/round-2-execution-3174439c-676c-4e57-8f51-18796370638f",
   "candidate_commit": null,
   "created": "2026-09-15T16:06:39Z",
-  "event_generation": 12,
+  "event_generation": 15,
   "feature_id": null,
   "feature_order": null,
   "id": "00000T19EJ0CNGHM85RBDXE000",
@@ -494,11 +494,273 @@
         "round_idx": 0
       },
       "workspace_branch": "refine/00000T19EJ0CNGHM85RBDXE000/round-1"
+    },
+    {
+      "agent_context": {
+        "assembled_at": "2026-09-16T12:29:08Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "Complete configurable AI providers and automatic provider selection\n\nComplete the original provider requirements and the Round 1 plan (P1-P8). The Goal's chevron title is stale; the scope is AI provider configuration and automated selection. Deliver a working, validated feature, including subscription-first selection, explicitly configured paid fallback with shared spending limits, automatic subscription recovery, preserved work, and attributable attempts. Keep credential values outside synchronized state.\n\nEvidence and starting point:\n- Round 1 failed in Implement on 2026-09-15 at 21:58:20Z because implementation and validation were incomplete. Preserve its recorded plan, failure, logs, event results, and retained source changes.\n- Its branch is refine/00000T19EJ0CNGHM85RBDXE000/round-1; its retained worktree is /home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T19EJ0CNGHM85RBDXE000-round-1. HEAD remains 9c7363164d582fac14e5076b24efdc47ec5f9461, with tracked modifications and untracked additions and no candidate commit. Inspect both kinds of changes; do not assume the branch tip contains the implementation. Preserve this historical worktree and recover useful changes into the new workflow-owned worktree through supported recovery.\n- Validation evidence is target/provider-checks/validation.json and its referenced logs in the Round 1 worktree. It records cargo check, 38 focused Rust tests, and 3 browser tests passing. Initial cargo test had 38 failures; cargo test -- --full had 29 failures and stopped at the unit stage. Some diagnostics passed after removing inherited Refine execution variables; overlapping compilation also deleted an active test executable. Remaining failures were not established as baseline defects or regressions.\n- Main has advanced. At follow-up creation it is 7912ec52bfe76387f2587988dc4b99d0fbcf0ca6 and includes provider catalog work from ca378ee0 (Goal 00000T19PJVMBGJ0Y33NWRJ002), including src/application/agents/providers.rs, src/model/providers.rs, and src/infrastructure/storage/providers.rs. Inspect current Git and source before applying retained work; reconcile overlapping configuration, migration, launch, and UI behavior into one authoritative implementation. Do not overwrite newer functionality or maintain competing catalogs.\n\nImplementation tasks:\n1. Reconcile and finish P1-P3: stable provider configuration IDs supporting two configurations of the same executable; argv templates; stdin/argument/private-file context transport; local credential references; output adapters; optional availability, interactive, and continuation capabilities. Persist validated, revision-checked system-level definitions and policies; migrate built-ins and custom paths idempotently without enabling paid fallback. Nodes hold optional overrides and inherit the system default when cleared. Preserve precedence: explicit invocation, node selection, system default; explicit providers stay pinned. Complete bootstrap, synchronization, conflicts, and fleet migration coverage.\n2. Complete P5 paid admission before enabling paid execution. Connect the existing authoritative Git compare-and-swap budget ledger to all launch and settlement paths, including explicit providers and repairs. Use integer amounts, currency/periods, idempotent attempt IDs, and confirmed published reservations against shared pools across nodes. Require an enforceable per-attempt maximum or bounded charge contract. Retain reservations for unknown usage and potentially running attempts; handle contention, lost acknowledgments, crashes, cancellation, rollover, and budget edits conservatively. Unreachable spending authority blocks new paid spending while permitting subscription work. Do not simply remove the retained paid-launch guard without admission.\n3. Complete P4 and P6 selection and continuation through one shared launch decision across Event/Skill execution, managed/interactive sessions, chat, direct invoke/resume, and maintenance. Evaluate subscription candidates in order; use bounded probes or controlled attempts, capacity observations, cooldowns, configured fallback, and return to a recovered subscription at the next attempt boundary. Ordinary task failures and Quality/Governance verdicts must not cause provider shopping. Pin definition revision and selection evidence per attempt. Confirm previous process-tree exit before switching, retain the admitted worktree/files, and construct a handoff from request, completed artifacts, output, and unfinished work. Resume native sessions only when configuration and credential/session scope are compatible. Preserve workflow authority and accepted results through restart, cancellation, supersession, and late completion. Capacity waits must be recoverably scheduled without sleeping under worker/checkout locks.\n4. Complete P7 CLI/API/browser configuration, inheritance and effective-selection preview, reference-safe deletion, local credential diagnostics, and Goal/Skill/process attempt history. Show provider, reason, definition revision, availability evidence, process receipt, reservation, usage, and outcome. Distinguish reserved, confirmed, and unknown spending; keep secrets out of responses, logs, metadata, and exported evidence.\n5. Complete P8 deterministic verification and documentation. Demonstrate subscription exhaustion -> configured paid fallback -> subscription recovery across a daemon restart, preserving edited files and attributable attempts, using fake providers and no real paid requests. Verify concurrent nodes cannot overspend a shared pool, all paid entry points use admission, incompatible sessions get handoffs, inherited selection follows system changes, built-ins/custom providers remain compatible, and secrets remain excluded. Update Agents, Settings, persistence intent, and the provider runbook, including two configurations of one CLI.\n\nValidation and completion:\nRun focused checks as appropriate, then the repository's required cargo test and cargo test -- --full, including later harness stages. Avoid overlapping compilations against the same test artifacts. Investigate environment contamination and compare unresolved failures against an unchanged baseline under equivalent conditions; do not dismiss them without evidence or weaken required checks. Resolve blocking issues or use evidence-backed workarounds that preserve the checks. Report exact commands, outcomes, prerequisites, and any unresolved failures separately. Finish with a concise P1-P8 implementation report distinguishing completed work from remaining gaps. Refine owns workflow transitions, candidate integration, and review; do not directly edit durable Goal state, approve, merge, or push.",
+          "reporter": "Buddy Williams",
+          "round": 2
+        },
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000T19EJ0CNGHM85RBDXE000",
+          "name": "The new menu item is missing a chevron indicating it is a drop-down. Add the che",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": false,
+          "constitution": "",
+          "product": "",
+          "rules": []
+        },
+        "guidance_candidates": [],
+        "previous_rounds": [
+          {
+            "assignee": "Buddy Williams",
+            "prompt": "Configure AI Providers and automate provider selection\n\nAllow users to define CLI providers with executable paths, arguments, context transport, credential references, and optional output, availability, and session-continuation behavior. Support multiple configurations of the same CLI without Refine code changes.\n\nStore provider definitions and default selection policies at the refine-state system level. Nodes may select a provider or policy, inheriting the system default when absent. Migrate existing providers into equivalent configurations.\n\nSupport subscription-first selection with configured paid fallback, shared spending limits, and automatic return when subscription capacity becomes available. Preserve work across switches and expose the provider and reason used for each attempt. Keep credential values outside synchronized state.",
+            "reporter": "Buddy Williams",
+            "round": 1
+          }
+        ],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree, the current Round, and available planning context. Follow the Goal and applicable Skill instructions and use your judgment to decide when to stop. Quality and Governance agents make their own decisions using their Skills before integration and human Review. Refine coordinates workflow transitions and Git actions. Do not directly advance Goal state, approve, merge, or push."
+      },
+      "assignee": "Buddy Williams",
+      "created": "2026-09-16T12:29:02Z",
+      "event_configuration": {
+        "events": {
+          "workflow.plan.enter": {
+            "bindings": [
+              {
+                "enabled": true,
+                "id": "default-plan",
+                "inputs": {},
+                "mode": "blocking",
+                "order": 0,
+                "overrides": null,
+                "scope": {
+                  "node_id": null
+                },
+                "skill_id": "default-plan"
+              }
+            ],
+            "enabled": true,
+            "id": "workflow.plan.enter",
+            "kind": "system",
+            "name": "Workflow Plan Enter",
+            "on_success": null,
+            "parameters": [],
+            "scope": {
+              "node_id": null
+            },
+            "source": "workflow.plan.enter"
+          }
+        },
+        "revision": 82,
+        "schema_version": 3,
+        "skills": {
+          "default-plan": {
+            "enabled": true,
+            "id": "default-plan",
+            "name": "Plan",
+            "parameters": [],
+            "prompt": "## Plan\n\nDevelop a plan to achieve the Goal's desired outcome. If the goal outcome is underspecified or is missing details add only just enough detail so that AI agents do not thrash or become confused.\n\n### Outcome\n\nA clear implementation plan that explains the approach and breaks the work into ordered tasks. Begin with a short description of the desired behavior and proposed solution. Use a numbered checklist, such as `Task #1 - What changes and why`. Include dependencies and important design decisions where they help implementation.\n\n### Guardrails\n\n- Read the context that helps explain the Goal and how the existing system works.\n- Look for the underlying cause. Consider whether a missing or misused concept explains the problem, and improve that concept rather than adding fixes for individual symptoms.\n- Give each task enough detail to guide implementation while leaving room for reasonable implementation choices.\n- Keep the plan focused on the desired outcome. Prefer straightforward changes that fit the existing architecture.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
+            "provenance": "refine-default-v1",
+            "role": "task",
+            "scope": {
+              "node_id": null
+            }
+          }
+        }
+      },
+      "failure_at": "",
+      "failure_category": "",
+      "failure_message": "",
+      "gate_configurations": {
+        "15:default:workflow.plan.enter": {
+          "events": {
+            "workflow.plan.enter": {
+              "bindings": [
+                {
+                  "enabled": true,
+                  "id": "default-plan",
+                  "inputs": {},
+                  "mode": "blocking",
+                  "order": 0,
+                  "overrides": null,
+                  "scope": {
+                    "node_id": null
+                  },
+                  "skill_id": "default-plan"
+                }
+              ],
+              "enabled": true,
+              "id": "workflow.plan.enter",
+              "kind": "system",
+              "name": "Workflow Plan Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.plan.enter"
+            }
+          },
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {
+            "default-plan": {
+              "enabled": true,
+              "id": "default-plan",
+              "name": "Plan",
+              "parameters": [],
+              "prompt": "## Plan\n\nDevelop a plan to achieve the Goal's desired outcome. If the goal outcome is underspecified or is missing details add only just enough detail so that AI agents do not thrash or become confused.\n\n### Outcome\n\nA clear implementation plan that explains the approach and breaks the work into ordered tasks. Begin with a short description of the desired behavior and proposed solution. Use a numbered checklist, such as `Task #1 - What changes and why`. Include dependencies and important design decisions where they help implementation.\n\n### Guardrails\n\n- Read the context that helps explain the Goal and how the existing system works.\n- Look for the underlying cause. Consider whether a missing or misused concept explains the problem, and improve that concept rather than adding fixes for individual symptoms.\n- Give each task enough detail to guide implementation while leaving room for reasonable implementation choices.\n- Keep the plan focused on the desired outcome. Prefer straightforward changes that fit the existing architecture.\n\n{{templates.purpose}}\n\n{{templates.architecture}}\n",
+              "provenance": "refine-default-v1",
+              "role": "task",
+              "scope": {
+                "node_id": null
+              }
+            }
+          }
+        }
+      },
+      "logs": [],
+      "prior_attempts": [
+        {
+          "agent_context": null,
+          "assignee": "Buddy Williams",
+          "created": "2026-09-16T12:29:02Z",
+          "event_configuration": {
+            "events": {
+              "workflow.todo.exit": {
+                "bindings": [],
+                "enabled": true,
+                "id": "workflow.todo.exit",
+                "kind": "system",
+                "name": "Workflow Todo Exit",
+                "on_success": null,
+                "parameters": [],
+                "scope": {
+                  "node_id": null
+                },
+                "source": "workflow.todo.exit"
+              }
+            },
+            "revision": 82,
+            "schema_version": 3,
+            "skills": {}
+          },
+          "failure_at": "",
+          "failure_category": "",
+          "failure_message": "",
+          "gate_configurations": {
+            "13:default:workflow.todo.enter": {
+              "events": {
+                "workflow.todo.enter": {
+                  "bindings": [],
+                  "enabled": true,
+                  "id": "workflow.todo.enter",
+                  "kind": "system",
+                  "name": "Workflow Todo Enter",
+                  "on_success": null,
+                  "parameters": [],
+                  "scope": {
+                    "node_id": null
+                  },
+                  "source": "workflow.todo.enter"
+                }
+              },
+              "revision": 82,
+              "schema_version": 3,
+              "skills": {}
+            },
+            "13:default:workflow.todo.exit": {
+              "events": {
+                "workflow.todo.exit": {
+                  "bindings": [],
+                  "enabled": true,
+                  "id": "workflow.todo.exit",
+                  "kind": "system",
+                  "name": "Workflow Todo Exit",
+                  "on_success": null,
+                  "parameters": [],
+                  "scope": {
+                    "node_id": null
+                  },
+                  "source": "workflow.todo.exit"
+                }
+              },
+              "revision": 82,
+              "schema_version": 3,
+              "skills": {}
+            },
+            "13:default:workflow.todo.success": {
+              "events": {},
+              "revision": 82,
+              "schema_version": 3,
+              "skills": {}
+            }
+          },
+          "governance_candidate_commit": "",
+          "governance_checked_at": "",
+          "governance_details": "",
+          "governance_message": "",
+          "governance_rule_actions": [],
+          "guidance_decision": null,
+          "implementation_plan": null,
+          "implementation_report": null,
+          "implementation_reported_at": null,
+          "logs": [],
+          "prompt": "Complete configurable AI providers and automatic provider selection\n\nComplete the original provider requirements and the Round 1 plan (P1-P8). The Goal's chevron title is stale; the scope is AI provider configuration and automated selection. Deliver a working, validated feature, including subscription-first selection, explicitly configured paid fallback with shared spending limits, automatic subscription recovery, preserved work, and attributable attempts. Keep credential values outside synchronized state.\n\nEvidence and starting point:\n- Round 1 failed in Implement on 2026-09-15 at 21:58:20Z because implementation and validation were incomplete. Preserve its recorded plan, failure, logs, event results, and retained source changes.\n- Its branch is refine/00000T19EJ0CNGHM85RBDXE000/round-1; its retained worktree is /home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T19EJ0CNGHM85RBDXE000-round-1. HEAD remains 9c7363164d582fac14e5076b24efdc47ec5f9461, with tracked modifications and untracked additions and no candidate commit. Inspect both kinds of changes; do not assume the branch tip contains the implementation. Preserve this historical worktree and recover useful changes into the new workflow-owned worktree through supported recovery.\n- Validation evidence is target/provider-checks/validation.json and its referenced logs in the Round 1 worktree. It records cargo check, 38 focused Rust tests, and 3 browser tests passing. Initial cargo test had 38 failures; cargo test -- --full had 29 failures and stopped at the unit stage. Some diagnostics passed after removing inherited Refine execution variables; overlapping compilation also deleted an active test executable. Remaining failures were not established as baseline defects or regressions.\n- Main has advanced. At follow-up creation it is 7912ec52bfe76387f2587988dc4b99d0fbcf0ca6 and includes provider catalog work from ca378ee0 (Goal 00000T19PJVMBGJ0Y33NWRJ002), including src/application/agents/providers.rs, src/model/providers.rs, and src/infrastructure/storage/providers.rs. Inspect current Git and source before applying retained work; reconcile overlapping configuration, migration, launch, and UI behavior into one authoritative implementation. Do not overwrite newer functionality or maintain competing catalogs.\n\nImplementation tasks:\n1. Reconcile and finish P1-P3: stable provider configuration IDs supporting two configurations of the same executable; argv templates; stdin/argument/private-file context transport; local credential references; output adapters; optional availability, interactive, and continuation capabilities. Persist validated, revision-checked system-level definitions and policies; migrate built-ins and custom paths idempotently without enabling paid fallback. Nodes hold optional overrides and inherit the system default when cleared. Preserve precedence: explicit invocation, node selection, system default; explicit providers stay pinned. Complete bootstrap, synchronization, conflicts, and fleet migration coverage.\n2. Complete P5 paid admission before enabling paid execution. Connect the existing authoritative Git compare-and-swap budget ledger to all launch and settlement paths, including explicit providers and repairs. Use integer amounts, currency/periods, idempotent attempt IDs, and confirmed published reservations against shared pools across nodes. Require an enforceable per-attempt maximum or bounded charge contract. Retain reservations for unknown usage and potentially running attempts; handle contention, lost acknowledgments, crashes, cancellation, rollover, and budget edits conservatively. Unreachable spending authority blocks new paid spending while permitting subscription work. Do not simply remove the retained paid-launch guard without admission.\n3. Complete P4 and P6 selection and continuation through one shared launch decision across Event/Skill execution, managed/interactive sessions, chat, direct invoke/resume, and maintenance. Evaluate subscription candidates in order; use bounded probes or controlled attempts, capacity observations, cooldowns, configured fallback, and return to a recovered subscription at the next attempt boundary. Ordinary task failures and Quality/Governance verdicts must not cause provider shopping. Pin definition revision and selection evidence per attempt. Confirm previous process-tree exit before switching, retain the admitted worktree/files, and construct a handoff from request, completed artifacts, output, and unfinished work. Resume native sessions only when configuration and credential/session scope are compatible. Preserve workflow authority and accepted results through restart, cancellation, supersession, and late completion. Capacity waits must be recoverably scheduled without sleeping under worker/checkout locks.\n4. Complete P7 CLI/API/browser configuration, inheritance and effective-selection preview, reference-safe deletion, local credential diagnostics, and Goal/Skill/process attempt history. Show provider, reason, definition revision, availability evidence, process receipt, reservation, usage, and outcome. Distinguish reserved, confirmed, and unknown spending; keep secrets out of responses, logs, metadata, and exported evidence.\n5. Complete P8 deterministic verification and documentation. Demonstrate subscription exhaustion -> configured paid fallback -> subscription recovery across a daemon restart, preserving edited files and attributable attempts, using fake providers and no real paid requests. Verify concurrent nodes cannot overspend a shared pool, all paid entry points use admission, incompatible sessions get handoffs, inherited selection follows system changes, built-ins/custom providers remain compatible, and secrets remain excluded. Update Agents, Settings, persistence intent, and the provider runbook, including two configurations of one CLI.\n\nValidation and completion:\nRun focused checks as appropriate, then the repository's required cargo test and cargo test -- --full, including later harness stages. Avoid overlapping compilations against the same test artifacts. Investigate environment contamination and compare unresolved failures against an unchanged baseline under equivalent conditions; do not dismiss them without evidence or weaken required checks. Resolve blocking issues or use evidence-backed workarounds that preserve the checks. Report exact commands, outcomes, prerequisites, and any unresolved failures separately. Finish with a concise P1-P8 implementation report distinguishing completed work from remaining gaps. Refine owns workflow transitions, candidate integration, and review; do not directly edit durable Goal state, approve, merge, or push.",
+          "quality_checked_at": "",
+          "quality_details": "",
+          "quality_message": "",
+          "quality_state": "unclassified",
+          "reporter": "Buddy Williams",
+          "rule_state": "unclassified",
+          "updated": "2026-09-16T12:29:07Z",
+          "workflow_attempt_authority": {
+            "claimed_at": "2026-09-16T12:29:06Z",
+            "generation": 13,
+            "round_idx": 1,
+            "workflow_revision": 30
+          },
+          "workflow_reconciliation": null,
+          "workflow_recovery": null
+        }
+      ],
+      "prompt": "Complete configurable AI providers and automatic provider selection\n\nComplete the original provider requirements and the Round 1 plan (P1-P8). The Goal's chevron title is stale; the scope is AI provider configuration and automated selection. Deliver a working, validated feature, including subscription-first selection, explicitly configured paid fallback with shared spending limits, automatic subscription recovery, preserved work, and attributable attempts. Keep credential values outside synchronized state.\n\nEvidence and starting point:\n- Round 1 failed in Implement on 2026-09-15 at 21:58:20Z because implementation and validation were incomplete. Preserve its recorded plan, failure, logs, event results, and retained source changes.\n- Its branch is refine/00000T19EJ0CNGHM85RBDXE000/round-1; its retained worktree is /home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T19EJ0CNGHM85RBDXE000-round-1. HEAD remains 9c7363164d582fac14e5076b24efdc47ec5f9461, with tracked modifications and untracked additions and no candidate commit. Inspect both kinds of changes; do not assume the branch tip contains the implementation. Preserve this historical worktree and recover useful changes into the new workflow-owned worktree through supported recovery.\n- Validation evidence is target/provider-checks/validation.json and its referenced logs in the Round 1 worktree. It records cargo check, 38 focused Rust tests, and 3 browser tests passing. Initial cargo test had 38 failures; cargo test -- --full had 29 failures and stopped at the unit stage. Some diagnostics passed after removing inherited Refine execution variables; overlapping compilation also deleted an active test executable. Remaining failures were not established as baseline defects or regressions.\n- Main has advanced. At follow-up creation it is 7912ec52bfe76387f2587988dc4b99d0fbcf0ca6 and includes provider catalog work from ca378ee0 (Goal 00000T19PJVMBGJ0Y33NWRJ002), including src/application/agents/providers.rs, src/model/providers.rs, and src/infrastructure/storage/providers.rs. Inspect current Git and source before applying retained work; reconcile overlapping configuration, migration, launch, and UI behavior into one authoritative implementation. Do not overwrite newer functionality or maintain competing catalogs.\n\nImplementation tasks:\n1. Reconcile and finish P1-P3: stable provider configuration IDs supporting two configurations of the same executable; argv templates; stdin/argument/private-file context transport; local credential references; output adapters; optional availability, interactive, and continuation capabilities. Persist validated, revision-checked system-level definitions and policies; migrate built-ins and custom paths idempotently without enabling paid fallback. Nodes hold optional overrides and inherit the system default when cleared. Preserve precedence: explicit invocation, node selection, system default; explicit providers stay pinned. Complete bootstrap, synchronization, conflicts, and fleet migration coverage.\n2. Complete P5 paid admission before enabling paid execution. Connect the existing authoritative Git compare-and-swap budget ledger to all launch and settlement paths, including explicit providers and repairs. Use integer amounts, currency/periods, idempotent attempt IDs, and confirmed published reservations against shared pools across nodes. Require an enforceable per-attempt maximum or bounded charge contract. Retain reservations for unknown usage and potentially running attempts; handle contention, lost acknowledgments, crashes, cancellation, rollover, and budget edits conservatively. Unreachable spending authority blocks new paid spending while permitting subscription work. Do not simply remove the retained paid-launch guard without admission.\n3. Complete P4 and P6 selection and continuation through one shared launch decision across Event/Skill execution, managed/interactive sessions, chat, direct invoke/resume, and maintenance. Evaluate subscription candidates in order; use bounded probes or controlled attempts, capacity observations, cooldowns, configured fallback, and return to a recovered subscription at the next attempt boundary. Ordinary task failures and Quality/Governance verdicts must not cause provider shopping. Pin definition revision and selection evidence per attempt. Confirm previous process-tree exit before switching, retain the admitted worktree/files, and construct a handoff from request, completed artifacts, output, and unfinished work. Resume native sessions only when configuration and credential/session scope are compatible. Preserve workflow authority and accepted results through restart, cancellation, supersession, and late completion. Capacity waits must be recoverably scheduled without sleeping under worker/checkout locks.\n4. Complete P7 CLI/API/browser configuration, inheritance and effective-selection preview, reference-safe deletion, local credential diagnostics, and Goal/Skill/process attempt history. Show provider, reason, definition revision, availability evidence, process receipt, reservation, usage, and outcome. Distinguish reserved, confirmed, and unknown spending; keep secrets out of responses, logs, metadata, and exported evidence.\n5. Complete P8 deterministic verification and documentation. Demonstrate subscription exhaustion -> configured paid fallback -> subscription recovery across a daemon restart, preserving edited files and attributable attempts, using fake providers and no real paid requests. Verify concurrent nodes cannot overspend a shared pool, all paid entry points use admission, incompatible sessions get handoffs, inherited selection follows system changes, built-ins/custom providers remain compatible, and secrets remain excluded. Update Agents, Settings, persistence intent, and the provider runbook, including two configurations of one CLI.\n\nValidation and completion:\nRun focused checks as appropriate, then the repository's required cargo test and cargo test -- --full, including later harness stages. Avoid overlapping compilations against the same test artifacts. Investigate environment contamination and compare unresolved failures against an unchanged baseline under equivalent conditions; do not dismiss them without evidence or weaken required checks. Resolve blocking issues or use evidence-backed workarounds that preserve the checks. Report exact commands, outcomes, prerequisites, and any unresolved failures separately. Finish with a concise P1-P8 implementation report distinguishing completed work from remaining gaps. Refine owns workflow transitions, candidate integration, and review; do not directly edit durable Goal state, approve, merge, or push.",
+      "reporter": "Buddy Williams",
+      "updated": "2026-09-16T12:29:09Z",
+      "workflow_attempt_authority": {
+        "claimed_at": "2026-09-16T12:29:06Z",
+        "generation": 13,
+        "round_idx": 1,
+        "workflow_revision": 30
+      },
+      "workspace_branch": "refine/00000T19EJ0CNGHM85RBDXE000/round-2-execution-3174439c-676c-4e57-8f51-18796370638f",
+      "workspace_recoveries": [
+        {
+          "at": "2026-09-16T12:29:08Z",
+          "base": "9c7363164d582fac14e5076b24efdc47ec5f9461",
+          "branch": "refine/00000T19EJ0CNGHM85RBDXE000/round-1",
+          "candidate": null,
+          "generation": 14,
+          "reason": "Generated workspace inputs are missing or inconsistent; reproduce the authored Round in a clean execution",
+          "step": "plan",
+          "target": "main"
+        }
+      ]
     }
   ],
-  "status": "failed",
+  "status": "plan",
   "target_branch": "main",
-  "updated": "2026-09-15T21:58:20Z",
+  "updated": "2026-09-16T12:29:09Z",
   "workflow_context": "",
   "workflow_controls": [
     {
@@ -510,6 +772,28 @@
       "request_id": "6a637d82-691a-491e-9813-0516df06c6fa",
       "source_round": 1,
       "to": "todo"
+    },
+    {
+      "actor": "refine",
+      "at": "2026-09-16T12:29:08Z",
+      "decision": true,
+      "forced": false,
+      "from": "plan",
+      "reason": "Generated workspace inputs are missing or inconsistent; reproduce the authored Round in a clean execution",
+      "recovery": true,
+      "request": {
+        "actor": "refine",
+        "context": "",
+        "expected_revision": 34,
+        "force": false,
+        "invocation_id": null,
+        "reason": "Generated workspace inputs are missing or inconsistent; reproduce the authored Round in a clean execution",
+        "request_id": "0b89862f-b425-41bd-a25b-725254317317",
+        "to": "plan"
+      },
+      "request_id": "0b89862f-b425-41bd-a25b-725254317317",
+      "source_round": 2,
+      "to": "plan"
     }
   ],
   "workflow_events": [
@@ -638,7 +922,38 @@
       "round_idx": 0,
       "to": "failed",
       "workflow_revision": 29
+    },
+    {
+      "at": "2026-09-16T12:29:02.735676307+00:00",
+      "forced": false,
+      "from": "failed",
+      "generation": 13,
+      "node_id": "default",
+      "round_idx": 1,
+      "supersedes_execution": true,
+      "to": "todo",
+      "workflow_revision": 30
+    },
+    {
+      "at": "2026-09-16T12:29:07.438314439+00:00",
+      "forced": false,
+      "from": "todo",
+      "generation": 14,
+      "node_id": "default",
+      "round_idx": 1,
+      "to": "plan",
+      "workflow_revision": 34
+    },
+    {
+      "at": "2026-09-16T12:29:08.375308175+00:00",
+      "from": "plan",
+      "generation": 15,
+      "node_id": "default",
+      "round_idx": 1,
+      "supersedes_execution": true,
+      "to": "plan",
+      "workflow_revision": 35
     }
   ],
-  "workflow_revision": 29
+  "workflow_revision": 37
 }
