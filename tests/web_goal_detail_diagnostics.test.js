@@ -340,3 +340,45 @@ test("distinct recorded failure occurrences survive even with the same timestamp
   assert.equal(result.history.length, 2);
   assert.match(runtime.failed({ status: "implement" }, round), /&quot;generation&quot;: 2/);
 });
+
+test("partial recorded failure metadata never borrows a later log's reason or timestamp", () => {
+  const runtime = goalDetailRuntime();
+  for (const recorded of [{ failure_category: "integration" }, { failure_at: "2026-09-15T12:00:00Z" }]) {
+    const round = { ...recorded, latest_error_log: { severity: "error", category: "provider",
+      datetime: "2026-09-16T12:00:00Z", message: "Unrelated later error", details: { stderr: "later output" } } };
+    const summary = runtime.failure({ status: "failed" }, round);
+    assert.match(summary, /recorded failure reason is unavailable/);
+    assert.doesNotMatch(summary, /Unrelated later error|later output|2026-09-16/);
+    assert.match(runtime.failed({ status: "failed" }, round), /Unrelated later error/);
+    assert.match(runtime.failed({ status: "failed" }, round), /later output/);
+  }
+});
+
+test("Round logs without IDs deduplicate across retry snapshots and latest-log projections", () => {
+  const runtime = goalDetailRuntime();
+  const archived = { datetime: "2026-09-15T12:00:00Z", severity: "error", category: "quality",
+    message: "Earlier test failure", details: { exit_code: 1, stderr: "retained output" }, round_idx: 0 };
+  const current = { ...archived, datetime: "2026-09-16T12:00:00Z", severity: "warn", message: "Current warning" };
+  const round = { prior_attempts: [{ logs: [archived], latest_error_log: structuredClone(archived) }],
+    logs: [structuredClone(archived), current], latest_error_log: structuredClone(current), latest_log: structuredClone(current) };
+  const result = runtime.collect({ status: "implement" }, round);
+  assert.equal(result.failure, null);
+  assert.equal(result.history.length, 1);
+  assert.equal(result.history[0].message, "Earlier test failure");
+  assert.equal(result.history[0].history, "Previous execution");
+  assert.equal(result.diagnostics.length, 1);
+  assert.equal(result.diagnostics[0].message, "Current warning");
+});
+
+test("passing current and retained gates alone leave Failed empty", () => {
+  const runtime = goalDetailRuntime();
+  const passed = { quality_state: "passed", quality_message: "Tests passed", rule_state: "passed",
+    governance_message: "Verified", event_results: { check: { state: "succeeded", generation: 1,
+      results: { skill: { outcome: "success", summary: "Accepted" } } } },
+    logs: [{ severity: "info", message: "Normal progress" }] };
+  const round = { ...passed, prior_attempts: [structuredClone(passed)],
+    workflow_candidate_refresh: { previous_gate_evidence: structuredClone(passed) } };
+  const html = runtime.failed({ status: "done" }, round);
+  assert.match(html, /No failure evidence has been recorded for this Round/);
+  assert.doesNotMatch(html, /Why this Round failed|Supporting diagnostics|Historical failures/);
+});
