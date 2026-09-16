@@ -3,7 +3,7 @@
   "branch_name": null,
   "candidate_commit": null,
   "created": "2026-09-16T12:30:41Z",
-  "event_generation": 1,
+  "event_generation": 2,
   "feature_id": null,
   "feature_order": null,
   "id": "00000T1AHJMNN00AGHY02TT000",
@@ -41,6 +41,26 @@
           "revision": 82,
           "schema_version": 3,
           "skills": {}
+        },
+        "2:default:workflow.cancelled.enter": {
+          "events": {
+            "workflow.cancelled.enter": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.cancelled.enter",
+              "kind": "system",
+              "name": "Workflow Cancelled Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.cancelled.enter"
+            }
+          },
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {}
         }
       },
       "governance_candidate_commit": "",
@@ -66,9 +86,21 @@
       "workflow_recovery": null
     }
   ],
-  "status": "backlog",
+  "status": "cancelled",
   "target_branch": null,
-  "updated": "2026-09-16T12:30:41Z",
+  "updated": "2026-09-16T12:31:01Z",
+  "workflow_controls": [
+    {
+      "actor": "operator",
+      "at": "2026-09-16T12:31:01Z",
+      "forced": false,
+      "from": "backlog",
+      "reason": "Explicit cancellation",
+      "request_id": "3126138a-ba37-4813-b9b6-d263ccda8fd4",
+      "source_round": 1,
+      "to": "cancelled"
+    }
+  ],
   "workflow_events": [
     {
       "at": "2026-09-16T12:30:41.002935827+00:00",
@@ -79,7 +111,18 @@
       "round_idx": 0,
       "to": "backlog",
       "workflow_revision": 1
+    },
+    {
+      "at": "2026-09-16T12:31:01.731993808+00:00",
+      "forced": true,
+      "from": "backlog",
+      "generation": 2,
+      "node_id": "default",
+      "round_idx": 0,
+      "supersedes_execution": true,
+      "to": "cancelled",
+      "workflow_revision": 2
     }
   ],
-  "workflow_revision": 1
+  "workflow_revision": 2
 }
