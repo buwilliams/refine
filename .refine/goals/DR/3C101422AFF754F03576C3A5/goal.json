@@ -1,0 +1,85 @@
+{
+  "base_commit": null,
+  "branch_name": null,
+  "candidate_commit": null,
+  "created": "2026-09-16T12:13:41Z",
+  "event_generation": 1,
+  "feature_id": null,
+  "feature_order": null,
+  "id": "DR3C101422AFF754F03576C3A5",
+  "name": "Bug: evidence[0]: invalid type: map output-contract fault survives the 4.3.2 unknown-field fix",
+  "node_id": "default",
+  "notes": [],
+  "pending_event_dispatches": {},
+  "priority": "low",
+  "reporter": "kevin.xiong@insurity.com",
+  "rounds": [
+    {
+      "agent_context": null,
+      "assignee": "kevin.xiong@insurity.com",
+      "created": "2026-09-16T12:13:41Z",
+      "failure_at": "",
+      "failure_category": "",
+      "failure_message": "",
+      "gate_configurations": {
+        "1:default:workflow.backlog.enter": {
+          "events": {
+            "workflow.backlog.enter": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.backlog.enter",
+              "kind": "system",
+              "name": "Workflow Backlog Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.backlog.enter"
+            }
+          },
+          "revision": 82,
+          "schema_version": 3,
+          "skills": {}
+        }
+      },
+      "governance_candidate_commit": "",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "guidance_decision": null,
+      "implementation_plan": null,
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "prompt": "From: Kevin Xiong <kevin.xiong@insurity.com>\nSubject: Bug: evidence[0]: invalid type: map output-contract fault survives the 4.3.2 unknown-field fix\n\nBody:\nVersion: 4.3.2 (commit 48804eebdcd830cb98fe8dabea39ced4c651a36a)\r\nNode: bo2lnxipsapp01 �P Agent model: claude-opus-4-7[1m] (also reproduced earlier on 4-8)\r\nSeverity: High �X silently discards a completed agent turn. In our case the implement agent ran ~1 hour (23 e2e runs, real auth fixes, isolated the target bug) and all of it was lost at the reporting step over the JSON shape.\r\n\r\nSymptom\r\n\r\nFailed round, failure_category: workflow:\r\nSkill output contract failed: Skill invocation\r\n1a7d38c65afa176c2734d64e26c9d9b8fe0fcbb869746ae3226a2fe93310a392\r\nrequired bindings [default-implement] cannot authorize a gate: Error;\r\nagent returned invalid structured Skill completion report:\r\ndoes not match the required schema at field `evidence[0]`: invalid type: map, expected a string\r\nGoal: 00000T12G5WS2J4A7NGFJ8C00F, round 4.\r\n\r\nRoot cause\r\n\r\nsrc/application/agent_io/contracts/skill_result.rs:\r\n- SkillReport (line ~35) is #[serde(deny_unknown_fields)] with pub evidence: Vec<String> (line 40).\r\n- The a4e27372 normalization in decode_result sanitizes only the top-level key set:\r\nobject.retain(|key, _| matches!(key.as_str(),\r\n    \"invocation_id\"|\"binding_id\"|\"role\"|\"outcome\"|\"summary\"|\"evidence\"|\"artifacts\"));\r\n  This strips unknown top-level fields (e.g. checklist) �X which fixes the unknown field variant. But it does not touch the contents of retained fields.\r\n\r\nWhen the model emits evidence as an array of objects (e.g. [{\"id\":\"P1\",\"detail\":\"...\"}] instead of [\"...\"]), retain keeps the evidence key, then SkillReport deserialization fails on Vec<String> �� evidence[0]: invalid type: map, expected a string. The normalization never had a chance to catch it.\r\n\r\nSo a4e27372 fixed the unknown-field variant but not the wrong-element-type variant of the same class of fault.\r\n\r\nReproduction\r\n\r\nFeed decode_result a completion whose evidence is an array of maps:\r\n{\"outcome\":\"success\",\"summary\":\"...\",\"evidence\":[{\"id\":\"P1\",\"note\":\"did X\"}],\"artifacts\":{}}\r\n�� errors with evidence[0]: invalid type: map, expected a string. (The existing test at ~line 191 shows the intended shape: evidence as strings, structured data like checklist under artifacts �X models routinely don't follow this.)\r\n\r\nSuggested fixes (any one)\r\n\r\n1. Coerce/normalize evidence elements in the same decode_result boundary: for each non-string element, stringify it (serde_json::to_string) or lift objects into artifacts �X mirroring how unknown top-level keys are already tolerated there.\r\n2. Loosen the field type: evidence: Vec<Value> (or a #[serde(deserialize_with=...)] that accepts string-or-object and renders to string), keeping the strict persisted SkillResult as-is downstream.\r\n3. At minimum, route this through the structured-output repair loop instead of hard-failing, so a malformed envelope gets one corrective re-prompt rather than discarding a completed turn.\r\n\r\nImpact note\r\n\r\nBecause this rejects at the reporting step after the work is done, a long, successful agent turn is thrown away �X very costly. Same class as the earlier 2 distinct JSON candidates / unknown field checklist faults; the model just picks a different wrong shape.\r\n\r\n[cid:insurity-small2_60d9d841-975e-4326-81a1-42eb773307d1.jpg]\r\n\r\nKevin Xiong\r\n\r\nSenior Developer\r\n\r\nT 860-616-7842\r\n\r\n\r\n\r\n[cid:excellence2026signature(17b0688e-5473-4b74-96eb-a73f633f2c2f)_48407359-d77b-4967-95cd-277a32b50ebc.png]<https://insurity.com/excellence?utm_source=Email-Signature&utm_medium=Email&utm_campaign=Event-Excellence-2026>\r\n\r\n_____________________________________________________________________________________________________\r\n\r\nThe information contained in this e-mail message is intended only for the personal and confidential use of the intended recipient(s). This message may be an attorney-client communication and/or work product and as such is privileged and confidential. If the reader of this message is not the intended recipient or an agent responsible for delivering it to the intended recipient, you are hereby notified that you have received this document in error and that any review, dissemination, distribution, or copying of this message is strictly prohibited. If you have received this communication in error, please notify us immediately by e-mail, and delete the original message.\r\n_____________________________________________________________________________________________________\r\n~~~Insurity~~~",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "kevin.xiong@insurity.com",
+      "rule_state": "unclassified",
+      "updated": "2026-09-16T12:13:41Z",
+      "workflow_attempt_authority": null,
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
+    }
+  ],
+  "status": "backlog",
+  "target_branch": null,
+  "updated": "2026-09-16T12:13:41Z",
+  "workflow_events": [
+    {
+      "at": "2026-09-16T12:13:41.654796922+00:00",
+      "forced": false,
+      "from": null,
+      "generation": 1,
+      "node_id": "default",
+      "round_idx": 0,
+      "to": "backlog",
+      "workflow_revision": 1
+    }
+  ],
+  "workflow_revision": 1
+}
