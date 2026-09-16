@@ -54,8 +54,12 @@
       }
     },
     "metadata": {
+      "event_operation_id": "1a0aa22aeb363c1",
       "manual_skill_id": "fetch-goals-from-email",
       "requested_parameters": {},
+      "started_bindings": {
+        "trigger-2748a40c-20f1-4533-851a-d3d752e56013": "2026-09-16T12:13:14.826082374+00:00"
+      },
       "template_snapshot": {
         "records": {
           "agent": {
@@ -386,7 +390,7 @@
       "parameters": {}
     }
   ],
-  "state": "pending",
+  "state": "running",
   "results": {},
   "attempts": [],
   "created_at": "2026-09-16T12:13:06.763773505+00:00",
