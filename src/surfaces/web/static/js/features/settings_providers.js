@@ -19,6 +19,7 @@ function renderProviderCatalog(data = {}) {
   const catalog = data.catalog;
   if (!catalog) return '';
   const pending = providerStored(providerDraftKey('default'));
+  const stale = pending && pending.base.revision !== catalog.revision;
   const effective = catalog.providers.find(p => p.id === data.effective_provider);
   return `<section class="settings-section" data-testid="provider-catalog">
     <div class="provider-heading"><div><h3>Shared AI providers</h3><p class="muted small">Definitions and the system default are shared across nodes.</p></div><button type="button" id="provider-add">Add provider</button></div>
@@ -27,8 +28,8 @@ function renderProviderCatalog(data = {}) {
     <div class="provider-list">${catalog.providers.map(p => `<div class="provider-row"><div><strong>${htmlEscape(p.name)}</strong>${p.id === catalog.default_provider ? ' <span class="muted small">System default</span>' : ''}<div class="muted small"><code>${htmlEscape(p.executable)}</code></div></div><button type="button" class="secondary" data-provider-edit="${htmlEscape(p.id)}" aria-label="Edit ${htmlEscape(p.name)}">Edit</button></div>`).join('')}</div>
     <button type="button" class="secondary" id="provider-restore" ${providerStored(providerDraftKey()) ? '' : 'hidden'}>Resume unsaved provider draft</button>
     <button type="button" class="secondary" id="provider-discard" ${providerStored(providerDraftKey()) ? '' : 'hidden'}>Discard unsaved draft</button>
-    <p role="status" id="provider-catalog-status" class="muted small"></p><p role="alert" class="form-error" id="provider-catalog-error"></p>
-    <button type="button" class="secondary" id="provider-default-rebase" hidden>Review latest default</button>
+    <p role="status" id="provider-catalog-status" class="muted small"></p><p role="alert" class="form-error" id="provider-catalog-error">${stale ? 'The provider catalog changed. Review the latest default before applying your retained selection.' : ''}</p>
+    <button type="button" class="secondary" id="provider-default-rebase" ${stale ? '' : 'hidden'}>Review latest default</button>
   </section>`;
 }
 function bindProviderCatalog(data = {}) {
@@ -53,7 +54,8 @@ function bindProviderCatalog(data = {}) {
     try {
       await api('PUT', '/api/providers', catalog);
       if (!current()) return;
-      providerStored(key, null);
+      // Another tab may have retained a newer choice while this request ran.
+      if (JSON.stringify(providerStored(key)) === JSON.stringify(pending)) providerStored(key, null);
       await refreshSettingsTab('runtime', {force: true});
       if (current()) document.querySelector('#provider-catalog-status').textContent = 'System default saved.';
     } catch (error) {
@@ -229,6 +231,7 @@ function openProviderEditor(catalog, id, restored) {
       const invalid = validateProviderForm(root, value);
       if (invalid) { error.textContent = invalid; return; }
     }
+    const submittedDraft = providerStored(storageKey);
     const controls = [...root.querySelectorAll('input, textarea, select, button:not([data-close])')].map(control => [control, control.disabled]);
     controls.forEach(([control]) => { control.disabled = true; }); save.textContent = 'Saving…';
     try {
@@ -237,7 +240,8 @@ function openProviderEditor(catalog, id, restored) {
       else if (index < 0) updated.providers.push(value); else updated.providers[index] = value;
       await api('PUT', '/api/providers', updated);
       if (!current()) return;
-      providerStored(storageKey, null); root._close();
+      if (JSON.stringify(providerStored(storageKey)) === JSON.stringify(submittedDraft)) providerStored(storageKey, null);
+      root._close();
       await refreshSettingsTab('runtime', {force: true});
       if (isNodeContextGenerationCurrent(generation)) document.querySelector('#provider-catalog-status').textContent = deleting ? 'Provider deleted.' : 'Provider saved.';
     } catch (failure) {

@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const {openApp, apiFixture, SKIP} = require('./support/web_app');
 const defaults = require('../src/model/providers_defaults.json');
-const evidence = path.join(__dirname, '../target/provider-checks/screenshots');
+const evidence = process.env.REFINE_PROVIDER_SCREENSHOTS || path.join(__dirname, '../target/provider-checks/screenshots');
 fs.mkdirSync(evidence, {recursive: true});
 
 function fixture() {
@@ -30,13 +30,33 @@ async function addArgument(dialog, group, value) {
   await dialog.locator(`[data-add-argument="${group}"]`).click();
   await dialog.locator(`[data-args="${group}"] textarea`).last().fill(value);
 }
-async function save(dialog) { await dialog.locator('[data-save]').click(); await dialog.waitFor({state:'detached'}); }
+async function save(dialog) {
+  const id = await dialog.locator('#provider-id').inputValue();
+  const name = await dialog.locator('#provider-name').inputValue();
+  await dialog.locator('[data-save]').click();
+  await dialog.waitFor({state:'detached'});
+  await dialog.page().waitForFunction(({id, name}) => [...document.querySelectorAll('[data-provider-edit]')]
+    .some(button => button.dataset.providerEdit === id && button.getAttribute('aria-label') === `Edit ${name}`), {id, name});
+}
 async function nodeSelection(page, value) {
   const field = page.locator('[data-settings-editable-field]').filter({has: page.locator('#s-cli')});
   await field.locator('[data-settings-editable-toggle]').click();
   await page.locator('#s-cli').selectOption(value);
   await field.locator('[data-settings-editable-toggle]').click();
-  await page.waitForTimeout(200);
+  await page.waitForFunction(value => document.querySelector('#s-cli')?.dataset.settingsSavedValue === value, value);
+}
+async function anotherProviderTab(page, app, data) {
+  const opened = page.waitForEvent('popup');
+  await page.evaluate(() => window.open('about:blank'));
+  const other = await opened;
+  other.on('pageerror', error => app.pageErrors.push(error.message));
+  await other.route('**/api/**', route => {
+    const url = new URL(route.request().url()).pathname;
+    if (url === '/api/sse') return route.fulfill({contentType:'text/event-stream', body:''});
+    return route.fulfill({json: data.response(url, route.request())});
+  });
+  await other.goto(`${app.origin}/#/settings/runtime`);
+  return other;
 }
 
 test('visible provider controls preserve exact argv, variants, default, override, reload and keyboard behavior', {skip:SKIP}, async () => {
@@ -273,4 +293,78 @@ test('a remotely deleted pending selection stays visible until the user chooses 
     assert.equal(data.node,null);
     assert.deepEqual(app.pageErrors,[]);
   } finally {await app.close();}
+});
+
+test('a shared-default save cannot discard a newer selection made in another tab', {skip:SKIP}, async () => {
+  const data = fixture();
+  const app = await openApp({fixture: data.response});
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  try {
+    const {page} = app;
+    await page.goto(`${app.origin}/#/settings/runtime`);
+    const other = await anotherProviderTab(page, app, data);
+    await page.route('**/api/providers', async route => {
+      if (route.request().method() === 'PUT') {
+        await gate;
+        if (route.request().postDataJSON().revision !== data.catalog.revision) {
+          return route.fulfill({status:409, json:{error:{message:'AI provider catalog changed; reload and reapply your edits'}}});
+        }
+      }
+      return route.fallback();
+    });
+    await page.locator('#provider-system-default').selectOption('codex');
+    await page.locator('#provider-save-default').click();
+    await other.locator('#provider-system-default').selectOption('gemini');
+    await page.bringToFront();
+    const acknowledged = page.waitForResponse(response => response.url().endsWith('/api/providers') && response.request().method() === 'PUT');
+    release();
+    assert.equal((await acknowledged).status(), 200);
+    await page.waitForFunction(() => document.querySelector('#provider-save-default')?.disabled === false);
+    assert.equal(data.catalog.default_provider, 'codex');
+    await page.reload();
+    assert.equal(await page.locator('#provider-system-default').inputValue(), 'gemini');
+    await page.locator('#provider-save-default').click();
+    await page.evaluate(() => refreshSettingsTab('runtime', {force:true}));
+    await page.locator('#provider-default-rebase').click();
+    await page.waitForFunction(() => document.querySelector('#provider-catalog-error')?.textContent.includes('Latest default'));
+    const saved = page.waitForResponse(response => response.url().endsWith('/api/providers') && response.request().method() === 'PUT');
+    await page.locator('#provider-save-default').click();
+    assert.equal((await saved).status(), 200);
+    await page.waitForFunction(() => document.querySelector('#provider-save-default')?.disabled === false);
+    assert.equal(data.catalog.default_provider, 'gemini');
+    assert.deepEqual(app.pageErrors, []);
+  } finally { release(); await app.close(); }
+});
+
+test('saving one provider preserves a newer editor draft from another tab', {skip:SKIP}, async () => {
+  const data = fixture();
+  const app = await openApp({fixture:data.response});
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  try {
+    const {page} = app;
+    await page.goto(`${app.origin}/#/settings/runtime`);
+    const other = await anotherProviderTab(page, app, data);
+    await page.route('**/api/providers', async route => {
+      if (route.request().method() === 'PUT') await gate;
+      return route.fallback();
+    });
+    await page.locator('[data-provider-edit="claude"]').click();
+    await page.locator('#provider-name').fill('Saved Claude');
+    await page.locator('[data-save]').click();
+    await other.locator('[data-provider-edit="gemini"]').click();
+    await other.locator('#provider-name').fill('Unsaved Gemini');
+    await page.bringToFront();
+    release();
+    await page.locator('[data-testid="automation-modal"]').waitFor({state:'detached'});
+    assert.equal(data.catalog.providers.find(p => p.id === 'claude').name, 'Saved Claude');
+    await other.reload();
+    await other.locator('#provider-add').waitFor();
+    assert.equal(await other.locator('#provider-restore').isVisible(), true);
+    await other.locator('#provider-restore').click();
+    assert.equal(await other.locator('#provider-name').inputValue(), 'Unsaved Gemini');
+    assert.equal(await other.locator('#provider-id').inputValue(), 'gemini');
+    assert.deepEqual(app.pageErrors, []);
+  } finally { release(); await app.close(); }
 });

@@ -436,3 +436,62 @@ fn retained_sessions_reject_changed_launch_contracts_but_allow_display_name_edit
     );
     std::fs::remove_dir_all(root).unwrap();
 }
+
+#[cfg(unix)]
+#[test]
+fn selected_provider_failure_is_reported_without_launching_another_configuration() {
+    use std::os::unix::fs::PermissionsExt;
+    let root = root();
+    let binary = root.join("fake-provider");
+    std::fs::write(
+        &binary,
+        "#!/usr/bin/python3\nimport sys\nwith open('attempts', 'a') as log: log.write(sys.argv[1] + '\\n')\nprint('Selected provider capacity exhausted', file=sys.stderr)\nsys.exit(23)\n",
+    )
+    .unwrap();
+    std::fs::set_permissions(&binary, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let mut catalog = defaults();
+    for id in ["system-variant", "node-variant", "explicit-variant"] {
+        let mut provider = ProviderDefinition::generic(id);
+        provider.executable = binary.display().to_string();
+        provider.automated.args = vec![id.into()];
+        catalog.providers.push(provider);
+    }
+    catalog.default_provider = "system-variant".into();
+    save(&root, &json!(catalog)).unwrap();
+    let settings = FileSettingsService::new(&root);
+    settings
+        .update(&json!({"agent_cli":"node-variant"}))
+        .unwrap();
+    let service =
+        HostAgentProviderService::with_runtime_root(root.join("run/8082")).with_refine_dir(&root);
+    for selected in ["explicit-variant", ""] {
+        let failure = service
+            .invoke(ProviderInvocation {
+                provider: selected.into(),
+                prompt: "request".into(),
+                session_id: None,
+                cwd: Some(root.display().to_string()),
+                stall_timeout_seconds: Some(10),
+                process_metadata: Default::default(),
+            })
+            .unwrap_err();
+        assert!(
+            failure
+                .to_string()
+                .contains("Selected provider capacity exhausted")
+        );
+    }
+    assert_eq!(
+        std::fs::read_to_string(root.join("attempts")).unwrap(),
+        "explicit-variant\nnode-variant\n"
+    );
+    assert_eq!(
+        settings.provider_override().unwrap().as_deref(),
+        Some("node-variant")
+    );
+    assert_eq!(
+        ProviderStore::new(&root).load().unwrap().default_provider,
+        "system-variant"
+    );
+    std::fs::remove_dir_all(root).unwrap();
+}

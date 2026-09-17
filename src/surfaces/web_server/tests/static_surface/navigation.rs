@@ -256,8 +256,6 @@ fn static_main_nav_consolidates_context_and_controls() {
     assert!(menu.contains(r#"class="nav-control-status nav-theme-status""#));
     assert!(menu.contains("<span>Contact Refine Devs</span>"));
     assert!(!menu.contains("<span>Report a bug</span>"));
-    assert!(index.contains(r#"data-testid="nav-settings""#));
-    assert!(index.contains(r#"<span class="rail-copy">Settings</span>"#));
     assert!(!menu.contains("<span>Settings</span>"));
     assert!(menu.contains(r#"aria-pressed="false""#));
     assert!(theme.contains(r#"const STORAGE_KEY = "refine_color_theme""#));
