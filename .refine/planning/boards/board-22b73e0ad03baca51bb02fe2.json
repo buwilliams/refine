@@ -1,0 +1,24 @@
+{
+  "id": "board-22b73e0ad03baca51bb02fe2",
+  "name": "Browser Use",
+  "revision": 1,
+  "archived": false,
+  "routing": null,
+  "lanes": [
+    {
+      "id": "lane-7da10f95b1b1096b3bcdb9d6",
+      "name": "Ideas",
+      "action": "none",
+      "routing": null
+    },
+    {
+      "id": "lane-6a3e29c57d0db0682bf5935f",
+      "name": "Done",
+      "action": "none",
+      "routing": null
+    }
+  ],
+  "created": "2026-09-17T16:58:11.939264969+00:00",
+  "reporter": null,
+  "last_request_id": "item-dfa622ff-1354-4543-ad97-9799196711f0"
+}

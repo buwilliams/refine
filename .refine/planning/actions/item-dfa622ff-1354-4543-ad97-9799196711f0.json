@@ -1,0 +1,51 @@
+{
+  "id": "item-dfa622ff-1354-4543-ad97-9799196711f0",
+  "command": {
+    "request_id": "item-dfa622ff-1354-4543-ad97-9799196711f0",
+    "operation": "board.create",
+    "expected_revision": null,
+    "board_id": null,
+    "lane_id": null,
+    "goal_id": null,
+    "actor": "Buddy Williams",
+    "data": {
+      "name": "Browser Use",
+      "routing": null
+    }
+  },
+  "owner": "default",
+  "state": "complete",
+  "phase": "prepare",
+  "created": "2026-09-17T16:58:11.936737264+00:00",
+  "result": {
+    "archived": false,
+    "created": "2026-09-17T16:58:11.939264969+00:00",
+    "id": "board-22b73e0ad03baca51bb02fe2",
+    "lanes": [
+      {
+        "action": "none",
+        "id": "lane-7da10f95b1b1096b3bcdb9d6",
+        "name": "Ideas",
+        "routing": null
+      },
+      {
+        "action": "none",
+        "id": "lane-6a3e29c57d0db0682bf5935f",
+        "name": "Done",
+        "routing": null
+      }
+    ],
+    "last_request_id": "item-dfa622ff-1354-4543-ad97-9799196711f0",
+    "name": "Browser Use",
+    "reporter": null,
+    "revision": 1,
+    "routing": null
+  },
+  "message": null,
+  "target_node": null,
+  "before": null,
+  "destination": null,
+  "behavior": "none",
+  "configuration": null,
+  "invocations": {}
+}
