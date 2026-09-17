@@ -3,7 +3,7 @@
   "branch_name": "refine/00000T1ARYE9B1JAXBPW2TT001/round-1",
   "candidate_commit": "07c90d91f32d40a70f0998c5c617b0f96471a28a",
   "created": "2026-09-16T16:48:14Z",
-  "event_generation": 7,
+  "event_generation": 8,
   "feature_id": null,
   "feature_order": null,
   "id": "00000T1ARYE9B1JAXBPW2TT001",
@@ -27,6 +27,28 @@
       "round_idx": 0
     }
   ],
+  "lifecycle_gate_configurations": {
+    "8:default:workflow.done.enter": {
+      "events": {
+        "workflow.done.enter": {
+          "bindings": [],
+          "enabled": true,
+          "id": "workflow.done.enter",
+          "kind": "system",
+          "name": "Workflow Done Enter",
+          "on_success": null,
+          "parameters": [],
+          "scope": {
+            "node_id": null
+          },
+          "source": "workflow.done.enter"
+        }
+      },
+      "revision": 87,
+      "schema_version": 4,
+      "skills": {}
+    }
+  },
   "name": "Goal modal > Round > Flat tabs needs a new tab for Failed, which gathers the inf",
   "node_id": "default",
   "notes": [],
@@ -556,6 +578,26 @@
           "revision": 86,
           "schema_version": 3,
           "skills": {}
+        },
+        "8:default:workflow.done.enter": {
+          "events": {
+            "workflow.done.enter": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.done.enter",
+              "kind": "system",
+              "name": "Workflow Done Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.done.enter"
+            }
+          },
+          "revision": 87,
+          "schema_version": 4,
+          "skills": {}
         }
       },
       "governance_candidate_commit": "07c90d91f32d40a70f0998c5c617b0f96471a28a",
@@ -789,9 +831,9 @@
       "workspace_branch": "refine/00000T1ARYE9B1JAXBPW2TT001/round-1"
     }
   ],
-  "status": "review",
+  "status": "done",
   "target_branch": "main",
-  "updated": "2026-09-16T17:02:17Z",
+  "updated": "2026-09-17T17:00:22Z",
   "workflow_context": "",
   "workflow_controls": [
     {
@@ -821,6 +863,39 @@
       "retained_candidate": null,
       "source_round": 1,
       "to": "todo"
+    },
+    {
+      "at": "2026-09-17T17:00:22Z",
+      "decision": true,
+      "forced": true,
+      "from": "review",
+      "generation": 8,
+      "integration_performed": false,
+      "integration_requested": false,
+      "overridden_requirements": [
+        "transition_policy",
+        "workflow_evidence_gates"
+      ],
+      "previous_attempt": {
+        "claimed_at": "2026-09-16T16:48:24Z",
+        "generation": 2,
+        "round_idx": 0,
+        "workflow_revision": 2
+      },
+      "request": {
+        "actor": "Buddy Williams",
+        "context": "",
+        "expected_revision": 39,
+        "force": true,
+        "invocation_id": null,
+        "reason": "User selected workflow step",
+        "request_id": "item-abf419b1-cac0-4661-8032-a2d6573eaa2d",
+        "to": "done"
+      },
+      "request_id": "item-abf419b1-cac0-4661-8032-a2d6573eaa2d",
+      "retained_candidate": "07c90d91f32d40a70f0998c5c617b0f96471a28a",
+      "source_round": 1,
+      "to": "done"
     }
   ],
   "workflow_events": [
@@ -894,7 +969,18 @@
       "round_idx": 0,
       "to": "review",
       "workflow_revision": 39
+    },
+    {
+      "at": "2026-09-17T17:00:22.714730445+00:00",
+      "forced": true,
+      "from": "review",
+      "generation": 8,
+      "node_id": "default",
+      "round_idx": 0,
+      "supersedes_execution": true,
+      "to": "done",
+      "workflow_revision": 40
     }
   ],
-  "workflow_revision": 39
+  "workflow_revision": 40
 }
