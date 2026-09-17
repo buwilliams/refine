@@ -1,9 +1,9 @@
 {
-  "base_commit": "91cbcdf3611f61f0e7afb7244b05f8135f1a58b4",
+  "base_commit": "b6ba64780f7021a222e9fe54f3a2986782695427",
   "branch_name": "refine/00000T19EJ0CNGHM85RBDXE000/round-3-execution-e18804c7-b49a-497f-9d29-053a3607d7cf",
-  "candidate_commit": null,
+  "candidate_commit": "3d1f9341ce0ef06eca2810db63952a847309e88a",
   "created": "2026-09-15T16:06:39Z",
-  "event_generation": 26,
+  "event_generation": 27,
   "feature_id": null,
   "feature_order": null,
   "id": "00000T19EJ0CNGHM85RBDXE000",
@@ -1743,11 +1743,11 @@
       "created": "2026-09-17T20:13:35Z",
       "event_configuration": {
         "events": {
-          "workflow.implement.enter": {
+          "workflow.quality.enter": {
             "bindings": [
               {
                 "enabled": true,
-                "id": "default-implement",
+                "id": "default-quality",
                 "inputs": {},
                 "mode": "blocking",
                 "order": 0,
@@ -1755,96 +1755,36 @@
                 "scope": {
                   "node_id": null
                 },
-                "skill_id": "default-implement"
+                "skill_id": "default-quality"
               }
             ],
             "enabled": true,
-            "id": "workflow.implement.enter",
+            "id": "workflow.quality.enter",
             "kind": "system",
-            "name": "Workflow Implement Enter",
+            "name": "Workflow Quality Enter",
             "on_success": null,
             "parameters": [],
             "scope": {
               "node_id": null
             },
-            "source": "workflow.implement.enter"
+            "source": "workflow.quality.enter"
           }
         },
         "revision": 87,
         "schema_version": 4,
         "skills": {
-          "default-implement": {
+          "default-quality": {
             "enabled": true,
-            "id": "default-implement",
-            "name": "Implement",
+            "id": "default-quality",
+            "name": "Quality",
             "parameters": [],
-            "prompt": "{{templates.purpose}}\n\n{{templates.architecture}}\n\n## Implement\n\nImplement the plan.\n\n### Outcome\n\nThe plan is implemented in a way that aligns with the project's purpose and architecture. Provide a brief summary organized by plan task: what changed, any important departures from the plan and why, and any unfinished work.\n\n### Guardrails\n\n- Follow established code patterns and put shared behavior in one place. Fix the underlying cause rather than each symptom separately.\n- Keep code focused on one responsibility and preserve stable interfaces where possible. Split mixed responsibilities into separate files. Keep files relatively small, under roughly 1,000 lines where possible.\n- Prefer clear, straightforward code and abstractions that make the behavior easier to understand and maintain.\n",
+            "prompt": "{{templates.purpose}}\n\n{{templates.architecture}}\n\n## Quality\n\nTest the implementation. Create and groom tests to cover the behavior described in the plan.\n\n### Outcome\n\nMeaningful tests cover the changed behavior and pass. Provide a brief report of the behavior tested, tests added or updated, commands run and their results, and any remaining failures or gaps. Include runtime or browser test results where useful. These results support Governance's verification of the work.\n\n### Guardrails\n\n- Test observable behavior, including relevant failure cases and effects on existing functionality. Tests should catch defects rather than mirror the implementation.\n- Keep useful tests, update tests for changed behavior, and remove obsolete or meaningless tests.\n- Investigate failures, correct problems in the implementation or tests, and rerun affected tests.\n- Choose tests suited to the change. Expand coverage when failures or affected behavior call for it.",
             "provenance": "refine-default-v1",
             "role": "task",
             "scope": {
               "node_id": null
             }
           }
-        }
-      },
-      "event_results": {
-        "54eabedb37447f245303543057063459343276b1baa9c3eacd227e6f2b51a283": {
-          "candidate_commit": null,
-          "generation": 25,
-          "results": {
-            "default-plan": {
-              "artifacts": {
-                "plan": {
-                  "checklist": [
-                    {
-                      "description": "Task #1 - Establish the implementation baseline and Settings design. Continue from the clean Round 3 workspace at 91cbcdf3611f61f0e7afb7244b05f8135f1a58b4. Reuse the existing catalog rather than importing earlier Rounds wholesale. Inspect Runtime, Reporters, Skills/Templates, shared editable fields, modal helpers, and design tokens before changing the UI. Keep the provider controls in Settings > Runtime, with clearly labeled shared and node scopes. Preserve all available earlier Round records, commits, worktrees, failures, and logs.",
-                      "id": "1"
-                    },
-                    {
-                      "description": "Task #2 - Complete provider configuration and local credential references. Extend src/model/providers.rs and the existing application/storage services with backward-compatible defaults. Keep stable IDs independent of editable names and executable paths, allowing multiple configurations of one CLI. Preserve ordered argument elements exactly, including empty strings, whitespace, newlines, and supported templates; never introduce shell splitting or recursive expansion. Retain existing argument/file-fallback and native-stdin context delivery, output adapters, and optional session templates. Add narrowly scoped credential references resolved on the launching host, preferably through existing SecretStore facilities or explicitly named environment references. Store only references in shared definitions, inject resolved values into the child environment, and keep values out of serialized launch metadata, diagnostics, and captured logs. Missing references produce actionable errors without exposing values. Dependencies: Task #1.",
-                      "id": "2"
-                    },
-                    {
-                      "description": "Task #3 - Verify one selection and launch contract across entry points. Audit Event/Skill execution, managed and interactive sessions, chat, direct invoke/resume, and maintenance/repair launches. Route configuration resolution and credential preparation through shared behavior: explicit invocation selection, then node override, then system default. Clearing an override must persist inheritance; later default changes affect subsequent inherited launches. Preserve built-in and custom-path migration, output parsing, and supported native session behavior. Keep retained sessions associated with their provider; reject unsupported or incompatible continuation clearly rather than silently using another configuration. Running processes retain their launch configuration. A selected provider's failure or limit must not trigger another provider. Dependencies: Task #2.",
-                      "id": "3"
-                    },
-                    {
-                      "description": "Task #4 - Build the finished provider list and form editor. Reuse established Settings sections, form rows, buttons, feedback, spacing, typography, and modal behavior. Show provider name and executable with obvious Add/Edit actions, shared-default and node-override controls, and the effective provider with its selection source. Suggest a stable ID when adding and keep it fixed when editing. Replace JSON textareas with labeled controls and ordered argument rows offering add, remove, and keyboard-accessible reordering. Use controls that round-trip argument content without trimming or newline loss. Keep ordinary name, executable, arguments, and context setup concise; place credential references, output adapters, interactive launch overrides, cwd, and session options in expandable sections. Preserve advanced configuration when editing basic fields. Include associated labels, visible focus, modal focus trapping/restoration, Escape behavior, and responsive layouts without horizontal overflow. Dependencies: Tasks #1–#3.",
-                      "id": "4"
-                    },
-                    {
-                      "description": "Task #5 - Make saving and conflict recovery dependable. Keep draft state separate from refreshed server data and scoped to project/node context, including provider edits and pending default/override selections. Preserve drafts through background refresh, page reload, validation errors, failed requests, and stale revisions; do not persist credential values. Guard request submission and completion against context changes so late responses cannot close or overwrite another context's editor. Use existing revision-checked catalog saves and reference-safe deletion. Provide inline errors, busy states, Cancel, and success feedback. On a revision conflict, offer a concrete action to fetch the latest catalog and reapply the draft, retaining unrelated remote edits and presenting overlapping edits for explicit resolution. Distinguish revision conflicts from deletion-reference conflicts. Never resolve a conflict merely by replacing the revision and overwriting the latest catalog. Dependencies: Tasks #2 and #4.",
-                      "id": "5"
-                    },
-                    {
-                      "description": "Task #6 - Verify backend behavior and real browser interactions. Extend existing provider Rust tests and tests/web_settings_providers_browser.test.js. Use fake providers to capture exact argv, stdin/context, cwd, selection, and session behavior across launch paths. Cover two IDs using the same executable, explicit/node/default precedence, clearing inheritance, catalog migration/synchronization, invalid templates, missing executables/references, unsupported capabilities, stale revisions, reference-safe deletion, and credential exclusion, including a fake provider that echoes a credential. In a real browser, exercise visible controls to add/edit both variants, change the default, set/clear the node override, recover invalid input, and resolve a genuine revision conflict without losing edits. Cover refresh/reload, project/node changes, late responses, keyboard navigation, and Escape/focus restoration. Retain and inspect desktop and narrow-screen screenshots of the list, editor, errors/conflicts, and neighboring Settings screens. Existing browser tests intercept API responses; supplement them with isolated real API/persistence coverage and clearly label fixture-based evidence. Ensure browser tests execute rather than silently skip. Dependencies: Tasks #3–#5.",
-                      "id": "6"
-                    },
-                    {
-                      "description": "Task #7 - Update documentation, run required checks, and hand off evidence. Update the provider guide and relevant Agents, Settings, and persistence documentation with two variants of one CLI, templates/context delivery, local credential setup, inheritance, conflict recovery, and manual response to provider failures. Update any affected superseded automation tests/docs while retaining useful configuration and compatibility coverage; do not import selection policies, capacity probes/cooldowns, automatic paid fallback, shared spending orchestration, cross-provider handoffs, or automatic subscription recovery. Run focused checks first, then cargo test and cargo test -- --full sequentially, including every later harness stage. Avoid concurrent compilation against the same artifacts. Investigate failures and environment contamination; compare unresolved failures against unchanged baseline code under equivalent conditions before attributing them to baseline. Record exact commands, exit results, prerequisites, skipped stages, logs, browser evidence, and screenshot paths. Finish with delivered behavior and remaining gaps. Leave workflow transitions, integration, and review to Refine. Dependencies: Task #6.",
-                      "id": "7"
-                    }
-                  ],
-                  "summary": "Users can configure named CLI providers through polished Settings controls, choose a shared default, and optionally override it per node. Extend the existing authoritative catalog and launch infrastructure from the current workflow workspace. Preserve exact arguments, existing session capabilities, local credentials, and recoverable drafts. Provider failures use existing failure handling; automatic switching and the superseded P1–P8 requirements are excluded."
-                }
-              },
-              "binding_id": "default-plan",
-              "evidence": [
-                "Read-only inspection found a clean Round 3 workspace at 91cbcdf3611f61f0e7afb7244b05f8135f1a58b4, matching main at inspection time.",
-                "Inspected src/model/providers.rs, src/application/agents/providers.rs, and src/infrastructure/storage/providers.rs: one catalog already provides stable IDs, template validation, selection precedence, revision checks, and node-reference deletion protection; ProviderDefinition currently has no credential-reference fields.",
-                "Inspected settings_providers.js, settings_runtime.js, settings_reporters.js, and automationModal in settings_skills.js: provider editing currently requires JSON for argument arrays and several scalar options; conflict handling retains the modal draft but supplies no actionable reconciliation flow.",
-                "Inspected provider selection, invocation/discovery, provider documentation, existing Rust tests, and browser support. Browser coverage uses the actual UI with intercepted API responses and can skip when browser dependencies are unavailable.",
-                "Refine system status reported a healthy daemon and this Goal's live execution. No lifecycle changes, source edits, or test runs were performed during planning."
-              ],
-              "invocation_id": "54eabedb37447f245303543057063459343276b1baa9c3eacd227e6f2b51a283",
-              "outcome": "success",
-              "role": "plan",
-              "summary": "Round 3 implementation plan is ready. Current source supports extending the existing catalog; the main work is Settings polish, recoverable drafts/conflicts, local credential references, and launch-path verification. Historical memory informed inspection priorities; current-source findings were verified directly.\n\n"
-            }
-          },
-          "round_idx": 2,
-          "source": "workflow.plan.enter",
-          "state": "succeeded"
         }
       },
       "failure_at": "",
@@ -1982,8 +1922,96 @@
               }
             }
           }
+        },
+        "26:default:workflow.implement.exit": {
+          "events": {
+            "workflow.implement.exit": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.implement.exit",
+              "kind": "system",
+              "name": "Workflow Implement Exit",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.implement.exit"
+            }
+          },
+          "revision": 87,
+          "schema_version": 4,
+          "skills": {}
+        },
+        "26:default:workflow.implement.success": {
+          "events": {
+            "workflow.implement.success": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.implement.success",
+              "kind": "system",
+              "name": "workflow.implement.success",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.implement.success"
+            }
+          },
+          "revision": 87,
+          "schema_version": 4,
+          "skills": {}
+        },
+        "27:default:workflow.quality.enter": {
+          "events": {
+            "workflow.quality.enter": {
+              "bindings": [
+                {
+                  "enabled": true,
+                  "id": "default-quality",
+                  "inputs": {},
+                  "mode": "blocking",
+                  "order": 0,
+                  "overrides": null,
+                  "scope": {
+                    "node_id": null
+                  },
+                  "skill_id": "default-quality"
+                }
+              ],
+              "enabled": true,
+              "id": "workflow.quality.enter",
+              "kind": "system",
+              "name": "Workflow Quality Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.quality.enter"
+            }
+          },
+          "revision": 87,
+          "schema_version": 4,
+          "skills": {
+            "default-quality": {
+              "enabled": true,
+              "id": "default-quality",
+              "name": "Quality",
+              "parameters": [],
+              "prompt": "{{templates.purpose}}\n\n{{templates.architecture}}\n\n## Quality\n\nTest the implementation. Create and groom tests to cover the behavior described in the plan.\n\n### Outcome\n\nMeaningful tests cover the changed behavior and pass. Provide a brief report of the behavior tested, tests added or updated, commands run and their results, and any remaining failures or gaps. Include runtime or browser test results where useful. These results support Governance's verification of the work.\n\n### Guardrails\n\n- Test observable behavior, including relevant failure cases and effects on existing functionality. Tests should catch defects rather than mirror the implementation.\n- Keep useful tests, update tests for changed behavior, and remove obsolete or meaningless tests.\n- Investigate failures, correct problems in the implementation or tests, and rerun affected tests.\n- Choose tests suited to the change. Expand coverage when failures or affected behavior call for it.",
+              "provenance": "refine-default-v1",
+              "role": "task",
+              "scope": {
+                "node_id": null
+              }
+            }
+          }
         }
       },
+      "implementation_report": "workflow.implement.enter:default-implement: Round 3 provider behavior and Settings UX are implemented. Validation also exposed and corrected stale fixture assertions, a cleanup race, and shared Settings layout/pagination defects. Detailed results and retained visual evidence are linked through the artifact paths. No workflow transition, approval, integration, merge, or push was performed.",
+      "implementation_reported_at": "2026-09-17T21:54:27Z",
       "logs": [],
       "prior_attempts": [
         {
@@ -2105,12 +2133,151 @@
       ],
       "prompt": "Make AI providers configurable, with excellent Settings UX\n\nOutcome\nUsers can add, edit, and select named AI provider configurations without changing Refine code. Make this a simple, polished part of Refine that is easy to understand and pleasant to use.\n\nThis Round replaces the earlier scope and P1-P8 completion requirements. Automatic provider switching is not required. Do not implement selection policies, subscription-first routing, capacity probing/cooldowns, automatic paid fallback, shared spending orchestration, cross-provider handoffs, or automatic subscription recovery for this Round. When the selected provider fails or reaches its limit, report that clearly through the existing failure behavior; the user chooses what to do next.\n\nBehavior\n- A provider configuration has a stable ID and editable name, executable/path, distinct argument elements with supported context templates, context delivery, and local credential references where needed. Support two configurations of the same CLI with different arguments. Keep credential values outside synchronized state and diagnostics.\n- Store shared definitions and a system default. Each node may select an override or inherit the default; clearing its override restores inheritance. Explicit invocation selection takes precedence. Show the effective provider clearly.\n- Use the configured provider consistently through existing launch paths. Preserve existing built-in/custom provider behavior and supported session capabilities. Report invalid configuration and unsupported capabilities clearly. Keep one authoritative catalog and use existing validation, persistence, and conflict handling.\n\nUX and UI\nInspect neighboring Settings screens and shared components first. The provider list and editor must feel like a first-class part of the same product: matching typography, spacing, alignment, hierarchy, buttons, action placement, modal behavior, and responsive layout. Reuse established components and design tokens.\n- Make the list easy to scan, with obvious add/edit actions and clear shared-default versus node-override controls.\n- Use labeled controls, sensible defaults, concise help, and ordered argument rows that preserve each argument exactly, including spaces and templates. Ordinary setup must not require editing JSON. Put less common options in expandable sections.\n- Provide useful inline validation and clear loading, save, cancel, and success feedback. Preserve drafts through refreshes, failed saves, and revision conflicts, with a clear conflict-resolution action. Respect project/node context changes.\n- Support keyboard navigation, visible focus, associated labels, normal modal focus/Escape behavior, and narrow screens without overflow. Aim for an uncluttered, coherent finished experience, not just functioning controls.\n\nStarting point\nYou may ignore the earlier implementation and start fresh from current main if that is simpler and produces a better result. Reuse previous work only where it helps this outcome; do not complete or carry forward unwanted automation merely because it already exists. Preserve prior Round records, failures, logs, and available Git/worktree evidence. Work in the workflow-owned workspace through Refine's supported lifecycle.\n\nVerification\nVerify actual browser flows: add/edit a provider, configure two variants of one CLI, change the system default, set/clear a node override, and recover from invalid input and stale revisions without losing edits. Inspect desktop and narrow-screen renders against neighboring Settings and retain screenshots. Use fake providers to verify exact arguments/context, effective selection, compatibility, and credential exclusion. Run the repository's required checks, including cargo test and cargo test -- --full, sequentially; investigate failures and report exact results honestly. Tests for explicitly removed automatic-switching behavior are no longer acceptance requirements; update affected tests and documentation to match this scope while retaining useful coverage.\n\nFinish with a concise report of delivered behavior, browser/visual evidence, validation results, and any remaining gaps. Refine owns workflow transitions, integration, and review.",
       "reporter": "Buddy Williams",
-      "updated": "2026-09-17T20:15:41Z",
+      "updated": "2026-09-17T21:54:29Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-17T20:13:37Z",
         "generation": 23,
         "round_idx": 2,
         "workflow_revision": 67
+      },
+      "workflow_candidate_refresh": {
+        "authorizing_status": "quality",
+        "branch": "refine/00000T19EJ0CNGHM85RBDXE000/round-3-execution-e18804c7-b49a-497f-9d29-053a3607d7cf",
+        "node_id": "default",
+        "original_base_commit": "91cbcdf3611f61f0e7afb7244b05f8135f1a58b4",
+        "original_candidate_commit": "ae967a96aee8386906ba66b99bd157b728aca1ad",
+        "previous_gate_evidence": {
+          "event_results": {
+            "10998989a49c7f5761e9b042925468f2128fff24a65c03c413d630ca7468e4da": {
+              "candidate_commit": null,
+              "generation": 26,
+              "results": {
+                "default-implement": {
+                  "artifacts": {
+                    "capability_boundary": "Credential-protected detached launches require Linux; redaction covers literal credential values.",
+                    "remaining_work": "Migrate two unchanged full-workflow fixtures from the retired Governance endpoint and older provider protocol to current Skill contracts.",
+                    "report": "target/provider-checks/implementation-report.md",
+                    "screenshots": "target/provider-checks/screenshots/README.md",
+                    "tasks": [
+                      {
+                        "summary": "Extended the existing catalog and reused neighboring Settings patterns; preserved prior Round evidence.",
+                        "task": 1
+                      },
+                      {
+                        "summary": "Added local credential references, exact argument preservation, validation, and streaming credential redaction.",
+                        "task": 2
+                      },
+                      {
+                        "summary": "Unified credential preparation across launch paths; retained selection precedence and added session compatibility checks.",
+                        "task": 3
+                      },
+                      {
+                        "summary": "Delivered labeled provider forms, ordered argument rows, advanced sections, accessible modals, and responsive layouts.",
+                        "task": 4
+                      },
+                      {
+                        "summary": "Added scoped persistent drafts, explicit conflict reconciliation, busy states, and protection against stale responses.",
+                        "task": 5
+                      },
+                      {
+                        "summary": "Verified fake-provider behavior, real API/CLI persistence, six Chromium provider flows, and desktop/narrow screenshots.",
+                        "task": 6
+                      },
+                      {
+                        "summary": "Updated documentation and exercised all validation stages. Two baseline full-workflow fixtures still require migration.",
+                        "task": 7
+                      }
+                    ],
+                    "validation": "target/provider-checks/validation.json"
+                  },
+                  "binding_id": "default-implement",
+                  "evidence": [
+                    "cargo test: 1,459 passed, 0 failed, 7 existing opt-in tests ignored.",
+                    "Latest full-command attempt passed units, then failed three browser checks. Those were corrected; the subsequent complete browser/static check passed 420 tests with zero skips.",
+                    "Final Cargo integration, smoke-provider, CLI, Docker/SSH, and multi-instance checks passed.",
+                    "Two full-workflow tests still fail at PATCH /api/governance with HTTP 404; both failures reproduced on unchanged baseline.",
+                    "Formatting and whitespace checks passed. The aggregate full command remains non-green."
+                  ],
+                  "invocation_id": "10998989a49c7f5761e9b042925468f2128fff24a65c03c413d630ca7468e4da",
+                  "outcome": "success",
+                  "role": "implement",
+                  "summary": "Round 3 provider behavior and Settings UX are implemented. Validation also exposed and corrected stale fixture assertions, a cleanup race, and shared Settings layout/pagination defects. Detailed results and retained visual evidence are linked through the artifact paths. No workflow transition, approval, integration, merge, or push was performed.\n\n"
+                }
+              },
+              "round_idx": 2,
+              "source": "workflow.implement.enter",
+              "state": "succeeded"
+            },
+            "54eabedb37447f245303543057063459343276b1baa9c3eacd227e6f2b51a283": {
+              "candidate_commit": null,
+              "generation": 25,
+              "results": {
+                "default-plan": {
+                  "artifacts": {
+                    "plan": {
+                      "checklist": [
+                        {
+                          "description": "Task #1 - Establish the implementation baseline and Settings design. Continue from the clean Round 3 workspace at 91cbcdf3611f61f0e7afb7244b05f8135f1a58b4. Reuse the existing catalog rather than importing earlier Rounds wholesale. Inspect Runtime, Reporters, Skills/Templates, shared editable fields, modal helpers, and design tokens before changing the UI. Keep the provider controls in Settings > Runtime, with clearly labeled shared and node scopes. Preserve all available earlier Round records, commits, worktrees, failures, and logs.",
+                          "id": "1"
+                        },
+                        {
+                          "description": "Task #2 - Complete provider configuration and local credential references. Extend src/model/providers.rs and the existing application/storage services with backward-compatible defaults. Keep stable IDs independent of editable names and executable paths, allowing multiple configurations of one CLI. Preserve ordered argument elements exactly, including empty strings, whitespace, newlines, and supported templates; never introduce shell splitting or recursive expansion. Retain existing argument/file-fallback and native-stdin context delivery, output adapters, and optional session templates. Add narrowly scoped credential references resolved on the launching host, preferably through existing SecretStore facilities or explicitly named environment references. Store only references in shared definitions, inject resolved values into the child environment, and keep values out of serialized launch metadata, diagnostics, and captured logs. Missing references produce actionable errors without exposing values. Dependencies: Task #1.",
+                          "id": "2"
+                        },
+                        {
+                          "description": "Task #3 - Verify one selection and launch contract across entry points. Audit Event/Skill execution, managed and interactive sessions, chat, direct invoke/resume, and maintenance/repair launches. Route configuration resolution and credential preparation through shared behavior: explicit invocation selection, then node override, then system default. Clearing an override must persist inheritance; later default changes affect subsequent inherited launches. Preserve built-in and custom-path migration, output parsing, and supported native session behavior. Keep retained sessions associated with their provider; reject unsupported or incompatible continuation clearly rather than silently using another configuration. Running processes retain their launch configuration. A selected provider's failure or limit must not trigger another provider. Dependencies: Task #2.",
+                          "id": "3"
+                        },
+                        {
+                          "description": "Task #4 - Build the finished provider list and form editor. Reuse established Settings sections, form rows, buttons, feedback, spacing, typography, and modal behavior. Show provider name and executable with obvious Add/Edit actions, shared-default and node-override controls, and the effective provider with its selection source. Suggest a stable ID when adding and keep it fixed when editing. Replace JSON textareas with labeled controls and ordered argument rows offering add, remove, and keyboard-accessible reordering. Use controls that round-trip argument content without trimming or newline loss. Keep ordinary name, executable, arguments, and context setup concise; place credential references, output adapters, interactive launch overrides, cwd, and session options in expandable sections. Preserve advanced configuration when editing basic fields. Include associated labels, visible focus, modal focus trapping/restoration, Escape behavior, and responsive layouts without horizontal overflow. Dependencies: Tasks #1–#3.",
+                          "id": "4"
+                        },
+                        {
+                          "description": "Task #5 - Make saving and conflict recovery dependable. Keep draft state separate from refreshed server data and scoped to project/node context, including provider edits and pending default/override selections. Preserve drafts through background refresh, page reload, validation errors, failed requests, and stale revisions; do not persist credential values. Guard request submission and completion against context changes so late responses cannot close or overwrite another context's editor. Use existing revision-checked catalog saves and reference-safe deletion. Provide inline errors, busy states, Cancel, and success feedback. On a revision conflict, offer a concrete action to fetch the latest catalog and reapply the draft, retaining unrelated remote edits and presenting overlapping edits for explicit resolution. Distinguish revision conflicts from deletion-reference conflicts. Never resolve a conflict merely by replacing the revision and overwriting the latest catalog. Dependencies: Tasks #2 and #4.",
+                          "id": "5"
+                        },
+                        {
+                          "description": "Task #6 - Verify backend behavior and real browser interactions. Extend existing provider Rust tests and tests/web_settings_providers_browser.test.js. Use fake providers to capture exact argv, stdin/context, cwd, selection, and session behavior across launch paths. Cover two IDs using the same executable, explicit/node/default precedence, clearing inheritance, catalog migration/synchronization, invalid templates, missing executables/references, unsupported capabilities, stale revisions, reference-safe deletion, and credential exclusion, including a fake provider that echoes a credential. In a real browser, exercise visible controls to add/edit both variants, change the default, set/clear the node override, recover invalid input, and resolve a genuine revision conflict without losing edits. Cover refresh/reload, project/node changes, late responses, keyboard navigation, and Escape/focus restoration. Retain and inspect desktop and narrow-screen screenshots of the list, editor, errors/conflicts, and neighboring Settings screens. Existing browser tests intercept API responses; supplement them with isolated real API/persistence coverage and clearly label fixture-based evidence. Ensure browser tests execute rather than silently skip. Dependencies: Tasks #3–#5.",
+                          "id": "6"
+                        },
+                        {
+                          "description": "Task #7 - Update documentation, run required checks, and hand off evidence. Update the provider guide and relevant Agents, Settings, and persistence documentation with two variants of one CLI, templates/context delivery, local credential setup, inheritance, conflict recovery, and manual response to provider failures. Update any affected superseded automation tests/docs while retaining useful configuration and compatibility coverage; do not import selection policies, capacity probes/cooldowns, automatic paid fallback, shared spending orchestration, cross-provider handoffs, or automatic subscription recovery. Run focused checks first, then cargo test and cargo test -- --full sequentially, including every later harness stage. Avoid concurrent compilation against the same artifacts. Investigate failures and environment contamination; compare unresolved failures against unchanged baseline code under equivalent conditions before attributing them to baseline. Record exact commands, exit results, prerequisites, skipped stages, logs, browser evidence, and screenshot paths. Finish with delivered behavior and remaining gaps. Leave workflow transitions, integration, and review to Refine. Dependencies: Task #6.",
+                          "id": "7"
+                        }
+                      ],
+                      "summary": "Users can configure named CLI providers through polished Settings controls, choose a shared default, and optionally override it per node. Extend the existing authoritative catalog and launch infrastructure from the current workflow workspace. Preserve exact arguments, existing session capabilities, local credentials, and recoverable drafts. Provider failures use existing failure handling; automatic switching and the superseded P1–P8 requirements are excluded."
+                    }
+                  },
+                  "binding_id": "default-plan",
+                  "evidence": [
+                    "Read-only inspection found a clean Round 3 workspace at 91cbcdf3611f61f0e7afb7244b05f8135f1a58b4, matching main at inspection time.",
+                    "Inspected src/model/providers.rs, src/application/agents/providers.rs, and src/infrastructure/storage/providers.rs: one catalog already provides stable IDs, template validation, selection precedence, revision checks, and node-reference deletion protection; ProviderDefinition currently has no credential-reference fields.",
+                    "Inspected settings_providers.js, settings_runtime.js, settings_reporters.js, and automationModal in settings_skills.js: provider editing currently requires JSON for argument arrays and several scalar options; conflict handling retains the modal draft but supplies no actionable reconciliation flow.",
+                    "Inspected provider selection, invocation/discovery, provider documentation, existing Rust tests, and browser support. Browser coverage uses the actual UI with intercepted API responses and can skip when browser dependencies are unavailable.",
+                    "Refine system status reported a healthy daemon and this Goal's live execution. No lifecycle changes, source edits, or test runs were performed during planning."
+                  ],
+                  "invocation_id": "54eabedb37447f245303543057063459343276b1baa9c3eacd227e6f2b51a283",
+                  "outcome": "success",
+                  "role": "plan",
+                  "summary": "Round 3 implementation plan is ready. Current source supports extending the existing catalog; the main work is Settings polish, recoverable drafts/conflicts, local credential references, and launch-path verification. Historical memory informed inspection priorities; current-source findings were verified directly.\n\n"
+                }
+              },
+              "round_idx": 2,
+              "source": "workflow.plan.enter",
+              "state": "succeeded"
+            }
+          },
+          "failure_at": "",
+          "failure_category": "",
+          "failure_message": ""
+        },
+        "refreshed_at": "2026-09-17T21:54:29Z",
+        "replacement_base_commit": "b6ba64780f7021a222e9fe54f3a2986782695427",
+        "replacement_candidate_commit": "3d1f9341ce0ef06eca2810db63952a847309e88a",
+        "round_idx": 2,
+        "state": "refreshed",
+        "workflow_revision": 67,
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T19EJ0CNGHM85RBDXE000-round-3-execution-e18804c7-b49a-497f-9d29-053a3607d7cf"
       },
       "workspace_branch": "refine/00000T19EJ0CNGHM85RBDXE000/round-3-execution-e18804c7-b49a-497f-9d29-053a3607d7cf",
       "workspace_recoveries": [
@@ -2127,9 +2294,9 @@
       ]
     }
   ],
-  "status": "implement",
+  "status": "quality",
   "target_branch": "main",
-  "updated": "2026-09-17T20:15:41Z",
+  "updated": "2026-09-17T21:54:29Z",
   "workflow_context": "",
   "workflow_controls": [
     {
@@ -2500,7 +2667,17 @@
       "round_idx": 2,
       "to": "implement",
       "workflow_revision": 78
+    },
+    {
+      "at": "2026-09-17T21:54:28.951807583+00:00",
+      "forced": false,
+      "from": "implement",
+      "generation": 27,
+      "node_id": "default",
+      "round_idx": 2,
+      "to": "quality",
+      "workflow_revision": 85
     }
   ],
-  "workflow_revision": 79
+  "workflow_revision": 87
 }
