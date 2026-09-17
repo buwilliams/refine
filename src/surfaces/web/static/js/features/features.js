@@ -125,8 +125,12 @@ async function renderFeaturesList() {
     </details>
     <div id="features-table" data-testid="features-table"><p class="muted">Loading...</p></div>
   `;
-  bindOnce($("#features-search"), "input", debounce((e) =>
-    updateFeaturesFilter({ q: e.target.value, page: 1 }), 250));
+  const filterHost = document.getElementById("main");
+  const refreshFilteredFeatures = debounce(() => {
+    if (document.getElementById("main") === filterHost) refreshFeaturesTable();
+  }, 250);
+  bindOnce($("#features-search"), "input", (e) =>
+    updateFeaturesFilter({ q: e.target.value, page: 1 }, refreshFilteredFeatures));
   bindOnce($("#features-status"), "change", (e) =>
     updateFeaturesFilter({ status: e.target.value, page: 1 }));
   bindOnce($("#features-reporter"), "change", (e) =>
@@ -154,7 +158,7 @@ async function renderFeaturesList() {
   await refreshFeaturesTable();
 }
 
-function updateFeaturesFilter(patch) {
+function updateFeaturesFilter(patch, refresh = refreshFeaturesTable) {
   const current = featuresFilterFromHash();
   const next = {
     q: "q" in patch ? patch.q : current.q,
@@ -168,12 +172,13 @@ function updateFeaturesFilter(patch) {
     dir: "dir" in patch ? patch.dir : current.dir,
   };
   history.replaceState(null, "", featuresHash(next));
-  refreshFeaturesTable();
+  refresh();
 }
 
 async function refreshFeaturesTable() {
   if (state.currentRoute !== "features") return;
   const nodeGeneration = captureNodeContextGeneration();
+  const screenCurrent = typeof captureMainScreenRequest === "function" ? captureMainScreenRequest() : () => true;
   const f = featuresFilterFromHash();
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries({
@@ -184,7 +189,7 @@ async function refreshFeaturesTable() {
     if (value !== "" && value != null) params.set(key, String(value));
   }
   const data = await api("GET", `/api/features?${params}`);
-  if (!isNodeContextGenerationCurrent(nodeGeneration) || state.currentRoute !== "features") return;
+  if (!screenCurrent() || !isNodeContextGenerationCurrent(nodeGeneration) || state.currentRoute !== "features") return;
   const renderState = { ...f, pageMeta: data.page || {} };
   _lastFeaturesRender = { features: data.features || [], state: renderState };
   drawFeaturesTable(_lastFeaturesRender.features, renderState);
@@ -726,6 +731,7 @@ function ensureFeatureModalUnderlay() {
 
 async function openFeatureDetailModal(featureId) {
   const nodeGeneration = captureNodeContextGeneration();
+  const screenCurrent = typeof captureMainScreenRequest === "function" ? captureMainScreenRequest() : () => true;
   ensureFeatureModalUnderlay();
   if (typeof closeGoalDetailModal === "function") {
     closeGoalDetailModal({ navigateAway: false });
@@ -733,10 +739,10 @@ async function openFeatureDetailModal(featureId) {
   closeFeatureModal({ navigateAway: false });
   try {
     const data = await api("GET", `/api/features/${encodeURIComponent(featureId)}`);
-    if (!isNodeContextGenerationCurrent(nodeGeneration)) return;
+    if (!screenCurrent() || !isNodeContextGenerationCurrent(nodeGeneration)) return;
     openFeatureModal(data.feature, { navigateAway: true });
   } catch (e) {
-    if (!isNodeContextGenerationCurrent(nodeGeneration)) return;
+    if (!screenCurrent() || !isNodeContextGenerationCurrent(nodeGeneration)) return;
     const root = document.createElement("div");
     root.className = "modal-backdrop";
     root.innerHTML = `

@@ -83,7 +83,7 @@ function navigate() {
     openAgentDock(goalId ? { goalId } : {});
     return;
   }
-  if (r.route === "window") {
+  if (!["goals_detail", "features_detail"].includes(r.route)) {
     if (_goalModalRoot) closeGoalDetailModal({ navigateAway: false });
     if (_featureModalRoot) closeFeatureModal({ navigateAway: false });
   }
@@ -91,15 +91,7 @@ function navigate() {
     const handled = routeWorkspace(r, destinationHash);
     if (handled) return handled;
   }
-  // Leaving the Goals list forgets in-memory bulk-selection exceptions on
-  // purpose — a fresh visit starts with all matching Goals selected again.
   const prevRoute = state.currentRoute;
-  if (prevRoute === "goals" && r.route !== "goals") {
-    resetGoalsSelection();
-  }
-  if (prevRoute === "features" && r.route !== "features") {
-    resetFeaturesSelection();
-  }
   if (r.route === "goals_detail") {
     // Goal detail is now a modal layered on top of the current screen, so
     // the user keeps their underlying context (Dashboard, Goals list, etc.)
@@ -112,7 +104,7 @@ function navigate() {
     // (modal-to-modal swaps shouldn't clobber the true underlay).
     try {
       const prevHash = new URL(_prevHashURL).hash || "#/";
-      if (!/^#\/goals\/[^/]+/.test(prevHash) || /^#\/goals\/(new|plan|import)/.test(prevHash)) {
+      if (!prevHash.startsWith("#/windows/") && (!/^#\/goals\/[^/]+/.test(prevHash) || /^#\/goals\/(new|plan|import)/.test(prevHash))) {
         state.underlayHash = prevHash;
       }
     } catch { /* keep prior state.underlayHash */ }
@@ -129,7 +121,7 @@ function navigate() {
       const prevHash = new URL(_prevHashURL).hash || "#/features";
       const fromFeatureDetail = /^#\/features\/[^/]+/.test(prevHash) && !/^#\/features\/new/.test(prevHash);
       const fromGoalDetail = /^#\/goals\/[^/]+/.test(prevHash) && !/^#\/goals\/(new|plan|import)/.test(prevHash);
-      if (!fromFeatureDetail && !fromGoalDetail) {
+      if (!prevHash.startsWith("#/windows/") && !fromFeatureDetail && !fromGoalDetail) {
         state.underlayHash = prevHash;
       }
     } catch { /* keep prior state.underlayHash */ }
@@ -190,6 +182,7 @@ function highlightNav(route) {
     if (a.classList.contains("active")) a.setAttribute("aria-current", "page");
     else a.removeAttribute("aria-current");
   }
+  if (typeof renderMainNavigation === "function") renderMainNavigation();
 }
 
 // Capture the URL we navigated FROM so the goal-detail modal can return

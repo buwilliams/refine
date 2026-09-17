@@ -34,6 +34,7 @@ async function renderSettingsSurface(route) {
 
 async function refreshSettings(options = {}) {
   if (!isSettingsRoute()) return;
+  if (typeof mainScreens !== "undefined" && (mainScreens.active?.stale || (mainScreens.active?.dirty && !options.force))) return;
   const surface = settingsSurfaceForRoute();
   const activeSlug = readSettingsTab(surface);
   if (
@@ -44,13 +45,15 @@ async function refreshSettings(options = {}) {
   ) {
     return;
   }
+  const screenCurrent = typeof captureMainScreenRequest === "function" ? captureMainScreenRequest() : () => true;
   try {
     const nodeGeneration = captureNodeContextGeneration();
     const data = await loadSettingsSurfaceData(surface, activeSlug);
-    if (!data || !isNodeContextGenerationCurrent(nodeGeneration)) return;
+    if (!data || !screenCurrent() || !isNodeContextGenerationCurrent(nodeGeneration)) return;
     if (surface !== settingsSurfaceForRoute() || activeSlug !== readSettingsTab(surface)) return;
     drawSettingsSurface(surface, data, activeSlug);
   } catch (e) {
+    if (!screenCurrent()) return;
     const root = document.getElementById("settings-content");
     if (root) drawRuntimeRecovery(e);
   }
@@ -63,6 +66,8 @@ async function refreshActiveSettingsTab(options = {}) {
 }
 
 async function refreshSettingsTab(slug, options = {}) {
+  if (typeof mainScreens !== "undefined" && (mainScreens.active?.stale
+      || (!options.force && mainScreenHasDraft(mainScreens.active, document.querySelector(`[data-tab-pane="${slug}"]`))))) return;
   const surface = settingsSurfaceForRoute();
   const activeSlug = normalizeSettingsTab(slug, surface) || readSettingsTab(surface);
   if (!document.querySelector(`[data-tab-pane="${activeSlug}"] .settings-tab-card`)) {
@@ -77,10 +82,11 @@ async function refreshSettingsTab(slug, options = {}) {
   ) {
     return;
   }
+  const screenCurrent = typeof captureMainScreenRequest === "function" ? captureMainScreenRequest() : () => true;
   try {
     const nodeGeneration = captureNodeContextGeneration();
     const data = await loadSettingsSurfaceData(surface, activeSlug);
-    if (!data || !isNodeContextGenerationCurrent(nodeGeneration)) return;
+    if (!data || !screenCurrent() || !isNodeContextGenerationCurrent(nodeGeneration)) return;
     if (surface !== settingsSurfaceForRoute() || activeSlug !== readSettingsTab(surface)) return;
     updateSettingsTabContent(
       activeSlug,
@@ -88,16 +94,18 @@ async function refreshSettingsTab(slug, options = {}) {
       () => bindSettingsTabBody(surface, activeSlug, data),
     );
   } catch (e) {
+    if (!screenCurrent()) return;
     await showActionError(e);
   }
 }
 
 async function loadSettingsSurfaceData() {
   const nodeGeneration = captureNodeContextGeneration();
+  const screenCurrent = typeof captureMainScreenRequest === "function" ? captureMainScreenRequest() : () => true;
   const surface = arguments[0] || settingsSurfaceForRoute();
   const activeSlug = arguments[1] || readSettingsTab(surface);
   const project = await api("GET", "/api/project/status");
-  if (!isNodeContextGenerationCurrent(nodeGeneration)) return null;
+  if (!screenCurrent() || !isNodeContextGenerationCurrent(nodeGeneration)) return null;
   state.project = project;
   updateActiveNodeLabel();
   if (project.attached === false) {
@@ -126,7 +134,7 @@ async function loadSettingsSurfaceData() {
         }))
       : Promise.resolve({}),
   ]);
-  if (!isNodeContextGenerationCurrent(nodeGeneration)) return null;
+  if (!screenCurrent() || !isNodeContextGenerationCurrent(nodeGeneration)) return null;
   state.project = project;
   state.reporters = reps.reporters || [];
   updateActiveNodeLabel();

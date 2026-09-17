@@ -194,6 +194,8 @@ function navigateCommand(hash) {
   const sourceHash = state.currentRoute === "goals_detail"
     ? state.underlayHash
     : location.hash;
+  const screen = typeof mainScreenForHash === "function" ? mainScreenForHash(hash) : null;
+  if (screen) return openMainScreen(screen);
   location.hash = nodeScopeNavigationHash(hash, sourceHash);
 }
 
@@ -204,7 +206,7 @@ function registerNavigationCommand(id, title, hash, keywords = []) {
     group: "Navigate",
     aliases: [title.toLowerCase()],
     keywords,
-    run: () => navigateCommand(hash),
+    run: () => id.startsWith("nav.settings.") ? (location.hash = hash) : navigateCommand(hash),
   });
 }
 
@@ -212,6 +214,7 @@ registerNavigationCommand("nav.planning", "Project Planning", "#/planning", ["bo
 registerNavigationCommand("nav.dashboard", "Dashboard", "#/", ["home"]);
 registerNavigationCommand("nav.features", "Features", "#/features", ["feature", "planning"]);
 registerNavigationCommand("nav.goals", "Goals", "#/goals", ["issues", "work"]);
+registerNavigationCommand("nav.settings", "Settings", "#/settings/application", ["configuration"]);
 registerNavigationCommand("nav.control", "Control", "#/control", ["processes", "workers", "start", "stop"]);
 registerNavigationCommand("nav.changes", "Changes", "#/changes", ["merges"]);
 registerCommand({ id: "toolbar.logs", title: "View System logs", group: "Tools", aliases: ["logs", "activity"], run: () => openSystemLogs() });

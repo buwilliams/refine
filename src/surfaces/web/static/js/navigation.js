@@ -1,9 +1,8 @@
-// Shared application shell. Windows retain their sessions while the main screen
-// stays mounted underneath, preserving drafts and list state during tool work.
+// Shared application shell. Tool sessions and retained Main hosts have separate
+// lifetimes; switching destinations never restarts a tool.
 const workspaceNavigation = {
   mainHash: null,
   mainRoute: null,
-  mainGoal: null,
   inWindow: false,
 };
 
@@ -12,7 +11,7 @@ function initWorkspaceNavigation() {
   if (!rail) return;
   try {
     rail.classList.toggle("collapsed", localStorage.getItem("refine_rail_collapsed") === "true");
-    for (const id of ["rail-main-section", "rail-skills-section", "rail-hubs-section"]) {
+    for (const id of ["rail-skills-section", "rail-hubs-section"]) {
       const section = document.getElementById(id);
       section.open = localStorage.getItem(id) !== "false";
     }
@@ -24,6 +23,8 @@ function initWorkspaceNavigation() {
     positionRailMenus();
   }));
   initRailNewMenu();
+  initRailNewMenu("main-screen-menu");
+  initMainScreens();
   document.getElementById("rail-navigation").addEventListener("scroll", positionRailMenus);
   window.addEventListener("resize", positionRailMenus);
   document.getElementById("rail-toggle").addEventListener("click", () => {
@@ -32,7 +33,7 @@ function initWorkspaceNavigation() {
     try { localStorage.setItem("refine_rail_collapsed", rail.classList.contains("collapsed")); } catch {}
     syncRailToggle();
   });
-  for (const id of ["rail-main-section", "rail-skills-section", "rail-hubs-section"]) {
+  for (const id of ["rail-skills-section", "rail-hubs-section"]) {
     const section = document.getElementById(id);
     section.addEventListener("toggle", () => {
       try { localStorage.setItem(id, section.open); } catch {}
@@ -84,8 +85,8 @@ function initWorkspaceNavigation() {
   });
 }
 
-function initRailNewMenu() {
-  const menu = document.getElementById("rail-new-menu");
+function initRailNewMenu(id = "rail-new-menu") {
+  const menu = document.getElementById(id);
   const summary = menu.querySelector("summary");
   const items = [...menu.querySelectorAll('[role="menuitem"]')];
   menu.addEventListener("keydown", event => {
@@ -163,6 +164,7 @@ function navigateToWindow(tabId) {
 }
 
 function syncWorkspaceVisibility() {
+  renderMainNavigation();
   const isWindow = !!chatState.open && !!currentToolbarTab();
   document.getElementById("main").hidden = isWindow;
   document.getElementById("toolbar-dock").hidden = !isWindow;
@@ -208,19 +210,14 @@ function routeWorkspace(route, hash) {
       navigate();
       return true;
     }
-    if (!workspaceNavigation.inWindow) {
-      workspaceNavigation.mainRoute = state.currentRoute;
-      workspaceNavigation.mainGoal = state.currentGoal;
-      workspaceNavigation.mainHash = state.underlayHash || "#/";
-      // Filter controls update history without a hashchange; capture the URL
-      // actually left so returning to the same screen preserves its controls.
-      if (!["goals_detail", "features_detail"].includes(state.currentRoute)) {
-        try {
-          const previousHash = new URL(_prevHashURL).hash || "#/";
-          if (!previousHash.startsWith("#/windows/")) workspaceNavigation.mainHash = previousHash;
-        } catch {}
-      }
+    captureMainScreen(true);
+    if (mainScreens.active?.host.isConnected) {
+      const placeholder = mainScreens.active.host.cloneNode(false);
+      mainScreens.active.host.replaceWith(placeholder);
     }
+    workspaceNavigation.mainHash = mainScreens.active?.hash || state.underlayHash || "#/";
+    workspaceNavigation.mainRoute = mainScreens.active?.route || state.currentRoute;
+    mainScreens.epoch++;
     workspaceNavigation.inWindow = true;
     state.currentRoute = "window";
     state.currentGoal = null;
@@ -231,21 +228,12 @@ function routeWorkspace(route, hash) {
       }
     });
   }
-  const restore = workspaceNavigation.inWindow;
   workspaceNavigation.inWindow = false;
   chatState.open = false;
-  if (restore) {
-    state.currentRoute = workspaceNavigation.mainRoute;
-    state.currentGoal = workspaceNavigation.mainGoal;
-  }
   saveChatStateToStorage();
+  const handled = activateMainScreen(route, hash);
   renderWindowNavigation();
-  if (restore && hash === workspaceNavigation.mainHash && document.getElementById("main").children.length) {
-    highlightNav(state.currentRoute);
-    syncWorkspaceVisibility();
-    return true;
-  }
-  return false;
+  return handled;
 }
 
 function navigateAfterWindowClose(tabId) {
@@ -260,7 +248,6 @@ function navigateAfterWindowClose(tabId) {
 function resetWorkspaceNavigation() {
   workspaceNavigation.mainHash = null;
   workspaceNavigation.mainRoute = null;
-  workspaceNavigation.mainGoal = null;
   workspaceNavigation.inWindow = false;
   if (location.hash.startsWith("#/windows/")) location.hash = "#/";
 }

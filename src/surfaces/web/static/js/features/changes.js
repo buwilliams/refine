@@ -101,9 +101,13 @@ async function renderChanges() {
       </div>
     </details>
     <div id="changes-body" data-testid="changes-body"><p class="muted">Loading...</p></div>`;
-  bindOnce($("#changes-q"), "input", debounce(() => {
-    updateChangesFilter({ q: $("#changes-q").value, page: 1 });
-  }, 250));
+  const filterHost = document.getElementById("main");
+  const refreshFilteredChanges = debounce(() => {
+    if (document.getElementById("main") === filterHost) loadChanges();
+  }, 250);
+  bindOnce($("#changes-q"), "input", (e) => {
+    updateChangesFilter({ q: e.target.value, page: 1 }, refreshFilteredChanges);
+  });
   bindOnce($("#changes-status"), "change", (e) =>
     updateChangesFilter({ status: e.target.value, page: 1 }));
   bindOnce($("#changes-priority"), "change", (e) =>
@@ -123,7 +127,7 @@ async function renderChanges() {
   await loadChanges();
 }
 
-function updateChangesFilter(patch) {
+function updateChangesFilter(patch, refresh = loadChanges) {
   const current = changesFiltersFromHash();
   const next = {
     q: "q" in patch ? patch.q : current.q,
@@ -136,7 +140,7 @@ function updateChangesFilter(patch) {
     period: "period" in patch ? patch.period : current.period,
   };
   history.replaceState(null, "", changesHashFromFilters(next));
-  loadChanges();
+  refresh();
 }
 
 function updateChangesSort(key) {
@@ -149,6 +153,7 @@ async function loadChanges() {
   if (state.currentRoute !== "changes") return;
   if (renderNoProjectIfDetached("Changes")) return;
   const nodeGeneration = captureNodeContextGeneration();
+  const screenCurrent = typeof captureMainScreenRequest === "function" ? captureMainScreenRequest() : () => true;
   const f = changesFiltersFromHash();
   const params = new URLSearchParams();
   if (f.q) params.set("q", f.q);
@@ -160,11 +165,11 @@ async function loadChanges() {
   params.set("offset", String((f.page - 1) * f.limit));
   try {
     const data = await api("GET", "/api/changes?" + params);
-    if (!isNodeContextGenerationCurrent(nodeGeneration) || state.currentRoute !== "changes") return;
+    if (!screenCurrent() || !isNodeContextGenerationCurrent(nodeGeneration) || state.currentRoute !== "changes") return;
     if (renderNoProjectIfApiDetached(data, "Changes")) return;
     drawChanges(data, f);
   } catch (e) {
-    if (!isNodeContextGenerationCurrent(nodeGeneration)) return;
+    if (!screenCurrent() || !isNodeContextGenerationCurrent(nodeGeneration)) return;
     const root = document.getElementById("changes-body");
     if (root) root.innerHTML = `<p class="muted">${htmlEscape(e.message)}</p>`;
   }
