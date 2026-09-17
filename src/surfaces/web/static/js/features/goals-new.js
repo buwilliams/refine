@@ -52,7 +52,6 @@ function openNewGoalModal(options = {}) {
             <textarea name="prompt" data-testid="new-goal-prompt" placeholder="Describe what the agent should accomplish."></textarea>
           </div>
           <div class="form-row">
-            <label>Initial step</label><select name="status" data-testid="new-goal-status"><option value="backlog">Backlog</option><option value="draft">Draft</option></select>
             <label>Priority</label>
             <select name="priority" data-testid="new-goal-priority">
               <option value="low" selected>Low (default)</option>
@@ -195,7 +194,6 @@ function openNewGoalModal(options = {}) {
     try {
       const r = await api("POST", "/api/goals", {
         reporter: currentReporter, prompt, priority,
-        ...(fd.get("status") === "draft" ? {status:"draft"} : {}),
         ...(options.featureId ? { feature_id: options.featureId } : {}),
         duplicate_decision: effectiveDuplicateDecision,
       });

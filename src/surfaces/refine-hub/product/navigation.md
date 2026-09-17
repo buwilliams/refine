@@ -15,7 +15,6 @@ Both menus identify their context with a heading. Node, Reporter, and Tools open
 | Screen | Use it to |
 | --- | --- |
 | Dashboard | Review work that needs attention and see overall progress. |
-| Project Planning | Organize shared boards, lanes and Goal cards, and release ready work to nodes. |
 | Features | Organize related Goals around a larger outcome. |
 | Goals | Create, filter, and follow Goals and their rounds. |
 | Changes | Inspect integrated changes and available follow-up actions. |
@@ -34,7 +33,7 @@ Switching screens preserves running sessions. Returning to the underlying Main s
 
 **Files** opens the file browser and preview. **System** contains logs, health information, and diagnostics.
 
-**Project Planning** is a main screen shared across project nodes. Create a personal board for a todo list, or configure a lane to accept or release work. Cards are Goals in Draft until accepted; a lane named Done does not claim that software was delivered. [Use Project Planning](planning.md).
+**Planning** has its own navigation section below Tools and above Skills and Hubs. Its dropdown creates or selects a board; boards are shared across project nodes. Create a personal board for a todo list, or configure a lane to accept or release work. Cards are Goals in Draft until accepted; a lane named Done does not claim that software was delivered. [Use Project Planning](planning.md).
 
 ## Control: processes and target-app actions
 

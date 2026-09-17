@@ -31,4 +31,4 @@ Enabled Custom Skills use shared parameter preflight and open an agent window. H
 
 When an attached app has no valid browser-local Reporter selection, Refine asks the user to choose or create a Reporter after loading the shared list. It never infers identity from the first entry. The orientation dialog yields to other dialogs; dismissing it leaves identity unselected for that page lifetime. The Reporter row remains available for later selection.
 
-Project Planning is a main navigation destination shared across project nodes. It replaces the former Todo tool; choosing a Reporter does not filter its boards.
+The navigation section order is Main, Tools, Planning, Skills, Hubs. Planning has its own board picker and Create board action, following the Tools dropdown pattern. Boards are shared across project nodes. It replaces the former Todo tool; choosing a Reporter does not filter its boards.

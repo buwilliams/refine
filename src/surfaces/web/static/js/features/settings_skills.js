@@ -176,7 +176,7 @@ function skillTriggerLabel(source) {
   if (source === "custom") return "Custom";
   if (source === "node.startup.ready") return "Node starts";
   const match = source?.match(/^workflow\.(.+)\.(enter|exit|error|success)$/);
-  return match ? `${match[1][0].toUpperCase() + match[1].slice(1)} ${({enter:"starts",exit:"exits",error:"error",success:"success"})[match[2]]}` : source ? source.split(/[._-]/).map(word => word[0]?.toUpperCase() + word.slice(1)).join(" ") : "Unconfigured";
+  return match ? `${match[1] === "draft" && state.currentRoute !== "planning" ? "Project Planning" : match[1][0].toUpperCase() + match[1].slice(1)} ${({enter:"starts",exit:"exits",error:"error",success:"success"})[match[2]]}` : source ? source.split(/[._-]/).map(word => word[0]?.toUpperCase() + word.slice(1)).join(" ") : "Unconfigured";
 }
 
 let skillIdSequence = 0;
@@ -204,7 +204,7 @@ async function openSkillEditor(original = null, clone = false, defaults = {}) {
       api("GET", original ? `/api/skills/${encodeURIComponent(original.id)}` : "/api/skills"),
     ]);
     if (!isNodeContextGenerationCurrent(generation)) return;
-    sources = catalog.sources; revision = current.revision;
+    sources = catalog.sources.filter(source => state.currentRoute === "planning" || !source.startsWith("workflow.draft.") || source === current.trigger?.source); revision = current.revision;
     item = original ? structuredClone(current.item) : {id: newSkillId(), name: "", prompt: "", enabled: true, scope: {node_id: null}, parameters: []};
     trigger = current.trigger || {source: defaults.source || "custom", mode: "blocking", order: 0, inputs: {}, planning: defaults.planning || null};
     if (clone) { item.id = newSkillId(); item.name += " copy"; trigger = {...trigger, id: undefined}; }

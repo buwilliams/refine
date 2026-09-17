@@ -101,6 +101,11 @@ async function loadGoalDetail(goalId) {
     const { goal } = await api("GET", "/api/goals/" + goalId);
     if (!isNodeContextGenerationCurrent(nodeGeneration)
         || state.currentGoal !== goalId || goal?.id !== goalId) return;
+    if (goal.status === "draft") {
+      closeGoalDetailModal();
+      location.hash = `#/planning?card=${encodeURIComponent(goal.id)}`;
+      return;
+    }
     drawGoalDetail(goal);
   } catch (e) {
     if (!isNodeContextGenerationCurrent(nodeGeneration) || state.currentGoal !== goalId) return;
@@ -353,7 +358,7 @@ function drawGoalDetail(goal) {
           <details class="nav-menu goal-action-menu goal-step-menu" data-testid="goal-step-menu"${stepMenuOpen ? " open" : ""}>
             <summary class="btn goal-action-more" aria-label="Set workflow step" data-testid="goal-step-toggle"></summary>
             <div class="nav-menu-panel goal-action-panel">
-            ${["draft", "backlog", "todo", "plan", "implement", "quality", "governance", "review", "done", "failed", "cancelled"].map(step =>
+            ${["backlog", "todo", "plan", "implement", "quality", "governance", "review", "done", "failed", "cancelled"].map(step =>
               `<button type="button" class="nav-menu-item" data-goal-step="${step}" data-testid="goal-step-${step}">${workflowStatusLabel(step)}</button>`).join("")}
             <p class="muted small">Moves stop active agents. Done changes status without merging code.</p>
             </div>

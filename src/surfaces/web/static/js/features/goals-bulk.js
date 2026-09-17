@@ -7,7 +7,6 @@
 const BULK_PRIORITY_OPTIONS = ["low", "medium", "high"];
 const BULK_STATUS_OPTIONS = [
   { value: "__last_workflow_state", label: "(Last workflow state)" },
-  { value: "draft", label: "draft" },
   { value: "backlog", label: "backlog" },
   { value: "todo", label: "todo" },
   { value: "plan", label: "plan" },
@@ -30,7 +29,7 @@ async function submitGoalsBulkAction(payload) {
 
 function goalsBulkFilterFromHash() {
   const f = goalsFilterFromHash();
-  const filter = {};
+  const filter = {exclude_draft: true};
   for (const key of ["status", "q", "reporter", "assignee", "feature", "node"]) {
     if (f[key]) filter[key] = f[key];
   }

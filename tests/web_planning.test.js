@@ -147,7 +147,7 @@ test("Project Planning replaces Todo navigation and exposes Draft", () => {
 });
 
 test(
-  "Draft Goal detail shows planning description and board without inventing a Round",
+  "Draft Goal links return to Project Planning",
   { skip: SKIP },
   async () => {
     const { openApp, apiFixture, GOAL } = require("./support/web_app");
@@ -168,21 +168,8 @@ test(
     });
     try {
       await app.page.goto(`${app.origin}/#/goals/GOAL1`);
-      await app.page.getByTestId("goal-description").waitFor();
-      assert.match(
-        await app.page.getByTestId("goal-description").innerText(),
-        /Research the onboarding flow/,
-      );
-      assert.equal(
-        await app.page
-          .getByRole("link", { name: "Open on project board" })
-          .getAttribute("href"),
-        "#/planning?board=shared",
-      );
-      assert.match(
-        await app.page.getByTestId("goal-detail").innerText(),
-        /Rounds \(0\)/,
-      );
+      await app.page.waitForURL(/#\/planning\?card=GOAL1$/);
+      assert.equal(await app.page.getByTestId("goal-detail").count(), 0);
       assert.deepEqual(app.pageErrors, []);
     } finally {
       await app.close();

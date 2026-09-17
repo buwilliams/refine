@@ -106,3 +106,72 @@ fn draft_goal_api_preserves_feature_and_reporter_without_creating_a_round() {
     assert_eq!(goal["round_count"], 0);
     let _ = fs::remove_dir_all(temp);
 }
+
+#[test]
+fn planning_drafts_are_excluded_before_workflow_pagination_and_bulk_selection() {
+    let temp = unique_temp_dir("http-planning-workflow-scope");
+    let root = temp.join(".refine");
+    let service = FileWorkItemService::new(&root);
+    for id in ["DRAFT1", "DRAFT2", "ACTIVE1"] {
+        service
+            .create_goal_summary("Shared search phrase", Some(id))
+            .unwrap();
+        if id.starts_with("DRAFT") {
+            service
+                .set_goal_status_unchecked(id, &GoalStatus::Draft)
+                .unwrap();
+        }
+    }
+    let mut server = server_with_projection();
+    server.target_root = Some(temp.clone());
+    let response = server.handle(ApiRequest {
+        method: "GET".into(),
+        path: "/api/goals?node=all&exclude_draft=1&limit=1&facets=1&q=Shared".into(),
+        body: None,
+    });
+    assert_eq!(response.status, 200, "{}", response.body);
+    assert_eq!(response.body["goals"].as_array().unwrap().len(), 1);
+    assert_eq!(response.body["goals"][0]["id"], "ACTIVE1");
+    assert_eq!(response.body["page"]["total"], 1);
+    assert!(
+        response.body["facets"]["status_counts"]
+            .get("draft")
+            .is_none()
+    );
+    let search = server.handle(ApiRequest {
+        method: "GET".into(),
+        path: "/api/goals?node=all&q=Shared".into(),
+        body: None,
+    });
+    assert_eq!(
+        search.body["page"]["total"], 3,
+        "Planning can still search all Goals"
+    );
+    for selected_ids in [None, Some(vec!["DRAFT1".into(), "ACTIVE1".into()])] {
+        let selection = crate::application::work_items::BulkGoalSelection {
+            filter: crate::application::work_items::BulkGoalFilter {
+                exclude_draft: true,
+                ..Default::default()
+            },
+            selected_ids,
+            ..Default::default()
+        };
+        let changed = service
+            .bulk_update_goals(
+                selection,
+                crate::application::work_items::BulkGoalUpdate::Reporter("Reviewer".into()),
+            )
+            .unwrap();
+        assert_eq!(changed.updated, 1);
+        assert_ne!(
+            service
+                .show_goal_summary("DRAFT1")
+                .unwrap()
+                .goal
+                .reporter
+                .as_deref(),
+            Some("Reviewer")
+        );
+    }
+    let _ = fs::remove_dir_all(temp);
+}

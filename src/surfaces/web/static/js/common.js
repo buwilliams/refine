@@ -20,8 +20,8 @@ const state = {
   screenDataCache: new Map(),
 };
 
+// Draft belongs to Project Planning, before the workflow begins.
 const WORKFLOW_STATUSES = [
-  "draft",
   "backlog",
   "todo",
   "plan",
@@ -233,7 +233,7 @@ function defaultScreenDataPaths() {
     "/api/project/status",
     "/api/dashboard?node=current",
     "/api/features?limit=50&offset=0",
-    "/api/goals?limit=50&offset=0&facets=1",
+    "/api/goals?exclude_draft=1&limit=50&offset=0&facets=1",
     "/api/activity?limit=50&offset=0&facets=1",
     "/api/changes?limit=50&offset=0",
     "/api/nodes",

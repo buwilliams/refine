@@ -10,7 +10,7 @@ const FEATURES_DEFAULT_DIR = {
   name: "asc", status: "asc", reporter: "asc", assignee: "asc", node: "asc", updated: "desc",
 };
 const FEATURES_STATUS_OPTIONS = [
-  "", "draft", "backlog", "todo", "plan", "implement", "quality", "governance",
+  "", "backlog", "todo", "plan", "implement", "quality", "governance",
   "review", "done", "failed", "cancelled",
 ];
 const FEATURE_WORKFLOW_PROTECTED_STATUSES = new Set([
@@ -593,6 +593,7 @@ async function renderFeatureDetail(route) {
 }
 
 function renderFeatureGoalTable(goals, options = {}) {
+  goals = goals.filter(goal => goal.status !== "draft");
   const actions = !!options.actions;
   const pageSize = Math.max(0, parseInt(options.pageSize || "0", 10) || 0);
   const pageNo = Math.max(1, parseInt(options.page || "1", 10) || 1);
@@ -708,7 +709,7 @@ function featureGoalActionIcon(name) {
 function featureWorkflowEligibleCount(feature, targetStatus) {
   return (feature?.goals || []).filter((goal) => {
     const status = goal.status || "";
-    return status !== targetStatus && !FEATURE_WORKFLOW_PROTECTED_STATUSES.has(status);
+    return status !== "draft" && status !== targetStatus && !FEATURE_WORKFLOW_PROTECTED_STATUSES.has(status);
   }).length;
 }
 
@@ -774,7 +775,7 @@ function openFeatureModal(feature = null, options = {}) {
   closeFeatureModal({ navigateAway: false });
   const root = document.createElement("div");
   root.className = "modal-backdrop";
-  const goals = feature?.goals || [];
+  const goals = (feature?.goals || []).filter(goal => goal.status !== "draft");
   const goalPage = Math.max(1, parseInt(options.goalPage || "1", 10) || 1);
   const navigateAway = !!options.navigateAway;
   const nodeDisplayName = feature

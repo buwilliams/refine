@@ -20,6 +20,9 @@ pub(super) fn bulk_goal_matches_filter(
     goal: &GoalSummaryProjection,
     filter: &BulkGoalFilter,
 ) -> bool {
+    if filter.exclude_draft && goal.goal.status == GoalStatus::Draft {
+        return false;
+    }
     if let Some(status) = filter
         .status
         .as_deref()

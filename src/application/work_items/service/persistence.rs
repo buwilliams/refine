@@ -481,6 +481,9 @@ impl FileWorkItemService {
                 })
                 .collect()
         };
+        if selection.filter.exclude_draft {
+            goals.retain(|goal| goal.goal.status != GoalStatus::Draft);
+        }
         goals.sort_by(|a, b| a.goal.id.cmp(&b.goal.id));
         let mut skipped_details = Vec::new();
         if !matches!(status_protection, BulkGoalStatusProtection::None) {

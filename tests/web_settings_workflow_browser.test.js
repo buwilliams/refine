@@ -52,9 +52,9 @@ test('Workflow covers every step and hook, system events, custom actions, and sh
     const {page} = app;
     await page.goto(`${app.origin}/#/settings/workflow`);
     await page.locator('[data-workflow-step="plan"]').waitFor();
-    assert.equal(await page.locator('[data-workflow-step]').count(), 11);
+    assert.equal(await page.locator('[data-workflow-step]').count(), 10);
     assert.equal(await page.locator('.settings-tabs [href="#/settings/skills"]').count(), 0);
-    for (const step of steps) {
+    for (const step of steps.filter(step => step !== "draft")) {
       await page.locator(`[data-workflow-step="${step}"]`).click();
       assert.equal(await page.locator('[data-workflow-hook]').count(), 4);
       for (const hook of ['enter', 'success', 'error', 'exit']) {

@@ -48,6 +48,7 @@ impl ProjectionQuery for ProjectionSnapshot {
         let scoped_goals = self
             .goals
             .values()
+            .filter(|projection| projection.goal.status != GoalStatus::Draft)
             .filter(|projection| {
                 goal_matches_node(
                     projection.goal.node_id.as_deref(),
@@ -57,7 +58,12 @@ impl ProjectionQuery for ProjectionSnapshot {
             })
             .collect::<Vec<_>>();
         let counts = goal_status_counts(scoped_goals.iter().map(|goal| &goal.goal.status));
-        let all_node_counts = goal_status_counts(self.goals.values().map(|goal| &goal.goal.status));
+        let all_node_counts = goal_status_counts(
+            self.goals
+                .values()
+                .filter(|goal| goal.goal.status != GoalStatus::Draft)
+                .map(|goal| &goal.goal.status),
+        );
         let mut reporter_stats: BTreeMap<String, BTreeMap<GoalStatus, usize>> = BTreeMap::new();
         let mut assignee_stats: BTreeMap<String, BTreeMap<GoalStatus, usize>> = BTreeMap::new();
         for goal in &scoped_goals {
@@ -247,6 +253,9 @@ fn goal_matches(
     query: &GoalProjectionQuery,
 ) -> bool {
     let goal = &projection.goal;
+    if query.exclude_draft && goal.status == GoalStatus::Draft {
+        return false;
+    }
     if query
         .status
         .as_ref()

@@ -53,6 +53,11 @@ function planningSubmitter(operation) {
   };
 }
 async function renderPlanning() {
+  if (
+    typeof renderNoProjectIfDetached === "function" &&
+    renderNoProjectIfDetached("Project Planning")
+  )
+    return;
   const main = document.getElementById("main");
   main.innerHTML =
     '<section class="planning-page"><h1>Project Planning</h1><p role="status">Loading shared boards…</p></section>';
@@ -71,7 +76,20 @@ async function refreshPlanning() {
       !isNodeContextGenerationCurrent(nodeGeneration)
     )
       return;
+    if (document.querySelector(".planning-composer, .planning-dragging"))
+      return;
     planningSnapshot = snapshot;
+    const linkedCard = snapshot.cards.find(
+      (c) =>
+        c.placement.goal_id ===
+        new URLSearchParams(location.hash.split("?")[1] || "").get("card"),
+    );
+    if (
+      linkedCard?.placement.archived ||
+      snapshot.boards.find((b) => b.id === linkedCard?.placement.board_id)
+        ?.archived
+    )
+      planningShowArchived = true;
     const boards = snapshot.boards.filter(
       (b) => planningShowArchived || !b.archived,
     );
@@ -79,8 +97,13 @@ async function refreshPlanning() {
       location.hash.split("?")[1] || "",
     ).get("board");
     let board =
-      boards.find((b) => b.id === (requested || planningBoardId)) || boards[0];
+      boards.find(
+        (b) =>
+          b.id ===
+          (requested || linkedCard?.placement.board_id || planningBoardId),
+      ) || boards[0];
     planningBoardId = board?.id || null;
+    renderPlanningNavigation(snapshot);
     const esc = htmlEscape;
     const actions = snapshot.actions.filter(
       (a) =>
@@ -93,36 +116,68 @@ async function refreshPlanning() {
               c.placement.goal_id === a.command.goal_id,
           )),
     );
+    const previousPage = document.querySelector(".planning-page");
+    const previousScroll =
+      previousPage?.dataset.boardId === board?.id
+        ? previousPage.querySelector(".planning-lanes")?.scrollLeft || 0
+        : 0;
+    const focused = document.activeElement;
+    const focusAttribute = focused?.closest(".planning-page")
+      ? [...focused.attributes].find((attribute) =>
+          attribute.name.startsWith("data-"),
+        )
+      : null;
     document.getElementById("main").innerHTML =
-      `<section class="planning-page" data-testid="planning-page">
-      <div class="actions"><h1>Project Planning</h1><span class="spacer"></span><button data-planning-new-board>New board</button><button class="secondary" data-planning-refresh>Refresh</button></div>
-      <p class="muted">Shared across project nodes. Lanes organize cards; badges show Goal progress.</p>
-      <div class="actions"><label>Board <select data-planning-board aria-label="Board">${boards.map((b) => `<option value="${esc(b.id)}" ${b.id === board?.id ? "selected" : ""}>${esc(b.name)}${b.archived ? " (archived)" : ""}</option>`).join("")}</select></label>
-      <label><input type="checkbox" data-planning-archived ${planningShowArchived ? "checked" : ""}> Show archived</label>
+      `<section class="planning-page" data-testid="planning-page" data-board-id="${esc(board?.id || "")}">
+      <div class="planning-heading"><div><h1>Project Planning</h1><p class="muted">A shared space for ideas, personal tasks, and work ready for your nodes.</p></div><div class="actions"><button data-planning-new-board>New board</button><button class="secondary" data-planning-refresh>Refresh</button></div></div>
+      <div class="planning-toolbar"><div class="planning-board-heading"><h2>${esc(board?.name || "Your boards")}</h2><span class="muted">${board ? `${board.lanes.length} lanes · ${snapshot.cards.filter((c) => c.placement.board_id === board.id && !c.placement.archived).length} cards` : "Create your first board to get started"}</span></div>
+      <button type="button" class="planning-archive-toggle" role="switch" aria-checked="${planningShowArchived}" data-planning-archived><span class="planning-toggle-track" aria-hidden="true"></span>Show archived</button>
       ${board ? '<button class="secondary" data-planning-board-settings>Board settings</button><button data-planning-new-lane>Add lane</button>' : ""}
       ${!snapshot.migration ? '<button class="secondary" data-planning-migrate>Import Todo Lists</button>' : ""}</div>
+      ${board?.archived ? '<p class="muted">This board is archived. Restore it in Board settings to add new cards.</p>' : ""}
       ${(snapshot.errors || []).map((error) => `<p role="alert">${esc(error)}</p>`).join("")}
-      ${actions.length ? `<section class="planning-actions" aria-label="Planning actions">${actions.map((a) => `<div role="status"><strong>${esc(a.state)}</strong> · ${esc(a.command.operation)} · ${esc(a.message || `Processing on ${a.owner}`)} <button class="secondary" data-planning-action="${esc(a.id)}">Details</button>${!["failed", "cancelled"].includes(a.state) ? `<button class="secondary" data-planning-cancel="${esc(a.id)}">Cancel</button>` : ""}</div>`).join("")}</section>` : ""}
+      ${actions.length ? `<section class="planning-actions" aria-label="Planning actions">${actions.map((a) => `<div role="status"><strong>${esc({ queued: "Queued", waiting: "Waiting", failed: "Needs attention", cancelled: "Cancelled" }[a.state] || a.state)}</strong> · ${esc({ "card.create": "Create card", "card.move": "Move card", "card.attach": "Add existing Goal", "card.apply": "Release card", "card.update": "Update card" }[a.command.operation] || "Board update")} · ${esc(a.message || `Processing on ${a.owner}`)} <button class="secondary" data-planning-action="${esc(a.id)}">Details</button>${!["failed", "cancelled"].includes(a.state) ? `<button class="secondary" data-planning-cancel="${esc(a.id)}">Cancel</button>` : ""}</div>`).join("")}</section>` : ""}
       ${
         board
           ? `<div class="planning-lanes" aria-label="${esc(board.name)}">${board.lanes
               .map(
                 (
                   lane,
-                ) => `<section class="planning-lane" data-lane="${esc(lane.id)}" aria-label="${esc(lane.name)}">
-        <header><h2>${esc(lane.name)}</h2><button class="secondary" data-lane-settings="${esc(lane.id)}" aria-label="Settings for ${esc(lane.name)}">⋯</button></header>
-        ${lane.action !== "none" ? `<p class="planning-lane-action">${lane.action === "release" ? "Releases work" : "Accepts into Backlog"}</p>` : ""}
+                ) => `<section class="planning-lane" data-lane="${esc(lane.id)}" data-lane-action="${esc(lane.action)}" aria-label="${esc(lane.name)}">
+        <header><h2>${esc(lane.name)} <span class="planning-lane-count">${planningCards(board.id, lane.id).length}</span></h2><button class="secondary" data-lane-settings="${esc(lane.id)}" aria-label="Settings for ${esc(lane.name)}">⋯</button></header>
+        <p class="planning-lane-action">${lane.action === "release" ? "Releases work" : lane.action === "accept_into_backlog" ? "Accepts into Backlog" : "Organize ideas and tasks"}</p>
         <div class="planning-card-list">${planningCards(board.id, lane.id)
           .map((card) => planningCardHtml(card, board))
           .join("")}</div>
-        <button class="secondary" data-planning-add="${esc(lane.id)}">Add card</button><button class="secondary" data-planning-attach="${esc(lane.id)}">Add existing Goal</button>
+        <div class="planning-lane-footer"><button class="secondary" data-planning-add="${esc(lane.id)}" ${board.archived ? "disabled" : ""}><span aria-hidden="true">＋</span> Add card</button></div>
       </section>`,
               )
               .join("")}</div>`
-          : "<p>Create a board to collect ideas, organize personal tasks, or release work to your nodes.</p>"
+          : '<div class="planning-empty"><h2>Make room for your next idea</h2><p>Create a board, add lanes, and collect cards. Choose when your ideas enter the workflow.</p></div>'
       }
       </section>`;
     bindPlanning(board);
+    const lanes = document.querySelector(".planning-lanes");
+    if (lanes) lanes.scrollLeft = previousScroll;
+    if (focusAttribute) {
+      [...document.querySelectorAll(`.planning-page [${focusAttribute.name}]`)]
+        .find(
+          (element) =>
+            element.getAttribute(focusAttribute.name) ===
+              focusAttribute.value && element.className === focused.className,
+        )
+        ?.focus({ preventScroll: true });
+    }
+    const requestedCard = new URLSearchParams(
+      location.hash.split("?")[1] || "",
+    ).get("card");
+    if (requestedCard) {
+      const el = [...document.querySelectorAll("[data-card]")].find(
+        (el) => el.dataset.card === requestedCard,
+      );
+      el?.focus();
+      el?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    }
   } catch (error) {
     if (state.currentRoute === "planning") showActionError(error);
   }
@@ -131,14 +186,14 @@ function planningCardHtml(card, board) {
   const p = card.placement,
     goal = card.goal || {},
     esc = htmlEscape;
-  return `<article class="planning-card" draggable="true" data-card="${esc(p.goal_id)}" tabindex="0" aria-label="${esc(goal.name || p.goal_id)}">
-    <a href="#/goals/${encodeURIComponent(p.goal_id)}">${esc(goal.name || p.goal_id)}</a>
-    <span class="badge status-${esc(goal.status || "draft")}">${esc(workflowStatusLabel(goal.status || "draft"))}</span>
+  return `<article class="planning-card" draggable="${!board.archived}" data-card="${esc(p.goal_id)}" tabindex="0" aria-label="${esc(goal.name || p.goal_id)}">
+    ${goal.status === "draft" ? `<button class="planning-card-title" data-card-edit="${esc(p.goal_id)}">${esc(goal.name || p.goal_id)}</button>` : `<a class="planning-card-title" href="#/goals/${encodeURIComponent(p.goal_id)}">${esc(goal.name || p.goal_id)}</a>`}
+    <span class="planning-status status-${esc(goal.status || "draft")}">${esc(workflowStatusLabel(goal.status || "draft"))}</span>
     ${goal.description ? `<p>${esc(goal.description.slice(0, 180))}</p>` : ""}
     ${card.error ? `<p role="alert">${esc(card.error)}</p>` : ""}
-    <p class="muted">${esc(goal.reporter || "No Reporter")} · ${esc(goal.priority || "low")} priority<br>Current node: ${esc(goal.node_display_name || goal.node_id || "unknown")}</p>
+    <p class="planning-card-meta">${esc(goal.reporter || "No Reporter")} · ${esc(goal.priority || "low")} priority${goal.status !== "draft" ? `<br>Node: ${esc(goal.node_display_name || goal.node_id || "unknown")}` : ""}</p>
     <div class="actions">${card.error ? `<button class="secondary" data-card-detach="${esc(p.goal_id)}">Remove from board</button>` : `<button class="secondary" data-card-edit="${esc(p.goal_id)}">Edit</button>`}<button class="secondary" data-card-move="${esc(p.goal_id)}">Move</button><button class="secondary" data-card-archive="${esc(p.goal_id)}">${p.archived ? "Restore" : "Archive"}</button></div>
-    ${board.lanes.find((l) => l.id === p.lane_id)?.action !== "none" ? `<button class="secondary" data-card-apply="${esc(p.goal_id)}">Apply lane action</button>` : ""}</article>`;
+    ${board.lanes.find((l) => l.id === p.lane_id)?.action !== "none" ? `<button class="secondary" data-card-apply="${esc(p.goal_id)}">${board.lanes.find((l) => l.id === p.lane_id)?.action === "release" ? "Release to execution" : "Send to Backlog"}</button>` : ""}</article>`;
 }
 function bindPlanning(board) {
   const root = document.querySelector(".planning-page");
@@ -153,13 +208,14 @@ function bindPlanning(board) {
   root.querySelector("[data-planning-new-board]").onclick = () =>
     planningEdit("New board", "board.create", {}, { name: "", routing: "" });
   root.querySelector("[data-planning-refresh]").onclick = refreshPlanning;
-  root.querySelector("[data-planning-board]").onchange = (e) => {
-    planningBoardId = e.target.value;
-    location.hash = `#/planning?board=${encodeURIComponent(planningBoardId)}`;
-  };
-  root.querySelector("[data-planning-archived]").onchange = (e) => {
-    planningShowArchived = e.target.checked;
-    refreshPlanning();
+  root.querySelector("[data-planning-archived]").onclick = async (event) => {
+    planningShowArchived = !planningShowArchived;
+    event.currentTarget.setAttribute(
+      "aria-checked",
+      String(planningShowArchived),
+    );
+    await refreshPlanning();
+    document.querySelector("[data-planning-archived]")?.focus();
   };
   root.querySelector("[data-planning-migrate]")?.addEventListener(
     "click",
@@ -231,33 +287,10 @@ function bindPlanning(board) {
         );
       }),
   );
-  root.querySelectorAll("[data-planning-add]").forEach(
-    (el) =>
-      (el.onclick = () =>
-        planningEdit(
-          "New card",
-          "card.create",
-          { board_id: board.id, lane_id: el.dataset.planningAdd },
-          {
-            name: "",
-            description: "",
-            reporter: state.lastReporter || "",
-            routing: "",
-          },
-        )),
-  );
-  root
-    .querySelectorAll("[data-planning-attach]")
-    .forEach(
-      (el) =>
-        (el.onclick = () =>
-          planningEdit(
-            "Add existing Goal",
-            "card.attach",
-            { board_id: board.id, lane_id: el.dataset.planningAttach },
-            { goal_id: "" },
-          )),
-    );
+  root.querySelectorAll("[data-planning-add]").forEach((button) => {
+    button.onclick = () =>
+      planningOpenComposer(board, button.dataset.planningAdd, button);
+  });
   const card = (id) =>
     planningSnapshot.cards.find((c) => c.placement.goal_id === id);
   const fields = (c) => ({
@@ -311,10 +344,35 @@ function bindPlanning(board) {
           planningCommand("card.apply", fields(card(el.dataset.cardApply))),
         )),
     );
+  let draggedId = null;
+  const clearDrop = () => {
+    root
+      .querySelectorAll(
+        ".planning-drop-before, .planning-drop-after, .planning-drop-lane",
+      )
+      .forEach((el) =>
+        el.classList.remove(
+          "planning-drop-before",
+          "planning-drop-after",
+          "planning-drop-lane",
+        ),
+      );
+  };
   root.querySelectorAll("[data-card]").forEach((el) => {
     el.ondragstart = (e) => {
-      e.dataTransfer.setData("text/refine-goal", el.dataset.card);
+      if (board.archived || e.target.closest("input, textarea, select")) {
+        e.preventDefault();
+        return;
+      }
+      draggedId = el.dataset.card;
+      e.dataTransfer.setData("text/refine-goal", draggedId);
       e.dataTransfer.effectAllowed = "move";
+      requestAnimationFrame(() => el.classList.add("planning-dragging"));
+    };
+    el.ondragend = () => {
+      draggedId = null;
+      el.classList.remove("planning-dragging");
+      clearDrop();
     };
     el.onkeydown = (e) => {
       if (e.target === el && e.key.toLowerCase() === "m") {
@@ -323,45 +381,255 @@ function bindPlanning(board) {
       }
     };
   });
-  root.querySelectorAll("[data-lane]").forEach((el) => {
-    el.ondragover = (e) => {
-      if ([...e.dataTransfer.types].includes("text/refine-goal")) {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = "move";
-      }
+  root.querySelectorAll("[data-lane]").forEach((lane) => {
+    const destination = (e) => {
+      const peers = [...lane.querySelectorAll("[data-card]")].filter(
+        (el) => el.dataset.card !== draggedId,
+      );
+      const before = peers.find(
+        (el) =>
+          e.clientY <
+          el.getBoundingClientRect().top +
+            el.getBoundingClientRect().height / 2,
+      );
+      return { peers, before };
     };
-    el.ondrop = run((e) => {
+    lane.ondragover = (e) => {
+      if (![...e.dataTransfer.types].includes("text/refine-goal")) return;
       e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      clearDrop();
+      lane.classList.add("planning-drop-lane");
+      const { peers, before } = destination(e);
+      if (before) before.classList.add("planning-drop-before");
+      else peers.at(-1)?.classList.add("planning-drop-after");
+      const viewport = root.querySelector(".planning-lanes");
+      const bounds = viewport.getBoundingClientRect();
+      if (e.clientX < bounds.left + 48) viewport.scrollLeft -= 24;
+      if (e.clientX > bounds.right - 48) viewport.scrollLeft += 24;
+    };
+    lane.ondragleave = (e) => {
+      if (!lane.contains(e.relatedTarget)) clearDrop();
+    };
+    lane.ondrop = run(async (e) => {
+      e.preventDefault();
+      clearDrop();
       const c = card(e.dataTransfer.getData("text/refine-goal"));
       if (!c) return;
-      const before = e.target.closest("[data-card]");
-      const peers = planningCards(board.id, el.dataset.lane).filter(
-        (item) => item.placement.goal_id !== c.placement.goal_id,
-      );
-      const index = before
-        ? peers.findIndex(
-            (item) => item.placement.goal_id === before.dataset.card,
-          )
-        : -1;
+      draggedId = c.placement.goal_id;
+      const { peers, before } = destination(e);
+      const index = before ? peers.indexOf(before) : peers.length;
+      const previous = index
+        ? card(peers[index - 1].dataset.card).placement.position
+        : null;
+      const next = before ? card(before.dataset.card).placement.position : null;
       const position =
-        index >= 0
-          ? (peers[index].placement.position +
-              (index
-                ? peers[index - 1].placement.position
-                : peers[index].placement.position - 2048)) /
-            2
-          : Math.max(
-              Date.now(),
-              ...peers.map((item) => item.placement.position),
-            ) + 1024;
-      return planningCommand(
+        previous == null
+          ? (next ?? 1024) - 1024
+          : next == null
+            ? previous + 1024
+            : (previous + next) / 2;
+      draggedId = null;
+      await planningCommand(
         "card.move",
-        { ...fields(c), lane_id: el.dataset.lane },
+        { ...fields(c), lane_id: lane.dataset.lane },
         { position },
       );
     });
   });
 }
+
+function planningOpenComposer(board, laneId, button) {
+  document.querySelectorAll(".planning-composer").forEach((el) => el._close());
+  const root = document.createElement("form");
+  root.className = "planning-composer";
+  const listId = `planning-suggestions-${planningRequestId()}`;
+  const hintId = `${listId}-hint`;
+  root.innerHTML = `<label class="visually-hidden" for="${listId}-input">Card title or existing Goal</label><input id="${listId}-input" autocomplete="off" placeholder="Write an idea or find a Goal…" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="${listId}" aria-describedby="${hintId}" maxlength="500"><div id="${listId}" role="listbox" aria-label="Create or choose a card"></div><p class="planning-composer-hint" id="${hintId}">Enter to create · ↑ ↓ to choose · Esc to close</p><p class="form-error" role="status" data-composer-status></p><button type="button" class="subtle" data-composer-close>Cancel</button>`;
+  button.hidden = true;
+  button.parentElement.before(root);
+  const input = root.querySelector("input"),
+    list = root.querySelector('[role="listbox"]'),
+    status = root.querySelector("[data-composer-status]");
+  let timer,
+    sequence = 0,
+    choices = [],
+    active = 0,
+    busy = false;
+  const generation = captureNodeContextGeneration();
+  const submitCreate = planningSubmitter("card.create"),
+    submitAttach = planningSubmitter("card.attach"),
+    submitMove = planningSubmitter("card.move");
+  root._close = () => {
+    clearTimeout(timer);
+    sequence++;
+    root.remove();
+    button.hidden = false;
+    button.focus();
+  };
+  root.querySelector("[data-composer-close]").onclick = root._close;
+  const draw = () => {
+    input.setAttribute("aria-expanded", String(choices.length > 0));
+    if (choices.length)
+      input.setAttribute("aria-activedescendant", `${listId}-${active}`);
+    else input.removeAttribute("aria-activedescendant");
+    list.innerHTML = choices
+      .map(
+        (choice, i) =>
+          `<div role="option" id="${listId}-${i}" aria-selected="${active === i}" data-choice="${i}"><strong>${htmlEscape(choice.goal ? choice.goal.name : `Create “${input.value.trim()}”`)}</strong><span>${htmlEscape(choice.subtitle)}</span></div>`,
+      )
+      .join("");
+    list.querySelectorAll("[data-choice]").forEach((option) => {
+      option.onmousedown = (e) => e.preventDefault();
+      option.onclick = () => choose(Number(option.dataset.choice));
+    });
+  };
+  const choose = async (index) => {
+    if (busy || !choices[index]) return;
+    if (!isNodeContextGenerationCurrent(generation)) {
+      status.textContent =
+        "Project or node changed. Reopen Add card before saving.";
+      return;
+    }
+    if (choices[index].openOnly) {
+      const choice = choices[index];
+      root._close();
+      location.hash = `#/planning?board=${encodeURIComponent(choice.placement.board_id)}&card=${encodeURIComponent(choice.goal.id)}`;
+      return;
+    }
+    busy = true;
+    input.disabled = true;
+    root.querySelector("[data-composer-close]").disabled = true;
+    root.setAttribute("aria-busy", "true");
+    const choice = choices[index],
+      name = input.value.trim();
+    status.textContent = choice.goal ? "Adding Goal…" : "Creating card…";
+    try {
+      const args = { board_id: board.id, lane_id: laneId };
+      const action = choice.placement
+        ? await submitMove({
+            ...args,
+            goal_id: choice.goal.id,
+            expected_revision: choice.placement.revision,
+          })
+        : choice.goal
+          ? await submitAttach({ ...args, goal_id: choice.goal.id })
+          : await submitCreate(args, {
+              name,
+              description: name,
+              reporter: state.lastReporter || "",
+            });
+      root._close();
+      await refreshPlanning();
+      if (typeof toast === "function")
+        toast(
+          action.state === "complete"
+            ? "Card added"
+            : "Card queued — it will appear when ready.",
+          "info",
+        );
+    } catch (error) {
+      status.textContent = error.message;
+      input.disabled = false;
+      input.focus();
+    } finally {
+      busy = false;
+      root.querySelector("[data-composer-close]").disabled = false;
+      root.removeAttribute("aria-busy");
+    }
+  };
+  input.oninput = () => {
+    clearTimeout(timer);
+    const ticket = ++sequence,
+      query = input.value.trim();
+    active = 0;
+    choices = query
+      ? [
+          {
+            subtitle:
+              "New card in " + board.lanes.find((l) => l.id === laneId).name,
+          },
+        ]
+      : [];
+    status.textContent = "";
+    draw();
+    if (!query) return;
+    timer = setTimeout(async () => {
+      try {
+        const result = await api(
+          "GET",
+          `/api/goals?q=${encodeURIComponent(query)}&node=all&limit=8`,
+          undefined,
+          { cache: false },
+        );
+        if (
+          ticket !== sequence ||
+          !root.isConnected ||
+          !isNodeContextGenerationCurrent(generation)
+        )
+          return;
+        const matches = (result.goals || []).flatMap((goal) => {
+          const placement = planningSnapshot.cards.find(
+            (c) => c.placement.goal_id === goal.id,
+          )?.placement;
+          const from =
+            placement &&
+            planningSnapshot.boards.find((b) => b.id === placement.board_id);
+          return [
+            {
+              goal,
+              placement,
+              openOnly:
+                placement?.archived ||
+                from?.archived ||
+                (placement?.board_id === board.id &&
+                  placement.lane_id === laneId),
+              subtitle:
+                placement?.archived || from?.archived
+                  ? "Archived · Open on board"
+                  : placement?.board_id === board.id &&
+                      placement.lane_id === laneId
+                    ? "Already in this lane · Open card"
+                    : placement
+                      ? `Move from ${from?.name || "another board"}`
+                      : `${workflowStatusLabel(goal.status)} · Add existing Goal`,
+            },
+          ];
+        });
+        choices = [choices[0], ...matches];
+        active = Math.min(active, choices.length - 1);
+        draw();
+      } catch (error) {
+        if (ticket === sequence && root.isConnected)
+          status.textContent =
+            "Search unavailable. You can still create a card.";
+      }
+    }, 180);
+  };
+  input.onkeydown = (e) => {
+    if (["ArrowDown", "ArrowUp"].includes(e.key) && choices.length) {
+      e.preventDefault();
+      active =
+        (active + (e.key === "ArrowDown" ? 1 : -1) + choices.length) %
+        choices.length;
+      draw();
+      document
+        .getElementById(`${listId}-${active}`)
+        ?.scrollIntoView({ block: "nearest" });
+    }
+    if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopPropagation();
+      root._close();
+    }
+  };
+  root.onsubmit = (e) => {
+    e.preventDefault();
+    choose(active);
+  };
+  input.focus();
+}
+
 function planningMove(card) {
   const p = card.placement,
     esc = htmlEscape;
@@ -383,6 +651,7 @@ function planningMove(card) {
   };
   populate();
   root.querySelector("[data-board]").onchange = populate;
+  root.classList.add("planning-editor");
   const submit = planningSubmitter("card.move");
   root.querySelector("[data-planning-save]").onclick = () =>
     hubAction(root, async () => {
@@ -424,9 +693,11 @@ function planningEdit(title, operation, fields, values, board) {
                 `<option value="${id}" ${id === value ? "selected" : ""}>${label}</option>`,
             )
             .join("")}</select>`
-        : key === "description"
-          ? `<textarea name="description" rows="6">${esc(value)}</textarea>`
-          : `<input name="${key}" value="${esc(value)}" ${key === "name" ? "required" : ""} ${key === "routing" ? 'placeholder="Inherit, auto, or node ID"' : ""}>`;
+        : key === "priority"
+          ? `<select name="priority">${["low", "medium", "high"].map((priority) => `<option value="${priority}" ${priority === value ? "selected" : ""}>${priority[0].toUpperCase() + priority.slice(1)}</option>`).join("")}</select>`
+          : key === "description"
+            ? `<textarea name="description" rows="6">${esc(value)}</textarea>`
+            : `<input name="${key}" value="${esc(value)}" ${key === "name" ? "required" : ""} ${key === "routing" ? 'placeholder="Inherit, auto, or node ID"' : ""}>`;
   const root = hubModal(
     title,
     `<form>${"expected_goal_revision" in values ? `<input type="hidden" name="expected_goal_revision" value="${values.expected_goal_revision}">` : ""}${Object.entries(
@@ -435,12 +706,14 @@ function planningEdit(title, operation, fields, values, board) {
       .filter(([key]) => key !== "expected_goal_revision")
       .map(
         ([key, value]) =>
-          `<label>${esc({ goal_id: "Goal ID", routing: "Execution routing" }[key] || key[0].toUpperCase() + key.slice(1))}${input(key, value)}</label>`,
+          `<label class="form-row">${esc({ goal_id: "Goal ID", routing: "Execution routing" }[key] || key[0].toUpperCase() + key.slice(1))}${input(key, value)}</label>`,
       )
       .join(
         "",
       )}<p role="alert" data-error></p><button type="submit">Save</button></form>${operation === "card.update" ? "<button data-detach>Remove from board</button>" : ""}${board && operation === "board.update" ? `<button data-archive>${board.archived ? "Restore" : "Archive"} board</button>` : ""}${board && operation === "lane.update" ? "<button data-lane-left>Move lane left</button><button data-lane-right>Move lane right</button><button data-delete>Delete empty lane</button><button data-skill>Add lane Skill</button>" : ""}`,
   );
+  root.classList.add("planning-editor");
+  root.querySelector("input:not([type=hidden]), textarea, select")?.focus();
   const submit = planningSubmitter(operation);
   let saving = false;
   root.querySelector("form").onsubmit = async (e) => {
@@ -462,7 +735,15 @@ function planningEdit(title, operation, fields, values, board) {
       delete data.goal_id;
     }
     try {
-      await submit(args, data);
+      const action = await submit(args, data);
+      if (operation === "board.create" && action.result?.id) {
+        planningBoardId = action.result.id;
+        history.replaceState(
+          null,
+          "",
+          `#/planning?board=${encodeURIComponent(planningBoardId)}`,
+        );
+      }
       root._close();
       await refreshPlanning();
     } catch (error) {
@@ -525,7 +806,81 @@ setInterval(() => {
   if (
     state.currentRoute === "planning" &&
     !document.querySelector(".modal-backdrop") &&
-    !document.querySelector(".planning-page :focus")
+    !document.querySelector(".planning-composer") &&
+    !document.querySelector(".planning-dragging") &&
+    !document.querySelector("#planning-board-menu[open]")
   )
     refreshPlanning();
 }, 5000);
+
+let planningNavigationGeneration = 0;
+function renderPlanningNavigation(snapshot) {
+  const options = document.getElementById("planning-board-options"),
+    rail = document.getElementById("rail-planning-boards");
+  if (!options || !rail) return;
+  const selected =
+    new URLSearchParams(location.hash.split("?")[1] || "").get("board") ||
+    planningBoardId;
+  const boards = (snapshot.boards || []).filter(
+    (board) => planningShowArchived || !board.archived,
+  );
+  const links = boards
+    .map(
+      (board) =>
+        `<a class="rail-row${state.currentRoute === "planning" && board.id === selected ? " active" : ""}" href="#/planning?board=${encodeURIComponent(board.id)}" data-route="planning" data-planning-nav-board="${htmlEscape(board.id)}" title="${htmlEscape(board.name)}"${state.currentRoute === "planning" && board.id === selected ? ' aria-current="page"' : ""}><svg class="rail-icon" aria-hidden="true" viewBox="0 0 24 24"><use href="/static/vendor/lucide/navigation.svg#kanban"></use></svg><span class="rail-copy">${htmlEscape(board.name)}${board.archived ? " (archived)" : ""}</span></a>`,
+    )
+    .join("");
+  rail.innerHTML =
+    links ||
+    '<a class="rail-row" href="#/planning" data-route="planning"><span class="rail-copy">Create your first board</span></a>';
+  options.innerHTML = `<a class="nav-menu-item" href="#/planning" data-route="planning" data-testid="nav-planning">Project Planning</a>${links.replaceAll(" active", "").replaceAll(' aria-current="page"', "")}`;
+  options.querySelectorAll("a").forEach((link) => {
+    link.onclick = () => {
+      document.getElementById("planning-board-menu").open = false;
+    };
+  });
+  if (typeof positionRailMenus === "function") positionRailMenus();
+}
+async function refreshPlanningNavigation() {
+  const ticket = ++planningNavigationGeneration,
+    generation = captureNodeContextGeneration();
+  const root = document.getElementById("rail-planning-boards");
+  if (!root) return;
+  try {
+    const snapshot = await api("GET", "/api/planning", undefined, {
+      cache: false,
+      recordError: false,
+    });
+    if (
+      ticket !== planningNavigationGeneration ||
+      !isNodeContextGenerationCurrent(generation)
+    )
+      return;
+  } catch (_) {
+    if (
+      ticket === planningNavigationGeneration &&
+      isNodeContextGenerationCurrent(generation)
+    )
+      renderPlanningNavigation({ boards: [] });
+  }
+}
+document
+  .getElementById("planning-board-menu")
+  ?.addEventListener("toggle", (event) => {
+    if (event.target.open) refreshPlanningNavigation();
+  });
+document
+  .querySelector("[data-planning-create-board]")
+  ?.addEventListener("click", async () => {
+    document.getElementById("planning-board-menu").open = false;
+    if (typeof closeMobileNavigation === "function") closeMobileNavigation();
+    try {
+      _prevHashURL = location.href;
+      history.pushState(null, "", "#/planning");
+      await navigate();
+      planningEdit("New board", "board.create", {}, { name: "", routing: "" });
+    } catch (error) {
+      showActionError(error);
+    }
+  });
+window.addEventListener("load", refreshPlanningNavigation);

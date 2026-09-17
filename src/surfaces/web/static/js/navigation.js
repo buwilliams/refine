@@ -173,7 +173,8 @@ function syncWorkspaceVisibility() {
       link.removeAttribute("aria-current");
     }
   });
-  document.getElementById("rail-main-section").classList.toggle("has-active", !isWindow);
+  document.getElementById("rail-main-section").classList.toggle("has-active", !isWindow && state.currentRoute !== "planning");
+  document.getElementById("rail-planning-section")?.classList.toggle("has-active", !isWindow && state.currentRoute === "planning");
 }
 
 // Same locally bundled SVGs are used by the static rail and window menu.

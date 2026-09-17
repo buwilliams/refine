@@ -177,6 +177,7 @@ impl Default for PageRequest {
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct GoalProjectionQuery {
+    pub exclude_draft: bool,
     pub page: PageRequest,
     pub q: Option<String>,
     pub status: Option<GoalStatus>,

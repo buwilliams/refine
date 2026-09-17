@@ -6,6 +6,8 @@ use crate::model::workflow::GoalStatus;
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 pub struct BulkGoalFilter {
+    #[serde(default)]
+    pub exclude_draft: bool,
     pub status: Option<String>,
     pub q: Option<String>,
     pub reporter: Option<String>,

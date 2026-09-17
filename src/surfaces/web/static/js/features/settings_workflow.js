@@ -26,7 +26,7 @@ function workflowSources(data) {
   return [...new Set([...(data.catalog.sources || []), ...(data.events.items || []).map(event => event.source).filter(Boolean), ...(data.skills.items || []).map(skill => skill.trigger_source).filter(Boolean)])];
 }
 function workflowStepNames(data) {
-  return [...new Set(workflowSources(data).filter(source => source.startsWith("workflow.")).map(source => source.split(".")[1]))];
+  return [...new Set(workflowSources(data).filter(source => source.startsWith("workflow.") && !source.startsWith("workflow.draft.")).map(source => source.split(".")[1]))];
 }
 function workflowSourceLabel(source) {
   if (source === "custom") return "Manual and custom actions";

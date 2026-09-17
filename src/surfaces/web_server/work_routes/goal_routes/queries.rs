@@ -101,6 +101,7 @@ impl InProcessWebServer {
             .unwrap_or_else(|| (page - 1).saturating_mul(limit));
         let current_node_id = self.active_node_id_for_routes();
         let query = GoalProjectionQuery {
+            exclude_draft: query_param(raw_path, "exclude_draft").is_some_and(|value| value == "1"),
             page: PageRequest {
                 limit,
                 offset,

@@ -79,6 +79,11 @@ pub fn compare_feature_goal_order(a_order: Option<i64>, b_order: Option<i64>) ->
 
 impl FeatureRollup {
     pub fn derive(goals: &[GoalIndexProjection]) -> Self {
+        // Planning cards do not participate in workflow progress until accepted.
+        let goals = goals
+            .iter()
+            .filter(|goal| goal.status != GoalStatus::Draft)
+            .collect::<Vec<_>>();
         let goal_count = goals.len();
         let done_count = goals
             .iter()
@@ -218,6 +223,17 @@ pub fn failed_goal_feature_blocking_notice(
 mod tests {
     use super::*;
     use crate::model::goal::GoalPriority;
+
+    #[test]
+    fn planning_drafts_do_not_change_feature_workflow_progress() {
+        let rollup = FeatureRollup::derive(&[
+            goal("DRAFT", GoalStatus::Draft, Some(1)),
+            goal("DONE", GoalStatus::Done, Some(2)),
+        ]);
+        assert_eq!(rollup.goal_count, 1);
+        assert_eq!(rollup.done_count, 1);
+        assert_eq!(rollup.status, GoalStatus::Done);
+    }
 
     #[test]
     fn feature_rollup_is_done_when_every_goal_has_a_final_status() {

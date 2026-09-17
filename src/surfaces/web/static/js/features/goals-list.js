@@ -336,7 +336,7 @@ async function refreshGoalsTable() {
   if (renderNoProjectIfDetached("Goals")) return;
   const nodeGeneration = captureNodeContextGeneration();
   const f = goalsFilterFromHash();
-  const params = new URLSearchParams();
+  const params = new URLSearchParams({exclude_draft: "1"});
   if (f.status) params.set("status", f.status);
   if (f.q) params.set("q", f.q);
   if (f.reporter) params.set("reporter", f.reporter);
