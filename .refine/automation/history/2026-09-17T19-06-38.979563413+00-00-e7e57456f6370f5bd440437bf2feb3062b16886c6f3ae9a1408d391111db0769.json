@@ -1,5 +1,5 @@
 {
-  "completed_at": null,
+  "completed_at": "2026-09-17T19:06:56.079100656+00:00",
   "config_revision": 87,
   "created_at": "2026-09-17T19:06:38.979563413+00:00",
   "error": null,
@@ -9,11 +9,11 @@
     "name": "Node Startup Ready",
     "source": "node.startup.ready"
   },
-  "execution_state": "running",
+  "execution_state": "succeeded",
   "gate": "satisfied",
   "goal_id": null,
   "id": "e7e57456f6370f5bd440437bf2feb3062b16886c6f3ae9a1408d391111db0769",
   "node_id": "default",
-  "result_count": 0,
-  "state": "running"
+  "result_count": 1,
+  "state": "succeeded"
 }
