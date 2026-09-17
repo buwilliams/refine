@@ -1,0 +1,56 @@
+{
+  "base_commit": null,
+  "branch_name": null,
+  "candidate_commit": null,
+  "created": "2026-09-17T19:28:40Z",
+  "description": "buddy",
+  "event_generation": 1,
+  "feature_id": null,
+  "feature_order": null,
+  "id": "PLNFA4D75DCB09E9A3CCD3B6E2B",
+  "lifecycle_gate_configurations": {
+    "1:default:workflow.draft.enter": {
+      "events": {
+        "workflow.draft.enter": {
+          "bindings": [],
+          "enabled": true,
+          "id": "workflow.draft.enter",
+          "kind": "system",
+          "name": "workflow.draft.enter",
+          "on_success": null,
+          "parameters": [],
+          "scope": {
+            "node_id": null
+          },
+          "source": "workflow.draft.enter"
+        }
+      },
+      "revision": 87,
+      "schema_version": 4,
+      "skills": {}
+    }
+  },
+  "name": "buddy",
+  "node_id": "default",
+  "notes": [],
+  "pending_event_dispatches": {},
+  "priority": "low",
+  "reporter": "Buddy Williams",
+  "rounds": [],
+  "status": "draft",
+  "target_branch": null,
+  "updated": "2026-09-17T19:28:40Z",
+  "workflow_events": [
+    {
+      "at": "2026-09-17T19:28:40.215093064+00:00",
+      "forced": false,
+      "from": null,
+      "generation": 1,
+      "node_id": "default",
+      "round_idx": null,
+      "to": "draft",
+      "workflow_revision": 1
+    }
+  ],
+  "workflow_revision": 1
+}
