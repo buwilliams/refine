@@ -1,0 +1,27 @@
+{
+  "id": "item-c31fb058-3558-4c3c-a4e3-a383d782da91",
+  "command": {
+    "request_id": "item-c31fb058-3558-4c3c-a4e3-a383d782da91",
+    "operation": "card.detach",
+    "expected_revision": 1,
+    "board_id": "board-b06224601053b273f0a52730",
+    "lane_id": null,
+    "goal_id": "PLN393BC46D16585DF06590227E",
+    "actor": "Buddy Williams",
+    "data": {}
+  },
+  "owner": "default",
+  "state": "complete",
+  "phase": "detach",
+  "created": "2026-09-17T19:08:03.977411019+00:00",
+  "result": {
+    "goal_id": "PLN393BC46D16585DF06590227E"
+  },
+  "message": null,
+  "target_node": null,
+  "before": null,
+  "destination": null,
+  "behavior": "none",
+  "configuration": null,
+  "invocations": {}
+}
