@@ -43,14 +43,15 @@
   background: var(--card);
   box-shadow: var(--shadow-lg);
 }
-.toolbar-add-options button {
+.toolbar-add-options :is(button, a) {
   text-align: left;
+  text-decoration: none;
   background: transparent;
   color: var(--fg);
   border: 0;
 }
-.toolbar-add-options button:hover,
-.toolbar-add-options button:focus-visible {
+.toolbar-add-options :is(button, a):hover,
+.toolbar-add-options :is(button, a):focus-visible {
   background: var(--color-primary-hover);
   color: white;
 }

@@ -42,6 +42,8 @@ pub struct Board {
     #[serde(default)]
     pub archived: bool,
     #[serde(default)]
+    pub deleted: bool,
+    #[serde(default)]
     pub routing: Option<String>,
     pub lanes: Vec<Lane>,
     pub created: String,
@@ -168,10 +170,21 @@ impl FilePlanningService {
             .collect()
     }
     pub fn board(&self, id: &str) -> RefineResult<Board> {
-        read_json(&self.path("boards", id)?)
+        let board: Board = read_json(&self.path("boards", id)?)?;
+        if board.deleted {
+            return Err(RefineError::NotFound("Board was deleted".into()));
+        }
+        Ok(board)
     }
     pub fn placement(&self, id: &str) -> RefineResult<Placement> {
-        read_json(&self.path("cards", id)?)
+        let placement: Placement = read_json(&self.path("cards", id)?)?;
+        let board: Board = read_json(&self.path("boards", &placement.board_id)?)?;
+        if board.deleted {
+            return Err(RefineError::NotFound(
+                "Card placement was removed with its board".into(),
+            ));
+        }
+        Ok(placement)
     }
     pub fn action(&self, id: &str) -> RefineResult<PlanningAction> {
         read_json(&self.path("actions", id)?)
@@ -186,10 +199,19 @@ impl FilePlanningService {
         write_json(&path, a)
     }
     pub fn snapshot(&self) -> RefineResult<Value> {
-        let boards: Vec<Board> = self.records("boards")?;
+        let mut boards: Vec<Board> = self.records("boards")?;
+        let deleted: std::collections::BTreeSet<_> = boards
+            .iter()
+            .filter(|board| board.deleted)
+            .map(|board| board.id.clone())
+            .collect();
+        boards.retain(|board| !board.deleted);
         let placements: Vec<Placement> = self.records("cards")?;
         let mut cards = Vec::new();
-        for placement in placements {
+        for placement in placements
+            .into_iter()
+            .filter(|placement| !deleted.contains(&placement.board_id))
+        {
             match self.work().show_goal_detail(&placement.goal_id) {
                 Ok(goal) => cards.push(json!({"placement":placement,"goal":goal})),
                 Err(e) => cards.push(json!({"placement":placement,"error":e.to_string()})),
@@ -416,13 +438,14 @@ impl FilePlanningService {
         with_record_lock(&self.root, &format!("planning-board-{id}"), || {
             let path = self.path("boards", &id)?;
             let mut b = if path.exists() {
-                self.board(&id)?
+                read_json::<Board>(&path)?
             } else if c.operation == "board.create" {
                 Board {
                     id: id.clone(),
                     name: text(&c.data, "name")?,
                     revision: 0,
                     archived: false,
+                    deleted: false,
                     routing: None,
                     lanes: vec![],
                     created: now(),
@@ -436,6 +459,9 @@ impl FilePlanningService {
                 a.result = json!(b);
                 a.state = "complete".into();
                 return Ok(());
+            }
+            if b.deleted {
+                return Err(RefineError::NotFound("Board was deleted".into()));
             }
             if c.operation != "board.create" {
                 revision(c.expected_revision, b.revision)?;
@@ -467,6 +493,36 @@ impl FilePlanningService {
                     if c.data.get("routing").is_some() {
                         b.routing = route(&c.data)?
                     }
+                }
+                "board.delete" => {
+                    let placements: Vec<Placement> = self.records("cards")?;
+                    let (actions, errors) = self.read_actions()?;
+                    if !errors.is_empty() {
+                        return Err(conflict(
+                            "Repair unreadable planning actions before deleting this board",
+                        ));
+                    }
+                    if actions.iter().any(|pending| {
+                        pending.id != a.id
+                            && !pending.terminal()
+                            && (pending.command.board_id.as_deref() == Some(&id)
+                                || pending.before.as_ref().is_some_and(|p| p.board_id == id)
+                                || pending
+                                    .destination
+                                    .as_ref()
+                                    .is_some_and(|p| p.board_id == id)
+                                || pending.command.goal_id.as_ref().is_some_and(|goal_id| {
+                                    placements
+                                        .iter()
+                                        .any(|p| &p.goal_id == goal_id && p.board_id == id)
+                                }))
+                    }) {
+                        return Err(conflict(
+                            "Finish or cancel pending board actions before deleting this board",
+                        ));
+                    }
+                    // Retain a synced deletion marker so old placements cannot resurrect the board.
+                    b.deleted = true;
                 }
                 "board.archive" => b.archived = c.data["archived"].as_bool().unwrap_or(true),
                 "lane.create" => b.lanes.push(Lane {
@@ -581,6 +637,7 @@ fn validate_command(c: &PlanningCommand) -> RefineResult<()> {
         "board.create",
         "board.update",
         "board.archive",
+        "board.delete",
         "lane.create",
         "lane.update",
         "lane.reorder",

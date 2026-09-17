@@ -103,6 +103,7 @@ async function refreshPlanning() {
           (requested || linkedCard?.placement.board_id || planningBoardId),
       ) || boards[0];
     planningBoardId = board?.id || null;
+    if (board) rememberPlanningBoard(board.id);
     renderPlanningNavigation(snapshot);
     const esc = htmlEscape;
     const actions = snapshot.actions.filter(
@@ -710,7 +711,7 @@ function planningEdit(title, operation, fields, values, board) {
       )
       .join(
         "",
-      )}<p role="alert" data-error></p><button type="submit">Save</button></form>${operation === "card.update" ? "<button data-detach>Remove from board</button>" : ""}${board && operation === "board.update" ? `<button data-archive>${board.archived ? "Restore" : "Archive"} board</button>` : ""}${board && operation === "lane.update" ? "<button data-lane-left>Move lane left</button><button data-lane-right>Move lane right</button><button data-delete>Delete empty lane</button><button data-skill>Add lane Skill</button>" : ""}`,
+      )}<p role="alert" data-error></p><button type="submit">Save</button></form>${operation === "card.update" ? "<button data-detach>Remove from board</button>" : ""}${board && operation === "board.update" ? `<button data-archive>${board.archived ? "Restore" : "Archive"} board</button><button class="danger" data-delete-board>Delete board</button>` : ""}${board && operation === "lane.update" ? "<button data-lane-left>Move lane left</button><button data-lane-right>Move lane right</button><button data-delete>Delete empty lane</button><button data-skill>Add lane Skill</button>" : ""}`,
   );
   root.classList.add("planning-editor");
   root.querySelector("input:not([type=hidden]), textarea, select")?.focus();
@@ -768,6 +769,26 @@ function planningEdit(title, operation, fields, values, board) {
       refreshPlanning();
     }),
   );
+  root
+    .querySelector("[data-delete-board]")
+    ?.addEventListener("click", async () => {
+      if (
+        !(await modalConfirm(
+          `Delete “${board.name}” and remove its card placements? The underlying Goals will be kept. This cannot be undone.`,
+          { title: "Delete board", okLabel: "Delete board", danger: true },
+        ))
+      )
+        return;
+      hubAction(root, async () => {
+        await planningCommand("board.delete", {
+          board_id: board.id,
+          expected_revision: board.revision,
+        });
+        root._close();
+        closePlanningBoardView(board.id);
+        await refreshPlanningNavigation();
+      });
+    });
   for (const [selector, delta] of [
     ["[data-lane-left]", -1],
     ["[data-lane-right]", 1],
@@ -813,6 +834,52 @@ setInterval(() => {
     refreshPlanning();
 }, 5000);
 
+function planningViewsKey() {
+  return `refine_planning_views:${state.project?.target_root || ""}`;
+}
+function openPlanningBoards() {
+  try {
+    const ids = JSON.parse(localStorage.getItem(planningViewsKey()) || "[]");
+    return Array.isArray(ids) ? ids.filter((id) => typeof id === "string") : [];
+  } catch (_) {
+    return [];
+  }
+}
+function savePlanningBoards(ids) {
+  try {
+    localStorage.setItem(planningViewsKey(), JSON.stringify(ids));
+  } catch (_) {}
+}
+function rememberPlanningBoard(id) {
+  savePlanningBoards([...new Set([...openPlanningBoards(), id])]);
+}
+function closePlanningBoardView(id) {
+  const remaining = openPlanningBoards().filter((board) => board !== id);
+  savePlanningBoards(remaining);
+  if (
+    typeof workspaceNavigation !== "undefined" &&
+    workspaceNavigation.inWindow &&
+    workspaceNavigation.mainRoute === "planning" &&
+    planningBoardId === id
+  ) {
+    planningBoardId = remaining.at(-1) || null;
+    workspaceNavigation.mainHash = planningBoardId
+      ? `#/planning?board=${encodeURIComponent(planningBoardId)}`
+      : "#/";
+    workspaceNavigation.mainRoute = planningBoardId ? "planning" : "dashboard";
+    document.getElementById("main").replaceChildren();
+  }
+  if (state.currentRoute === "planning" && planningBoardId === id) {
+    planningBoardId = remaining.at(-1) || null;
+    location.hash = planningBoardId
+      ? `#/planning?board=${encodeURIComponent(planningBoardId)}`
+      : "#/";
+  }
+  document.querySelectorAll("[data-planning-view]").forEach((row) => {
+    if (row.dataset.planningView === id) row.remove();
+  });
+}
+
 let planningNavigationGeneration = 0;
 function renderPlanningNavigation(snapshot) {
   const options = document.getElementById("planning-board-options"),
@@ -830,10 +897,27 @@ function renderPlanningNavigation(snapshot) {
         `<a class="rail-row${state.currentRoute === "planning" && board.id === selected ? " active" : ""}" href="#/planning?board=${encodeURIComponent(board.id)}" data-route="planning" data-planning-nav-board="${htmlEscape(board.id)}" title="${htmlEscape(board.name)}"${state.currentRoute === "planning" && board.id === selected ? ' aria-current="page"' : ""}><svg class="rail-icon" aria-hidden="true" viewBox="0 0 24 24"><use href="/static/vendor/lucide/navigation.svg#kanban"></use></svg><span class="rail-copy">${htmlEscape(board.name)}${board.archived ? " (archived)" : ""}</span></a>`,
     )
     .join("");
-  rail.innerHTML =
-    links ||
-    '<a class="rail-row" href="#/planning" data-route="planning"><span class="rail-copy">Create your first board</span></a>';
-  options.innerHTML = `<a class="nav-menu-item" href="#/planning" data-route="planning" data-testid="nav-planning">Project Planning</a>${links.replaceAll(" active", "").replaceAll(' aria-current="page"', "")}`;
+  const opened = openPlanningBoards().filter((id) =>
+    (snapshot.boards || []).some((board) => board.id === id),
+  );
+  savePlanningBoards(opened);
+  rail.innerHTML = boards
+    .filter((board) => opened.includes(board.id))
+    .map((board) => {
+      const active = state.currentRoute === "planning" && board.id === selected;
+      return `<div class="rail-window-row${active ? " active" : ""}" data-planning-view="${htmlEscape(board.id)}"><a class="rail-row${active ? " active" : ""}" href="#/planning?board=${encodeURIComponent(board.id)}" data-route="planning" data-planning-nav-board="${htmlEscape(board.id)}" title="${htmlEscape(board.name)}"${active ? ' aria-current="page"' : ""}><svg class="rail-icon" aria-hidden="true" viewBox="0 0 24 24"><use href="/static/vendor/lucide/navigation.svg#kanban"></use></svg><span class="rail-copy rail-window-label">${htmlEscape(board.name)}</span></a><button class="rail-window-close" type="button" data-close-planning-board="${htmlEscape(board.id)}" aria-label="Close ${htmlEscape(board.name)} view" title="Close view"><svg class="rail-icon" aria-hidden="true" viewBox="0 0 24 24"><use href="/static/vendor/lucide/navigation.svg#x"></use></svg></button></div>`;
+    })
+    .join("");
+  rail.querySelectorAll("[data-close-planning-board]").forEach((button) => {
+    button.onclick = () =>
+      closePlanningBoardView(button.dataset.closePlanningBoard);
+  });
+  options.innerHTML = links
+    ? links
+        .replaceAll(" active", "")
+        .replaceAll('class="rail-row"', 'class="planning-menu-board"')
+        .replaceAll(' aria-current="page"', "")
+    : '<a href="#/planning" data-route="planning" data-testid="nav-planning">Open Project Planning</a>';
   options.querySelectorAll("a").forEach((link) => {
     link.onclick = () => {
       document.getElementById("planning-board-menu").open = false;
@@ -856,6 +940,7 @@ async function refreshPlanningNavigation() {
       !isNodeContextGenerationCurrent(generation)
     )
       return;
+    renderPlanningNavigation(snapshot);
   } catch (_) {
     if (
       ticket === planningNavigationGeneration &&

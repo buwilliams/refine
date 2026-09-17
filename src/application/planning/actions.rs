@@ -3,6 +3,47 @@ use crate::application::events::{FileEventService, InvocationState};
 use crate::model::automation::BindingMode;
 impl FilePlanningService {
     pub(super) fn advance(&self, a: &mut PlanningAction) -> RefineResult<()> {
+        if !a.command.operation.starts_with("card.") {
+            return self.advance_locked(a);
+        }
+        let mut boards = Vec::new();
+        boards.extend(a.command.board_id.iter().cloned());
+        boards.extend(a.destination.iter().map(|p| p.board_id.clone()));
+        boards.extend(a.before.iter().map(|p| p.board_id.clone()));
+        if let Some(goal) = &a.command.goal_id {
+            let path = self.path("cards", goal)?;
+            if path.exists() {
+                boards.push(read_json::<Placement>(&path)?.board_id);
+            }
+        }
+        boards.sort();
+        boards.dedup();
+        self.with_board_locks(&boards, || {
+            if let Some(board) = a
+                .destination
+                .as_ref()
+                .map(|p| &p.board_id)
+                .or(a.command.board_id.as_ref())
+            {
+                self.board(board)?;
+            }
+            self.advance_locked(a)
+        })
+    }
+    fn with_board_locks<T>(
+        &self,
+        boards: &[String],
+        operation: impl FnOnce() -> RefineResult<T>,
+    ) -> RefineResult<T> {
+        if let Some((board, rest)) = boards.split_first() {
+            with_record_lock(&self.root, &format!("planning-board-{board}"), || {
+                self.with_board_locks(rest, operation)
+            })
+        } else {
+            operation()
+        }
+    }
+    fn advance_locked(&self, a: &mut PlanningAction) -> RefineResult<()> {
         if let Some(report) = crate::application::persistence_sync::conflict_reports::latest_state_sync_conflict_report(&self.runtime)? {
             let target = self.target.canonicalize().unwrap_or_else(|_| self.target.clone());
             if report.target_identity == target.to_string_lossy()
@@ -55,8 +96,19 @@ impl FilePlanningService {
                     .config()?)
                 .clone();
                 let path = self.path("cards", &goal_id)?;
+                let previous_revision = if path.exists() {
+                    read_json::<Placement>(&path)?.revision
+                } else {
+                    0
+                };
                 let mut prior = if path.exists() {
-                    Some(self.placement(&goal_id)?)
+                    match self.placement(&goal_id) {
+                        Ok(placement) => Some(placement),
+                        Err(RefineError::NotFound(_)) if a.command.operation == "card.attach" => {
+                            None
+                        }
+                        Err(error) => return Err(error),
+                    }
                 } else {
                     None
                 };
@@ -163,7 +215,7 @@ impl FilePlanningService {
                     position: a.command.data["position"]
                         .as_f64()
                         .unwrap_or_else(|| chrono::Utc::now().timestamp_millis() as f64),
-                    revision: prior.as_ref().map_or(0, |p| p.revision) + 1,
+                    revision: prior.as_ref().map_or(previous_revision, |p| p.revision) + 1,
                     archived: prior.as_ref().is_some_and(|p| p.archived),
                     routing: prior.as_ref().and_then(|p| p.routing.clone()),
                     last_request_id: a.id.clone(),
@@ -226,9 +278,18 @@ impl FilePlanningService {
                     let dest = a.destination.as_ref().unwrap();
                     let path = self.path("cards", &goal_id)?;
                     if path.exists() {
-                        let actual = self.placement(&goal_id)?;
+                        let actual: Placement = read_json(&path)?;
                         if actual.last_request_id != a.id {
-                            revision(a.before.as_ref().map(|p| p.revision), actual.revision)?
+                            let expected = if a.before.is_none()
+                                && a.command.operation == "card.attach"
+                                && read_json::<Board>(&self.path("boards", &actual.board_id)?)?
+                                    .deleted
+                            {
+                                dest.revision.checked_sub(1)
+                            } else {
+                                a.before.as_ref().map(|p| p.revision)
+                            };
+                            revision(expected, actual.revision)?
                         }
                     }
                     write_json(&path, dest)?;

@@ -666,3 +666,106 @@ fn release_resumes_after_round_creation_without_creating_another_round() {
         1
     );
 }
+
+#[test]
+fn deleting_board_preserves_goals_detaches_cards_and_replays_after_interruption() {
+    let f = Fixture::new();
+    let board = f.board();
+    let goal = f.card(&board);
+    let before = f.service.work().show_goal_detail(&goal).unwrap();
+    let stale = f.apply(
+        "board.delete",
+        Some(&board.id),
+        None,
+        None,
+        Some(0),
+        json!({}),
+    );
+    assert_eq!(stale.state, "failed");
+    assert!(f.service.board(&board.id).is_ok());
+    let deleted = f.apply(
+        "board.delete",
+        Some(&board.id),
+        None,
+        None,
+        Some(board.revision),
+        json!({}),
+    );
+    assert_eq!(deleted.state, "complete", "{:?}", deleted.message);
+    assert!(f.service.board(&board.id).is_err());
+    assert!(f.service.placement(&goal).is_err());
+    let snapshot = f.service.snapshot().unwrap();
+    assert_eq!(snapshot["boards"].as_array().unwrap().len(), 0);
+    assert_eq!(snapshot["cards"].as_array().unwrap().len(), 0);
+    let after = f.service.work().show_goal_detail(&goal).unwrap();
+    assert_eq!(before["status"], after["status"]);
+    assert_eq!(before["workflow_revision"], after["workflow_revision"]);
+    assert!(after.get("planning").is_none());
+    let mut interrupted = deleted.clone();
+    interrupted.state = "queued".into();
+    f.service.save_action(&interrupted).unwrap();
+    f.service.process_action(&interrupted.id).unwrap();
+    assert_eq!(f.service.action(&interrupted.id).unwrap().state, "complete");
+    let replacement = f.board();
+    let attach = f.apply(
+        "card.attach",
+        Some(&replacement.id),
+        Some(&replacement.lanes[0].id),
+        Some(&goal),
+        None,
+        json!({}),
+    );
+    assert_eq!(attach.state, "complete", "{:?}", attach.message);
+    let placement = f.service.placement(&goal).unwrap();
+    assert_eq!(placement.board_id, replacement.id);
+    assert_eq!(placement.revision, 2);
+}
+
+#[test]
+fn deleting_board_rejects_pending_card_actions() {
+    let f = Fixture::new();
+    let board = f.board();
+    let pending = f
+        .service
+        .submit(PlanningCommand {
+            request_id: "pending-delete-test".into(),
+            operation: "card.create".into(),
+            expected_revision: None,
+            board_id: Some(board.id.clone()),
+            lane_id: Some(board.lanes[0].id.clone()),
+            goal_id: None,
+            actor: "Buddy".into(),
+            data: json!({"name":"Pending","reporter":"Buddy"}),
+        })
+        .unwrap();
+    let deletion = f
+        .service
+        .submit(PlanningCommand {
+            request_id: "blocked-delete-test".into(),
+            operation: "board.delete".into(),
+            expected_revision: Some(board.revision),
+            board_id: Some(board.id.clone()),
+            lane_id: None,
+            goal_id: None,
+            actor: "Buddy".into(),
+            data: json!({}),
+        })
+        .unwrap();
+    f.service.process_action(&deletion.id).unwrap();
+    let failed = f.service.action(&deletion.id).unwrap();
+    assert_eq!(failed.state, "failed");
+    assert!(failed.message.unwrap().contains("pending board actions"));
+    f.service.cancel(&pending.id).unwrap();
+    assert_eq!(
+        f.apply(
+            "board.delete",
+            Some(&board.id),
+            None,
+            None,
+            Some(board.revision),
+            json!({})
+        )
+        .state,
+        "complete"
+    );
+}

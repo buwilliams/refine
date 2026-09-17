@@ -202,7 +202,25 @@ impl FileWorkItemService {
         if planning_path.exists() {
             let placement: Value =
                 crate::infrastructure::storage::automation::read_json(&planning_path)?;
-            object.insert("planning".into(), placement);
+            let board_id = placement["board_id"]
+                .as_str()
+                .filter(|id| crate::model::automation::valid_id(id));
+            let deleted = if let Some(board_id) = board_id {
+                let board_path = self
+                    .refine_dir
+                    .join("planning/boards")
+                    .join(format!("{board_id}.json"));
+                if board_path.exists() {
+                    crate::infrastructure::storage::automation::read_json::<Value>(&board_path)?["deleted"].as_bool().unwrap_or(false)
+                } else {
+                    false
+                }
+            } else {
+                false
+            };
+            if !deleted {
+                object.insert("planning".into(), placement);
+            }
         }
         self.attach_round_logs(goal_id, object)?;
         Ok(value)

@@ -102,6 +102,14 @@ async function planningApp() {
         const body = request.postDataJSON();
         requests.push(body);
         let result = {};
+        if (body.operation === "board.delete") {
+          snapshot.boards = snapshot.boards.filter(
+            (board) => board.id !== body.board_id,
+          );
+          snapshot.cards = snapshot.cards.filter(
+            (card) => card.placement.board_id !== body.board_id,
+          );
+        }
         if (body.operation === "board.create") {
           result = {
             id: "new-board",
@@ -511,13 +519,13 @@ test(
       await app.page.waitForFunction(
         () =>
           !document.querySelector(
-            '#rail-planning-boards [data-planning-nav-board="personal"]',
+            '#planning-board-options [data-planning-nav-board="personal"]',
           ),
       );
       await app.page.getByRole("switch", { name: "Show archived" }).click();
       await app.page
-        .locator('#rail-planning-boards [data-planning-nav-board="personal"]')
-        .waitFor();
+        .locator('#planning-board-options [data-planning-nav-board="personal"]')
+        .waitFor({ state: "attached" });
       await app.page.getByTestId("planning-menu").click();
       await app.page
         .locator('#planning-board-options [data-planning-nav-board="personal"]')
@@ -527,6 +535,86 @@ test(
         () =>
           document.querySelector(".planning-board-heading h2")?.textContent ===
           "Personal",
+      );
+      assert.deepEqual(app.pageErrors, []);
+    } finally {
+      await app.close();
+    }
+  },
+);
+
+test(
+  "Board views close without deleting data and reopen from the Planning menu",
+  { skip: SKIP },
+  async () => {
+    const app = await planningApp();
+    try {
+      const { page } = app;
+      await page.locator('[data-close-planning-board="board"]').click();
+      await page.waitForURL(/#\/$/);
+      assert.equal(app.requests.length, 0);
+      assert.equal(app.snapshot.boards.length, 2);
+      await page.reload();
+      await page.locator("#dash").waitFor();
+      assert.equal(
+        await page.locator('[data-close-planning-board="board"]').count(),
+        0,
+      );
+      await page.getByTestId("planning-menu").click();
+      await page
+        .locator('#planning-board-options [data-planning-nav-board="board"]')
+        .click();
+      await page.locator('[data-close-planning-board="board"]').waitFor();
+      assert.equal(await page.locator('[data-card="DRAFT1"]').count(), 1);
+      await page.getByTestId("toolbar-add").click();
+      await page.locator('[data-add-toolbar-tab="files"]').click();
+      await page.waitForURL(/#\/windows\//);
+      await page.locator('[data-close-planning-board="board"]').click();
+      await page.getByTestId("toolbar-tab-close").click();
+      await page.waitForURL(/#\/$/);
+      await page.locator("#dash").waitFor();
+      assert.equal(
+        await page.locator('[data-close-planning-board="board"]').count(),
+        0,
+      );
+      assert.deepEqual(app.pageErrors, []);
+    } finally {
+      await app.close();
+    }
+  },
+);
+
+test(
+  "Board deletion confirms retained Goals and removes the board and open view",
+  { skip: SKIP },
+  async () => {
+    const app = await planningApp();
+    try {
+      const { page } = app;
+      await page.locator("[data-planning-board-settings]").click();
+      await page.locator("[data-delete-board]").click();
+      const confirm = page.locator(".modal-backdrop").last();
+      assert.match(await confirm.innerText(), /underlying Goals will be kept/);
+      await confirm
+        .getByRole("button", { name: "Cancel", exact: true })
+        .click();
+      assert.equal(app.requests.length, 0);
+      await page.locator("[data-delete-board]").click();
+      await page
+        .locator(".modal-backdrop")
+        .last()
+        .getByRole("button", { name: "Delete board", exact: true })
+        .click();
+      await page.waitForURL(/#\/$/);
+      assert.equal(app.requests[0].operation, "board.delete");
+      assert.equal(app.requests[0].expected_revision, 1);
+      assert.equal(
+        app.snapshot.boards.some((board) => board.id === "board"),
+        false,
+      );
+      assert.equal(
+        await page.locator('[data-close-planning-board="board"]').count(),
+        0,
       );
       assert.deepEqual(app.pageErrors, []);
     } finally {

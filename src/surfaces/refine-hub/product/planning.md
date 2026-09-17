@@ -31,3 +31,9 @@ Moves and releases run on the Goal's current node. The board shows pending work 
 Upgrade every node sharing the project, then choose **Import Todo Lists** once from the intended owning node. Import creates one board per old list, with Open and Done lanes. Existing completion marks, text, Reporter and timestamps are retained. Every imported item starts as a Draft Goal, including completed personal tasks. Import does not launch Skills or implementation.
 
 The original Todo data is retained for recovery. After migration, old Todo interfaces reject writes. See the [technical contract and CLI examples](../docs/intent/03-application/06-project-planning.md) for automation and upgrade details.
+
+## Close or delete a board
+
+Open boards appear below Planning in the navigation. Use the close button on a board row to close its view. The board and cards remain shared, and you can reopen it from the Planning dropdown.
+
+To remove a board, open **Board settings → Delete board** and confirm. This removes the board and its card placements while retaining the underlying Goals. Retained Goals can be added to another board through Add card search. Finish or cancel pending board actions before deleting. Deletion is shared across nodes; closing a view is local to your browser.

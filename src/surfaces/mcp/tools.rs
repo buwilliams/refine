@@ -230,7 +230,7 @@ pub fn tool_catalog() -> Vec<McpTool> {
             description: "Create or edit shared boards/lanes/cards, move or release a Goal card, or migrate Todo Lists. Read revisions first and reuse request_id on retry. Returns an action receipt; pending actions execute on the Goal owner.",
             input_schema: || {
                 json!({"type":"object","additionalProperties":false,"required":["operation","request_id"],"properties":{
-                    "operation":{"enum":["board.create","board.update","board.archive","lane.create","lane.update","lane.reorder","lane.delete","card.create","card.attach","card.update","card.move","card.archive","card.detach","card.apply","migrate"]},
+                    "operation":{"enum":["board.create","board.update","board.archive","board.delete","lane.create","lane.update","lane.reorder","lane.delete","card.create","card.attach","card.update","card.move","card.archive","card.detach","card.apply","migrate"]},
                     "request_id":{"type":"string"},"expected_revision":{"type":"integer","minimum":0},"board_id":{"type":"string"},"lane_id":{"type":"string"},"goal_id":{"type":"string"},"actor":{"type":"string"},"data":{"type":"object","properties":{
                         "name":{"type":"string"},"description":{"type":"string"},"reporter":{"type":"string"},
                         "priority":{"type":"string","enum":["low","medium","high"]},

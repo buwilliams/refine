@@ -89,8 +89,9 @@
       <section class="rail-section" id="rail-planning-section" aria-label="Project Planning">
         <details class="nav-menu nav-context-picker" id="planning-board-menu">
           <summary class="nav-context-summary nav-picker-summary rail-window-add" data-testid="planning-menu" aria-label="Planning" title="Create or select a board"><svg class="rail-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="/static/vendor/lucide/navigation.svg#kanban"></use></svg><span class="nav-picker-copy rail-copy">Planning</span><span class="nav-context-more" aria-hidden="true"></span></summary>
-          <div class="nav-menu-panel planning-board-options">
-            <button type="button" class="nav-menu-item" data-planning-create-board>Create board</button>
+          <div class="toolbar-add-options planning-board-options">
+            <div class="nav-menu-label">Planning</div>
+            <button type="button" data-planning-create-board><svg class="rail-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="/static/vendor/lucide/navigation.svg#plus"></use></svg>Create board</button>
             <nav class="nav" aria-label="Project boards" id="planning-board-options"><a class="nav-menu-item" href="#/planning" data-route="planning" data-testid="nav-planning">All boards</a></nav>
           </div>
         </details>

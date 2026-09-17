@@ -38,6 +38,7 @@ impl FilePlanningService {
                 name: text(list, "name")?,
                 revision: 1,
                 archived: false,
+                deleted: false,
                 routing: None,
                 lanes: vec![
                     Lane {
