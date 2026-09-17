@@ -1,6 +1,6 @@
 {
-  "schema_version": 3,
-  "revision": 86,
+  "schema_version": 4,
+  "revision": 87,
   "skills": {
     "default-governance": {
       "id": "default-governance",
@@ -203,6 +203,32 @@
       ],
       "on_success": null
     },
+    "planning.lane.enter": {
+      "id": "planning.lane.enter",
+      "name": "planning.lane.enter",
+      "kind": "system",
+      "source": "planning.lane.enter",
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [],
+      "bindings": [],
+      "on_success": null
+    },
+    "planning.lane.exit": {
+      "id": "planning.lane.exit",
+      "name": "planning.lane.exit",
+      "kind": "system",
+      "source": "planning.lane.exit",
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [],
+      "bindings": [],
+      "on_success": null
+    },
     "update-metrics-hub": {
       "id": "update-metrics-hub",
       "name": "Update Metrics Hub",
@@ -268,11 +294,37 @@
       "bindings": [],
       "on_success": null
     },
+    "workflow.backlog.error": {
+      "id": "workflow.backlog.error",
+      "name": "workflow.backlog.error",
+      "kind": "system",
+      "source": "workflow.backlog.error",
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [],
+      "bindings": [],
+      "on_success": null
+    },
     "workflow.backlog.exit": {
       "id": "workflow.backlog.exit",
       "name": "Workflow Backlog Exit",
       "kind": "system",
       "source": "workflow.backlog.exit",
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [],
+      "bindings": [],
+      "on_success": null
+    },
+    "workflow.backlog.success": {
+      "id": "workflow.backlog.success",
+      "name": "workflow.backlog.success",
+      "kind": "system",
+      "source": "workflow.backlog.success",
       "enabled": true,
       "scope": {
         "node_id": null
@@ -294,11 +346,37 @@
       "bindings": [],
       "on_success": null
     },
+    "workflow.cancelled.error": {
+      "id": "workflow.cancelled.error",
+      "name": "workflow.cancelled.error",
+      "kind": "system",
+      "source": "workflow.cancelled.error",
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [],
+      "bindings": [],
+      "on_success": null
+    },
     "workflow.cancelled.exit": {
       "id": "workflow.cancelled.exit",
       "name": "Workflow Cancelled Exit",
       "kind": "system",
       "source": "workflow.cancelled.exit",
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [],
+      "bindings": [],
+      "on_success": null
+    },
+    "workflow.cancelled.success": {
+      "id": "workflow.cancelled.success",
+      "name": "workflow.cancelled.success",
+      "kind": "system",
+      "source": "workflow.cancelled.success",
       "enabled": true,
       "scope": {
         "node_id": null
@@ -320,11 +398,89 @@
       "bindings": [],
       "on_success": null
     },
+    "workflow.done.error": {
+      "id": "workflow.done.error",
+      "name": "workflow.done.error",
+      "kind": "system",
+      "source": "workflow.done.error",
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [],
+      "bindings": [],
+      "on_success": null
+    },
     "workflow.done.exit": {
       "id": "workflow.done.exit",
       "name": "Workflow Done Exit",
       "kind": "system",
       "source": "workflow.done.exit",
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [],
+      "bindings": [],
+      "on_success": null
+    },
+    "workflow.done.success": {
+      "id": "workflow.done.success",
+      "name": "workflow.done.success",
+      "kind": "system",
+      "source": "workflow.done.success",
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [],
+      "bindings": [],
+      "on_success": null
+    },
+    "workflow.draft.enter": {
+      "id": "workflow.draft.enter",
+      "name": "workflow.draft.enter",
+      "kind": "system",
+      "source": "workflow.draft.enter",
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [],
+      "bindings": [],
+      "on_success": null
+    },
+    "workflow.draft.error": {
+      "id": "workflow.draft.error",
+      "name": "workflow.draft.error",
+      "kind": "system",
+      "source": "workflow.draft.error",
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [],
+      "bindings": [],
+      "on_success": null
+    },
+    "workflow.draft.exit": {
+      "id": "workflow.draft.exit",
+      "name": "workflow.draft.exit",
+      "kind": "system",
+      "source": "workflow.draft.exit",
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [],
+      "bindings": [],
+      "on_success": null
+    },
+    "workflow.draft.success": {
+      "id": "workflow.draft.success",
+      "name": "workflow.draft.success",
+      "kind": "system",
+      "source": "workflow.draft.success",
       "enabled": true,
       "scope": {
         "node_id": null
@@ -346,11 +502,37 @@
       "bindings": [],
       "on_success": null
     },
+    "workflow.failed.error": {
+      "id": "workflow.failed.error",
+      "name": "workflow.failed.error",
+      "kind": "system",
+      "source": "workflow.failed.error",
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [],
+      "bindings": [],
+      "on_success": null
+    },
     "workflow.failed.exit": {
       "id": "workflow.failed.exit",
       "name": "Workflow Failed Exit",
       "kind": "system",
       "source": "workflow.failed.exit",
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [],
+      "bindings": [],
+      "on_success": null
+    },
+    "workflow.failed.success": {
+      "id": "workflow.failed.success",
+      "name": "workflow.failed.success",
+      "kind": "system",
+      "source": "workflow.failed.success",
       "enabled": true,
       "scope": {
         "node_id": null
@@ -385,11 +567,37 @@
       ],
       "on_success": null
     },
+    "workflow.governance.error": {
+      "id": "workflow.governance.error",
+      "name": "workflow.governance.error",
+      "kind": "system",
+      "source": "workflow.governance.error",
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [],
+      "bindings": [],
+      "on_success": null
+    },
     "workflow.governance.exit": {
       "id": "workflow.governance.exit",
       "name": "Workflow Governance Exit",
       "kind": "system",
       "source": "workflow.governance.exit",
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [],
+      "bindings": [],
+      "on_success": null
+    },
+    "workflow.governance.success": {
+      "id": "workflow.governance.success",
+      "name": "workflow.governance.success",
+      "kind": "system",
+      "source": "workflow.governance.success",
       "enabled": true,
       "scope": {
         "node_id": null
@@ -424,11 +632,37 @@
       ],
       "on_success": null
     },
+    "workflow.implement.error": {
+      "id": "workflow.implement.error",
+      "name": "workflow.implement.error",
+      "kind": "system",
+      "source": "workflow.implement.error",
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [],
+      "bindings": [],
+      "on_success": null
+    },
     "workflow.implement.exit": {
       "id": "workflow.implement.exit",
       "name": "Workflow Implement Exit",
       "kind": "system",
       "source": "workflow.implement.exit",
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [],
+      "bindings": [],
+      "on_success": null
+    },
+    "workflow.implement.success": {
+      "id": "workflow.implement.success",
+      "name": "workflow.implement.success",
+      "kind": "system",
+      "source": "workflow.implement.success",
       "enabled": true,
       "scope": {
         "node_id": null
@@ -463,11 +697,37 @@
       ],
       "on_success": null
     },
+    "workflow.plan.error": {
+      "id": "workflow.plan.error",
+      "name": "workflow.plan.error",
+      "kind": "system",
+      "source": "workflow.plan.error",
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [],
+      "bindings": [],
+      "on_success": null
+    },
     "workflow.plan.exit": {
       "id": "workflow.plan.exit",
       "name": "Workflow Plan Exit",
       "kind": "system",
       "source": "workflow.plan.exit",
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [],
+      "bindings": [],
+      "on_success": null
+    },
+    "workflow.plan.success": {
+      "id": "workflow.plan.success",
+      "name": "workflow.plan.success",
+      "kind": "system",
+      "source": "workflow.plan.success",
       "enabled": true,
       "scope": {
         "node_id": null
@@ -502,11 +762,37 @@
       ],
       "on_success": null
     },
+    "workflow.quality.error": {
+      "id": "workflow.quality.error",
+      "name": "workflow.quality.error",
+      "kind": "system",
+      "source": "workflow.quality.error",
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [],
+      "bindings": [],
+      "on_success": null
+    },
     "workflow.quality.exit": {
       "id": "workflow.quality.exit",
       "name": "Workflow Quality Exit",
       "kind": "system",
       "source": "workflow.quality.exit",
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [],
+      "bindings": [],
+      "on_success": null
+    },
+    "workflow.quality.success": {
+      "id": "workflow.quality.success",
+      "name": "workflow.quality.success",
+      "kind": "system",
+      "source": "workflow.quality.success",
       "enabled": true,
       "scope": {
         "node_id": null
@@ -528,11 +814,37 @@
       "bindings": [],
       "on_success": null
     },
+    "workflow.review.error": {
+      "id": "workflow.review.error",
+      "name": "workflow.review.error",
+      "kind": "system",
+      "source": "workflow.review.error",
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [],
+      "bindings": [],
+      "on_success": null
+    },
     "workflow.review.exit": {
       "id": "workflow.review.exit",
       "name": "Workflow Review Exit",
       "kind": "system",
       "source": "workflow.review.exit",
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [],
+      "bindings": [],
+      "on_success": null
+    },
+    "workflow.review.success": {
+      "id": "workflow.review.success",
+      "name": "workflow.review.success",
+      "kind": "system",
+      "source": "workflow.review.success",
       "enabled": true,
       "scope": {
         "node_id": null
@@ -554,11 +866,37 @@
       "bindings": [],
       "on_success": null
     },
+    "workflow.todo.error": {
+      "id": "workflow.todo.error",
+      "name": "workflow.todo.error",
+      "kind": "system",
+      "source": "workflow.todo.error",
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [],
+      "bindings": [],
+      "on_success": null
+    },
     "workflow.todo.exit": {
       "id": "workflow.todo.exit",
       "name": "Workflow Todo Exit",
       "kind": "system",
       "source": "workflow.todo.exit",
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [],
+      "bindings": [],
+      "on_success": null
+    },
+    "workflow.todo.success": {
+      "id": "workflow.todo.success",
+      "name": "workflow.todo.success",
+      "kind": "system",
+      "source": "workflow.todo.success",
       "enabled": true,
       "scope": {
         "node_id": null
