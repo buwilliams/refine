@@ -1,0 +1,205 @@
+{
+  "base_commit": null,
+  "branch_name": null,
+  "candidate_commit": null,
+  "created": "2026-09-17T20:22:44Z",
+  "event_generation": 2,
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000T1C895ZNHPSMGN4FJC000",
+  "lifecycle_gate_configurations": {
+    "1:default:workflow.backlog.enter": {
+      "events": {
+        "workflow.backlog.enter": {
+          "bindings": [],
+          "enabled": true,
+          "id": "workflow.backlog.enter",
+          "kind": "system",
+          "name": "Workflow Backlog Enter",
+          "on_success": null,
+          "parameters": [],
+          "scope": {
+            "node_id": null
+          },
+          "source": "workflow.backlog.enter"
+        }
+      },
+      "revision": 87,
+      "schema_version": 4,
+      "skills": {}
+    },
+    "2:default:workflow.todo.enter": {
+      "events": {
+        "workflow.todo.enter": {
+          "bindings": [],
+          "enabled": true,
+          "id": "workflow.todo.enter",
+          "kind": "system",
+          "name": "Workflow Todo Enter",
+          "on_success": null,
+          "parameters": [],
+          "scope": {
+            "node_id": null
+          },
+          "source": "workflow.todo.enter"
+        }
+      },
+      "revision": 87,
+      "schema_version": 4,
+      "skills": {}
+    }
+  },
+  "name": "In the UI, I don't like how, if you open the Dashboard and click around, then op",
+  "node_id": "default",
+  "notes": [],
+  "pending_event_dispatches": {},
+  "priority": "low",
+  "reporter": "Buddy Williams",
+  "rounds": [
+    {
+      "assignee": "Buddy Williams",
+      "created": "2026-09-17T20:22:44Z",
+      "failure_at": "",
+      "failure_category": "",
+      "failure_message": "",
+      "gate_configurations": {
+        "2:default:workflow.todo.enter": {
+          "events": {
+            "workflow.todo.enter": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.todo.enter",
+              "kind": "system",
+              "name": "Workflow Todo Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.todo.enter"
+            }
+          },
+          "revision": 87,
+          "schema_version": 4,
+          "skills": {}
+        }
+      },
+      "logs": [],
+      "prior_attempts": [
+        {
+          "agent_context": null,
+          "assignee": "Buddy Williams",
+          "created": "2026-09-17T20:22:44Z",
+          "failure_at": "",
+          "failure_category": "",
+          "failure_message": "",
+          "gate_configurations": {
+            "1:default:workflow.backlog.enter": {
+              "events": {
+                "workflow.backlog.enter": {
+                  "bindings": [],
+                  "enabled": true,
+                  "id": "workflow.backlog.enter",
+                  "kind": "system",
+                  "name": "Workflow Backlog Enter",
+                  "on_success": null,
+                  "parameters": [],
+                  "scope": {
+                    "node_id": null
+                  },
+                  "source": "workflow.backlog.enter"
+                }
+              },
+              "revision": 87,
+              "schema_version": 4,
+              "skills": {}
+            }
+          },
+          "governance_candidate_commit": "",
+          "governance_checked_at": "",
+          "governance_details": "",
+          "governance_message": "",
+          "governance_rule_actions": [],
+          "guidance_decision": null,
+          "implementation_plan": null,
+          "implementation_report": null,
+          "implementation_reported_at": null,
+          "logs": [],
+          "prompt": "In the UI, I don't like how, if you open the Dashboard and click around, then open an agent and switch back to the dashboard, you lose your place because it reloads the screen. Therefore, I think we need to treat the main nav the same way we do Tools (same theme, layout, and styles), so that clicking the main nav opens a new context menu, and clicking a context menu item opens that screen, making it persistent. The UI should be consistent with Tools and Planning since they work the way I want Main to work. Also, the Main icon will need to change too.",
+          "quality_checked_at": "",
+          "quality_details": "",
+          "quality_message": "",
+          "quality_state": "unclassified",
+          "reporter": "Buddy Williams",
+          "rule_state": "unclassified",
+          "updated": "2026-09-17T20:22:44Z",
+          "workflow_attempt_authority": null,
+          "workflow_reconciliation": null,
+          "workflow_recovery": null
+        }
+      ],
+      "prompt": "In the UI, I don't like how, if you open the Dashboard and click around, then open an agent and switch back to the dashboard, you lose your place because it reloads the screen. Therefore, I think we need to treat the main nav the same way we do Tools (same theme, layout, and styles), so that clicking the main nav opens a new context menu, and clicking a context menu item opens that screen, making it persistent. The UI should be consistent with Tools and Planning since they work the way I want Main to work. Also, the Main icon will need to change too.",
+      "reporter": "Buddy Williams",
+      "updated": "2026-09-17T20:22:44Z",
+      "workflow_attempt_authority": null
+    }
+  ],
+  "status": "todo",
+  "target_branch": null,
+  "updated": "2026-09-17T20:22:49Z",
+  "workflow_context": "",
+  "workflow_controls": [
+    {
+      "at": "2026-09-17T20:22:49Z",
+      "decision": true,
+      "forced": true,
+      "from": "backlog",
+      "generation": 2,
+      "integration_performed": false,
+      "integration_requested": false,
+      "overridden_requirements": [
+        "transition_policy",
+        "workflow_evidence_gates"
+      ],
+      "previous_attempt": null,
+      "request": {
+        "actor": "Buddy Williams",
+        "context": "",
+        "expected_revision": 1,
+        "force": true,
+        "invocation_id": null,
+        "reason": "User selected workflow step",
+        "request_id": "item-1b48b8b2-068e-4f7b-919b-4fdea3fb3403",
+        "to": "todo"
+      },
+      "request_id": "item-1b48b8b2-068e-4f7b-919b-4fdea3fb3403",
+      "retained_candidate": null,
+      "source_round": 1,
+      "to": "todo"
+    }
+  ],
+  "workflow_events": [
+    {
+      "at": "2026-09-17T20:22:44.459876543+00:00",
+      "forced": false,
+      "from": null,
+      "generation": 1,
+      "node_id": "default",
+      "round_idx": 0,
+      "to": "backlog",
+      "workflow_revision": 1
+    },
+    {
+      "at": "2026-09-17T20:22:49.926226839+00:00",
+      "forced": true,
+      "from": "backlog",
+      "generation": 2,
+      "node_id": "default",
+      "round_idx": 0,
+      "supersedes_execution": true,
+      "to": "todo",
+      "workflow_revision": 2
+    }
+  ],
+  "workflow_revision": 2
+}
