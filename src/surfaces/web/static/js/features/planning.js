@@ -146,7 +146,7 @@ async function refreshPlanning() {
                   lane,
                 ) => `<section class="planning-lane" data-lane="${esc(lane.id)}" data-lane-action="${esc(lane.action)}" aria-label="${esc(lane.name)}">
         <header><h2>${esc(lane.name)} <span class="planning-lane-count">${planningCards(board.id, lane.id).length}</span></h2><button class="secondary" data-lane-settings="${esc(lane.id)}" aria-label="Settings for ${esc(lane.name)}">⋯</button></header>
-        <p class="planning-lane-action">${lane.action === "release" ? "Releases work" : lane.action === "accept_into_backlog" ? "Accepts into Backlog" : "Organize ideas and tasks"}</p>
+        ${lane.action === "release" ? '<p class="planning-lane-action">Releases work</p>' : lane.action === "accept_into_backlog" ? '<p class="planning-lane-action">Accepts into Backlog</p>' : ""}
         <div class="planning-card-list">${planningCards(board.id, lane.id)
           .map((card) => planningCardHtml(card, board))
           .join("")}</div>
@@ -894,7 +894,7 @@ function renderPlanningNavigation(snapshot) {
   const links = boards
     .map(
       (board) =>
-        `<a class="rail-row${state.currentRoute === "planning" && board.id === selected ? " active" : ""}" href="#/planning?board=${encodeURIComponent(board.id)}" data-route="planning" data-planning-nav-board="${htmlEscape(board.id)}" title="${htmlEscape(board.name)}"${state.currentRoute === "planning" && board.id === selected ? ' aria-current="page"' : ""}><svg class="rail-icon" aria-hidden="true" viewBox="0 0 24 24"><use href="/static/vendor/lucide/navigation.svg#kanban"></use></svg><span class="rail-copy">${htmlEscape(board.name)}${board.archived ? " (archived)" : ""}</span></a>`,
+        `<a href="#/planning?board=${encodeURIComponent(board.id)}" data-route="planning" data-planning-nav-board="${htmlEscape(board.id)}" title="${htmlEscape(board.name)}"><svg class="rail-icon" aria-hidden="true" viewBox="0 0 24 24"><use href="/static/vendor/lucide/navigation.svg#kanban"></use></svg><span>${htmlEscape(board.name)}${board.archived ? " (archived)" : ""}</span></a>`,
     )
     .join("");
   const opened = openPlanningBoards().filter((id) =>
@@ -912,12 +912,7 @@ function renderPlanningNavigation(snapshot) {
     button.onclick = () =>
       closePlanningBoardView(button.dataset.closePlanningBoard);
   });
-  options.innerHTML = links
-    ? links
-        .replaceAll(" active", "")
-        .replaceAll('class="rail-row"', 'class="planning-menu-board"')
-        .replaceAll(' aria-current="page"', "")
-    : '<a href="#/planning" data-route="planning" data-testid="nav-planning">Open Project Planning</a>';
+  options.innerHTML = links || '<a href="#/planning" data-route="planning" data-testid="nav-planning">Open Project Planning</a>';
   options.querySelectorAll("a").forEach((link) => {
     link.onclick = () => {
       document.getElementById("planning-board-menu").open = false;

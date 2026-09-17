@@ -41,7 +41,8 @@ svg.rail-icon { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-line
 .rail-count + .rail-section-state { margin-left: 0; }
 .rail-main { display: flex; flex-direction: column; align-items: stretch; gap: 2px; padding: 0; }
 .navigation-rail .rail-main a.active, .navigation-rail .rail-window-row.active { background: var(--accent-bg); color: var(--accent); }
-.rail-window-row { position: relative; display: flex; align-items: center; border-radius: var(--radius-md); margin: 2px 0; }
+.rail-window-list { display: grid; align-items: stretch; gap: 2px; min-width: 0; }
+.rail-window-row { position: relative; display: flex; align-items: center; min-width: 0; border-radius: var(--radius-md); margin: 2px 0; }
 .rail-window-row .rail-row { min-width: 0; flex: 1; padding-right: 36px; color: inherit; }
 .rail-window-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rail-window-close { position: absolute; right: 2px; width: 32px; height: 36px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font-size: 19px; opacity: 0; }

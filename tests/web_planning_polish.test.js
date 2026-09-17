@@ -250,7 +250,7 @@ test(
       assert.equal(
         await page
           .locator(
-            '#planning-board-options [data-planning-nav-board="personal"] .rail-copy',
+            '#planning-board-options [data-planning-nav-board="personal"] span',
           )
           .isVisible(),
         true,

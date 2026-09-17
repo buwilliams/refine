@@ -84,7 +84,7 @@
             <button type="button" data-add-toolbar-tab="plan"><svg class="rail-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="/static/vendor/lucide/navigation.svg#notebook-pen"></use></svg>Planning Agent</button>
           </div>
         </details>
-        <nav id="rail-windows" aria-label="Tools"></nav>
+        <nav class="rail-window-list" id="rail-windows" aria-label="Tools"></nav>
       </section>
       <section class="rail-section" id="rail-planning-section" aria-label="Project Planning">
         <details class="nav-menu nav-context-picker" id="planning-board-menu">
@@ -92,10 +92,10 @@
           <div class="toolbar-add-options planning-board-options">
             <div class="nav-menu-label">Planning</div>
             <button type="button" data-planning-create-board><svg class="rail-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="/static/vendor/lucide/navigation.svg#plus"></use></svg>Create board</button>
-            <nav class="nav" aria-label="Project boards" id="planning-board-options"><a class="nav-menu-item" href="#/planning" data-route="planning" data-testid="nav-planning">All boards</a></nav>
+            <nav class="toolbar-add-options-group" aria-label="Project boards" id="planning-board-options"><a href="#/planning" data-route="planning" data-testid="nav-planning">All boards</a></nav>
           </div>
         </details>
-        <nav class="nav rail-resource-list" id="rail-planning-boards" aria-label="Planning boards"></nav>
+        <nav class="rail-window-list" id="rail-planning-boards" aria-label="Planning boards"></nav>
       </section>
       <details class="rail-section" id="rail-skills-section" open>
         <summary class="rail-section-heading" title="Skills"><svg class="rail-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="/static/vendor/lucide/navigation.svg#wand-sparkles"></use></svg><span class="rail-copy">Skills</span><span class="rail-section-state" aria-hidden="true"><svg class="rail-icon rail-section-open-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="/static/vendor/lucide/navigation.svg#plus"></use></svg><svg class="rail-icon rail-section-close-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="/static/vendor/lucide/navigation.svg#minus"></use></svg></span></summary>

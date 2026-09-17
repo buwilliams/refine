@@ -180,14 +180,13 @@ function navigate() {
 
 function highlightNav(route) {
   if (typeof syncWorkspaceVisibility === "function") syncWorkspaceVisibility();
-  for (const a of $$(".nav a")) {
+  for (const a of $$(".nav a, .rail-window-list a[data-route]")) {
     const r = a.dataset.route;
     a.classList.toggle("active",
       r === route ||
       (r === "goals" && route.startsWith("goals")) ||
       (r === "features" && route.startsWith("features")));
     if (a.dataset.planningNavBoard) a.classList.toggle("active", route === "planning" && a.dataset.planningNavBoard === (new URLSearchParams(location.hash.split("?")[1] || "").get("board") || planningBoardId));
-    if (a.closest("#planning-board-options")) a.classList.remove("active");
     if (a.classList.contains("active")) a.setAttribute("aria-current", "page");
     else a.removeAttribute("aria-current");
   }

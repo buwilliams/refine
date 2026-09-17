@@ -43,7 +43,18 @@
   background: var(--card);
   box-shadow: var(--shadow-lg);
 }
+.toolbar-add-options-group {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
 .toolbar-add-options :is(button, a) {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow-wrap: anywhere;
+  font: inherit;
+  font-size: 13px;
   text-align: left;
   text-decoration: none;
   background: transparent;

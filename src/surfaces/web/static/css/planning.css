@@ -290,28 +290,11 @@
 .planning-archive-toggle[aria-checked="true"] .planning-toggle-track::after {
   transform: translateX(12px);
 }
-.planning-board-options .nav {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.planning-board-options > button {
-  width: 100%;
-  text-align: left;
-}
 .planning-lane-footer button {
   text-align: left;
   justify-content: flex-start;
   font-size: 13px;
   border: 1px dashed var(--color-border);
-}
-.planning-card-list:empty::before {
-  content: "Drop a card here";
-  display: block;
-  text-align: center;
-  padding: 32px 8px;
-  color: var(--color-text-muted);
-  font-size: 12px;
 }
 .planning-dragging {
   opacity: 0.4;
@@ -407,10 +390,4 @@
 .planning-composer input:focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
-}
-.navigation-rail.collapsed .planning-board-options .rail-copy {
-  display: inline;
-}
-.navigation-rail.collapsed .planning-board-options .rail-row {
-  justify-content: flex-start;
 }
