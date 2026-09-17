@@ -3,10 +3,32 @@
   "branch_name": "refine/DREA674C85503D17388FC14E44/round-1",
   "candidate_commit": "86d1cd9c091baa3d48012a209f438ebeeb27727c",
   "created": "2026-09-16T12:13:41Z",
-  "event_generation": 7,
+  "event_generation": 8,
   "feature_id": null,
   "feature_order": null,
   "id": "DREA674C85503D17388FC14E44",
+  "lifecycle_gate_configurations": {
+    "8:default:workflow.cancelled.enter": {
+      "events": {
+        "workflow.cancelled.enter": {
+          "bindings": [],
+          "enabled": true,
+          "id": "workflow.cancelled.enter",
+          "kind": "system",
+          "name": "Workflow Cancelled Enter",
+          "on_success": null,
+          "parameters": [],
+          "scope": {
+            "node_id": null
+          },
+          "source": "workflow.cancelled.enter"
+        }
+      },
+      "revision": 87,
+      "schema_version": 4,
+      "skills": {}
+    }
+  },
   "name": "fix evidence coercion in decode_result, not just unknown-field stripping",
   "node_id": "default",
   "notes": [],
@@ -466,6 +488,26 @@
           "revision": 86,
           "schema_version": 3,
           "skills": {}
+        },
+        "8:default:workflow.cancelled.enter": {
+          "events": {
+            "workflow.cancelled.enter": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.cancelled.enter",
+              "kind": "system",
+              "name": "Workflow Cancelled Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.cancelled.enter"
+            }
+          },
+          "revision": 87,
+          "schema_version": 4,
+          "skills": {}
         }
       },
       "implementation_report": "workflow.implement.enter:default-implement: Implemented all three plan tasks. No implementation departures or unfinished work. Completion repair remains disabled as planned. Relevant regressions pass; the full unit suite has unrelated failures requiring Quality review.",
@@ -689,9 +731,9 @@
       "workspace_branch": "refine/DREA674C85503D17388FC14E44/round-1"
     }
   ],
-  "status": "failed",
+  "status": "cancelled",
   "target_branch": "main",
-  "updated": "2026-09-16T12:51:48Z",
+  "updated": "2026-09-17T20:18:21Z",
   "workflow_context": "",
   "workflow_controls": [
     {
@@ -721,6 +763,36 @@
       "retained_candidate": null,
       "source_round": 1,
       "to": "todo"
+    },
+    {
+      "at": "2026-09-17T20:18:21Z",
+      "decision": true,
+      "forced": false,
+      "from": "failed",
+      "generation": 8,
+      "integration_performed": false,
+      "integration_requested": false,
+      "overridden_requirements": [],
+      "previous_attempt": {
+        "claimed_at": "2026-09-16T12:15:46Z",
+        "generation": 2,
+        "round_idx": 0,
+        "workflow_revision": 3
+      },
+      "request": {
+        "actor": "Buddy Williams",
+        "context": "",
+        "expected_revision": 33,
+        "force": false,
+        "invocation_id": null,
+        "reason": "Closed as superseded by completed Goal DR3C101422AFF754F03576C3A5. Its evidence-coercion fix was integrated in 95a05284 and remains in main. This Goal passed Quality but its candidate refresh conflicted with that overlapping change. User authorized closure; preserve Round 1 and its failure evidence.",
+        "request_id": "close-superseded-DREA674C85503D17388FC14E44-r33",
+        "to": "cancelled"
+      },
+      "request_id": "close-superseded-DREA674C85503D17388FC14E44-r33",
+      "retained_candidate": "86d1cd9c091baa3d48012a209f438ebeeb27727c",
+      "source_round": 1,
+      "to": "cancelled"
     }
   ],
   "workflow_events": [
@@ -794,7 +866,18 @@
       "round_idx": 0,
       "to": "failed",
       "workflow_revision": 33
+    },
+    {
+      "at": "2026-09-17T20:18:21.324540186+00:00",
+      "forced": true,
+      "from": "failed",
+      "generation": 8,
+      "node_id": "default",
+      "round_idx": 0,
+      "supersedes_execution": true,
+      "to": "cancelled",
+      "workflow_revision": 34
     }
   ],
-  "workflow_revision": 33
+  "workflow_revision": 34
 }
