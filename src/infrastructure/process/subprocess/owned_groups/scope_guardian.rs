@@ -145,9 +145,13 @@ fn run(mode: &str, socket: Option<&str>) -> RefineResult<()> {
     parent
         .set_write_timeout(Some(Duration::from_secs(5)))
         .map_err(io_error)?;
-    let mut child = helper_command("workload", &inherited)?
-        .spawn()
-        .map_err(io_error)?;
+    let mut child_command = helper_command("workload", &inherited)?;
+    let capture = super::credential_capture::CredentialCapture::prepare(
+        &request.workload,
+        &mut child_command,
+    )?;
+    let mut child = child_command.spawn().map_err(io_error)?;
+    let capture = capture.map(|capture| capture.start(&mut child));
     drop(inherited);
     send(&mut parent, &request)?;
     let mut proof = OpenOptions::new()
@@ -231,6 +235,9 @@ fn run(mode: &str, socket: Option<&str>) -> RefineResult<()> {
                 while !Path::new(gate).exists() {
                     std::thread::sleep(Duration::from_millis(5));
                 }
+            }
+            if let Some(capture) = capture {
+                super::credential_capture::finish(capture)?;
             }
             proof
                 .write_all(b"exited\n")

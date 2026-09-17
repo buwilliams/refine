@@ -263,9 +263,12 @@ fn release_api_previews_semver_and_rejects_unconfirmed_publication() {
         body: Some(json!({"bump": "patch"})),
     });
     assert_eq!(plan.status, 200, "{}", plan.body);
-    assert_eq!(plan.body["plan"]["current_version"], "4.2.0");
-    assert_eq!(plan.body["plan"]["proposed_version"], "4.2.1");
-    assert_eq!(plan.body["plan"]["proposed_tag"], "4.2.1");
+    let current = env!("CARGO_PKG_VERSION");
+    let (prefix, patch) = current.rsplit_once('.').unwrap();
+    let next = format!("{prefix}.{}", patch.parse::<u64>().unwrap() + 1);
+    assert_eq!(plan.body["plan"]["current_version"], current);
+    assert_eq!(plan.body["plan"]["proposed_version"], next);
+    assert_eq!(plan.body["plan"]["proposed_tag"], next);
 
     let publish = server.handle(ApiRequest {
         method: "POST".to_string(),

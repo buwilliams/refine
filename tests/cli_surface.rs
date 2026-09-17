@@ -50,7 +50,7 @@ fn hub_and_workflow_surface_suite() {
 fn cli_surface_suite() {
     let fixture = IntegrationFixture::start("cli");
 
-    system_status_reports_healthy_daemon(&fixture);
+    system_status_reports_reachable_daemon_with_disabled_workflow(&fixture);
     project_status_is_attached_to_test_app(&fixture);
     config_commands_route_through_the_active_daemon(&fixture);
     provider_configuration_commands(&fixture);

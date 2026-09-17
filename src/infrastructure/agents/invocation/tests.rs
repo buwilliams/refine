@@ -194,14 +194,22 @@ fn interactive_session_continuity_pins_and_resumes_only_where_the_cli_supports_i
             "revise the plan"
         ]
     );
-    // A provider without the capability launches exactly as it always has.
-    let codex = service
+    // Unsupported continuation must fail clearly, never silently start a fresh session.
+    let error = service
         .interactive_command_with_session_and_environment(
             "codex",
             "initial context",
             Some(&ProviderSessionContinuity::Resume("session-1".to_string())),
             &[],
         )
+        .unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("does not support provider-session resume")
+    );
+    let codex = service
+        .interactive_command("codex", "initial context")
         .unwrap();
     assert_eq!(
         codex.args,
@@ -210,7 +218,6 @@ fn interactive_session_continuity_pins_and_resumes_only_where_the_cli_supports_i
             "initial context"
         ]
     );
-    assert!(!codex.args.iter().any(|arg| arg.contains("session-1")));
 
     fs::remove_dir_all(temp_root).unwrap();
 }

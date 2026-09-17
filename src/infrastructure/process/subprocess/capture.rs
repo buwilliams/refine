@@ -13,10 +13,15 @@ pub(super) struct Capture<R> {
     pub eof: bool,
     failure: Option<String>,
     truncated: bool,
+    redactor: crate::infrastructure::process::redaction::Redactor,
 }
 
 impl<R: Read + AsRawFd> Capture<R> {
-    pub fn new(reader: R, path: &Path) -> RefineResult<Self> {
+    pub fn new(
+        reader: R,
+        path: &Path,
+        redactor: crate::infrastructure::process::redaction::Redactor,
+    ) -> RefineResult<Self> {
         let fd = reader.as_raw_fd();
         // These are exclusively owned read ends; the writer's flags are separate.
         let flags = unsafe { libc::fcntl(fd, libc::F_GETFL) };
@@ -36,6 +41,7 @@ impl<R: Read + AsRawFd> Capture<R> {
             eof: false,
             failure: None,
             truncated: false,
+            redactor,
         })
     }
 
@@ -49,12 +55,24 @@ impl<R: Read + AsRawFd> Capture<R> {
         for _ in 0..8 {
             let result = match self.reader.read(&mut buffer) {
                 Ok(0) => {
+                    let bytes = self.redactor.push(&[], true);
+                    self.file
+                        .write_all(&bytes)
+                        .map_err(|e| RefineError::Io(e.to_string()))?;
+                    let keep = bytes
+                        .len()
+                        .min(MEMORY_LIMIT.saturating_sub(self.bytes.len()));
+                    self.bytes.extend_from_slice(&bytes[..keep]);
+                    self.truncated |= keep < bytes.len();
+                    on_chunk(&bytes);
                     self.eof = true;
                     break;
                 }
                 Ok(n) => {
                     progress = true;
-                    let bytes = &buffer[..n];
+                    let redacted = self.redactor.push(&buffer[..n], false);
+                    let bytes = redacted.as_slice();
+                    let n = bytes.len();
                     let keep = n.min(MEMORY_LIMIT.saturating_sub(self.bytes.len()));
                     self.bytes.extend_from_slice(&bytes[..keep]);
                     self.truncated |= keep < n;

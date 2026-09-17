@@ -113,7 +113,12 @@ test('Resource pagination stays bounded and search reaches entries on later page
     await page.goto(`${app.origin}/#/settings/templates`);
     await page.locator('[data-resource-next]').click();
     assert.equal(await page.locator('[data-template-catalog-row]:visible').count(),50);
+    await page.waitForFunction(() => document.querySelector('[data-resource-range]')?.textContent === '51–100 of 101 resources');
+    await page.evaluate(() => refreshSettingsTab('templates',{force:true}));
     assert.equal(await page.locator('[data-resource-range]').innerText(),'51–100 of 101 resources');
+    await page.evaluate(() => { nodeContextGeneration++; return refreshSettingsTab('templates',{force:true}); });
+    assert.equal(await page.locator('[data-resource-range]').innerText(),'1–50 of 101 resources');
+    await page.locator('[data-resource-next]').click();
     await page.locator('[data-resource-next]').click();
     assert.equal(await page.locator('[data-template-catalog-row]:visible').count(),1);
     assert.equal(await page.locator('[data-resource-next]').isDisabled(),true);

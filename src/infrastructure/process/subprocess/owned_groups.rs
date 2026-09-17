@@ -4,6 +4,8 @@ use super::*;
 use std::collections::BTreeMap;
 
 #[cfg(target_os = "linux")]
+mod credential_capture;
+#[cfg(target_os = "linux")]
 pub(crate) mod launch_scope;
 #[cfg(target_os = "linux")]
 mod quiescence;
@@ -475,7 +477,9 @@ fn requires_ownership(details: &str) -> bool {
     serde_json::from_str::<Value>(details)
         .ok()
         .is_some_and(|value| {
-            !value["workflow_incarnation"].is_null() || !value["agent_hard_cap_millis"].is_null()
+            !value["workflow_incarnation"].is_null()
+                || !value["agent_hard_cap_millis"].is_null()
+                || !value["provider_credential_env"].is_null()
         })
 }
 #[cfg(target_os = "linux")]

@@ -84,10 +84,10 @@ fn static_goal_reports_and_bulk_jira_export_use_the_correct_surfaces() {
     let goals_bulk = fs::read_to_string(static_root.join("js/features/goals-bulk.js")).unwrap();
     let commands = fs::read_to_string(static_root.join("js/commands.js")).unwrap();
 
-    assert!(goals_detail.contains("rnd.implementation_report"));
+    assert!(goals_detail.contains("record.implementation_report"));
     assert!(goals_detail.contains(r#"data-testid="goal-implementation-report""#));
     assert!(goals_detail.contains(r#"data-testid="goal-implementation-report-body""#));
-    assert!(goals_detail.contains("rnd.implementation_reported_at"));
+    assert!(goals_detail.contains("record.implementation_reported_at"));
     assert!(!goals_detail.contains(r#"data-testid="goal-action-export-jira""#));
     assert!(!goals_detail.contains("/export/jira"));
     assert!(goals_list.contains(r#"data-testid="goals-bulk-export-jira""#));
