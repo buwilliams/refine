@@ -1,10 +1,10 @@
 {
-  "id": "d1e85f77c323c97e38a28bffc9c387e8f864f302aeeaf4a2e8fb6553a95aea14",
+  "id": "6d411b9ef75b057d8d94ee4e8434fbdaa923c1b8e3a1a8ce9733781b03e2c2f7",
   "event": {
-    "id": "workflow.quality.enter",
-    "name": "Workflow Quality Enter",
+    "id": "workflow.governance.enter",
+    "name": "Workflow Governance Enter",
     "kind": "system",
-    "source": "workflow.quality.enter",
+    "source": "workflow.governance.enter",
     "enabled": true,
     "scope": {
       "node_id": null
@@ -12,8 +12,8 @@
     "parameters": [],
     "bindings": [
       {
-        "id": "default-quality",
-        "skill_id": "default-quality",
+        "id": "default-governance",
+        "skill_id": "default-governance",
         "enabled": true,
         "mode": "blocking",
         "order": 0,
@@ -48,65 +48,43 @@
     "goal_id": "00000T1C895ZNHPSMGN4FJC000",
     "round_idx": 0,
     "workflow_revision": 2,
-    "candidate_commit": "e9a636417e7350333fa293fe2fb54e34f90db2ef",
+    "candidate_commit": "4c4ec00a49e614b6fb358275417066000cacd679",
     "data": {
       "context": {
-        "agent_context": {
-          "assembled_at": "2026-09-17T20:23:00Z",
-          "current_round": {
-            "assignee": "Buddy Williams",
-            "prompt": "In the UI, I don't like how, if you open the Dashboard and click around, then open an agent and switch back to the dashboard, you lose your place because it reloads the screen. Therefore, I think we need to treat the main nav the same way we do Tools (same theme, layout, and styles), so that clicking the main nav opens a new context menu, and clicking a context menu item opens that screen, making it persistent. The UI should be consistent with Tools and Planning since they work the way I want Main to work. Also, the Main icon will need to change too.",
-            "reporter": "Buddy Williams",
-            "round": 1
-          },
-          "goal": {
-            "assignee": "Buddy Williams",
-            "id": "00000T1C895ZNHPSMGN4FJC000",
-            "name": "In the UI, I don't like how, if you open the Dashboard and click around, then op",
-            "node_id": "default",
-            "priority": "low",
-            "reporter": "Buddy Williams"
-          },
-          "governance": {
-            "configured": false,
-            "constitution": "",
-            "product": "",
-            "rules": []
-          },
-          "guidance_candidates": [],
-          "previous_rounds": [],
-          "version": 1,
-          "workflow_summary": "Refine gives this Goal Agent an isolated worktree, the current Round, and available planning context. Follow the Goal and applicable Skill instructions and use your judgment to decide when to stop. Quality and Governance agents make their own decisions using their Skills before integration and human Review. Refine coordinates workflow transitions and Git actions. Do not directly advance Goal state, approve, merge, or push."
+        "assembled_at": "2026-09-17T20:23:00Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "In the UI, I don't like how, if you open the Dashboard and click around, then open an agent and switch back to the dashboard, you lose your place because it reloads the screen. Therefore, I think we need to treat the main nav the same way we do Tools (same theme, layout, and styles), so that clicking the main nav opens a new context menu, and clicking a context menu item opens that screen, making it persistent. The UI should be consistent with Tools and Planning since they work the way I want Main to work. Also, the Main icon will need to change too.",
+          "reporter": "Buddy Williams",
+          "round": 1
         },
-        "implementation_report": "workflow.implement.enter:default-implement: Implemented all six plan tasks within the browser surface. Changes remain in the worktree for Quality and Governance; no workflow transitions or integration actions were performed.",
-        "plans": [
-          {
-            "artifacts": {
-              "plan": "Main will open a context menu styled like Tools and Planning. Selecting Dashboard, Features, Goals, Changes, Control, or Settings will open or activate a persistent screen listed beneath Main. Returning from an agent, another Main screen, or Planning will restore that screen’s place and controls.\n\n1. [ ] Task #1 - Introduce a retained Main-screen lifecycle.\n   Extend the browser navigation shell in navigation.js and router.js with one open instance per Main destination. Track each screen’s current URL, retained content, scroll position, and necessary view state. Dashboard remains the initial screen. Selecting an already-open destination activates its existing instance; closing it releases its retained state. Persistence means surviving screen switches within the page session; browser reload may reconstruct screens from lightweight navigation metadata using existing storage conventions. Do not serialize DOM or unsaved form contents.\n\n2. [ ] Task #2 - Retain screen content safely during navigation.\n   Build on Task #1 to replace the single mainHash/mainRoute return slot with screen-specific activation and deactivation. Preserve live DOM and handlers rather than restoring HTML strings. Keep existing renderers usable through the active #main host, avoiding duplicate IDs and global selectors that can reach inactive screens. Capture state before leaving and restore it before resuming updates. Audit shared globals, especially Settings and Control, and move or snapshot only the state needed for independent restoration. Screen switching must preserve filters, expanded panels, selection, settings tabs, drafts, and scroll; adjust the router’s current list-selection resets accordingly. Explicit close continues to respect existing dirty-state safeguards.\n\n3. [ ] Task #3 - Replace Main’s disclosure with the shared menu pattern.\n   After the lifecycle exists, update index.html, navigation.js, and navigation.css so Main uses the same full-row trigger, menu positioning, theme tokens, spacing, and persistent-row styling as Tools and Planning. Replace the compass icon with the bundled panels-top-left icon. Include the six existing Main destinations in their current order. Open screens remain visible beneath the trigger when its menu closes, with active indication and accessible close controls. Remove Main from the old collapsible-section storage logic. Support keyboard opening and dismissal, focus restoration, outside-click dismissal, collapsed rail, and mobile drawer behavior using existing helpers.\n\n4. [ ] Task #4 - Reconcile retained screens with routes and live context.\n   Route Main menu selections, open-screen rows, command-palette navigation, direct links, and Back/Forward through the same lifecycle. Activating an existing screen restores its saved URL, including filters; an explicit link with different parameters intentionally updates the destination. Preserve existing Dashboard/Goals node-scope translation for new navigation without overwriting a retained screen’s saved state. Keep Goal and Feature modal underlays associated with their owning screen. Define deterministic fallback and focus when an active screen closes. Preserve Tools session handling and Planning navigation. On activation, refresh data without resetting interaction state. Guard asynchronous responses against inactive, closed, or superseded screen instances. Integrate with existing Node/target-app context handling so retained screens cannot display or submit another context’s data, including dirty-state protection.\n\n5. [ ] Task #5 - Verify the behavior through browser flows.\n   Extend tests/web_navigation_browser.test.js and relevant Dashboard, node-scope, Planning, Settings, and modal suites. Cover an interacted-with, scrolled Dashboard → agent → Dashboard; Dashboard → another Main screen → Dashboard; repeated selection without duplicate instances; saved filters and settings drafts; explicit parameterized links; Back/Forward; close/reopen; delayed responses during rapid switching; and Node/target-app changes. Assert preserved content identity and user-visible state, not merely the correct heading. Verify tool sessions are neither restarted nor stopped by screen switching. Check light/dark themes, collapsed/mobile navigation, keyboard focus, and Ctrl/Cmd+K. Update affected static navigation assertions and obsolete disclosure expectations. Run focused Node browser tests with Playwright available and relevant Rust static-surface tests; report skipped browser checks and unrelated baseline failures separately.\n\n6. [ ] Task #6 - Document the new navigation contract.\n   Update src/surfaces/refine-hub/product/navigation.md and directly affected browser intent documentation to describe Main’s menu, retained screen rows, activation, closing, and persistence boundary. Record verification results for Quality and Governance. Keep implementation within the browser surface unless inspection demonstrates a necessary shared behavior change; Refine continues to manage workflow transitions and integration."
-            },
-            "binding_id": "default-plan",
-            "evidence": [
-              "{\"finding\":\"routeWorkspace retains only one Main context and bypasses rendering on return only when the destination hash exactly matches its saved hash.\",\"source\":\"src/surfaces/web/static/js/navigation.js:202\"}",
-              "{\"finding\":\"Normal navigation invokes screen renderers and resets Goals/Features selections when leaving their lists. Goal and Feature details use modal underlays.\",\"source\":\"src/surfaces/web/static/js/router.js:95\"}",
-              "{\"finding\":\"Main currently uses a collapsible disclosure and fixed links; Tools and Planning use menus with separate persistent navigation rows.\",\"source\":\"src/surfaces/web/static/index.html:64\"}",
-              "{\"finding\":\"Existing coverage checks an untouched Dashboard’s DOM identity after returning from a terminal. It does not establish preservation across multiple Main screens or the richer interaction sequence requested.\",\"source\":\"tests/web_navigation_browser.test.js:41\"}",
-              "{\"finding\":\"Read-only planning completed. Working tree is clean; no implementation, tests, or Goal lifecycle mutations were performed.\",\"source\":\"Workspace inspection\"}"
-            ],
-            "invocation_id": "1c6c0506b526e8a9d699d3b8dfbb4837b592f6f93d711b9cea6cee7a70c0f85e",
-            "outcome": "success",
-            "role": "plan",
-            "summary": "Plan ready for implementation. The underlying gap is the absence of independently retained Main screens; changing the menu alone would leave that gap. Current source inspection supports a browser-shell solution that preserves existing routes, tool sessions, and context safeguards. Prior navigation notes informed component reuse and accessibility considerations; implementation findings were verified against this worktree.\n\n"
-          }
-        ]
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000T1C895ZNHPSMGN4FJC000",
+          "name": "In the UI, I don't like how, if you open the Dashboard and click around, then op",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": false,
+          "constitution": "",
+          "product": "",
+          "rules": []
+        },
+        "guidance_candidates": [],
+        "previous_rounds": [],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree, the current Round, and available planning context. Follow the Goal and applicable Skill instructions and use your judgment to decide when to stop. Quality and Governance agents make their own decisions using their Skills before integration and human Review. Refine coordinates workflow transitions and Git actions. Do not directly advance Goal state, approve, merge, or push."
       },
       "event": {},
       "goal": {
         "assignee": "Buddy Williams",
         "base_commit": "91cbcdf3611f61f0e7afb7244b05f8135f1a58b4",
         "branch_name": "refine/00000T1C895ZNHPSMGN4FJC000/round-1",
-        "candidate_commit": "e9a636417e7350333fa293fe2fb54e34f90db2ef",
+        "candidate_commit": "4c4ec00a49e614b6fb358275417066000cacd679",
         "created": "2026-09-17T20:22:44Z",
-        "event_generation": 5,
+        "event_generation": 6,
         "feature_id": null,
         "feature_order": null,
         "id": "00000T1C895ZNHPSMGN4FJC000",
@@ -124,28 +102,32 @@
             "implementation_report": "workflow.implement.enter:default-implement: Implemented all six plan tasks within the browser surface. Changes remain in the worktree for Quality and Governance; no workflow transitions or integration actions were performed.",
             "implementation_reported_at": "2026-09-17T20:44:14Z",
             "prompt": "In the UI, I don't like how, if you open the Dashboard and click around, then open an agent and switch back to the dashboard, you lose your place because it reloads the screen. Therefore, I think we need to treat the main nav the same way we do Tools (same theme, layout, and styles), so that clicking the main nav opens a new context menu, and clicking a context menu item opens that screen, making it persistent. The UI should be consistent with Tools and Planning since they work the way I want Main to work. Also, the Main icon will need to change too.",
+            "quality_agent_report": "workflow.quality.enter:default-quality: Quality passed for the changed behavior after correcting two defects. Seven files retain uncommitted fixes and test improvements for Governance. No workflow transitions or integration actions were performed.\n\n",
+            "quality_candidate_commit": "4c4ec00a49e614b6fb358275417066000cacd679",
+            "quality_message": "Quality Skills reported success.",
+            "quality_state": "passed",
             "reporter": "Buddy Williams",
-            "updated": "2026-09-17T20:44:15Z"
+            "updated": "2026-09-17T20:56:06Z"
           }
         ],
-        "status": "quality",
+        "status": "governance",
         "target_branch": "main",
-        "updated": "2026-09-17T20:44:15Z",
+        "updated": "2026-09-17T20:56:06Z",
         "workflow_context": "",
-        "workflow_revision": 21
+        "workflow_revision": 31
       },
       "system": {
-        "candidate_commit": "e9a636417e7350333fa293fe2fb54e34f90db2ef",
+        "candidate_commit": "4c4ec00a49e614b6fb358275417066000cacd679",
         "node_id": "default",
         "project_root": "/home/buddy/projects/refine-next",
         "refine_executable": "/home/buddy/projects/refine/bin/refine",
-        "workflow_step": "quality",
+        "workflow_step": "governance",
         "workspace": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T1C895ZNHPSMGN4FJC000-round-1"
       }
     },
     "metadata": {
       "behavior": "EventSkill",
-      "event_operation_id": "1a0b11ce6f01121298",
+      "event_operation_id": "1a0b127bdc8112129a",
       "goal_id": "00000T1C895ZNHPSMGN4FJC000",
       "kind": "workflow",
       "managed_worktree": {
@@ -164,7 +146,7 @@
       "provider": "codex",
       "round_idx": 0,
       "started_bindings": {
-        "default-quality": "2026-09-17T20:44:17.215106960+00:00"
+        "default-governance": "2026-09-17T20:56:07.657419481+00:00"
       },
       "target_app_id": "/home/buddy/projects/refine-next",
       "template_snapshot": {
@@ -467,15 +449,15 @@
         }
       },
       "workflow_revision": 2,
-      "workflow_state": "quality",
-      "workflow_step_generation": 5
+      "workflow_state": "governance",
+      "workflow_step_generation": 6
     }
   },
   "bindings": [
     {
       "binding": {
-        "id": "default-quality",
-        "skill_id": "default-quality",
+        "id": "default-governance",
+        "skill_id": "default-governance",
         "enabled": true,
         "mode": "blocking",
         "order": 0,
@@ -486,10 +468,10 @@
         "inputs": {}
       },
       "skill": {
-        "id": "default-quality",
-        "name": "Quality",
-        "prompt": "{{templates.purpose}}\n\n{{templates.architecture}}\n\n## Quality\n\nTest the implementation. Create and groom tests to cover the behavior described in the plan.\n\n### Outcome\n\nMeaningful tests cover the changed behavior and pass. Provide a brief report of the behavior tested, tests added or updated, commands run and their results, and any remaining failures or gaps. Include runtime or browser test results where useful. These results support Governance's verification of the work.\n\n### Guardrails\n\n- Test observable behavior, including relevant failure cases and effects on existing functionality. Tests should catch defects rather than mirror the implementation.\n- Keep useful tests, update tests for changed behavior, and remove obsolete or meaningless tests.\n- Investigate failures, correct problems in the implementation or tests, and rerun affected tests.\n- Choose tests suited to the change. Expand coverage when failures or affected behavior call for it.",
-        "role": "quality",
+        "id": "default-governance",
+        "name": "Governance",
+        "prompt": "{{templates.purpose}}\n\n{{templates.architecture}}\n\n## Governance\n\nVerify that the implementation meets the user-defined Goal, fits the system architecture, and serves the project's purpose.\n\n### Outcome\n\nA clear assessment of whether the implementation satisfies all three. Begin with the verdict, then briefly explain how the work meets the Goal, fits the architecture, and supports the project's purpose, using concrete evidence from the implementation and Quality results. For each gap, describe what falls short, why it matters, and the recommended correction. Separate necessary corrections from optional improvements.\n\n### Guardrails\n\n- Read the context that helps explain the user's Goal, the system architecture, and the project's purpose.\n- Compare the implementation with the user's desired outcome as well as the plan. Completing the plan and passing tests alone do not establish that the Goal is met.\n- Look for clear responsibilities, shared behavior implemented in one place, and interfaces that remain easy to use and maintain.\n- Judge design choices by how they serve the project. Allow sound approaches that differ from personal preference.\n- Group related issues by their underlying cause so the next step can address them together.",
+        "role": "governance",
         "enabled": true,
         "scope": {
           "node_id": null
@@ -500,92 +482,11 @@
       "parameters": {}
     }
   ],
-  "state": "succeeded",
-  "results": {
-    "default-quality": {
-      "invocation_id": "d1e85f77c323c97e38a28bffc9c387e8f864f302aeeaf4a2e8fb6553a95aea14",
-      "binding_id": "default-quality",
-      "role": "quality",
-      "outcome": "success",
-      "summary": "Quality passed for the changed behavior after correcting two defects. Seven files retain uncommitted fixes and test improvements for Governance. No workflow transitions or integration actions were performed.\n\n",
-      "evidence": [
-        "/tmp/refine-main-quality-verified-js.log",
-        "/tmp/refine-main-quality-final-rust.log",
-        "/tmp/refine-main-quality-main-static.log",
-        "/tmp/refine-main-quality-baseline-js.log",
-        "/tmp/refine-main-quality-baseline-rust.log"
-      ],
-      "artifacts": {
-        "changes": [
-          "Fixed delayed filter callbacks that could overwrite another screen’s URL or access detached inputs.",
-          "Fixed hidden Main-menu labels in the collapsed rail.",
-          "Added seven browser checks covering rapid filter navigation, Agent sessions, Planning drafts, Back/Forward, and menu layouts in both themes.",
-          "Updated the clipboard test helper and strengthened visible selection assertions."
-        ],
-        "limits": "Browser checks used real Chromium with intercepted daemon APIs. Live provider processes were not exercised.",
-        "remaining_failures": [
-          "Picker test expects a removed 1px split border.",
-          "Rust checks retain obsolete controls-menu expectations, missing Guide targets, and an outdated implementation-report assertion.",
-          "All four failures reproduce on pinned base commit 91cbcdf3611f61f0e7afb7244b05f8135f1a58b4."
-        ],
-        "verification": [
-          {
-            "command": "NODE_PATH=/home/buddy/projects/refine-test/node_modules node --test --test-concurrency=2 tests/web_*.test.js",
-            "result": "420 passed, 1 baseline failure, 0 skipped."
-          },
-          {
-            "command": "cargo test --lib surfaces::web_server::tests::static_surface -- --test-threads=1",
-            "result": "20 passed, 3 baseline failures."
-          },
-          {
-            "command": "cargo test --lib surfaces::web_server::tests::static_surface::navigation::static_main_menu_uses_retained_screen_rows -- --exact",
-            "result": "1 passed."
-          },
-          {
-            "command": "git diff --check",
-            "result": "Passed."
-          }
-        ]
-      }
-    }
-  },
-  "attempts": [
-    {
-      "attempt": 0,
-      "binding_id": "default-quality",
-      "checkout": {
-        "observation": {
-          "branch": "refine/00000T1C895ZNHPSMGN4FJC000/round-1",
-          "head_commit": "e9a636417e7350333fa293fe2fb54e34f90db2ef",
-          "status_porcelain": [
-            " M src/surfaces/web/static/index.html",
-            " M src/surfaces/web/static/js/features/changes.js",
-            " M src/surfaces/web/static/js/features/features.js",
-            " M src/surfaces/web/static/js/features/goals-list.js",
-            " M tests/support/terminal_browser.js",
-            " M tests/web_navigation_browser.test.js",
-            " M tests/web_planning_polish.test.js"
-          ]
-        },
-        "tree": "39e8ed97fa1adcb82c72f06a6f72ec5d9dbb912d"
-      },
-      "checkout_recorded": true,
-      "diagnostic": null,
-      "host_bound_result": true,
-      "observational_violation": false,
-      "operation_id": null,
-      "process_id": "proc-1789677857468-1122601-8959",
-      "prompt_bytes": 13791,
-      "provider_session_id": null,
-      "purpose": "work",
-      "raw_output": "{\n  \"outcome\": \"success\",\n  \"artifacts\": {\n    \"changes\": [\n      \"Fixed delayed filter callbacks that could overwrite another screen’s URL or access detached inputs.\",\n      \"Fixed hidden Main-menu labels in the collapsed rail.\",\n      \"Added seven browser checks covering rapid filter navigation, Agent sessions, Planning drafts, Back/Forward, and menu layouts in both themes.\",\n      \"Updated the clipboard test helper and strengthened visible selection assertions.\"\n    ],\n    \"verification\": [\n      {\n        \"command\": \"NODE_PATH=/home/buddy/projects/refine-test/node_modules node --test --test-concurrency=2 tests/web_*.test.js\",\n        \"result\": \"420 passed, 1 baseline failure, 0 skipped.\"\n      },\n      {\n        \"command\": \"cargo test --lib surfaces::web_server::tests::static_surface -- --test-threads=1\",\n        \"result\": \"20 passed, 3 baseline failures.\"\n      },\n      {\n        \"command\": \"cargo test --lib surfaces::web_server::tests::static_surface::navigation::static_main_menu_uses_retained_screen_rows -- --exact\",\n        \"result\": \"1 passed.\"\n      },\n      {\n        \"command\": \"git diff --check\",\n        \"result\": \"Passed.\"\n      }\n    ],\n    \"remaining_failures\": [\n      \"Picker test expects a removed 1px split border.\",\n      \"Rust checks retain obsolete controls-menu expectations, missing Guide targets, and an outdated implementation-report assertion.\",\n      \"All four failures reproduce on pinned base commit 91cbcdf3611f61f0e7afb7244b05f8135f1a58b4.\"\n    ],\n    \"limits\": \"Browser checks used real Chromium with intercepted daemon APIs. Live provider processes were not exercised.\"\n  },\n  \"evidence\": [\n    \"/tmp/refine-main-quality-verified-js.log\",\n    \"/tmp/refine-main-quality-final-rust.log\",\n    \"/tmp/refine-main-quality-main-static.log\",\n    \"/tmp/refine-main-quality-baseline-js.log\",\n    \"/tmp/refine-main-quality-baseline-rust.log\"\n  ],\n  \"summary\": \"Quality passed for the changed behavior after correcting two defects. Seven files retain uncommitted fixes and test improvements for Governance. No workflow transitions or integration actions were performed.\\n\\n\"\n}",
-      "received_at": "2026-09-17T20:55:57.235252716+00:00",
-      "started_at": "2026-09-17T20:44:17.429512995+00:00",
-      "workflow_revision": 2
-    }
-  ],
-  "created_at": "2026-09-17T20:44:16.139468257+00:00",
-  "completed_at": "2026-09-17T20:55:58.823901324+00:00",
+  "state": "running",
+  "results": {},
+  "attempts": [],
+  "created_at": "2026-09-17T20:56:06.484995762+00:00",
+  "completed_at": null,
   "error": null,
   "action_applied": false
 }

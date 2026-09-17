@@ -1,9 +1,9 @@
 {
   "base_commit": "91cbcdf3611f61f0e7afb7244b05f8135f1a58b4",
   "branch_name": "refine/00000T1C895ZNHPSMGN4FJC000/round-1",
-  "candidate_commit": "e9a636417e7350333fa293fe2fb54e34f90db2ef",
+  "candidate_commit": "4c4ec00a49e614b6fb358275417066000cacd679",
   "created": "2026-09-17T20:22:44Z",
-  "event_generation": 5,
+  "event_generation": 6,
   "feature_id": null,
   "feature_order": null,
   "id": "00000T1C895ZNHPSMGN4FJC000",
@@ -88,11 +88,11 @@
       "created": "2026-09-17T20:22:44Z",
       "event_configuration": {
         "events": {
-          "workflow.quality.enter": {
+          "workflow.governance.enter": {
             "bindings": [
               {
                 "enabled": true,
-                "id": "default-quality",
+                "id": "default-governance",
                 "inputs": {},
                 "mode": "blocking",
                 "order": 0,
@@ -100,30 +100,30 @@
                 "scope": {
                   "node_id": null
                 },
-                "skill_id": "default-quality"
+                "skill_id": "default-governance"
               }
             ],
             "enabled": true,
-            "id": "workflow.quality.enter",
+            "id": "workflow.governance.enter",
             "kind": "system",
-            "name": "Workflow Quality Enter",
+            "name": "Workflow Governance Enter",
             "on_success": null,
             "parameters": [],
             "scope": {
               "node_id": null
             },
-            "source": "workflow.quality.enter"
+            "source": "workflow.governance.enter"
           }
         },
         "revision": 87,
         "schema_version": 4,
         "skills": {
-          "default-quality": {
+          "default-governance": {
             "enabled": true,
-            "id": "default-quality",
-            "name": "Quality",
+            "id": "default-governance",
+            "name": "Governance",
             "parameters": [],
-            "prompt": "{{templates.purpose}}\n\n{{templates.architecture}}\n\n## Quality\n\nTest the implementation. Create and groom tests to cover the behavior described in the plan.\n\n### Outcome\n\nMeaningful tests cover the changed behavior and pass. Provide a brief report of the behavior tested, tests added or updated, commands run and their results, and any remaining failures or gaps. Include runtime or browser test results where useful. These results support Governance's verification of the work.\n\n### Guardrails\n\n- Test observable behavior, including relevant failure cases and effects on existing functionality. Tests should catch defects rather than mirror the implementation.\n- Keep useful tests, update tests for changed behavior, and remove obsolete or meaningless tests.\n- Investigate failures, correct problems in the implementation or tests, and rerun affected tests.\n- Choose tests suited to the change. Expand coverage when failures or affected behavior call for it.",
+            "prompt": "{{templates.purpose}}\n\n{{templates.architecture}}\n\n## Governance\n\nVerify that the implementation meets the user-defined Goal, fits the system architecture, and serves the project's purpose.\n\n### Outcome\n\nA clear assessment of whether the implementation satisfies all three. Begin with the verdict, then briefly explain how the work meets the Goal, fits the architecture, and supports the project's purpose, using concrete evidence from the implementation and Quality results. For each gap, describe what falls short, why it matters, and the recommended correction. Separate necessary corrections from optional improvements.\n\n### Guardrails\n\n- Read the context that helps explain the user's Goal, the system architecture, and the project's purpose.\n- Compare the implementation with the user's desired outcome as well as the plan. Completing the plan and passing tests alone do not establish that the Goal is met.\n- Look for clear responsibilities, shared behavior implemented in one place, and interfaces that remain easy to use and maintain.\n- Judge design choices by how they serve the project. Allow sound approaches that differ from personal preference.\n- Group related issues by their underlying cause so the next step can address them together.",
             "provenance": "refine-default-v1",
             "role": "task",
             "scope": {
@@ -206,6 +206,61 @@
           },
           "round_idx": 0,
           "source": "workflow.implement.enter",
+          "state": "succeeded"
+        },
+        "d1e85f77c323c97e38a28bffc9c387e8f864f302aeeaf4a2e8fb6553a95aea14": {
+          "candidate_commit": "e9a636417e7350333fa293fe2fb54e34f90db2ef",
+          "generation": 5,
+          "results": {
+            "default-quality": {
+              "artifacts": {
+                "changes": [
+                  "Fixed delayed filter callbacks that could overwrite another screen’s URL or access detached inputs.",
+                  "Fixed hidden Main-menu labels in the collapsed rail.",
+                  "Added seven browser checks covering rapid filter navigation, Agent sessions, Planning drafts, Back/Forward, and menu layouts in both themes.",
+                  "Updated the clipboard test helper and strengthened visible selection assertions."
+                ],
+                "limits": "Browser checks used real Chromium with intercepted daemon APIs. Live provider processes were not exercised.",
+                "remaining_failures": [
+                  "Picker test expects a removed 1px split border.",
+                  "Rust checks retain obsolete controls-menu expectations, missing Guide targets, and an outdated implementation-report assertion.",
+                  "All four failures reproduce on pinned base commit 91cbcdf3611f61f0e7afb7244b05f8135f1a58b4."
+                ],
+                "verification": [
+                  {
+                    "command": "NODE_PATH=/home/buddy/projects/refine-test/node_modules node --test --test-concurrency=2 tests/web_*.test.js",
+                    "result": "420 passed, 1 baseline failure, 0 skipped."
+                  },
+                  {
+                    "command": "cargo test --lib surfaces::web_server::tests::static_surface -- --test-threads=1",
+                    "result": "20 passed, 3 baseline failures."
+                  },
+                  {
+                    "command": "cargo test --lib surfaces::web_server::tests::static_surface::navigation::static_main_menu_uses_retained_screen_rows -- --exact",
+                    "result": "1 passed."
+                  },
+                  {
+                    "command": "git diff --check",
+                    "result": "Passed."
+                  }
+                ]
+              },
+              "binding_id": "default-quality",
+              "evidence": [
+                "/tmp/refine-main-quality-verified-js.log",
+                "/tmp/refine-main-quality-final-rust.log",
+                "/tmp/refine-main-quality-main-static.log",
+                "/tmp/refine-main-quality-baseline-js.log",
+                "/tmp/refine-main-quality-baseline-rust.log"
+              ],
+              "invocation_id": "d1e85f77c323c97e38a28bffc9c387e8f864f302aeeaf4a2e8fb6553a95aea14",
+              "outcome": "success",
+              "role": "quality",
+              "summary": "Quality passed for the changed behavior after correcting two defects. Seven files retain uncommitted fixes and test improvements for Governance. No workflow transitions or integration actions were performed.\n\n"
+            }
+          },
+          "round_idx": 0,
+          "source": "workflow.quality.enter",
           "state": "succeeded"
         }
       },
@@ -490,6 +545,92 @@
               }
             }
           }
+        },
+        "5:default:workflow.quality.exit": {
+          "events": {
+            "workflow.quality.exit": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.quality.exit",
+              "kind": "system",
+              "name": "Workflow Quality Exit",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.quality.exit"
+            }
+          },
+          "revision": 87,
+          "schema_version": 4,
+          "skills": {}
+        },
+        "5:default:workflow.quality.success": {
+          "events": {
+            "workflow.quality.success": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.quality.success",
+              "kind": "system",
+              "name": "workflow.quality.success",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.quality.success"
+            }
+          },
+          "revision": 87,
+          "schema_version": 4,
+          "skills": {}
+        },
+        "6:default:workflow.governance.enter": {
+          "events": {
+            "workflow.governance.enter": {
+              "bindings": [
+                {
+                  "enabled": true,
+                  "id": "default-governance",
+                  "inputs": {},
+                  "mode": "blocking",
+                  "order": 0,
+                  "overrides": null,
+                  "scope": {
+                    "node_id": null
+                  },
+                  "skill_id": "default-governance"
+                }
+              ],
+              "enabled": true,
+              "id": "workflow.governance.enter",
+              "kind": "system",
+              "name": "Workflow Governance Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.governance.enter"
+            }
+          },
+          "revision": 87,
+          "schema_version": 4,
+          "skills": {
+            "default-governance": {
+              "enabled": true,
+              "id": "default-governance",
+              "name": "Governance",
+              "parameters": [],
+              "prompt": "{{templates.purpose}}\n\n{{templates.architecture}}\n\n## Governance\n\nVerify that the implementation meets the user-defined Goal, fits the system architecture, and serves the project's purpose.\n\n### Outcome\n\nA clear assessment of whether the implementation satisfies all three. Begin with the verdict, then briefly explain how the work meets the Goal, fits the architecture, and supports the project's purpose, using concrete evidence from the implementation and Quality results. For each gap, describe what falls short, why it matters, and the recommended correction. Separate necessary corrections from optional improvements.\n\n### Guardrails\n\n- Read the context that helps explain the user's Goal, the system architecture, and the project's purpose.\n- Compare the implementation with the user's desired outcome as well as the plan. Completing the plan and passing tests alone do not establish that the Goal is met.\n- Look for clear responsibilities, shared behavior implemented in one place, and interfaces that remain easy to use and maintain.\n- Judge design choices by how they serve the project. Allow sound approaches that differ from personal preference.\n- Group related issues by their underlying cause so the next step can address them together.",
+              "provenance": "refine-default-v1",
+              "role": "task",
+              "scope": {
+                "node_id": null
+              }
+            }
+          }
         }
       },
       "implementation_report": "workflow.implement.enter:default-implement: Implemented all six plan tasks within the browser surface. Changes remain in the worktree for Quality and Governance; no workflow transitions or integration actions were performed.",
@@ -549,8 +690,150 @@
         }
       ],
       "prompt": "In the UI, I don't like how, if you open the Dashboard and click around, then open an agent and switch back to the dashboard, you lose your place because it reloads the screen. Therefore, I think we need to treat the main nav the same way we do Tools (same theme, layout, and styles), so that clicking the main nav opens a new context menu, and clicking a context menu item opens that screen, making it persistent. The UI should be consistent with Tools and Planning since they work the way I want Main to work. Also, the Main icon will need to change too.",
+      "quality_agent_report": "workflow.quality.enter:default-quality: Quality passed for the changed behavior after correcting two defects. Seven files retain uncommitted fixes and test improvements for Governance. No workflow transitions or integration actions were performed.\n\n",
+      "quality_candidate_commit": "4c4ec00a49e614b6fb358275417066000cacd679",
+      "quality_checked_at": "2026-09-17T20:56:03Z",
+      "quality_details": {
+        "candidate_commit": "4c4ec00a49e614b6fb358275417066000cacd679",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T1C895ZNHPSMGN4FJC000-round-1",
+        "diagnostics": [
+          "Reused Skill review workflow.quality.enter:default-quality for final candidate content: automation/invocations/d1e85f77c323c97e38a28bffc9c387e8f864f302aeeaf4a2e8fb6553a95aea14.json"
+        ],
+        "evaluation_scope": "isolated_candidate",
+        "operation_id": "1a0b127a66d1121299",
+        "provider_attempts": [],
+        "quality_proof": {
+          "checked_at": "2026-09-17T20:56:03Z",
+          "checked_candidate_commit": "4c4ec00a49e614b6fb358275417066000cacd679",
+          "evaluation_scope": "isolated_candidate",
+          "goal_id": "00000T1C895ZNHPSMGN4FJC000",
+          "operation_id": "1a0b127a66d1121299",
+          "results": [
+            {
+              "command": "",
+              "evidence": "Quality passed for the changed behavior after correcting two defects. Seven files retain uncommitted fixes and test improvements for Governance. No workflow transitions or integration actions were performed.\n\n",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality"
+            }
+          ],
+          "round_idx": 0,
+          "schema_version": 1,
+          "skills": {
+            "invocations": {
+              "workflow.quality.enter:default-quality": "d1e85f77c323c97e38a28bffc9c387e8f864f302aeeaf4a2e8fb6553a95aea14"
+            },
+            "required_bindings": [
+              "workflow.quality.enter:default-quality"
+            ],
+            "requirements_id": "73692de4f6a0ac19c8f66f2c9e519de5bf06c52a2cc949f130d1cf0603693a17"
+          },
+          "source_candidate_commit": "4c4ec00a49e614b6fb358275417066000cacd679",
+          "state": "passed"
+        },
+        "results": [
+          {
+            "command": "",
+            "evidence": "Quality passed for the changed behavior after correcting two defects. Seven files retain uncommitted fixes and test improvements for Governance. No workflow transitions or integration actions were performed.\n\n",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality"
+          }
+        ],
+        "source_candidate_commit": "4c4ec00a49e614b6fb358275417066000cacd679"
+      },
+      "quality_message": "Quality Skills reported success.",
+      "quality_requirements": {
+        "candidate_commit": "4c4ec00a49e614b6fb358275417066000cacd679",
+        "id": "73692de4f6a0ac19c8f66f2c9e519de5bf06c52a2cc949f130d1cf0603693a17",
+        "node_id": "default",
+        "required_bindings": [
+          "workflow.quality.enter:default-quality"
+        ],
+        "selected": [
+          {
+            "attachments": [],
+            "binding": {
+              "binding": {
+                "enabled": true,
+                "id": "default-quality",
+                "inputs": {},
+                "mode": "blocking",
+                "order": 0,
+                "overrides": null,
+                "scope": {
+                  "node_id": null
+                },
+                "skill_id": "default-quality"
+              },
+              "parameters": {},
+              "skill": {
+                "enabled": true,
+                "id": "default-quality",
+                "name": "Quality",
+                "parameters": [],
+                "prompt": "{{templates.purpose}}\n\n{{templates.architecture}}\n\n## Quality\n\nTest the implementation. Create and groom tests to cover the behavior described in the plan.\n\n### Outcome\n\nMeaningful tests cover the changed behavior and pass. Provide a brief report of the behavior tested, tests added or updated, commands run and their results, and any remaining failures or gaps. Include runtime or browser test results where useful. These results support Governance's verification of the work.\n\n### Guardrails\n\n- Test observable behavior, including relevant failure cases and effects on existing functionality. Tests should catch defects rather than mirror the implementation.\n- Keep useful tests, update tests for changed behavior, and remove obsolete or meaningless tests.\n- Investigate failures, correct problems in the implementation or tests, and rerun affected tests.\n- Choose tests suited to the change. Expand coverage when failures or affected behavior call for it.",
+                "provenance": "refine-default-v1",
+                "role": "quality",
+                "scope": {
+                  "node_id": null
+                }
+              }
+            },
+            "contract_version": 1,
+            "key": "workflow.quality.enter:default-quality"
+          }
+        ]
+      },
+      "quality_skill_results": [
+        {
+          "artifacts": {
+            "changes": [
+              "Fixed delayed filter callbacks that could overwrite another screen’s URL or access detached inputs.",
+              "Fixed hidden Main-menu labels in the collapsed rail.",
+              "Added seven browser checks covering rapid filter navigation, Agent sessions, Planning drafts, Back/Forward, and menu layouts in both themes.",
+              "Updated the clipboard test helper and strengthened visible selection assertions."
+            ],
+            "limits": "Browser checks used real Chromium with intercepted daemon APIs. Live provider processes were not exercised.",
+            "remaining_failures": [
+              "Picker test expects a removed 1px split border.",
+              "Rust checks retain obsolete controls-menu expectations, missing Guide targets, and an outdated implementation-report assertion.",
+              "All four failures reproduce on pinned base commit 91cbcdf3611f61f0e7afb7244b05f8135f1a58b4."
+            ],
+            "verification": [
+              {
+                "command": "NODE_PATH=/home/buddy/projects/refine-test/node_modules node --test --test-concurrency=2 tests/web_*.test.js",
+                "result": "420 passed, 1 baseline failure, 0 skipped."
+              },
+              {
+                "command": "cargo test --lib surfaces::web_server::tests::static_surface -- --test-threads=1",
+                "result": "20 passed, 3 baseline failures."
+              },
+              {
+                "command": "cargo test --lib surfaces::web_server::tests::static_surface::navigation::static_main_menu_uses_retained_screen_rows -- --exact",
+                "result": "1 passed."
+              },
+              {
+                "command": "git diff --check",
+                "result": "Passed."
+              }
+            ]
+          },
+          "binding_id": "workflow.quality.enter:default-quality",
+          "evidence": [
+            "/tmp/refine-main-quality-verified-js.log",
+            "/tmp/refine-main-quality-final-rust.log",
+            "/tmp/refine-main-quality-main-static.log",
+            "/tmp/refine-main-quality-baseline-js.log",
+            "/tmp/refine-main-quality-baseline-rust.log"
+          ],
+          "invocation_id": "d1e85f77c323c97e38a28bffc9c387e8f864f302aeeaf4a2e8fb6553a95aea14",
+          "outcome": "success",
+          "role": "quality",
+          "summary": "Quality passed for the changed behavior after correcting two defects. Seven files retain uncommitted fixes and test improvements for Governance. No workflow transitions or integration actions were performed.\n\n"
+        }
+      ],
+      "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "updated": "2026-09-17T20:44:15Z",
+      "updated": "2026-09-17T20:56:06Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-17T20:22:55Z",
         "generation": 2,
@@ -560,9 +843,9 @@
       "workspace_branch": "refine/00000T1C895ZNHPSMGN4FJC000/round-1"
     }
   ],
-  "status": "quality",
+  "status": "governance",
   "target_branch": "main",
-  "updated": "2026-09-17T20:44:15Z",
+  "updated": "2026-09-17T20:56:06Z",
   "workflow_context": "",
   "workflow_controls": [
     {
@@ -645,7 +928,17 @@
       "round_idx": 0,
       "to": "quality",
       "workflow_revision": 20
+    },
+    {
+      "at": "2026-09-17T20:56:05.505262026+00:00",
+      "forced": false,
+      "from": "quality",
+      "generation": 6,
+      "node_id": "default",
+      "round_idx": 0,
+      "to": "governance",
+      "workflow_revision": 30
     }
   ],
-  "workflow_revision": 21
+  "workflow_revision": 31
 }
