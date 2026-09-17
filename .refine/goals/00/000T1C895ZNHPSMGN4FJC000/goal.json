@@ -1,9 +1,9 @@
 {
-  "base_commit": null,
-  "branch_name": null,
+  "base_commit": "91cbcdf3611f61f0e7afb7244b05f8135f1a58b4",
+  "branch_name": "refine/00000T1C895ZNHPSMGN4FJC000/round-1",
   "candidate_commit": null,
   "created": "2026-09-17T20:22:44Z",
-  "event_generation": 2,
+  "event_generation": 3,
   "feature_id": null,
   "feature_order": null,
   "id": "00000T1C895ZNHPSMGN4FJC000",
@@ -57,8 +57,81 @@
   "reporter": "Buddy Williams",
   "rounds": [
     {
+      "agent_context": {
+        "assembled_at": "2026-09-17T20:23:00Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "In the UI, I don't like how, if you open the Dashboard and click around, then open an agent and switch back to the dashboard, you lose your place because it reloads the screen. Therefore, I think we need to treat the main nav the same way we do Tools (same theme, layout, and styles), so that clicking the main nav opens a new context menu, and clicking a context menu item opens that screen, making it persistent. The UI should be consistent with Tools and Planning since they work the way I want Main to work. Also, the Main icon will need to change too.",
+          "reporter": "Buddy Williams",
+          "round": 1
+        },
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000T1C895ZNHPSMGN4FJC000",
+          "name": "In the UI, I don't like how, if you open the Dashboard and click around, then op",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": false,
+          "constitution": "",
+          "product": "",
+          "rules": []
+        },
+        "guidance_candidates": [],
+        "previous_rounds": [],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree, the current Round, and available planning context. Follow the Goal and applicable Skill instructions and use your judgment to decide when to stop. Quality and Governance agents make their own decisions using their Skills before integration and human Review. Refine coordinates workflow transitions and Git actions. Do not directly advance Goal state, approve, merge, or push."
+      },
       "assignee": "Buddy Williams",
       "created": "2026-09-17T20:22:44Z",
+      "event_configuration": {
+        "events": {
+          "workflow.plan.enter": {
+            "bindings": [
+              {
+                "enabled": true,
+                "id": "default-plan",
+                "inputs": {},
+                "mode": "blocking",
+                "order": 0,
+                "overrides": null,
+                "scope": {
+                  "node_id": null
+                },
+                "skill_id": "default-plan"
+              }
+            ],
+            "enabled": true,
+            "id": "workflow.plan.enter",
+            "kind": "system",
+            "name": "Workflow Plan Enter",
+            "on_success": null,
+            "parameters": [],
+            "scope": {
+              "node_id": null
+            },
+            "source": "workflow.plan.enter"
+          }
+        },
+        "revision": 87,
+        "schema_version": 4,
+        "skills": {
+          "default-plan": {
+            "enabled": true,
+            "id": "default-plan",
+            "name": "Plan",
+            "parameters": [],
+            "prompt": "{{templates.purpose}}\n\n{{templates.architecture}}\n\n## Plan\n\nDevelop a plan to achieve the Goal's desired outcome. If the goal outcome is underspecified or is missing details add only just enough detail so that AI agents do not thrash or become confused.\n\n### Outcome\n\nA clear implementation plan that explains the approach and breaks the work into ordered tasks. Begin with a short description of the desired behavior and proposed solution. Use a numbered checklist, such as `Task #1 - What changes and why`. Include dependencies and important design decisions where they help implementation.\n\n### Guardrails\n\n- Read the context that helps explain the Goal and how the existing system works.\n- Look for the underlying cause. Consider whether a missing or misused concept explains the problem, and improve that concept rather than adding fixes for individual symptoms.\n- Give each task enough detail to guide implementation while leaving room for reasonable implementation choices.\n- Keep the plan focused on the desired outcome. Prefer straightforward changes that fit the existing architecture.",
+            "provenance": "refine-default-v1",
+            "role": "task",
+            "scope": {
+              "node_id": null
+            }
+          }
+        }
+      },
       "failure_at": "",
       "failure_category": "",
       "failure_message": "",
@@ -82,6 +155,92 @@
           "revision": 87,
           "schema_version": 4,
           "skills": {}
+        },
+        "2:default:workflow.todo.exit": {
+          "events": {
+            "workflow.todo.exit": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.todo.exit",
+              "kind": "system",
+              "name": "Workflow Todo Exit",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.todo.exit"
+            }
+          },
+          "revision": 87,
+          "schema_version": 4,
+          "skills": {}
+        },
+        "2:default:workflow.todo.success": {
+          "events": {
+            "workflow.todo.success": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.todo.success",
+              "kind": "system",
+              "name": "workflow.todo.success",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.todo.success"
+            }
+          },
+          "revision": 87,
+          "schema_version": 4,
+          "skills": {}
+        },
+        "3:default:workflow.plan.enter": {
+          "events": {
+            "workflow.plan.enter": {
+              "bindings": [
+                {
+                  "enabled": true,
+                  "id": "default-plan",
+                  "inputs": {},
+                  "mode": "blocking",
+                  "order": 0,
+                  "overrides": null,
+                  "scope": {
+                    "node_id": null
+                  },
+                  "skill_id": "default-plan"
+                }
+              ],
+              "enabled": true,
+              "id": "workflow.plan.enter",
+              "kind": "system",
+              "name": "Workflow Plan Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.plan.enter"
+            }
+          },
+          "revision": 87,
+          "schema_version": 4,
+          "skills": {
+            "default-plan": {
+              "enabled": true,
+              "id": "default-plan",
+              "name": "Plan",
+              "parameters": [],
+              "prompt": "{{templates.purpose}}\n\n{{templates.architecture}}\n\n## Plan\n\nDevelop a plan to achieve the Goal's desired outcome. If the goal outcome is underspecified or is missing details add only just enough detail so that AI agents do not thrash or become confused.\n\n### Outcome\n\nA clear implementation plan that explains the approach and breaks the work into ordered tasks. Begin with a short description of the desired behavior and proposed solution. Use a numbered checklist, such as `Task #1 - What changes and why`. Include dependencies and important design decisions where they help implementation.\n\n### Guardrails\n\n- Read the context that helps explain the Goal and how the existing system works.\n- Look for the underlying cause. Consider whether a missing or misused concept explains the problem, and improve that concept rather than adding fixes for individual symptoms.\n- Give each task enough detail to guide implementation while leaving room for reasonable implementation choices.\n- Keep the plan focused on the desired outcome. Prefer straightforward changes that fit the existing architecture.",
+              "provenance": "refine-default-v1",
+              "role": "task",
+              "scope": {
+                "node_id": null
+              }
+            }
+          }
         }
       },
       "logs": [],
@@ -140,13 +299,19 @@
       ],
       "prompt": "In the UI, I don't like how, if you open the Dashboard and click around, then open an agent and switch back to the dashboard, you lose your place because it reloads the screen. Therefore, I think we need to treat the main nav the same way we do Tools (same theme, layout, and styles), so that clicking the main nav opens a new context menu, and clicking a context menu item opens that screen, making it persistent. The UI should be consistent with Tools and Planning since they work the way I want Main to work. Also, the Main icon will need to change too.",
       "reporter": "Buddy Williams",
-      "updated": "2026-09-17T20:22:44Z",
-      "workflow_attempt_authority": null
+      "updated": "2026-09-17T20:23:00Z",
+      "workflow_attempt_authority": {
+        "claimed_at": "2026-09-17T20:22:55Z",
+        "generation": 2,
+        "round_idx": 0,
+        "workflow_revision": 2
+      },
+      "workspace_branch": "refine/00000T1C895ZNHPSMGN4FJC000/round-1"
     }
   ],
-  "status": "todo",
-  "target_branch": null,
-  "updated": "2026-09-17T20:22:49Z",
+  "status": "plan",
+  "target_branch": "main",
+  "updated": "2026-09-17T20:23:00Z",
   "workflow_context": "",
   "workflow_controls": [
     {
@@ -199,7 +364,17 @@
       "supersedes_execution": true,
       "to": "todo",
       "workflow_revision": 2
+    },
+    {
+      "at": "2026-09-17T20:22:57.351367873+00:00",
+      "forced": false,
+      "from": "todo",
+      "generation": 3,
+      "node_id": "default",
+      "round_idx": 0,
+      "to": "plan",
+      "workflow_revision": 6
     }
   ],
-  "workflow_revision": 2
+  "workflow_revision": 9
 }
