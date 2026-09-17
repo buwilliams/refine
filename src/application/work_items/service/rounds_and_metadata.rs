@@ -580,9 +580,38 @@ impl FileWorkItemService {
     }
 
     pub fn delete_goal_record(&self, goal_id: &str) -> RefineResult<()> {
+        self.delete_goal_record_checked(goal_id, None)
+    }
+
+    pub fn delete_draft_goal_record(
+        &self,
+        goal_id: &str,
+        expected_revision: u64,
+    ) -> RefineResult<()> {
+        self.delete_goal_record_checked(goal_id, Some(expected_revision))
+    }
+
+    fn delete_goal_record_checked(
+        &self,
+        goal_id: &str,
+        draft_revision: Option<u64>,
+    ) -> RefineResult<()> {
         let _goal_lock = self.acquire_goal_mutation_lock(goal_id)?;
         let current = self.show_goal_summary(goal_id)?;
         self.ensure_goal_owned(&current)?;
+        if let Some(expected) = draft_revision {
+            if current.goal.status != GoalStatus::Draft {
+                return Err(RefineError::Conflict(
+                    "Only Draft Goals can be deleted from Project Planning".into(),
+                ));
+            }
+            let (_, goal) = self.read_goal_value_unchecked_locked(&current)?;
+            if super::record_persistence::workflow_revision(&goal) != expected {
+                return Err(RefineError::Conflict(
+                    "Goal changed; refresh before deleting".into(),
+                ));
+            }
+        }
         validate_goal_operation(&current.goal.status, &GoalOperation::Delete)?;
         let goal_path = self.refine_dir.join(&current.goal.json_path);
         ActiveGoalIndex::prepare_goal_write(&self.refine_dir, &goal_path, None)?;

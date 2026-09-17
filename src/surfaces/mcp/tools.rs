@@ -230,14 +230,14 @@ pub fn tool_catalog() -> Vec<McpTool> {
             description: "Create or edit shared boards/lanes/cards, move or release a Goal card, or migrate Todo Lists. Read revisions first and reuse request_id on retry. Returns an action receipt; pending actions execute on the Goal owner.",
             input_schema: || {
                 json!({"type":"object","additionalProperties":false,"required":["operation","request_id"],"properties":{
-                    "operation":{"enum":["board.create","board.update","board.archive","board.delete","lane.create","lane.update","lane.reorder","lane.delete","card.create","card.attach","card.update","card.move","card.archive","card.detach","card.apply","migrate"]},
+                    "operation":{"enum":["board.create","board.update","board.archive","board.delete","lane.create","lane.update","lane.reorder","lane.delete","card.create","card.attach","card.update","card.move","card.archive","card.detach","card.delete","card.apply","migrate"]},
                     "request_id":{"type":"string"},"expected_revision":{"type":"integer","minimum":0},"board_id":{"type":"string"},"lane_id":{"type":"string"},"goal_id":{"type":"string"},"actor":{"type":"string"},"data":{"type":"object","properties":{
                         "name":{"type":"string"},"description":{"type":"string"},"reporter":{"type":"string"},
                         "priority":{"type":"string","enum":["low","medium","high"]},
                         "routing":{"type":["string","null"],"description":"Explicit node ID, auto for least-loaded eligible node, or null to inherit card -> lane -> board."},
                         "action":{"type":"string","enum":["none","accept_into_backlog","release"]},
                         "archived":{"type":"boolean"},"position":{"type":"number","description":"Card ordering value, or a zero-based lane index for lane.update (saved atomically with other lane settings)."},
-                        "expected_goal_revision":{"type":"integer","minimum":0,"description":"Required when card.update edits Goal metadata."},
+                        "expected_goal_revision":{"type":"integer","minimum":0,"description":"Required when card.update edits Goal metadata or card.delete deletes a Draft Goal."},
                         "lane_ids":{"type":"array","items":{"type":"string"},"description":"Complete lane order for lane.reorder."}
                     }}
                 }})

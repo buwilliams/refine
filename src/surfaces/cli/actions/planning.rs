@@ -10,7 +10,7 @@ pub enum PlanningCliAction {
     /// Submit a board, lane or card operation. Use a stable request id for retries.
     Apply {
         /// board.create/update/archive/delete, lane.create/update/reorder/delete,
-        /// card.create/attach/update/move/archive/detach/apply, or migrate.
+        /// card.create/attach/update/move/archive/detach/delete/apply, or migrate.
         operation: String,
         #[arg(long)]
         request_id: String,

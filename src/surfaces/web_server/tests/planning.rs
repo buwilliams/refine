@@ -28,15 +28,18 @@ fn planning_api_retains_requests_revisions_and_goal_identity() {
         response.body
     );
     let create = json!({"operation":"card.create","request_id":"card-request","board_id":board["id"],"lane_id":board["lanes"][0]["id"],"data":{"name":"Read a paper","reporter":"Buddy","description":"Shared notes"}});
+    let created = request("POST", "/api/planning/commands", Some(create.clone()));
+    assert_eq!(created.status, 200, "{}", created.body);
+    assert_eq!(created.body["state"], "complete");
     assert_eq!(
-        request("POST", "/api/planning/commands", Some(create)).status,
-        202
+        request("POST", "/api/planning/commands", Some(create)).body,
+        created.body
     );
     let root = refine_dir_for_target_root(&temp).unwrap();
     let planning =
         crate::application::planning::FilePlanningService::new(&root, &temp, temp.join("runtime"))
             .unwrap();
-    planning.process_pending().unwrap();
+    // Creation must be visible without waiting for any background worker tick.
     let snapshot = request("GET", "/api/planning", None);
     assert_eq!(snapshot.status, 200);
     let card = &snapshot.body["cards"][0];
@@ -73,6 +76,25 @@ fn planning_api_retains_requests_revisions_and_goal_identity() {
     assert_eq!(
         request("GET", "/planning/actions/stale-request", None).body["state"],
         "failed"
+    );
+    let deletion = json!({"operation":"card.delete","request_id":"delete-request","goal_id":id,"board_id":board["id"],"expected_revision":2,"data":{"expected_goal_revision":before}});
+    let deleted = request("POST", "/api/planning/commands", Some(deletion.clone()));
+    assert_eq!(deleted.status, 200, "{}", deleted.body);
+    assert_eq!(deleted.body["state"], "complete");
+    assert_eq!(
+        request("POST", "/api/planning/commands", Some(deletion)).body,
+        deleted.body
+    );
+    assert!(
+        request("GET", "/api/planning", None).body["cards"]
+            .as_array()
+            .unwrap()
+            .is_empty()
+    );
+    assert!(
+        FileWorkItemService::new(&root)
+            .show_goal_detail(id)
+            .is_err()
     );
     let migrated = request(
         "POST",

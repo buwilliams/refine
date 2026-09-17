@@ -104,6 +104,25 @@ async function planningApp() {
         const body = request.postDataJSON();
         requests.push(body);
         let result = {};
+        if (body.operation === "card.delete") {
+          const card = snapshot.cards.find(
+            (card) => card.placement.goal_id === body.goal_id,
+          );
+          if (
+            card.goal.status !== "draft" ||
+            card.goal.workflow_revision !== body.data.expected_goal_revision ||
+            card.placement.revision !== body.expected_revision
+          ) {
+            return {
+              state: "failed",
+              message: "Goal changed; refresh before deleting",
+            };
+          }
+          snapshot.cards = snapshot.cards.filter(
+            (card) => card.placement.goal_id !== body.goal_id,
+          );
+          result = { goal_id: body.goal_id, deleted: true };
+        }
         if (
           body.operation === "lane.update" ||
           body.operation === "lane.delete"
@@ -880,6 +899,83 @@ test(
         true,
       );
       assert.equal(app.snapshot.boards[0].lanes[0].id, "ideas");
+      assert.deepEqual(app.pageErrors, []);
+    } finally {
+      await app.close();
+    }
+  },
+);
+
+test(
+  "Deleting a Draft card confirms removal, preserves other cards, and hides Delete for workflow Goals",
+  { skip: SKIP },
+  async () => {
+    const app = await planningApp();
+    try {
+      const { page } = app;
+      app.snapshot.cards[1].goal.status = "backlog";
+      await page.reload();
+      await page.locator('[data-card="DRAFT1"]').waitFor();
+      assert.equal(
+        await page.locator('[data-card="DRAFT2"] [data-card-delete]').count(),
+        0,
+      );
+      const remove = page.locator('[data-card-delete="DRAFT1"]');
+      await remove.click();
+      const confirm = page.getByRole("alertdialog", {
+        name: "Delete Draft Goal",
+        exact: true,
+      });
+      assert.match(
+        await confirm.textContent(),
+        /Research onboarding.*cannot be undone/s,
+      );
+      assert.equal(
+        await confirm
+          .getByRole("button", { name: "Cancel", exact: true })
+          .evaluate((el) => el === document.activeElement),
+        true,
+      );
+      await confirm
+        .getByRole("button", { name: "Cancel", exact: true })
+        .click();
+      assert.equal(app.requests.length, 0);
+      assert.equal(await page.locator('[data-card="DRAFT1"]').count(), 1);
+      await remove.click();
+      await confirm
+        .getByRole("button", { name: "Delete", exact: true })
+        .click();
+      await page.locator('[data-card="DRAFT1"]').waitFor({ state: "detached" });
+      assert.equal(app.requests.length, 1);
+      assert.equal(app.requests[0].operation, "card.delete");
+      assert.equal(app.requests[0].expected_revision, 1);
+      assert.equal(app.requests[0].data.expected_goal_revision, 1);
+      assert.equal(await page.locator('[data-card="DRAFT2"]').count(), 1);
+      assert.deepEqual(app.pageErrors, []);
+    } finally {
+      await app.close();
+    }
+  },
+);
+
+test(
+  "A rejected Draft deletion leaves the card visible and reports the conflict",
+  { skip: SKIP },
+  async () => {
+    const app = await planningApp();
+    try {
+      const { page } = app;
+      await page.locator('[data-card-delete="DRAFT1"]').click();
+      app.snapshot.cards[0].goal.status = "backlog";
+      await page
+        .getByRole("alertdialog", { name: "Delete Draft Goal", exact: true })
+        .getByRole("button", { name: "Delete", exact: true })
+        .click();
+      await page
+        .getByText("Goal changed; refresh before deleting", { exact: true })
+        .waitFor();
+      assert.equal(app.snapshot.cards.length, 2);
+      assert.equal(await page.locator('[data-card="DRAFT1"]').count(), 1);
       assert.deepEqual(app.pageErrors, []);
     } finally {
       await app.close();

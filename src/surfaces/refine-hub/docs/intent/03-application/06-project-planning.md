@@ -36,7 +36,7 @@ CLI, API and MCP call the same application service:
 - `GET /api/planning`, `/boards/:id`, `/cards/:id`, `/actions/:id`; `POST /api/planning/commands` and `/actions/:id/cancel`. The daemon accepts the same paths without `/api`.
 - MCP: `refine_planning`, `refine_planning_command`, `refine_planning_action`, `refine_cancel_planning_action`.
 
-Command operations are `board.create`, `board.update`, `board.archive`, `lane.create`, `lane.update`, `lane.reorder`, `lane.delete`, `card.create`, `card.attach`, `card.update`, `card.move`, `card.archive`, `card.detach`, `card.apply`, and `migrate`. A lane can be deleted only when empty, including archived placements. Board archive is reversible.
+Command operations are `board.create`, `board.update`, `board.archive`, `lane.create`, `lane.update`, `lane.reorder`, `lane.delete`, `card.create`, `card.attach`, `card.update`, `card.move`, `card.archive`, `card.detach`, `card.delete`, `card.apply`, and `migrate`. A lane can be deleted only when empty, including archived placements. Board archive is reversible.
 
 `lane.update` accepts an optional integer `position`, the lane's zero-based index in the board. Name, action, routing, and position are saved together under one board revision; an invalid position leaves the board unchanged.
 
@@ -65,3 +65,7 @@ The old Todo toolbar is retired. Legacy HTTP routes and the hidden CLI remain co
 Draft cards belong exclusively to Project Planning in the browser. Workflow visualizations, creation controls, filters, Goal lists and searches, Feature progress, and bulk selections exclude Draft. The Goals query supports `exclude_draft=1` before pagination and facets; bulk filters use `exclude_draft: true`. API and CLI callers can still explicitly inspect planning Goals. Draft detail links return to the board.
 
 `board.delete` requires the board revision and rejects pending actions involving that board. It records a durable deletion marker so synchronization cannot restore old placements. Goals and their workflow history remain intact; their old card placements are no longer visible and can be replaced by `card.attach` on another board. Card placement revisions remain monotonic across reattachment. Board locks serialize deletion with card processing, including moves between boards. Replaying the deletion request is safe after interruption.
+
+`card.delete` deletes a Draft Goal and its placement on the owning node. It requires the placement `expected_revision` and `data.expected_goal_revision`; promoted or changed Goals are rejected. Retrying the same request resumes interrupted placement cleanup without repeating the deletion. Use `card.detach` to keep the Goal and only remove its board placement.
+
+The API processes card creation during the request so ordinary Draft cards appear without a background-worker delay. Creation and deletion retain durable action records; actions waiting on Skills or another node continue through the worker.

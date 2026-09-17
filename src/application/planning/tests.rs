@@ -819,3 +819,116 @@ fn lane_settings_and_position_save_atomically() {
         "Ready"
     );
 }
+
+#[test]
+fn delete_draft_card_is_owned_revision_checked_and_replayable() {
+    let f = Fixture::new();
+    let board = f.board();
+    let id = f.card(&board);
+    let goal_revision = f.service.work().show_goal_detail(&id).unwrap()["workflow_revision"]
+        .as_u64()
+        .unwrap();
+    for (placement_revision, revision) in [(0, goal_revision), (1, goal_revision + 1)] {
+        let failed = f.apply(
+            "card.delete",
+            Some(&board.id),
+            None,
+            Some(&id),
+            Some(placement_revision),
+            json!({"expected_goal_revision":revision}),
+        );
+        assert_eq!(failed.state, "failed");
+        assert!(f.service.work().show_goal_detail(&id).is_ok());
+        assert!(f.service.placement(&id).is_ok());
+    }
+    let command = PlanningCommand {
+        request_id: "delete-draft".into(),
+        operation: "card.delete".into(),
+        board_id: Some(board.id.clone()),
+        lane_id: None,
+        goal_id: Some(id.clone()),
+        expected_revision: Some(1),
+        actor: "Buddy".into(),
+        data: json!({"expected_goal_revision":goal_revision}),
+    };
+    let mut other = FilePlanningService::new(&f.service.root, &f.path, &f.service.runtime).unwrap();
+    other.node = "other".into();
+    other.submit(command.clone()).unwrap();
+    other.process_action(&command.request_id).unwrap();
+    assert_eq!(other.action(&command.request_id).unwrap().state, "queued");
+    assert!(f.service.work().show_goal_detail(&id).is_ok());
+    f.service.process_action(&command.request_id).unwrap();
+    assert_eq!(
+        f.service.action(&command.request_id).unwrap().state,
+        "complete"
+    );
+    assert!(matches!(
+        f.service.work().show_goal_detail(&id),
+        Err(RefineError::NotFound(_))
+    ));
+    assert!(
+        f.service.snapshot().unwrap()["cards"]
+            .as_array()
+            .unwrap()
+            .is_empty()
+    );
+    assert_eq!(other.submit(command).unwrap().state, "complete");
+}
+
+#[test]
+fn draft_deletion_rejects_promoted_goals_and_resumes_after_goal_removal() {
+    let f = Fixture::new();
+    let board = f.board();
+    let id = f.card(&board);
+    let goal_revision = f.service.work().show_goal_detail(&id).unwrap()["workflow_revision"]
+        .as_u64()
+        .unwrap();
+    let command = PlanningCommand {
+        request_id: "resume-delete".into(),
+        operation: "card.delete".into(),
+        board_id: Some(board.id.clone()),
+        lane_id: None,
+        goal_id: Some(id.clone()),
+        expected_revision: Some(1),
+        actor: "Buddy".into(),
+        data: json!({"expected_goal_revision":goal_revision}),
+    };
+    let mut action = f.service.submit(command.clone()).unwrap();
+    action.phase = "delete".into();
+    action.before = Some(f.service.placement(&id).unwrap());
+    f.service.save_action(&action).unwrap();
+    f.service
+        .work()
+        .delete_draft_goal_record(&id, goal_revision)
+        .unwrap();
+    f.service.process_action(&action.id).unwrap();
+    assert_eq!(f.service.action(&action.id).unwrap().state, "complete");
+    assert!(
+        f.service.snapshot().unwrap()["cards"]
+            .as_array()
+            .unwrap()
+            .is_empty()
+    );
+
+    let id = f.card(&board);
+    f.service
+        .work()
+        .set_goal_status_unchecked(&id, &GoalStatus::Backlog)
+        .unwrap();
+    let revision = f.service.work().show_goal_detail(&id).unwrap()["workflow_revision"].clone();
+    let rejected = f.apply(
+        "card.delete",
+        Some(&board.id),
+        None,
+        Some(&id),
+        Some(1),
+        json!({"expected_goal_revision":revision}),
+    );
+    assert_eq!(rejected.state, "failed");
+    assert!(rejected.message.unwrap().contains("Only Draft"));
+    assert_eq!(
+        f.service.work().show_goal_detail(&id).unwrap()["status"],
+        "backlog"
+    );
+    assert!(f.service.placement(&id).is_ok());
+}

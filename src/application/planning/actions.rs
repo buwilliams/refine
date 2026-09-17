@@ -64,6 +64,39 @@ impl FilePlanningService {
             .clone()
             .unwrap_or_else(|| format!("PLN{}", stable_id(&a.id)[..24].to_uppercase()));
         let work = self.work();
+        if a.command.operation == "card.delete" {
+            if a.phase == "prepare" {
+                let placement = self.placement(&goal_id)?;
+                revision(a.command.expected_revision, placement.revision)?;
+                a.before = Some(placement);
+                // Persist intent before deleting the Goal so interrupted cleanup can resume.
+                a.phase = "delete".into();
+                self.save_action(a)?;
+            }
+            match work.show_goal_detail(&goal_id) {
+                Ok(goal) => {
+                    if goal["node_id"] != self.node {
+                        a.owner = goal["node_id"].as_str().unwrap_or("default").into();
+                        return Err(waiting("The current Goal node must process this action"));
+                    }
+                    work.delete_draft_goal_record(
+                        &goal_id,
+                        a.command.data["expected_goal_revision"]
+                            .as_u64()
+                            .ok_or_else(|| invalid("expected_goal_revision is required"))?,
+                    )?;
+                }
+                Err(RefineError::NotFound(_)) => {}
+                Err(error) => return Err(error),
+            }
+            let path = self.path("cards", &goal_id)?;
+            if path.exists() {
+                fs::remove_file(path).map_err(io)?;
+            }
+            a.state = "complete".into();
+            a.result = json!({"goal_id":goal_id, "deleted":true});
+            return Ok(());
+        }
         // Explicitly removing an orphaned placement must remain possible after
         // a Goal was deleted through another surface. Unreadable Goals still fail closed.
         if a.command.operation == "card.detach"

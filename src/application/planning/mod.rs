@@ -664,6 +664,7 @@ fn validate_command(c: &PlanningCommand) -> RefineResult<()> {
         "card.move",
         "card.archive",
         "card.detach",
+        "card.delete",
         "card.apply",
         "migrate",
     ]
@@ -678,6 +679,13 @@ fn validate_command(c: &PlanningCommand) -> RefineResult<()> {
     }
     if !c.data.is_null() && !c.data.is_object() {
         return Err(invalid("data must be an object"));
+    }
+    if c.operation == "card.delete"
+        && (c.goal_id.is_none() || c.data["expected_goal_revision"].as_u64().is_none())
+    {
+        return Err(invalid(
+            "card.delete requires goal_id and expected_goal_revision",
+        ));
     }
     Ok(())
 }

@@ -31,6 +31,7 @@ impl InProcessWebServer {
                             .map_err(|e| RefineError::InvalidInput(e.to_string()))?;
                     let immediate = command.operation.starts_with("board.")
                         || command.operation.starts_with("lane.")
+                        || matches!(command.operation.as_str(), "card.create" | "card.delete")
                         || command.operation == "migrate";
                     let action = service.submit(command)?;
                     if immediate {

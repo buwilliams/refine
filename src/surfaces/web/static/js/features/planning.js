@@ -137,7 +137,7 @@ async function refreshPlanning() {
       ${!snapshot.migration ? '<button class="secondary" data-planning-migrate>Import Todo Lists</button>' : ""}</div>
       ${board?.archived ? '<p class="muted">This board is archived. Restore it in Board settings to add new cards.</p>' : ""}
       ${(snapshot.errors || []).map((error) => `<p role="alert">${esc(error)}</p>`).join("")}
-      ${actions.length ? `<section class="planning-actions" aria-label="Planning actions">${actions.map((a) => `<div role="status"><strong>${esc({ queued: "Queued", waiting: "Waiting", failed: "Needs attention", cancelled: "Cancelled" }[a.state] || a.state)}</strong> · ${esc({ "card.create": "Create card", "card.move": "Move card", "card.attach": "Add existing Goal", "card.apply": "Release card", "card.update": "Update card" }[a.command.operation] || "Board update")} · ${esc(a.message || `Processing on ${a.owner}`)} <button class="secondary" data-planning-action="${esc(a.id)}">Details</button>${!["failed", "cancelled"].includes(a.state) ? `<button class="secondary" data-planning-cancel="${esc(a.id)}">Cancel</button>` : ""}</div>`).join("")}</section>` : ""}
+      ${actions.length ? `<section class="planning-actions" aria-label="Planning actions">${actions.map((a) => `<div role="status"><strong>${esc({ queued: "Queued", waiting: "Waiting", failed: "Needs attention", cancelled: "Cancelled" }[a.state] || a.state)}</strong> · ${esc({ "card.create": "Create card", "card.move": "Move card", "card.attach": "Add existing Goal", "card.apply": "Release card", "card.update": "Update card", "card.delete": "Delete Draft Goal" }[a.command.operation] || "Board update")} · ${esc(a.message || `Processing on ${a.owner}`)} <button class="secondary" data-planning-action="${esc(a.id)}">Details</button>${!["failed", "cancelled"].includes(a.state) ? `<button class="secondary" data-planning-cancel="${esc(a.id)}">Cancel</button>` : ""}</div>`).join("")}</section>` : ""}
       ${
         board
           ? `<div class="planning-lanes" aria-label="${esc(board.name)}">${board.lanes
@@ -193,7 +193,7 @@ function planningCardHtml(card, board) {
     ${goal.description ? `<p>${esc(goal.description.slice(0, 180))}</p>` : ""}
     ${card.error ? `<p role="alert">${esc(card.error)}</p>` : ""}
     <p class="planning-card-meta">${esc(goal.reporter || "No Reporter")} · ${esc(goal.priority || "low")} priority${goal.status !== "draft" ? `<br>Node: ${esc(goal.node_display_name || goal.node_id || "unknown")}` : ""}</p>
-    <div class="actions">${card.error ? `<button class="secondary" data-card-detach="${esc(p.goal_id)}">Remove from board</button>` : `<button class="secondary" data-card-edit="${esc(p.goal_id)}">Edit</button>`}<button class="secondary" data-card-move="${esc(p.goal_id)}">Move</button><button class="secondary" data-card-archive="${esc(p.goal_id)}">${p.archived ? "Restore" : "Archive"}</button></div>
+    <div class="actions">${card.error ? `<button class="secondary" data-card-detach="${esc(p.goal_id)}">Remove from board</button>` : `<button class="secondary" data-card-edit="${esc(p.goal_id)}">Edit</button>`}<button class="secondary" data-card-move="${esc(p.goal_id)}">Move</button><button class="secondary" data-card-archive="${esc(p.goal_id)}">${p.archived ? "Restore" : "Archive"}</button>${goal.status === "draft" && !card.error ? `<button class="danger" data-card-delete="${esc(p.goal_id)}">Delete</button>` : ""}</div>
     ${board.lanes.find((l) => l.id === p.lane_id)?.action !== "none" ? `<button class="secondary" data-card-apply="${esc(p.goal_id)}">${board.lanes.find((l) => l.id === p.lane_id)?.action === "release" ? "Release to execution" : "Send to Backlog"}</button>` : ""}</article>`;
 }
 function bindPlanning(board) {
@@ -312,6 +312,40 @@ function bindPlanning(board) {
           planningCommand("card.detach", fields(card(el.dataset.cardDetach))),
         )),
     );
+  root.querySelectorAll("[data-card-delete]").forEach((button) => {
+    const submit = planningSubmitter("card.delete");
+    button.onclick = async () => {
+      const c = card(button.dataset.cardDelete);
+      if (
+        !(await modalConfirm(
+          `Delete Draft Goal “${c.goal.name}” and remove it from this board? This cannot be undone.`,
+          {
+            title: "Delete Draft Goal",
+            okLabel: "Delete",
+            danger: true,
+            focusCancel: true,
+          },
+        ))
+      )
+        return;
+      await withButtonBusy(button, "Deleting…", async () => {
+        try {
+          const result = await submit(fields(c), {
+            expected_goal_revision: c.goal.workflow_revision || 0,
+          });
+          await refreshPlanning();
+          toast(
+            result.state === "complete"
+              ? "Draft Goal deleted"
+              : "Draft deletion queued",
+            "info",
+          );
+        } catch (error) {
+          await showActionError(error);
+        }
+      });
+    };
+  });
   root.querySelectorAll("[data-card-edit]").forEach(
     (el) =>
       (el.onclick = () => {
