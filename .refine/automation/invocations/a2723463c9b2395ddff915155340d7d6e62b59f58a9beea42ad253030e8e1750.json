@@ -1,10 +1,10 @@
 {
-  "id": "1c6c0506b526e8a9d699d3b8dfbb4837b592f6f93d711b9cea6cee7a70c0f85e",
+  "id": "a2723463c9b2395ddff915155340d7d6e62b59f58a9beea42ad253030e8e1750",
   "event": {
-    "id": "workflow.plan.enter",
-    "name": "Workflow Plan Enter",
+    "id": "workflow.implement.enter",
+    "name": "Workflow Implement Enter",
     "kind": "system",
-    "source": "workflow.plan.enter",
+    "source": "workflow.implement.enter",
     "enabled": true,
     "scope": {
       "node_id": null
@@ -12,8 +12,8 @@
     "parameters": [],
     "bindings": [
       {
-        "id": "default-plan",
-        "skill_id": "default-plan",
+        "id": "default-implement",
+        "skill_id": "default-implement",
         "enabled": true,
         "mode": "blocking",
         "order": 0,
@@ -51,31 +51,52 @@
     "candidate_commit": null,
     "data": {
       "context": {
-        "assembled_at": "2026-09-17T20:23:00Z",
-        "current_round": {
-          "assignee": "Buddy Williams",
-          "prompt": "In the UI, I don't like how, if you open the Dashboard and click around, then open an agent and switch back to the dashboard, you lose your place because it reloads the screen. Therefore, I think we need to treat the main nav the same way we do Tools (same theme, layout, and styles), so that clicking the main nav opens a new context menu, and clicking a context menu item opens that screen, making it persistent. The UI should be consistent with Tools and Planning since they work the way I want Main to work. Also, the Main icon will need to change too.",
-          "reporter": "Buddy Williams",
-          "round": 1
+        "agent_context": {
+          "assembled_at": "2026-09-17T20:23:00Z",
+          "current_round": {
+            "assignee": "Buddy Williams",
+            "prompt": "In the UI, I don't like how, if you open the Dashboard and click around, then open an agent and switch back to the dashboard, you lose your place because it reloads the screen. Therefore, I think we need to treat the main nav the same way we do Tools (same theme, layout, and styles), so that clicking the main nav opens a new context menu, and clicking a context menu item opens that screen, making it persistent. The UI should be consistent with Tools and Planning since they work the way I want Main to work. Also, the Main icon will need to change too.",
+            "reporter": "Buddy Williams",
+            "round": 1
+          },
+          "goal": {
+            "assignee": "Buddy Williams",
+            "id": "00000T1C895ZNHPSMGN4FJC000",
+            "name": "In the UI, I don't like how, if you open the Dashboard and click around, then op",
+            "node_id": "default",
+            "priority": "low",
+            "reporter": "Buddy Williams"
+          },
+          "governance": {
+            "configured": false,
+            "constitution": "",
+            "product": "",
+            "rules": []
+          },
+          "guidance_candidates": [],
+          "previous_rounds": [],
+          "version": 1,
+          "workflow_summary": "Refine gives this Goal Agent an isolated worktree, the current Round, and available planning context. Follow the Goal and applicable Skill instructions and use your judgment to decide when to stop. Quality and Governance agents make their own decisions using their Skills before integration and human Review. Refine coordinates workflow transitions and Git actions. Do not directly advance Goal state, approve, merge, or push."
         },
-        "goal": {
-          "assignee": "Buddy Williams",
-          "id": "00000T1C895ZNHPSMGN4FJC000",
-          "name": "In the UI, I don't like how, if you open the Dashboard and click around, then op",
-          "node_id": "default",
-          "priority": "low",
-          "reporter": "Buddy Williams"
-        },
-        "governance": {
-          "configured": false,
-          "constitution": "",
-          "product": "",
-          "rules": []
-        },
-        "guidance_candidates": [],
-        "previous_rounds": [],
-        "version": 1,
-        "workflow_summary": "Refine gives this Goal Agent an isolated worktree, the current Round, and available planning context. Follow the Goal and applicable Skill instructions and use your judgment to decide when to stop. Quality and Governance agents make their own decisions using their Skills before integration and human Review. Refine coordinates workflow transitions and Git actions. Do not directly advance Goal state, approve, merge, or push."
+        "plans": [
+          {
+            "artifacts": {
+              "plan": "Main will open a context menu styled like Tools and Planning. Selecting Dashboard, Features, Goals, Changes, Control, or Settings will open or activate a persistent screen listed beneath Main. Returning from an agent, another Main screen, or Planning will restore that screen’s place and controls.\n\n1. [ ] Task #1 - Introduce a retained Main-screen lifecycle.\n   Extend the browser navigation shell in navigation.js and router.js with one open instance per Main destination. Track each screen’s current URL, retained content, scroll position, and necessary view state. Dashboard remains the initial screen. Selecting an already-open destination activates its existing instance; closing it releases its retained state. Persistence means surviving screen switches within the page session; browser reload may reconstruct screens from lightweight navigation metadata using existing storage conventions. Do not serialize DOM or unsaved form contents.\n\n2. [ ] Task #2 - Retain screen content safely during navigation.\n   Build on Task #1 to replace the single mainHash/mainRoute return slot with screen-specific activation and deactivation. Preserve live DOM and handlers rather than restoring HTML strings. Keep existing renderers usable through the active #main host, avoiding duplicate IDs and global selectors that can reach inactive screens. Capture state before leaving and restore it before resuming updates. Audit shared globals, especially Settings and Control, and move or snapshot only the state needed for independent restoration. Screen switching must preserve filters, expanded panels, selection, settings tabs, drafts, and scroll; adjust the router’s current list-selection resets accordingly. Explicit close continues to respect existing dirty-state safeguards.\n\n3. [ ] Task #3 - Replace Main’s disclosure with the shared menu pattern.\n   After the lifecycle exists, update index.html, navigation.js, and navigation.css so Main uses the same full-row trigger, menu positioning, theme tokens, spacing, and persistent-row styling as Tools and Planning. Replace the compass icon with the bundled panels-top-left icon. Include the six existing Main destinations in their current order. Open screens remain visible beneath the trigger when its menu closes, with active indication and accessible close controls. Remove Main from the old collapsible-section storage logic. Support keyboard opening and dismissal, focus restoration, outside-click dismissal, collapsed rail, and mobile drawer behavior using existing helpers.\n\n4. [ ] Task #4 - Reconcile retained screens with routes and live context.\n   Route Main menu selections, open-screen rows, command-palette navigation, direct links, and Back/Forward through the same lifecycle. Activating an existing screen restores its saved URL, including filters; an explicit link with different parameters intentionally updates the destination. Preserve existing Dashboard/Goals node-scope translation for new navigation without overwriting a retained screen’s saved state. Keep Goal and Feature modal underlays associated with their owning screen. Define deterministic fallback and focus when an active screen closes. Preserve Tools session handling and Planning navigation. On activation, refresh data without resetting interaction state. Guard asynchronous responses against inactive, closed, or superseded screen instances. Integrate with existing Node/target-app context handling so retained screens cannot display or submit another context’s data, including dirty-state protection.\n\n5. [ ] Task #5 - Verify the behavior through browser flows.\n   Extend tests/web_navigation_browser.test.js and relevant Dashboard, node-scope, Planning, Settings, and modal suites. Cover an interacted-with, scrolled Dashboard → agent → Dashboard; Dashboard → another Main screen → Dashboard; repeated selection without duplicate instances; saved filters and settings drafts; explicit parameterized links; Back/Forward; close/reopen; delayed responses during rapid switching; and Node/target-app changes. Assert preserved content identity and user-visible state, not merely the correct heading. Verify tool sessions are neither restarted nor stopped by screen switching. Check light/dark themes, collapsed/mobile navigation, keyboard focus, and Ctrl/Cmd+K. Update affected static navigation assertions and obsolete disclosure expectations. Run focused Node browser tests with Playwright available and relevant Rust static-surface tests; report skipped browser checks and unrelated baseline failures separately.\n\n6. [ ] Task #6 - Document the new navigation contract.\n   Update src/surfaces/refine-hub/product/navigation.md and directly affected browser intent documentation to describe Main’s menu, retained screen rows, activation, closing, and persistence boundary. Record verification results for Quality and Governance. Keep implementation within the browser surface unless inspection demonstrates a necessary shared behavior change; Refine continues to manage workflow transitions and integration."
+            },
+            "binding_id": "default-plan",
+            "evidence": [
+              "{\"finding\":\"routeWorkspace retains only one Main context and bypasses rendering on return only when the destination hash exactly matches its saved hash.\",\"source\":\"src/surfaces/web/static/js/navigation.js:202\"}",
+              "{\"finding\":\"Normal navigation invokes screen renderers and resets Goals/Features selections when leaving their lists. Goal and Feature details use modal underlays.\",\"source\":\"src/surfaces/web/static/js/router.js:95\"}",
+              "{\"finding\":\"Main currently uses a collapsible disclosure and fixed links; Tools and Planning use menus with separate persistent navigation rows.\",\"source\":\"src/surfaces/web/static/index.html:64\"}",
+              "{\"finding\":\"Existing coverage checks an untouched Dashboard’s DOM identity after returning from a terminal. It does not establish preservation across multiple Main screens or the richer interaction sequence requested.\",\"source\":\"tests/web_navigation_browser.test.js:41\"}",
+              "{\"finding\":\"Read-only planning completed. Working tree is clean; no implementation, tests, or Goal lifecycle mutations were performed.\",\"source\":\"Workspace inspection\"}"
+            ],
+            "invocation_id": "1c6c0506b526e8a9d699d3b8dfbb4837b592f6f93d711b9cea6cee7a70c0f85e",
+            "outcome": "success",
+            "role": "plan",
+            "summary": "Plan ready for implementation. The underlying gap is the absence of independently retained Main screens; changing the menu alone would leave that gap. Current source inspection supports a browser-shell solution that preserves existing routes, tool sessions, and context safeguards. Prior navigation notes informed component reuse and accessibility considerations; implementation findings were verified against this worktree.\n\n"
+          }
+        ]
       },
       "event": {},
       "goal": {
@@ -84,7 +105,7 @@
         "branch_name": "refine/00000T1C895ZNHPSMGN4FJC000/round-1",
         "candidate_commit": null,
         "created": "2026-09-17T20:22:44Z",
-        "event_generation": 3,
+        "event_generation": 4,
         "feature_id": null,
         "feature_order": null,
         "id": "00000T1C895ZNHPSMGN4FJC000",
@@ -101,27 +122,27 @@
             "failure_message": "",
             "prompt": "In the UI, I don't like how, if you open the Dashboard and click around, then open an agent and switch back to the dashboard, you lose your place because it reloads the screen. Therefore, I think we need to treat the main nav the same way we do Tools (same theme, layout, and styles), so that clicking the main nav opens a new context menu, and clicking a context menu item opens that screen, making it persistent. The UI should be consistent with Tools and Planning since they work the way I want Main to work. Also, the Main icon will need to change too.",
             "reporter": "Buddy Williams",
-            "updated": "2026-09-17T20:23:00Z"
+            "updated": "2026-09-17T20:25:03Z"
           }
         ],
-        "status": "plan",
+        "status": "implement",
         "target_branch": "main",
-        "updated": "2026-09-17T20:23:00Z",
+        "updated": "2026-09-17T20:25:03Z",
         "workflow_context": "",
-        "workflow_revision": 9
+        "workflow_revision": 14
       },
       "system": {
         "candidate_commit": null,
         "node_id": "default",
         "project_root": "/home/buddy/projects/refine-next",
         "refine_executable": "/home/buddy/projects/refine/bin/refine",
-        "workflow_step": "plan",
+        "workflow_step": "implement",
         "workspace": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T1C895ZNHPSMGN4FJC000-round-1"
       }
     },
     "metadata": {
       "behavior": "EventSkill",
-      "event_operation_id": "1a0b10973681121296",
+      "event_operation_id": "1a0b10b594d1121297",
       "goal_id": "00000T1C895ZNHPSMGN4FJC000",
       "kind": "workflow",
       "managed_worktree": {
@@ -140,7 +161,7 @@
       "provider": "codex",
       "round_idx": 0,
       "started_bindings": {
-        "default-plan": "2026-09-17T20:23:02.510984892+00:00"
+        "default-implement": "2026-09-17T20:25:07.024329571+00:00"
       },
       "target_app_id": "/home/buddy/projects/refine-next",
       "template_snapshot": {
@@ -443,15 +464,15 @@
         }
       },
       "workflow_revision": 2,
-      "workflow_state": "plan",
-      "workflow_step_generation": 3
+      "workflow_state": "implement",
+      "workflow_step_generation": 4
     }
   },
   "bindings": [
     {
       "binding": {
-        "id": "default-plan",
-        "skill_id": "default-plan",
+        "id": "default-implement",
+        "skill_id": "default-implement",
         "enabled": true,
         "mode": "blocking",
         "order": 0,
@@ -462,10 +483,10 @@
         "inputs": {}
       },
       "skill": {
-        "id": "default-plan",
-        "name": "Plan",
-        "prompt": "{{templates.purpose}}\n\n{{templates.architecture}}\n\n## Plan\n\nDevelop a plan to achieve the Goal's desired outcome. If the goal outcome is underspecified or is missing details add only just enough detail so that AI agents do not thrash or become confused.\n\n### Outcome\n\nA clear implementation plan that explains the approach and breaks the work into ordered tasks. Begin with a short description of the desired behavior and proposed solution. Use a numbered checklist, such as `Task #1 - What changes and why`. Include dependencies and important design decisions where they help implementation.\n\n### Guardrails\n\n- Read the context that helps explain the Goal and how the existing system works.\n- Look for the underlying cause. Consider whether a missing or misused concept explains the problem, and improve that concept rather than adding fixes for individual symptoms.\n- Give each task enough detail to guide implementation while leaving room for reasonable implementation choices.\n- Keep the plan focused on the desired outcome. Prefer straightforward changes that fit the existing architecture.",
-        "role": "plan",
+        "id": "default-implement",
+        "name": "Implement",
+        "prompt": "{{templates.purpose}}\n\n{{templates.architecture}}\n\n## Implement\n\nImplement the plan.\n\n### Outcome\n\nThe plan is implemented in a way that aligns with the project's purpose and architecture. Provide a brief summary organized by plan task: what changed, any important departures from the plan and why, and any unfinished work.\n\n### Guardrails\n\n- Follow established code patterns and put shared behavior in one place. Fix the underlying cause rather than each symptom separately.\n- Keep code focused on one responsibility and preserve stable interfaces where possible. Split mixed responsibilities into separate files. Keep files relatively small, under roughly 1,000 lines where possible.\n- Prefer clear, straightforward code and abstractions that make the behavior easier to understand and maintain.\n",
+        "role": "implement",
         "enabled": true,
         "scope": {
           "node_id": null
@@ -476,55 +497,11 @@
       "parameters": {}
     }
   ],
-  "state": "succeeded",
-  "results": {
-    "default-plan": {
-      "invocation_id": "1c6c0506b526e8a9d699d3b8dfbb4837b592f6f93d711b9cea6cee7a70c0f85e",
-      "binding_id": "default-plan",
-      "role": "plan",
-      "outcome": "success",
-      "summary": "Plan ready for implementation. The underlying gap is the absence of independently retained Main screens; changing the menu alone would leave that gap. Current source inspection supports a browser-shell solution that preserves existing routes, tool sessions, and context safeguards. Prior navigation notes informed component reuse and accessibility considerations; implementation findings were verified against this worktree.\n\n",
-      "evidence": [
-        "{\"finding\":\"routeWorkspace retains only one Main context and bypasses rendering on return only when the destination hash exactly matches its saved hash.\",\"source\":\"src/surfaces/web/static/js/navigation.js:202\"}",
-        "{\"finding\":\"Normal navigation invokes screen renderers and resets Goals/Features selections when leaving their lists. Goal and Feature details use modal underlays.\",\"source\":\"src/surfaces/web/static/js/router.js:95\"}",
-        "{\"finding\":\"Main currently uses a collapsible disclosure and fixed links; Tools and Planning use menus with separate persistent navigation rows.\",\"source\":\"src/surfaces/web/static/index.html:64\"}",
-        "{\"finding\":\"Existing coverage checks an untouched Dashboard’s DOM identity after returning from a terminal. It does not establish preservation across multiple Main screens or the richer interaction sequence requested.\",\"source\":\"tests/web_navigation_browser.test.js:41\"}",
-        "{\"finding\":\"Read-only planning completed. Working tree is clean; no implementation, tests, or Goal lifecycle mutations were performed.\",\"source\":\"Workspace inspection\"}"
-      ],
-      "artifacts": {
-        "plan": "Main will open a context menu styled like Tools and Planning. Selecting Dashboard, Features, Goals, Changes, Control, or Settings will open or activate a persistent screen listed beneath Main. Returning from an agent, another Main screen, or Planning will restore that screen’s place and controls.\n\n1. [ ] Task #1 - Introduce a retained Main-screen lifecycle.\n   Extend the browser navigation shell in navigation.js and router.js with one open instance per Main destination. Track each screen’s current URL, retained content, scroll position, and necessary view state. Dashboard remains the initial screen. Selecting an already-open destination activates its existing instance; closing it releases its retained state. Persistence means surviving screen switches within the page session; browser reload may reconstruct screens from lightweight navigation metadata using existing storage conventions. Do not serialize DOM or unsaved form contents.\n\n2. [ ] Task #2 - Retain screen content safely during navigation.\n   Build on Task #1 to replace the single mainHash/mainRoute return slot with screen-specific activation and deactivation. Preserve live DOM and handlers rather than restoring HTML strings. Keep existing renderers usable through the active #main host, avoiding duplicate IDs and global selectors that can reach inactive screens. Capture state before leaving and restore it before resuming updates. Audit shared globals, especially Settings and Control, and move or snapshot only the state needed for independent restoration. Screen switching must preserve filters, expanded panels, selection, settings tabs, drafts, and scroll; adjust the router’s current list-selection resets accordingly. Explicit close continues to respect existing dirty-state safeguards.\n\n3. [ ] Task #3 - Replace Main’s disclosure with the shared menu pattern.\n   After the lifecycle exists, update index.html, navigation.js, and navigation.css so Main uses the same full-row trigger, menu positioning, theme tokens, spacing, and persistent-row styling as Tools and Planning. Replace the compass icon with the bundled panels-top-left icon. Include the six existing Main destinations in their current order. Open screens remain visible beneath the trigger when its menu closes, with active indication and accessible close controls. Remove Main from the old collapsible-section storage logic. Support keyboard opening and dismissal, focus restoration, outside-click dismissal, collapsed rail, and mobile drawer behavior using existing helpers.\n\n4. [ ] Task #4 - Reconcile retained screens with routes and live context.\n   Route Main menu selections, open-screen rows, command-palette navigation, direct links, and Back/Forward through the same lifecycle. Activating an existing screen restores its saved URL, including filters; an explicit link with different parameters intentionally updates the destination. Preserve existing Dashboard/Goals node-scope translation for new navigation without overwriting a retained screen’s saved state. Keep Goal and Feature modal underlays associated with their owning screen. Define deterministic fallback and focus when an active screen closes. Preserve Tools session handling and Planning navigation. On activation, refresh data without resetting interaction state. Guard asynchronous responses against inactive, closed, or superseded screen instances. Integrate with existing Node/target-app context handling so retained screens cannot display or submit another context’s data, including dirty-state protection.\n\n5. [ ] Task #5 - Verify the behavior through browser flows.\n   Extend tests/web_navigation_browser.test.js and relevant Dashboard, node-scope, Planning, Settings, and modal suites. Cover an interacted-with, scrolled Dashboard → agent → Dashboard; Dashboard → another Main screen → Dashboard; repeated selection without duplicate instances; saved filters and settings drafts; explicit parameterized links; Back/Forward; close/reopen; delayed responses during rapid switching; and Node/target-app changes. Assert preserved content identity and user-visible state, not merely the correct heading. Verify tool sessions are neither restarted nor stopped by screen switching. Check light/dark themes, collapsed/mobile navigation, keyboard focus, and Ctrl/Cmd+K. Update affected static navigation assertions and obsolete disclosure expectations. Run focused Node browser tests with Playwright available and relevant Rust static-surface tests; report skipped browser checks and unrelated baseline failures separately.\n\n6. [ ] Task #6 - Document the new navigation contract.\n   Update src/surfaces/refine-hub/product/navigation.md and directly affected browser intent documentation to describe Main’s menu, retained screen rows, activation, closing, and persistence boundary. Record verification results for Quality and Governance. Keep implementation within the browser surface unless inspection demonstrates a necessary shared behavior change; Refine continues to manage workflow transitions and integration."
-      }
-    }
-  },
-  "attempts": [
-    {
-      "attempt": 0,
-      "binding_id": "default-plan",
-      "checkout": {
-        "observation": {
-          "branch": "refine/00000T1C895ZNHPSMGN4FJC000/round-1",
-          "head_commit": "91cbcdf3611f61f0e7afb7244b05f8135f1a58b4",
-          "status_porcelain": []
-        },
-        "tree": "abf4e0205f07bab93f4bb86ec2d2574a6817c050"
-      },
-      "checkout_recorded": true,
-      "diagnostic": null,
-      "host_bound_result": true,
-      "observational_violation": false,
-      "operation_id": null,
-      "process_id": "proc-1789676582828-1122601-4844",
-      "prompt_bytes": 6435,
-      "provider_session_id": null,
-      "purpose": "work",
-      "raw_output": "{\n  \"outcome\": \"success\",\n  \"artifacts\": {\n    \"plan\": \"Main will open a context menu styled like Tools and Planning. Selecting Dashboard, Features, Goals, Changes, Control, or Settings will open or activate a persistent screen listed beneath Main. Returning from an agent, another Main screen, or Planning will restore that screen’s place and controls.\\n\\n1. [ ] Task #1 - Introduce a retained Main-screen lifecycle.\\n   Extend the browser navigation shell in navigation.js and router.js with one open instance per Main destination. Track each screen’s current URL, retained content, scroll position, and necessary view state. Dashboard remains the initial screen. Selecting an already-open destination activates its existing instance; closing it releases its retained state. Persistence means surviving screen switches within the page session; browser reload may reconstruct screens from lightweight navigation metadata using existing storage conventions. Do not serialize DOM or unsaved form contents.\\n\\n2. [ ] Task #2 - Retain screen content safely during navigation.\\n   Build on Task #1 to replace the single mainHash/mainRoute return slot with screen-specific activation and deactivation. Preserve live DOM and handlers rather than restoring HTML strings. Keep existing renderers usable through the active #main host, avoiding duplicate IDs and global selectors that can reach inactive screens. Capture state before leaving and restore it before resuming updates. Audit shared globals, especially Settings and Control, and move or snapshot only the state needed for independent restoration. Screen switching must preserve filters, expanded panels, selection, settings tabs, drafts, and scroll; adjust the router’s current list-selection resets accordingly. Explicit close continues to respect existing dirty-state safeguards.\\n\\n3. [ ] Task #3 - Replace Main’s disclosure with the shared menu pattern.\\n   After the lifecycle exists, update index.html, navigation.js, and navigation.css so Main uses the same full-row trigger, menu positioning, theme tokens, spacing, and persistent-row styling as Tools and Planning. Replace the compass icon with the bundled panels-top-left icon. Include the six existing Main destinations in their current order. Open screens remain visible beneath the trigger when its menu closes, with active indication and accessible close controls. Remove Main from the old collapsible-section storage logic. Support keyboard opening and dismissal, focus restoration, outside-click dismissal, collapsed rail, and mobile drawer behavior using existing helpers.\\n\\n4. [ ] Task #4 - Reconcile retained screens with routes and live context.\\n   Route Main menu selections, open-screen rows, command-palette navigation, direct links, and Back/Forward through the same lifecycle. Activating an existing screen restores its saved URL, including filters; an explicit link with different parameters intentionally updates the destination. Preserve existing Dashboard/Goals node-scope translation for new navigation without overwriting a retained screen’s saved state. Keep Goal and Feature modal underlays associated with their owning screen. Define deterministic fallback and focus when an active screen closes. Preserve Tools session handling and Planning navigation. On activation, refresh data without resetting interaction state. Guard asynchronous responses against inactive, closed, or superseded screen instances. Integrate with existing Node/target-app context handling so retained screens cannot display or submit another context’s data, including dirty-state protection.\\n\\n5. [ ] Task #5 - Verify the behavior through browser flows.\\n   Extend tests/web_navigation_browser.test.js and relevant Dashboard, node-scope, Planning, Settings, and modal suites. Cover an interacted-with, scrolled Dashboard → agent → Dashboard; Dashboard → another Main screen → Dashboard; repeated selection without duplicate instances; saved filters and settings drafts; explicit parameterized links; Back/Forward; close/reopen; delayed responses during rapid switching; and Node/target-app changes. Assert preserved content identity and user-visible state, not merely the correct heading. Verify tool sessions are neither restarted nor stopped by screen switching. Check light/dark themes, collapsed/mobile navigation, keyboard focus, and Ctrl/Cmd+K. Update affected static navigation assertions and obsolete disclosure expectations. Run focused Node browser tests with Playwright available and relevant Rust static-surface tests; report skipped browser checks and unrelated baseline failures separately.\\n\\n6. [ ] Task #6 - Document the new navigation contract.\\n   Update src/surfaces/refine-hub/product/navigation.md and directly affected browser intent documentation to describe Main’s menu, retained screen rows, activation, closing, and persistence boundary. Record verification results for Quality and Governance. Keep implementation within the browser surface unless inspection demonstrates a necessary shared behavior change; Refine continues to manage workflow transitions and integration.\"\n  },\n  \"evidence\": [\n    {\n      \"source\": \"src/surfaces/web/static/js/navigation.js:202\",\n      \"finding\": \"routeWorkspace retains only one Main context and bypasses rendering on return only when the destination hash exactly matches its saved hash.\"\n    },\n    {\n      \"source\": \"src/surfaces/web/static/js/router.js:95\",\n      \"finding\": \"Normal navigation invokes screen renderers and resets Goals/Features selections when leaving their lists. Goal and Feature details use modal underlays.\"\n    },\n    {\n      \"source\": \"src/surfaces/web/static/index.html:64\",\n      \"finding\": \"Main currently uses a collapsible disclosure and fixed links; Tools and Planning use menus with separate persistent navigation rows.\"\n    },\n    {\n      \"source\": \"tests/web_navigation_browser.test.js:41\",\n      \"finding\": \"Existing coverage checks an untouched Dashboard’s DOM identity after returning from a terminal. It does not establish preservation across multiple Main screens or the richer interaction sequence requested.\"\n    },\n    {\n      \"source\": \"Workspace inspection\",\n      \"finding\": \"Read-only planning completed. Working tree is clean; no implementation, tests, or Goal lifecycle mutations were performed.\"\n    }\n  ],\n  \"summary\": \"Plan ready for implementation. The underlying gap is the absence of independently retained Main screens; changing the menu alone would leave that gap. Current source inspection supports a browser-shell solution that preserves existing routes, tool sessions, and context safeguards. Prior navigation notes informed component reuse and accessibility considerations; implementation findings were verified against this worktree.\\n\\n\"\n}",
-      "received_at": "2026-09-17T20:24:59.724437264+00:00",
-      "started_at": "2026-09-17T20:23:02.789881799+00:00",
-      "workflow_revision": 2
-    }
-  ],
-  "created_at": "2026-09-17T20:23:01.380652535+00:00",
-  "completed_at": "2026-09-17T20:25:01.550862197+00:00",
+  "state": "running",
+  "results": {},
+  "attempts": [],
+  "created_at": "2026-09-17T20:25:04.587940825+00:00",
+  "completed_at": null,
   "error": null,
   "action_applied": false
 }
