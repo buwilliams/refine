@@ -401,11 +401,47 @@
       }
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "succeeded",
+  "results": {
+    "trigger-2124c51c-8d1f-44b7-8a07-7a989a68227f": {
+      "invocation_id": "d8e65608011939f2e8b4894f4f55367939bbb3d9050ee51fb8c39a0ef7888080",
+      "binding_id": "trigger-2124c51c-8d1f-44b7-8a07-7a989a68227f",
+      "role": "task",
+      "outcome": "success",
+      "summary": "Queued fetch-goals-from-email invocation 614dbd33aa088c26ca503022320cc89b90609db66674dde60c627664aa9bb150 with request ID startup-email-d8e65608011939f2e8b4894f4f55367939bbb3d9050ee51fb8c39a0ef7888080 and REFINE_DAEMON_PORT=8082. Completing this startup Skill immediately without waiting for the child Skill.",
+      "evidence": [],
+      "artifacts": null
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "trigger-2124c51c-8d1f-44b7-8a07-7a989a68227f",
+      "checkout": {
+        "observation": {
+          "branch": "main",
+          "head_commit": "dbf33a65b6e6ab9026a9fc953ecc654c314059be",
+          "status_porcelain": []
+        },
+        "tree": "9aab935f470c165e9ee5fc745db7cef6a0b2c799"
+      },
+      "checkout_recorded": true,
+      "diagnostic": null,
+      "host_bound_result": true,
+      "observational_violation": false,
+      "operation_id": null,
+      "process_id": "proc-1789673065152-1075669-3",
+      "prompt_bytes": 2204,
+      "provider_session_id": null,
+      "purpose": "work",
+      "raw_output": "{\"outcome\":\"success\",\"summary\":\"Queued fetch-goals-from-email invocation 614dbd33aa088c26ca503022320cc89b90609db66674dde60c627664aa9bb150 with request ID startup-email-d8e65608011939f2e8b4894f4f55367939bbb3d9050ee51fb8c39a0ef7888080 and REFINE_DAEMON_PORT=8082. Completing this startup Skill immediately without waiting for the child Skill.\"}",
+      "received_at": "2026-09-17T19:24:40.069429782+00:00",
+      "started_at": "2026-09-17T19:24:25.077093184+00:00",
+      "workflow_revision": null
+    }
+  ],
   "created_at": "2026-09-17T19:24:22.351881809+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-17T19:24:40.116605544+00:00",
   "error": null,
   "action_applied": false
 }
