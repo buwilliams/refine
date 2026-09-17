@@ -77,7 +77,7 @@ test('Target application actions honor configuration, confirm start and stop, an
   } finally {await app.close();}
 });
 
-test('Custom topbar pickers share split borders, support keyboard selection, and retain Reporter after cancelled creation', {skip:SKIP}, async()=>{
+test('Navigation pickers support keyboard selection and retain Reporter after cancelled creation', {skip:SKIP}, async()=>{
   const app=await openApp({fixture(path){
     if(path==='/api/reporters')return {reporters:[{name:'Reporter'},{name:'Reviewer'}]};
     return apiFixture(path);
@@ -105,7 +105,7 @@ test('Custom topbar pickers share split borders, support keyboard selection, and
     await page.waitForFunction(()=>document.querySelector('[data-topbar-picker="reporter"] [data-picker-value]').textContent==='Reviewer');
     const heights=await page.locator('.nav-picker-summary').evaluateAll(els=>els.map(el=>el.getBoundingClientRect().height));
     assert.ok(heights.every(height => height >= 44));
-    assert.equal(await picker.locator('.nav-context-more').evaluate(el=>getComputedStyle(el).borderLeftWidth),'1px');
+    assert.equal(await picker.locator('.nav-context-more').evaluate(el=>getComputedStyle(el).borderLeftWidth),'0px');
     await picker.locator('summary').click();
     await page.locator('[data-topbar-picker="node"] > summary').click();
     assert.equal(await picker.getAttribute('open'),null);

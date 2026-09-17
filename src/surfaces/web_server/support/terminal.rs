@@ -439,13 +439,23 @@ impl TerminalSession {
             prompt_artifact: Mutex::new(launch.prompt_artifact),
         });
         let reader_session = Arc::clone(&session);
+        let mut redactor = environment.redactor();
         thread::spawn(move || {
             let mut buf = [0_u8; 4096];
             loop {
                 match reader.read(&mut buf) {
-                    Ok(0) => break,
+                    Ok(0) => {
+                        let final_bytes = redactor.push(&[], true);
+                        if !final_bytes.is_empty() {
+                            let text = String::from_utf8_lossy(&final_bytes).to_string();
+                            reader_session.append_process_output(text.as_bytes());
+                            reader_session.push_event("terminal_output", text);
+                        }
+                        break;
+                    }
                     Ok(count) => {
-                        let text = String::from_utf8_lossy(&buf[..count]).to_string();
+                        let bytes = redactor.push(&buf[..count], false);
+                        let text = String::from_utf8_lossy(&bytes).to_string();
                         reader_session.append_process_output(text.as_bytes());
                         reader_session.push_event("terminal_output", text);
                     }
@@ -855,3 +865,7 @@ mod tests {
         fs::remove_dir_all(root).unwrap();
     }
 }
+
+#[cfg(all(test, unix))]
+#[path = "terminal_credential_tests.rs"]
+mod credential_tests;

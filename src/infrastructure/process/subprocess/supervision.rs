@@ -14,7 +14,7 @@ impl FileProcessSupervisor {
         });
     }
 
-    pub(super) fn wait_for_reaper_idle(&self, process_id: &str) -> RefineResult<()> {
+    pub(crate) fn wait_for_reaper_idle(&self, process_id: &str) -> RefineResult<()> {
         let deadline = Instant::now() + Duration::from_secs(1);
         loop {
             let reaper_owned = self
@@ -64,8 +64,23 @@ impl FileProcessSupervisor {
     }
 }
 
-impl ProcessSupervisor for FileProcessSupervisor {
-    fn launch(&self, spec: ManagedProcessSpec) -> RefineResult<ManagedProcess> {
+impl FileProcessSupervisor {
+    pub(crate) fn launch_with_prepared_environment(
+        &self,
+        mut spec: ManagedProcessSpec,
+        environment: &crate::infrastructure::process::launch_environment::EffectiveLaunchEnvironment,
+    ) -> RefineResult<ManagedProcess> {
+        if !environment.credential_targets().is_empty() {
+            #[cfg(not(target_os = "linux"))]
+            return Err(RefineError::InvalidInput(
+                "credential-protected detached provider launches require Linux scope capture"
+                    .into(),
+            ));
+            spec.metadata.insert(
+                "provider_credential_env".into(),
+                json!(environment.credential_targets()),
+            );
+        }
         self.validate_launch(&spec)?;
         let launch_guard = self.operation_launch_guard(&spec)?;
         fs::create_dir_all(self.processes_dir()).map_err(|error| {
@@ -94,7 +109,7 @@ impl ProcessSupervisor for FileProcessSupervisor {
             ))
         })?;
 
-        let mut command = process_command(&spec)?;
+        let mut command = process_command_with_environment(&spec, environment)?;
         #[cfg(target_os = "linux")]
         let mut scope_launch = owned_groups::launch_scope::ScopeLaunch::prepare(
             self,
@@ -219,6 +234,13 @@ impl ProcessSupervisor for FileProcessSupervisor {
             }
         });
         Ok(process)
+    }
+}
+
+impl ProcessSupervisor for FileProcessSupervisor {
+    fn launch(&self, spec: ManagedProcessSpec) -> RefineResult<ManagedProcess> {
+        let environment = crate::infrastructure::process::launch_environment::EffectiveLaunchEnvironment::assemble(&spec.owner, &spec.env)?;
+        self.launch_with_prepared_environment(spec, &environment)
     }
 
     fn signal(&self, process_id: &str, signal: &str) -> RefineResult<ManagedProcess> {

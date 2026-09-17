@@ -104,12 +104,12 @@ function automationModal(title, content) {
     <div class="modal-title" id="automation-dialog-title" tabindex="-1">${htmlEscape(title)}</div>
     <div class="modal-body">${content}<p data-automation-error role="alert" class="form-error"></p></div>
     <div class="modal-actions"><button class="danger" data-delete hidden>Delete</button><span class="spacer"></span><button class="secondary" data-close>Cancel</button><button data-save>Save</button></div></div>`;
-  const close = () => { root.remove(); document.removeEventListener("keydown", onKey, true); if (automationEditor === root) automationEditor = null; if (automationHistory === root) automationHistory = null; priorFocus?.focus?.(); };
+  const close = () => { root._onClose?.(); root.remove(); document.removeEventListener("keydown", onKey, true); if (automationEditor === root) automationEditor = null; if (automationHistory === root) automationHistory = null; priorFocus?.focus?.(); };
   function onKey(event) {
     if (!root.contains(event.target)) return;
     if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); close(); }
     if (event.key === "Tab") {
-      const controls = [...root.querySelectorAll("button:not([disabled]):not([hidden]), input:not([disabled]), textarea, select, [tabindex='0']")].filter(e => e.tabIndex >= 0 && e.getClientRects().length);
+      const controls = [...root.querySelectorAll("button:not([disabled]):not([hidden]), input:not([disabled]), textarea, select, summary, [tabindex='0']")].filter(e => e.tabIndex >= 0 && e.getClientRects().length);
       const first = controls[0], last = controls.at(-1);
       if (event.shiftKey && (document.activeElement === first || !controls.includes(document.activeElement))) { event.preventDefault(); last?.focus(); }
       else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }

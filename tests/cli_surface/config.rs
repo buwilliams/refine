@@ -23,11 +23,12 @@ pub(crate) fn config_commands_route_through_the_active_daemon(fixture: &Integrat
     let catalog = fixture.run_refine(&["skills", "triggers"]);
     fixture.assert_success("skills triggers", &catalog);
     assert_eq!(
-        fixture.json_stdout(&catalog)["sources"]
-            .as_array()
-            .unwrap()
-            .len(),
-        42
+        fixture.json_stdout(&catalog)["sources"],
+        json!(
+            std::iter::once(refine::model::automation::CUSTOM_EVENT_ID.to_string())
+                .chain(refine::model::automation::system_catalog())
+                .collect::<Vec<_>>()
+        )
     );
     for retired in ["quality", "governance", "guidance"] {
         assert!(

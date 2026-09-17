@@ -135,7 +135,12 @@ fn web_server_route_groups_cover_static_web_surface() {
 
     let static_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surfaces/web/static/js");
     let guide = fs::read_to_string(static_root.join("features/guide.js")).unwrap();
-    let guide_ids = extract_prefixed_string_literals(&guide, "guideItem(\"")
+    let reference = fs::read_to_string(
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surfaces/refine-hub/product/reference.md"),
+    )
+    .unwrap();
+    assert!(guide.contains("product/reference.md#"));
+    let guide_ids = extract_prefixed_string_literals(&reference, "id=\"")
         .into_iter()
         .collect::<std::collections::BTreeSet<_>>();
     let mut settings_ids = std::collections::BTreeSet::new();
@@ -187,7 +192,7 @@ fn static_main_nav_consolidates_context_and_controls() {
     let releases = fs::read_to_string(static_root.join("js/features/source_update.js")).unwrap();
 
     let menu_start = index
-        .find(r#"<details class="nav-menu nav-create-menu" id="nav-create-menu">"#)
+        .find(r#"<details class="nav-menu" id="nav-create-menu">"#)
         .expect("controls menu should exist");
     let menu_end = menu_start
         + index[menu_start..]
@@ -200,8 +205,14 @@ fn static_main_nav_consolidates_context_and_controls() {
         .expect("controls summary should close");
     let summary = &menu[..summary_end];
 
-    assert!(summary.contains(r#"aria-label="Open New Goal menu""#));
-    assert!(summary.contains("nav-create-more"));
+    assert!(summary.contains("Workspace controls &amp; support"));
+    assert!(index.contains(r#"id="rail-new-menu""#));
+    let search = index.find(r#"id="btn-command-palette""#).unwrap();
+    assert!(
+        search < menu_start,
+        "global search belongs to the navigation rail"
+    );
+    assert_eq!(index.matches(r#" id="btn-command-palette""#).count(), 1);
     assert!(!index.contains(r#"id="nav-context-menu""#));
     assert!(menu.contains(r#"id="btn-new-feature""#));
     assert!(menu.contains(r#"id="btn-import""#));
@@ -209,7 +220,6 @@ fn static_main_nav_consolidates_context_and_controls() {
     for control_id in [
         r#"id="target-app-indicator""#,
         r#"id="workflow-status-indicator""#,
-        r#"id="btn-command-palette""#,
         r#"id="btn-refine-issue""#,
         r#"id="btn-theme-toggle""#,
     ] {
@@ -246,7 +256,6 @@ fn static_main_nav_consolidates_context_and_controls() {
     assert!(menu.contains(r#"class="nav-control-status nav-theme-status""#));
     assert!(menu.contains("<span>Contact Refine Devs</span>"));
     assert!(!menu.contains("<span>Report a bug</span>"));
-    assert!(index.contains(r#"data-testid="nav-settings">Settings</a>"#));
     assert!(!menu.contains("<span>Settings</span>"));
     assert!(menu.contains(r#"aria-pressed="false""#));
     assert!(theme.contains(r#"const STORAGE_KEY = "refine_color_theme""#));
@@ -286,27 +295,15 @@ html[data-theme="dark"] .brand-logo-dark {
     let management_start = menu
         .find(r#">Tools and Support</div>"#)
         .expect("management section should exist");
-    let first_tool_start = menu
-        .find(r#"id="btn-command-palette""#)
-        .expect("source update control should exist");
-    let guide_start = menu
-        .find(r#"id="nav-guide-open""#)
-        .expect("guide management control should exist");
+    let contact = menu.find(r#"id="btn-refine-issue""#).unwrap();
     assert!(
-        management_start < first_tool_start && first_tool_start < guide_start,
-        "command palette should be the first tool"
+        management_start < contact,
+        "support follows its section heading"
     );
-    assert!(menu.contains(
-        r#"class="nav-menu-item nav-control-item nav-management-item nav-command-button""#
-    ));
-    let command_start = menu
-        .find(r#"class="nav-menu-item nav-control-item nav-management-item nav-command-button""#)
-        .expect("command palette management-style control should exist");
-    let command_end = command_start
-        + menu[command_start..]
-            .find("</button>")
-            .expect("command palette control should close");
-    assert!(menu[command_start..command_end].contains(r#"class="nav-menu-icon""#));
+    assert!(
+        index.contains(r#"id="nav-hubs""#),
+        "shared documentation is exposed through the rail's Hubs list"
+    );
     assert!(target_app.contains(r#"querySelector(".target-app-state")"#));
     assert!(target_app.contains(r#"`${statusLabel} · ${agentCount}`"#));
     assert!(releases.contains(r#"querySelector(".nav-source-update-status")"#));

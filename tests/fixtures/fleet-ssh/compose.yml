@@ -3,10 +3,10 @@ services:
     build:
       context: .
     ports:
-      - "127.0.0.1:${REFINE_CLUSTER_SSH_PORT}:22"
+      - "127.0.0.1:${REFINE_FLEET_SSH_PORT}:22"
     volumes:
       - type: bind
-        source: ${REFINE_CLUSTER_SSH_AUTHORIZED_KEYS}
+        source: ${REFINE_FLEET_SSH_AUTHORIZED_KEYS}
         target: /ssh/authorized_keys
         read_only: true
     healthcheck:

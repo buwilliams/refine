@@ -129,6 +129,28 @@ fn configuration_only_provider_launches_exact_argv_stdin_and_updated_parameters(
             .args,
         vec![context]
     );
+    let mut second = catalog.provider("UnfamiliarAgent").unwrap().clone();
+    second.id = "second-cli-variant".into();
+    second.automated.args = vec!["".into(), "  exact spaces  ".into(), "\r\nlines\n".into()];
+    catalog.providers.push(second);
+    catalog.default_provider = "second-cli-variant".into();
+    catalog = save(&root, &json!(catalog)).unwrap();
+    // The node override still wins; an explicit ID chooses the other argv contract.
+    assert_eq!(invoke()["args"], json!(["first parameter", context]));
+    let explicit = service
+        .invoke(ProviderInvocation {
+            provider: "second-cli-variant".into(),
+            prompt: context.into(),
+            session_id: None,
+            cwd: Some(root.display().to_string()),
+            stall_timeout_seconds: Some(10),
+            process_metadata: Default::default(),
+        })
+        .unwrap();
+    assert_eq!(
+        serde_json::from_str::<Value>(&explicit).unwrap()["args"],
+        json!(["", "  exact spaces  ", "\r\nlines\n", context])
+    );
     assert!(service.configure("missing-id").is_err());
     let custom = catalog
         .providers
@@ -274,5 +296,202 @@ fn system_default_changes_only_inheriting_nodes_and_unknown_selections_can_be_re
     assert_eq!(service.selected_provider_id("claude").unwrap(), "claude");
     inherited.update(&json!({"agent_cli":null})).unwrap();
     assert_eq!(service.selected_provider_id("").unwrap(), "codex");
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[cfg(unix)]
+#[test]
+fn credentials_are_local_injected_and_redacted_before_capture_for_every_split() {
+    use std::os::unix::fs::PermissionsExt;
+    let root = root();
+    let binary = root.join("echo-credential");
+    std::fs::write(&binary, "#!/usr/bin/python3\nimport os,sys,time\ns=os.environ['OPENAI_API_KEY']\nfor c in s:\n print(c,end='',flush=True);time.sleep(.002)\nprint(' done')\nprint(s,file=sys.stderr)\n").unwrap();
+    std::fs::set_permissions(&binary, std::fs::Permissions::from_mode(0o755)).unwrap();
+    // A unique environment name avoids races with unrelated provider fixtures.
+    let reference = format!("PROVIDER_TEST_{}", uuid::Uuid::new_v4().simple());
+    let secret = "credential-that-must-never-be-captured";
+    unsafe {
+        std::env::set_var(&reference, secret);
+    }
+    let mut catalog = defaults();
+    let mut provider = ProviderDefinition::generic("credential-fixture");
+    provider.executable = binary.display().to_string();
+    provider
+        .credentials
+        .insert("OPENAI_API_KEY".into(), reference.clone());
+    catalog.providers.push(provider.clone());
+    provider.id = "second-variant".into();
+    provider.automated.args = vec!["".into(), "  whitespace  ".into(), "\nline\n".into()];
+    catalog.providers.push(provider);
+    save(&root, &json!(catalog)).unwrap();
+    let service =
+        HostAgentProviderService::with_runtime_root(root.join("run/8082")).with_refine_dir(&root);
+    let launch = service
+        .interactive_command("credential-fixture", "context")
+        .unwrap();
+    assert_eq!(
+        launch.launch_environment.get("OPENAI_API_KEY").unwrap(),
+        secret
+    );
+    assert!(!format!("{launch:?}").contains(secret));
+    let mut progress = String::new();
+    let invocation = || ProviderInvocation {
+        provider: "credential-fixture".into(),
+        prompt: "hello".into(),
+        session_id: None,
+        cwd: Some(root.display().to_string()),
+        stall_timeout_seconds: Some(10),
+        process_metadata: Default::default(),
+    };
+    let result = service
+        .invoke_detailed_with_output(invocation(), |s| progress.push_str(&s))
+        .unwrap();
+    assert!(result.raw_output.contains("[REDACTED] done"));
+    assert!(!progress.contains(secret));
+    let process = service.launch_managed(invocation()).unwrap();
+    let stdout = std::path::Path::new(process.stdout_path.as_ref().unwrap());
+    for _ in 0..100 {
+        if std::fs::read_to_string(stdout)
+            .unwrap_or_default()
+            .contains("done")
+        {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    assert!(
+        std::fs::read_to_string(stdout)
+            .unwrap()
+            .contains("[REDACTED] done")
+    );
+    fn inspect(path: &Path, secret: &str) {
+        for entry in std::fs::read_dir(path).unwrap().flatten() {
+            if entry.path().is_dir() {
+                inspect(&entry.path(), secret);
+            } else {
+                assert!(
+                    !String::from_utf8_lossy(&std::fs::read(entry.path()).unwrap())
+                        .contains(secret),
+                    "credential persisted in {}",
+                    entry.path().display()
+                );
+            }
+        }
+    }
+    inspect(&root, secret);
+    unsafe {
+        std::env::remove_var(&reference);
+    }
+    assert!(
+        service
+            .interactive_command("credential-fixture", "context")
+            .unwrap_err()
+            .to_string()
+            .contains(&reference)
+    );
+    let mut resume = invocation();
+    resume.session_id = Some("unsupported".into());
+    assert!(
+        service
+            .invoke(resume)
+            .unwrap_err()
+            .to_string()
+            .contains("does not support")
+    );
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[cfg(unix)]
+#[test]
+fn retained_sessions_reject_changed_launch_contracts_but_allow_display_name_edits() {
+    use crate::infrastructure::agents::invocation::ProviderSessionContinuity;
+    let root = root();
+    let mut catalog = defaults();
+    let p = &mut catalog.providers[0];
+    p.executable = "/bin/echo".into();
+    let mut saved = save(&root, &json!(catalog)).unwrap();
+    let service =
+        HostAgentProviderService::with_runtime_root(root.join("run/8082")).with_refine_dir(&root);
+    let pin = ProviderSessionContinuity::Pin("session-fixture".into());
+    service
+        .interactive_command_with_session_and_environment("claude", "hello", Some(&pin), &[])
+        .unwrap();
+    saved.providers[0].name = "Renamed Claude".into();
+    saved = save(&root, &json!(saved)).unwrap();
+    let resume = ProviderSessionContinuity::Resume("session-fixture".into());
+    service
+        .interactive_command_with_session_and_environment("claude", "hello", Some(&resume), &[])
+        .unwrap();
+    saved.providers[0]
+        .interactive
+        .args
+        .push("--incompatible".into());
+    save(&root, &json!(saved)).unwrap();
+    assert!(
+        service
+            .interactive_command_with_session_and_environment("claude", "hello", Some(&resume), &[])
+            .unwrap_err()
+            .to_string()
+            .contains("configuration changed")
+    );
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[cfg(unix)]
+#[test]
+fn selected_provider_failure_is_reported_without_launching_another_configuration() {
+    use std::os::unix::fs::PermissionsExt;
+    let root = root();
+    let binary = root.join("fake-provider");
+    std::fs::write(
+        &binary,
+        "#!/usr/bin/python3\nimport sys\nwith open('attempts', 'a') as log: log.write(sys.argv[1] + '\\n')\nprint('Selected provider capacity exhausted', file=sys.stderr)\nsys.exit(23)\n",
+    )
+    .unwrap();
+    std::fs::set_permissions(&binary, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let mut catalog = defaults();
+    for id in ["system-variant", "node-variant", "explicit-variant"] {
+        let mut provider = ProviderDefinition::generic(id);
+        provider.executable = binary.display().to_string();
+        provider.automated.args = vec![id.into()];
+        catalog.providers.push(provider);
+    }
+    catalog.default_provider = "system-variant".into();
+    save(&root, &json!(catalog)).unwrap();
+    let settings = FileSettingsService::new(&root);
+    settings
+        .update(&json!({"agent_cli":"node-variant"}))
+        .unwrap();
+    let service =
+        HostAgentProviderService::with_runtime_root(root.join("run/8082")).with_refine_dir(&root);
+    for selected in ["explicit-variant", ""] {
+        let failure = service
+            .invoke(ProviderInvocation {
+                provider: selected.into(),
+                prompt: "request".into(),
+                session_id: None,
+                cwd: Some(root.display().to_string()),
+                stall_timeout_seconds: Some(10),
+                process_metadata: Default::default(),
+            })
+            .unwrap_err();
+        assert!(
+            failure
+                .to_string()
+                .contains("Selected provider capacity exhausted")
+        );
+    }
+    assert_eq!(
+        std::fs::read_to_string(root.join("attempts")).unwrap(),
+        "explicit-variant\nnode-variant\n"
+    );
+    assert_eq!(
+        settings.provider_override().unwrap().as_deref(),
+        Some("node-variant")
+    );
+    assert_eq!(
+        ProviderStore::new(&root).load().unwrap().default_provider,
+        "system-variant"
+    );
     std::fs::remove_dir_all(root).unwrap();
 }

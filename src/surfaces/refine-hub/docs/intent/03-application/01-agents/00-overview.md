@@ -82,3 +82,5 @@ Future agents should become the main actors in Refine. They may decompose Featur
 As agents improve, the Application should become less transcript-bound and more evidence-aware. Agents should produce structured plans, source links, tests, risk summaries, dependency graphs, review notes, merge summaries, and recovery proposals.
 
 The long-term direction is fleets of agents composing software at scale. Refine should give those agents enough shared context, tools, evidence, and handoff semantics to work in parallel without losing the product's purpose.
+
+Provider configurations have stable IDs independent of names and executable paths. Multiple configurations may launch the same CLI with different exact argv elements. Explicit selection precedes the node override and system default. Shared launch preparation resolves local credential references, checks supported continuation capabilities, and prepares the same environment for direct, Event/Skill, chat, managed maintenance, and interactive launches. Provider failure does not authorize switching providers. See [Configure AI providers](../../../ai-providers.md).

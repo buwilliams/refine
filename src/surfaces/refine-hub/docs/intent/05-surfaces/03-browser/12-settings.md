@@ -50,3 +50,9 @@ The surface should move toward guided configuration and reviewable changes, not 
 ### Runtime AI providers
 
 Runtime separates **AI provider for this node** from **Shared AI providers**. The node selector includes **Use system default**. Shared definitions expose a stable ID, display name, executable, ordered JSON argument arrays, automated and interactive modes, and advanced transport, session, and output settings. Provider drafts survive Runtime refreshes and failed saves; catalog revisions prevent overwriting another editor's changes. Installation and authentication remain host responsibilities. See [Configure AI providers](../../../ai-providers.md).
+
+### Configurable AI providers
+
+Runtime owns the shared provider catalog editor and clearly separates the system default from the current node's optional override. Show the effective provider and selection source. Ordinary provider editing uses labeled controls and ordered argument rows; executable paths and argument boundaries must remain exact. Advanced context transport, credential references, output parsing, and native session options are expandable.
+
+Retain browser drafts per project/node through refreshes, reloads, failed requests, and stale revisions. Reconcile against the latest catalog without discarding unrelated edits. Overlapping edits require an explicit choice. Late responses from an earlier context cannot close or replace another context's editor. Use the shared modal's focus, Escape, and keyboard behavior, with usable narrow-screen layouts.

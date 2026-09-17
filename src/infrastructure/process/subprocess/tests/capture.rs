@@ -331,8 +331,12 @@ fn missing_and_mismatched_scope_proof_cannot_release_incomplete_capture() {
 fn capture_memory_is_bounded_and_truncation_is_explicit_while_artifact_is_complete() {
     let f = Fixture::new();
     let path = f.0.join("bounded.log");
-    let mut capture =
-        super::super::capture::Capture::new(fs::File::open("/dev/zero").unwrap(), &path).unwrap();
+    let mut capture = super::super::capture::Capture::new(
+        fs::File::open("/dev/zero").unwrap(),
+        &path,
+        Default::default(),
+    )
+    .unwrap();
     let mut observed = 0;
     for _ in 0..257 {
         assert!(capture.poll(|b| observed += b.len()).unwrap());

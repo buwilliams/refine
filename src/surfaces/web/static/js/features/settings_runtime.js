@@ -435,7 +435,13 @@ function bindNodeRuntimeConfigControls(providers = {}) {
     root,
     "#s-cli",
     async () => {
-      await api("PATCH", "/api/settings", {agent_cli: $("#s-cli").value || null});
+      const generation = captureNodeContextGeneration();
+      const key = providerDraftKey('node');
+      const value = $("#s-cli").value;
+      providerStored(key, value);
+      await api("PATCH", "/api/settings", {agent_cli: value || null});
+      if (!isNodeContextGenerationCurrent(generation)) return;
+      if (providerStored(key) === value) providerStored(key, null);
       await refreshSettingsTab("runtime", {force: true});
     },
     { event: "settings-editable-commit" },
@@ -494,6 +500,18 @@ function bindNodeRuntimeConfigControls(providers = {}) {
     });
   });
   bindSettingsEditableFields(root);
+  if (providers.catalog) {
+    const key = providerDraftKey('node'), control = root.querySelector('#s-cli');
+    const pending = providerStored(key);
+    if (pending !== null && control) {
+      editSettingsEditableField(control.closest('[data-settings-editable-field]'));
+      if (pending && ![...control.options].some(option => option.value === pending)) {
+        control.add(new Option(`Unavailable provider (${pending})`, pending));
+      }
+      control.value = pending;
+    }
+    if (control) control.addEventListener('change', () => providerStored(key, control.value));
+  }
   return autosaveRuntime;
 }
 
