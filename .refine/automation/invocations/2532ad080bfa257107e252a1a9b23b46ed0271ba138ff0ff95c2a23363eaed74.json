@@ -572,11 +572,57 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "succeeded",
+  "results": {
+    "default-governance": {
+      "invocation_id": "2532ad080bfa257107e252a1a9b23b46ed0271ba138ff0ff95c2a23363eaed74",
+      "binding_id": "default-governance",
+      "role": "governance",
+      "outcome": "success",
+      "summary": "Pass for Round 3, with the documented validation limitation. Configurable providers, selection precedence, credential references, and recoverable Settings edits satisfy the Goal. Shared model rules, application resolution, infrastructure launch handling, and existing surface components fit the architecture. The feature supports user-owned tools and inspectable configuration without introducing excluded automation. No blocking correction was identified. Refine retains workflow and integration authority.\n\n",
+      "evidence": [
+        "Reviewed candidate 205e759898386f6ff65c2176fb0be6c86a80d873 against Round 3 and its retained plan.",
+        "Independent Governance browser run: eight provider flows passed, zero skipped. Desktop and narrow-screen screenshots inspected.",
+        "Quality recorded 1,461 passing Rust unit tests and 437 passing browser tests. The full command remains red on two unchanged workflow fixtures independently reproduced on baseline."
+      ],
+      "artifacts": {
+        "necessary_corrections": [],
+        "nonblocking_followup": "Migrate the two obsolete full-workflow fixtures from the retired Governance endpoint to current Skills/recovery contracts, then rerun the full command. Their failures leave end-to-end workflow coverage incomplete.",
+        "optional_improvements": [],
+        "report": "target/governance-provider-checks/report.md",
+        "screenshots": "target/governance-provider-checks/screenshots"
+      }
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "default-governance",
+      "checkout": {
+        "observation": {
+          "branch": "refine/00000T19EJ0CNGHM85RBDXE000/round-3-execution-e18804c7-b49a-497f-9d29-053a3607d7cf",
+          "head_commit": "205e759898386f6ff65c2176fb0be6c86a80d873",
+          "status_porcelain": []
+        },
+        "tree": "06782cf4abff325e6125f15dc7d2c18feeb08990"
+      },
+      "checkout_recorded": true,
+      "diagnostic": null,
+      "host_bound_result": true,
+      "observational_violation": false,
+      "operation_id": null,
+      "process_id": "proc-1789684084124-1122601-28523",
+      "prompt_bytes": 39562,
+      "provider_session_id": null,
+      "purpose": "work",
+      "raw_output": "{\n  \"outcome\": \"success\",\n  \"evidence\": [\n    \"Reviewed candidate 205e759898386f6ff65c2176fb0be6c86a80d873 against Round 3 and its retained plan.\",\n    \"Independent Governance browser run: eight provider flows passed, zero skipped. Desktop and narrow-screen screenshots inspected.\",\n    \"Quality recorded 1,461 passing Rust unit tests and 437 passing browser tests. The full command remains red on two unchanged workflow fixtures independently reproduced on baseline.\"\n  ],\n  \"artifacts\": {\n    \"report\": \"target/governance-provider-checks/report.md\",\n    \"screenshots\": \"target/governance-provider-checks/screenshots\",\n    \"necessary_corrections\": [],\n    \"nonblocking_followup\": \"Migrate the two obsolete full-workflow fixtures from the retired Governance endpoint to current Skills/recovery contracts, then rerun the full command. Their failures leave end-to-end workflow coverage incomplete.\",\n    \"optional_improvements\": []\n  },\n  \"summary\": \"Pass for Round 3, with the documented validation limitation. Configurable providers, selection precedence, credential references, and recoverable Settings edits satisfy the Goal. Shared model rules, application resolution, infrastructure launch handling, and existing surface components fit the architecture. The feature supports user-owned tools and inspectable configuration without introducing excluded automation. No blocking correction was identified. Refine retains workflow and integration authority.\\n\\n\"\n}",
+      "received_at": "2026-09-17T22:31:27.617111982+00:00",
+      "started_at": "2026-09-17T22:28:04.083744298+00:00",
+      "workflow_revision": 67
+    }
+  ],
   "created_at": "2026-09-17T22:28:02.645182190+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-17T22:31:28.923300043+00:00",
   "error": null,
   "action_applied": false
 }

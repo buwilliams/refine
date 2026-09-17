@@ -3,10 +3,30 @@
   "branch_name": "refine/00000T19EJ0CNGHM85RBDXE000/round-3-execution-e18804c7-b49a-497f-9d29-053a3607d7cf",
   "candidate_commit": "205e759898386f6ff65c2176fb0be6c86a80d873",
   "created": "2026-09-15T16:06:39Z",
-  "event_generation": 28,
+  "event_generation": 29,
   "feature_id": null,
   "feature_order": null,
   "id": "00000T19EJ0CNGHM85RBDXE000",
+  "integration_history": [
+    {
+      "complete": true,
+      "generation": 28,
+      "integration": {
+        "candidate_commit": "205e759898386f6ff65c2176fb0be6c86a80d873",
+        "integrated_at": "2026-09-17T22:31:34.684629085+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n src/application/agents/providers/tests.rs          | 219 +++++++++++\n src/application/agents/sessions/output_capture.rs  |  21 +-\n src/application/agents/sessions/pty_lifecycle.rs   |   2 +\n src/application/agents/sessions/session_runtime.rs |   2 +\n src/application/agents/sessions/tests.rs           |   1 +\n src/application/workers/maintenance/tests.rs       |   4 +\n src/infrastructure/agents/invocation/service.rs    |  99 ++++-\n .../service/detached_credentials_tests.rs          |  83 ++++\n .../agents/invocation/service/session_contract.rs  |  65 ++++\n src/infrastructure/agents/invocation/tests.rs      |  13 +-\n .../process/launch_environment/mod.rs              |  40 +-\n src/infrastructure/process/mod.rs                  |   1 +\n src/infrastructure/process/redaction.rs            |  60 +++\n src/infrastructure/process/subprocess/capture.rs   |  22 +-\n src/infrastructure/process/subprocess/execution.rs |  12 +-\n .../process/subprocess/owned_groups.rs             |   6 +-\n .../subprocess/owned_groups/credential_capture.rs  | 106 ++++++\n .../subprocess/owned_groups/scope_guardian.rs      |  13 +-\n .../process/subprocess/supervision.rs              |  30 +-\n .../process/subprocess/tests/capture.rs            |   8 +-\n src/model/providers.rs                             |  32 ++\n src/surfaces/refine-hub/docs/ai-providers.md       |  26 ++\n .../intent/03-application/01-agents/00-overview.md |   2 +\n .../intent/03-application/04-persistence-sync.md   |   2 +\n .../intent/05-surfaces/03-browser/12-settings.md   |   6 +\n src/surfaces/refine-hub/product/reference.md       |   6 +-\n src/surfaces/web/static/css/modals.css             |  32 ++\n src/surfaces/web/static/css/navigation.css         |   2 +-\n .../web/static/js/features/settings_providers.js   | 378 +++++++++++++-----\n .../web/static/js/features/settings_runtime.js     |  20 +-\n .../web/static/js/features/settings_skills.js      |   4 +-\n .../js/features/settings_templates_catalog.js      |   6 +-\n src/surfaces/web_server/support/terminal.rs        |  18 +-\n .../support/terminal_credential_tests.rs           |  78 ++++\n src/surfaces/web_server/tests/activity_exports.rs  |   9 +-\n .../web_server/tests/static_surface/navigation.rs  |  47 ++-\n .../web_server/tests/static_surface/work_items.rs  |   4 +-\n tests/cli_surface.rs                               |   2 +-\n tests/cli_surface/config.rs                        |  11 +-\n tests/cli_surface/daemon_status.rs                 |  13 +-\n tests/cli_surface/goals.rs                         |  24 +-\n tests/fixtures/fleet-ssh/compose.yml               |   4 +-\n tests/support/terminal-clipboard-browser.js        |   6 +\n tests/web_quick_actions_browser.test.js            |   4 +-\n tests/web_settings_providers_browser.test.js       | 422 +++++++++++++++++----\n tests/web_settings_templates_browser.test.js       |   5 +\n tests/web_settings_workflow_browser.test.js        |   2 +\n tests/web_terminal_clipboard_browser.test.js       |   4 +\n 48 files changed, 1705 insertions(+), 271 deletions(-)\n create mode 100644 src/infrastructure/agents/invocation/service/detached_credentials_tests.rs\n create mode 100644 src/infrastructure/agents/invocation/service/session_contract.rs\n create mode 100644 src/infrastructure/process/redaction.rs\n create mode 100644 src/infrastructure/process/subprocess/owned_groups/credential_capture.rs\n create mode 100644 src/surfaces/web_server/support/terminal_credential_tests.rs",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "86ff79da221af0b94e4e1f60251b9f9d6d2a8f2c"
+      },
+      "round_idx": 2
+    }
+  ],
   "lifecycle_gate_configurations": {
     "23:default:workflow.todo.enter": {
       "events": {
@@ -22,6 +42,26 @@
             "node_id": null
           },
           "source": "workflow.todo.enter"
+        }
+      },
+      "revision": 87,
+      "schema_version": 4,
+      "skills": {}
+    },
+    "29:default:workflow.review.enter": {
+      "events": {
+        "workflow.review.enter": {
+          "bindings": [],
+          "enabled": true,
+          "id": "workflow.review.enter",
+          "kind": "system",
+          "name": "Workflow Review Enter",
+          "on_success": null,
+          "parameters": [],
+          "scope": {
+            "node_id": null
+          },
+          "source": "workflow.review.enter"
         }
       },
       "revision": 87,
@@ -1743,51 +1783,53 @@
       "created": "2026-09-17T20:13:35Z",
       "event_configuration": {
         "events": {
-          "workflow.governance.enter": {
-            "bindings": [
-              {
-                "enabled": true,
-                "id": "default-governance",
-                "inputs": {},
-                "mode": "blocking",
-                "order": 0,
-                "overrides": null,
-                "scope": {
-                  "node_id": null
-                },
-                "skill_id": "default-governance"
-              }
-            ],
+          "workflow.governance.exit": {
+            "bindings": [],
             "enabled": true,
-            "id": "workflow.governance.enter",
+            "id": "workflow.governance.exit",
             "kind": "system",
-            "name": "Workflow Governance Enter",
+            "name": "Workflow Governance Exit",
             "on_success": null,
             "parameters": [],
             "scope": {
               "node_id": null
             },
-            "source": "workflow.governance.enter"
+            "source": "workflow.governance.exit"
           }
         },
         "revision": 87,
         "schema_version": 4,
-        "skills": {
-          "default-governance": {
-            "enabled": true,
-            "id": "default-governance",
-            "name": "Governance",
-            "parameters": [],
-            "prompt": "{{templates.purpose}}\n\n{{templates.architecture}}\n\n## Governance\n\nVerify that the implementation meets the user-defined Goal, fits the system architecture, and serves the project's purpose.\n\n### Outcome\n\nA clear assessment of whether the implementation satisfies all three. Begin with the verdict, then briefly explain how the work meets the Goal, fits the architecture, and supports the project's purpose, using concrete evidence from the implementation and Quality results. For each gap, describe what falls short, why it matters, and the recommended correction. Separate necessary corrections from optional improvements.\n\n### Guardrails\n\n- Read the context that helps explain the user's Goal, the system architecture, and the project's purpose.\n- Compare the implementation with the user's desired outcome as well as the plan. Completing the plan and passing tests alone do not establish that the Goal is met.\n- Look for clear responsibilities, shared behavior implemented in one place, and interfaces that remain easy to use and maintain.\n- Judge design choices by how they serve the project. Allow sound approaches that differ from personal preference.\n- Group related issues by their underlying cause so the next step can address them together.",
-            "provenance": "refine-default-v1",
-            "role": "task",
-            "scope": {
-              "node_id": null
-            }
-          }
-        }
+        "skills": {}
       },
       "event_results": {
+        "2532ad080bfa257107e252a1a9b23b46ed0271ba138ff0ff95c2a23363eaed74": {
+          "candidate_commit": "205e759898386f6ff65c2176fb0be6c86a80d873",
+          "generation": 28,
+          "results": {
+            "default-governance": {
+              "artifacts": {
+                "necessary_corrections": [],
+                "nonblocking_followup": "Migrate the two obsolete full-workflow fixtures from the retired Governance endpoint to current Skills/recovery contracts, then rerun the full command. Their failures leave end-to-end workflow coverage incomplete.",
+                "optional_improvements": [],
+                "report": "target/governance-provider-checks/report.md",
+                "screenshots": "target/governance-provider-checks/screenshots"
+              },
+              "binding_id": "default-governance",
+              "evidence": [
+                "Reviewed candidate 205e759898386f6ff65c2176fb0be6c86a80d873 against Round 3 and its retained plan.",
+                "Independent Governance browser run: eight provider flows passed, zero skipped. Desktop and narrow-screen screenshots inspected.",
+                "Quality recorded 1,461 passing Rust unit tests and 437 passing browser tests. The full command remains red on two unchanged workflow fixtures independently reproduced on baseline."
+              ],
+              "invocation_id": "2532ad080bfa257107e252a1a9b23b46ed0271ba138ff0ff95c2a23363eaed74",
+              "outcome": "success",
+              "role": "governance",
+              "summary": "Pass for Round 3, with the documented validation limitation. Configurable providers, selection precedence, credential references, and recoverable Settings edits satisfy the Goal. Shared model rules, application resolution, infrastructure launch handling, and existing surface components fit the architecture. The feature supports user-owned tools and inspectable configuration without introducing excluded automation. No blocking correction was identified. Refine retains workflow and integration authority.\n\n"
+            }
+          },
+          "round_idx": 2,
+          "source": "workflow.governance.enter",
+          "state": "succeeded"
+        },
         "f1d1dbf74f0d50210d9cdf1c46f7550e2b0d2088ed142ae5531944d5fbc5d3a1": {
           "candidate_commit": "3d1f9341ce0ef06eca2810db63952a847309e88a",
           "generation": 27,
@@ -2124,8 +2166,102 @@
               }
             }
           }
+        },
+        "28:default:workflow.governance.exit": {
+          "events": {
+            "workflow.governance.exit": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.governance.exit",
+              "kind": "system",
+              "name": "Workflow Governance Exit",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.governance.exit"
+            }
+          },
+          "revision": 87,
+          "schema_version": 4,
+          "skills": {}
+        },
+        "28:default:workflow.governance.success": {
+          "events": {
+            "workflow.governance.success": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.governance.success",
+              "kind": "system",
+              "name": "workflow.governance.success",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.governance.success"
+            }
+          },
+          "revision": 87,
+          "schema_version": 4,
+          "skills": {}
+        },
+        "29:default:workflow.review.enter": {
+          "events": {
+            "workflow.review.enter": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.review.enter",
+              "kind": "system",
+              "name": "Workflow Review Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.review.enter"
+            }
+          },
+          "revision": 87,
+          "schema_version": 4,
+          "skills": {}
         }
       },
+      "governance_candidate_commit": "205e759898386f6ff65c2176fb0be6c86a80d873",
+      "governance_checked_at": "2026-09-17T22:31:29Z",
+      "governance_details": {
+        "candidate_commit": "205e759898386f6ff65c2176fb0be6c86a80d873",
+        "configured": true,
+        "failed_actions": [],
+        "phase": "post_implementation",
+        "skill_results": [
+          {
+            "artifacts": {
+              "necessary_corrections": [],
+              "nonblocking_followup": "Migrate the two obsolete full-workflow fixtures from the retired Governance endpoint to current Skills/recovery contracts, then rerun the full command. Their failures leave end-to-end workflow coverage incomplete.",
+              "optional_improvements": [],
+              "report": "target/governance-provider-checks/report.md",
+              "screenshots": "target/governance-provider-checks/screenshots"
+            },
+            "binding_id": "workflow.governance.enter:default-governance",
+            "evidence": [
+              "Reviewed candidate 205e759898386f6ff65c2176fb0be6c86a80d873 against Round 3 and its retained plan.",
+              "Independent Governance browser run: eight provider flows passed, zero skipped. Desktop and narrow-screen screenshots inspected.",
+              "Quality recorded 1,461 passing Rust unit tests and 437 passing browser tests. The full command remains red on two unchanged workflow fixtures independently reproduced on baseline."
+            ],
+            "invocation_id": "2532ad080bfa257107e252a1a9b23b46ed0271ba138ff0ff95c2a23363eaed74",
+            "outcome": "success",
+            "role": "governance",
+            "summary": "Pass for Round 3, with the documented validation limitation. Configurable providers, selection precedence, credential references, and recoverable Settings edits satisfy the Goal. Shared model rules, application resolution, infrastructure launch handling, and existing surface components fit the architecture. The feature supports user-owned tools and inspectable configuration without introducing excluded automation. No blocking correction was identified. Refine retains workflow and integration authority.\n\n"
+          }
+        ],
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T19EJ0CNGHM85RBDXE000-round-3-execution-e18804c7-b49a-497f-9d29-053a3607d7cf"
+      },
+      "governance_message": "Governance checks passed.",
+      "governance_recovery_analysis": null,
+      "governance_recovery_round_prompt": null,
+      "governance_rule_actions": [],
       "implementation_report": "workflow.implement.enter:default-implement: Round 3 provider behavior and Settings UX are implemented. Validation also exposed and corrected stale fixture assertions, a cleanup race, and shared Settings layout/pagination defects. Detailed results and retained visual evidence are linked through the artifact paths. No workflow transition, approval, integration, merge, or push was performed.",
       "implementation_reported_at": "2026-09-17T21:54:27Z",
       "logs": [],
@@ -2364,7 +2500,8 @@
       ],
       "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "updated": "2026-09-17T22:28:02Z",
+      "rule_state": "passed",
+      "updated": "2026-09-17T22:31:30Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-17T20:13:37Z",
         "generation": 23,
@@ -2510,6 +2647,20 @@
         "workflow_revision": 67,
         "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T19EJ0CNGHM85RBDXE000-round-3-execution-e18804c7-b49a-497f-9d29-053a3607d7cf"
       },
+      "workflow_git_remote": "origin",
+      "workflow_integration": {
+        "candidate_commit": "205e759898386f6ff65c2176fb0be6c86a80d873",
+        "integrated_at": "2026-09-17T22:31:34.684629085+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n src/application/agents/providers/tests.rs          | 219 +++++++++++\n src/application/agents/sessions/output_capture.rs  |  21 +-\n src/application/agents/sessions/pty_lifecycle.rs   |   2 +\n src/application/agents/sessions/session_runtime.rs |   2 +\n src/application/agents/sessions/tests.rs           |   1 +\n src/application/workers/maintenance/tests.rs       |   4 +\n src/infrastructure/agents/invocation/service.rs    |  99 ++++-\n .../service/detached_credentials_tests.rs          |  83 ++++\n .../agents/invocation/service/session_contract.rs  |  65 ++++\n src/infrastructure/agents/invocation/tests.rs      |  13 +-\n .../process/launch_environment/mod.rs              |  40 +-\n src/infrastructure/process/mod.rs                  |   1 +\n src/infrastructure/process/redaction.rs            |  60 +++\n src/infrastructure/process/subprocess/capture.rs   |  22 +-\n src/infrastructure/process/subprocess/execution.rs |  12 +-\n .../process/subprocess/owned_groups.rs             |   6 +-\n .../subprocess/owned_groups/credential_capture.rs  | 106 ++++++\n .../subprocess/owned_groups/scope_guardian.rs      |  13 +-\n .../process/subprocess/supervision.rs              |  30 +-\n .../process/subprocess/tests/capture.rs            |   8 +-\n src/model/providers.rs                             |  32 ++\n src/surfaces/refine-hub/docs/ai-providers.md       |  26 ++\n .../intent/03-application/01-agents/00-overview.md |   2 +\n .../intent/03-application/04-persistence-sync.md   |   2 +\n .../intent/05-surfaces/03-browser/12-settings.md   |   6 +\n src/surfaces/refine-hub/product/reference.md       |   6 +-\n src/surfaces/web/static/css/modals.css             |  32 ++\n src/surfaces/web/static/css/navigation.css         |   2 +-\n .../web/static/js/features/settings_providers.js   | 378 +++++++++++++-----\n .../web/static/js/features/settings_runtime.js     |  20 +-\n .../web/static/js/features/settings_skills.js      |   4 +-\n .../js/features/settings_templates_catalog.js      |   6 +-\n src/surfaces/web_server/support/terminal.rs        |  18 +-\n .../support/terminal_credential_tests.rs           |  78 ++++\n src/surfaces/web_server/tests/activity_exports.rs  |   9 +-\n .../web_server/tests/static_surface/navigation.rs  |  47 ++-\n .../web_server/tests/static_surface/work_items.rs  |   4 +-\n tests/cli_surface.rs                               |   2 +-\n tests/cli_surface/config.rs                        |  11 +-\n tests/cli_surface/daemon_status.rs                 |  13 +-\n tests/cli_surface/goals.rs                         |  24 +-\n tests/fixtures/fleet-ssh/compose.yml               |   4 +-\n tests/support/terminal-clipboard-browser.js        |   6 +\n tests/web_quick_actions_browser.test.js            |   4 +-\n tests/web_settings_providers_browser.test.js       | 422 +++++++++++++++++----\n tests/web_settings_templates_browser.test.js       |   5 +\n tests/web_settings_workflow_browser.test.js        |   2 +\n tests/web_terminal_clipboard_browser.test.js       |   4 +\n 48 files changed, 1705 insertions(+), 271 deletions(-)\n create mode 100644 src/infrastructure/agents/invocation/service/detached_credentials_tests.rs\n create mode 100644 src/infrastructure/agents/invocation/service/session_contract.rs\n create mode 100644 src/infrastructure/process/redaction.rs\n create mode 100644 src/infrastructure/process/subprocess/owned_groups/credential_capture.rs\n create mode 100644 src/surfaces/web_server/support/terminal_credential_tests.rs",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "86ff79da221af0b94e4e1f60251b9f9d6d2a8f2c"
+      },
       "workspace_branch": "refine/00000T19EJ0CNGHM85RBDXE000/round-3-execution-e18804c7-b49a-497f-9d29-053a3607d7cf",
       "workspace_recoveries": [
         {
@@ -2525,9 +2676,9 @@
       ]
     }
   ],
-  "status": "governance",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-09-17T22:28:02Z",
+  "updated": "2026-09-17T22:31:36Z",
   "workflow_context": "",
   "workflow_controls": [
     {
@@ -2918,7 +3069,17 @@
       "round_idx": 2,
       "to": "governance",
       "workflow_revision": 96
+    },
+    {
+      "at": "2026-09-17T22:31:36.855026608+00:00",
+      "forced": false,
+      "from": "governance",
+      "generation": 29,
+      "node_id": "default",
+      "round_idx": 2,
+      "to": "review",
+      "workflow_revision": 105
     }
   ],
-  "workflow_revision": 97
+  "workflow_revision": 105
 }
