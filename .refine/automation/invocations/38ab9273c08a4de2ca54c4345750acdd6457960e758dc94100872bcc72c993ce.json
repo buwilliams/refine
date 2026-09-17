@@ -390,11 +390,49 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "succeeded",
+  "results": {
+    "trigger-2748a40c-20f1-4533-851a-d3d752e56013": {
+      "invocation_id": "38ab9273c08a4de2ca54c4345750acdd6457960e758dc94100872bcc72c993ce",
+      "binding_id": "trigger-2748a40c-20f1-4533-851a-d3d752e56013",
+      "role": "task",
+      "outcome": "success",
+      "summary": "Fetched one batch. No new messages, imported or recovered Goals, or errors. No further batch was needed; the result does not indicate more mail remains.\n\n",
+      "evidence": [
+        "Exit code 0; fetched_count: 0; batch_limit: 25; goal_ids: []; errors: []."
+      ],
+      "artifacts": null
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "trigger-2748a40c-20f1-4533-851a-d3d752e56013",
+      "checkout": {
+        "observation": {
+          "branch": "main",
+          "head_commit": "6e4dd815d80ebef9b23d6bb6ed3135ea6084a640",
+          "status_porcelain": []
+        },
+        "tree": "f6ac6cf6d912205dd72225c02eb79d7c21a8248b"
+      },
+      "checkout_recorded": true,
+      "diagnostic": null,
+      "host_bound_result": true,
+      "observational_violation": false,
+      "operation_id": null,
+      "process_id": "proc-1789672017369-1013985-39",
+      "prompt_bytes": 2487,
+      "provider_session_id": null,
+      "purpose": "work",
+      "raw_output": "{\"outcome\":\"success\",\"evidence\":[\"Exit code 0; fetched_count: 0; batch_limit: 25; goal_ids: []; errors: [].\"],\"summary\":\"Fetched one batch. No new messages, imported or recovered Goals, or errors. No further batch was needed; the result does not indicate more mail remains.\\n\\n\"}",
+      "received_at": "2026-09-17T19:07:30.137225828+00:00",
+      "started_at": "2026-09-17T19:06:57.346521762+00:00",
+      "workflow_revision": null
+    }
+  ],
   "created_at": "2026-09-17T19:06:50.016297530+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-17T19:07:30.183931805+00:00",
   "error": null,
   "action_applied": false
 }
