@@ -21,7 +21,7 @@ New is a full-width row immediately below Search and before Node, independent of
 
 New remains accessible by label and hover title in the collapsed rail. The menu stays within the viewport and supports keyboard opening, arrow navigation, Home/End, and visible focus. Escape dismisses it and restores focus to New; outside clicks and selection also dismiss it. Only one rail menu is open at a time. On mobile, selection closes the drawer and releases its focus trap and workspace inert state before the selected flow opens.
 
-The Tools dropdown offers Agent, Agent in Worktree, System, Files, Todo List, Terminal, and Planning Agent. Goal-specific agent and log windows remain available from their existing actions. Repeated agent launches create independent sessions. Opening or closing the Tools dropdown does not hide existing windows. Context menus align to the top of their opening row and shift upward as needed to stay within the viewport. Node and Reporter menus identify their context with a heading; Add Node and Add Reporter open the shared creation flows.
+The Tools dropdown offers Agent, Agent in Worktree, System, Files, Terminal, and Planning Agent. Goal-specific agent and log windows remain available from their existing actions. Repeated agent launches create independent sessions. Opening or closing the Tools dropdown does not hide existing windows. Context menus align to the top of their opening row and shift upward as needed to stay within the viewport. Node and Reporter menus identify their context with a heading; Add Node and Add Reporter open the shared creation flows.
 
 Creation actions remain available in their page headers and Search. Settings → Workspace controls & support contains shared creation shortcuts, workflow and target-app quick controls, source update, contact, and appearance controls. Skills and Hubs have their own rail sections, including their Add and Manage actions. Settings owns configuration; Control owns process management.
 
@@ -30,3 +30,5 @@ Enabled Custom Skills use shared parameter preflight and open an agent window. H
 ## Reporter orientation
 
 When an attached app has no valid browser-local Reporter selection, Refine asks the user to choose or create a Reporter after loading the shared list. It never infers identity from the first entry. The orientation dialog yields to other dialogs; dismissing it leaves identity unselected for that page lifetime. The Reporter row remains available for later selection.
+
+Project Planning is a main navigation destination shared across project nodes. It replaces the former Todo tool; choosing a Reporter does not filter its boards.

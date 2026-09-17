@@ -54,6 +54,7 @@ pub enum WorkflowAction {
 
 #[derive(Clone, Debug, ValueEnum)]
 pub enum CliGoalStatus {
+    Draft,
     Backlog,
     Todo,
     Plan,
@@ -69,6 +70,7 @@ pub enum CliGoalStatus {
 impl From<CliGoalStatus> for GoalStatus {
     fn from(value: CliGoalStatus) -> Self {
         match value {
+            CliGoalStatus::Draft => Self::Draft,
             CliGoalStatus::Backlog => Self::Backlog,
             CliGoalStatus::Todo => Self::Todo,
             CliGoalStatus::Plan => Self::Plan,

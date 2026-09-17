@@ -39,6 +39,8 @@ impl GoalPriority {
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Goal {
+    #[serde(default)]
+    pub description: String,
     pub id: String,
     pub name: String,
     pub status: GoalStatus,

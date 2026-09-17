@@ -5,6 +5,9 @@ pub enum GoalAction {
     /// Create a new prompt-driven Goal.
     /// It starts in the backlog; add a round to describe the behavior, then `goal start` to begin work.
     Create {
+        /// Initial capture step. Execution must be explicitly released.
+        #[arg(long, default_value = "backlog", value_parser = ["draft", "backlog"])]
+        status: String,
         /// Human-readable Goal name.
         name: String,
         #[cfg_attr(test, arg(long, hide = true))]

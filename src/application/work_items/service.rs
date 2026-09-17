@@ -8,6 +8,7 @@ mod goal_authoring;
 mod goal_filters;
 mod integration_recovery;
 mod persistence;
+mod planning;
 mod record_persistence;
 mod round_deletion;
 mod round_helpers;

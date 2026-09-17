@@ -25,6 +25,19 @@ pub(super) fn with_action<T>(
     action()
 }
 
+thread_local! { static IMPORTING: std::cell::Cell<bool> = const { std::cell::Cell::new(false) }; }
+/// Import historical dormant records without replaying creation automation.
+pub(crate) fn without_dispatch<T>(action: impl FnOnce() -> RefineResult<T>) -> RefineResult<T> {
+    struct Restore(bool);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            IMPORTING.with(|v| v.set(self.0));
+        }
+    }
+    let _restore = Restore(IMPORTING.with(|v| v.replace(true)));
+    action()
+}
+
 pub const PENDING: &str = "Event gates pending:";
 
 pub fn edge_key(goal: &Value, to: &str) -> String {
@@ -51,7 +64,7 @@ pub fn prepare_write(
     current: Option<&Value>,
     next: &mut Value,
 ) -> RefineResult<bool> {
-    if !root.join("automation/config.json").exists() {
+    if IMPORTING.with(|v| v.get()) || !root.join("automation/config.json").exists() {
         return Ok(false);
     }
     ACTION.with(|receipt| {
@@ -200,7 +213,18 @@ pub fn prepare_write(
     // Automated phase entry is consumed by the existing workflow worker. Other
     // lifecycle hooks use the same pending dispatch capability as custom Events.
     let mut sources = Vec::new();
-    if let Some(from) = from {
+    let planning_handoff = from == Some("backlog")
+        && to == "todo"
+        && current.is_some_and(|goal| {
+            goal["planning_release"]["target_node"] == node
+                && goal["planning_release"]["released"] != true
+                && goal["planning_release"]["request_id"].is_string()
+                && approval_path(root, goal, "todo").exists()
+        });
+    if planning_handoff {
+        next["planning_release"]["released"] = json!(true);
+    }
+    if let Some(from) = from.filter(|_| !planning_handoff) {
         let success = format!("workflow.{from}.success");
         if !bypass_previous
             && !current.is_some_and(|value| value["pending_workflow_outcome"]["state"] == "pending")
@@ -255,7 +279,7 @@ pub fn prepare_write(
                 .any(|e| !config.bindings(e, &node).is_empty())
         {
             let key = super::execution::stable_id(&format!("{}:{generation}:{source}", next["id"]));
-            let queued = json!({"goal_path": relative, "source": source, "node_id": node, "generation": generation, "config": config, "forced": force, "occurrence": occurrence, "goal_context": super::execution::goal_context(next), "previous_generation": current.and_then(|v| v.get("event_generation")).cloned().unwrap_or(json!(0)), "previous_round": current.and_then(|v| v.get("rounds")).and_then(Value::as_array).and_then(|r| r.len().checked_sub(1)), "candidate_commit": current.and_then(|v| v.get("candidate_commit"))});
+            let queued = json!({"goal_path": relative, "source": source, "node_id": node, "generation": generation, "config": config, "forced": force, "occurrence": occurrence, "goal_context": planning_goal_context(root,next)?, "previous_generation": current.and_then(|v| v.get("event_generation")).cloned().unwrap_or(json!(0)), "previous_round": current.and_then(|v| v.get("rounds")).and_then(Value::as_array).and_then(|r| r.len().checked_sub(1)), "candidate_commit": current.and_then(|v| v.get("candidate_commit"))});
             retain_occurrence_dispatch(next, &key, queued);
         }
     }
@@ -264,6 +288,20 @@ pub fn prepare_write(
 
 /// Retain the exact dispatch inputs with the occurrence's Goal replacement. The
 /// queue is a derived delivery index, so losing it never loses the selected work.
+fn planning_goal_context(root: &Path, goal: &Value) -> RefineResult<Value> {
+    let mut context = super::execution::goal_context(goal);
+    if let Some(id) = goal["id"]
+        .as_str()
+        .filter(|id| crate::model::automation::valid_id(id))
+    {
+        let path = root.join("planning/cards").join(format!("{id}.json"));
+        if path.exists() {
+            context["planning"] = read_json(&path)?;
+        }
+    }
+    Ok(context)
+}
+
 pub(crate) fn retain_occurrence_dispatch(goal: &mut Value, key: &str, mut queued: Value) {
     queued["dispatch_key"] = json!(key);
     // The Goal retains only definitions used by this delivery. Terminal Entry

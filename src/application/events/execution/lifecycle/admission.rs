@@ -11,7 +11,11 @@ impl FileEventService {
         occurrence_key: &str,
     ) -> RefineResult<()> {
         let goal = &context.data["goal"];
-        let authority = if let Some(occurrence) = context.data.get("occurrence") {
+        let authority = if let Some(action_id) = context.data["planning"]["action_id"].as_str() {
+            LifecycleAuthority::Planning {
+                action_id: action_id.into(),
+            }
+        } else if let Some(occurrence) = context.data.get("occurrence") {
             LifecycleAuthority::Occurrence {
                 occurrence: occurrence.clone(),
             }

@@ -2,8 +2,8 @@ const assert = require('node:assert/strict');
 const test = require('node:test');
 const {openApp, apiFixture, SKIP} = require('./support/web_app');
 
-const steps = ['backlog', 'todo', 'plan', 'implement', 'quality', 'governance', 'review', 'done', 'failed', 'cancelled'];
-const sources = [...steps.flatMap(step => ['enter', 'success', 'error', 'exit'].map(hook => `workflow.${step}.${hook}`)), 'node.startup.ready', 'node.example.ready'];
+const steps = ['draft', 'backlog', 'todo', 'plan', 'implement', 'quality', 'governance', 'review', 'done', 'failed', 'cancelled'];
+const sources = [...steps.flatMap(step => ['enter', 'success', 'error', 'exit'].map(hook => `workflow.${step}.${hook}`)), 'node.startup.ready', 'node.example.ready', 'planning.lane.enter', 'planning.lane.exit'];
 function fixture() {
   let revision = 5;
   const requests = [];
@@ -14,6 +14,7 @@ function fixture() {
     {id: 'custom', name: 'Custom work', prompt: 'Custom', enabled: true, scope: {}, parameters: [], trigger_source: 'custom'},
   ];
   const events = skills.map((skill, index) => ({id: `event-${index}`, source: skill.trigger_source === 'custom' ? null : skill.trigger_source, enabled: true, bindings: [{id: `binding-${index}`, skill_id: skill.id, enabled: true, order: skill.id === 'context' ? -1 : 2, mode: skill.id === 'context' ? 'context' : 'blocking', scope: {}}]}));
+  events.push({id:'planning.lane.enter',source:'planning.lane.enter',enabled:true,bindings:[]});
   const templates = ['workflow', 'supervised-skill', 'goal-agents-session', 'context-skill', 'goal-completion', 'manual-skill', 'purpose', 'architecture'].map(id => ({name: id, item: {id, revision: 0, prompt: '{{skill}}'}, usage: {kind: 'template', description: 'Sample template', group: 'workflow'}}));
   return {requests, fixture(path, request) {
     if (request.method() !== 'GET') requests.push({path, method: request.method(), body: request.postDataJSON()});
@@ -51,7 +52,7 @@ test('Workflow covers every step and hook, system events, custom actions, and sh
     const {page} = app;
     await page.goto(`${app.origin}/#/settings/workflow`);
     await page.locator('[data-workflow-step="plan"]').waitFor();
-    assert.equal(await page.locator('[data-workflow-step]').count(), 10);
+    assert.equal(await page.locator('[data-workflow-step]').count(), 11);
     assert.equal(await page.locator('.settings-tabs [href="#/settings/skills"]').count(), 0);
     for (const step of steps) {
       await page.locator(`[data-workflow-step="${step}"]`).click();
@@ -216,4 +217,25 @@ test('Run Skill uses selected-node eligibility while retaining all assignments f
     assert.equal(await page.locator('[data-workflow-assignment="custom"] [data-workflow-skill]').isEnabled(),true);
     assert.deepEqual(app.pageErrors,[]);
   } finally {await app.close();}
+});
+
+test('lane Skill assignment scopes by board and lane while preserving other assignments', {skip: SKIP}, async () => {
+  const data = fixture(), app = await openApp(data);
+  try {
+    const {page} = app;
+    await page.goto(`${app.origin}/#/settings/workflow`);
+    await page.locator('[data-workflow-view="system"]').click();
+    await page.locator('[data-workflow-system="planning.lane.enter"]').click();
+    await page.locator('[data-workflow-existing]').click();
+    await page.locator('#assignment-skill').selectOption('review');
+    await page.locator('[data-assignment-board]').fill('board-a');
+    await page.locator('[data-assignment-lane]').fill('ready');
+    await page.locator('.modal-backdrop [data-save]').click();
+    await page.locator('.modal-backdrop').waitFor({state:'detached'});
+    const request = data.requests.find(request => request.method === 'PUT');
+    assert.equal(request.body.event_bindings.length, 2);
+    assert.deepEqual(request.body.event_bindings.find(assignment => assignment.event_id === 'planning.lane.enter').binding.planning, {board_id:'board-a',lane_id:'ready'});
+    assert.ok(request.body.event_bindings.some(assignment => assignment.event_id === 'event-0'));
+    assert.deepEqual(app.pageErrors, []);
+  } finally { await app.close(); }
 });

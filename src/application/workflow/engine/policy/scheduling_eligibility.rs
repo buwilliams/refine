@@ -83,7 +83,7 @@ fn feature_eligible_goal_ids<'a>(
     let mut lowest_holding_order: BTreeMap<(String, &str), i64> = BTreeMap::new();
     let mut occupying_count: BTreeMap<(String, &str), usize> = BTreeMap::new();
     for goal in goals.clone() {
-        if goal.round_count == 0 {
+        if goal.round_count == 0 || goal.status == GoalStatus::Draft {
             continue;
         }
         let (Some(feature_id), Some(order)) = (goal.feature_id.as_deref(), goal.feature_order)
@@ -104,7 +104,7 @@ fn feature_eligible_goal_ids<'a>(
     goals
         .into_iter()
         .filter(|goal| {
-            if goal.round_count == 0 {
+            if goal.round_count == 0 || goal.status == GoalStatus::Draft {
                 return false;
             }
             let (Some(feature_id), Some(order)) = (goal.feature_id.as_deref(), goal.feature_order)

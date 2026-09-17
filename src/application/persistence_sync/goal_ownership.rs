@@ -56,6 +56,15 @@ impl GoalOwnershipPolicy {
         local: Option<&[u8]>,
         remote: Option<&[u8]>,
     ) {
+        // Planning requests and placements carry explicit user decisions. A
+        // concurrent cancellation, move or handoff must not be chosen by an agent.
+        let relative = path.strip_prefix(".refine/").unwrap_or(path);
+        if relative.starts_with("planning/") && local != remote && local != base && remote != base {
+            self.decisions.insert(path.to_string(), GoalOwnership::Ambiguous {
+                reason: "Concurrent Project Planning decisions require explicit state recovery; preserve both operands and retry the intended action after reconciliation".into(),
+            });
+            return;
+        }
         if let Some(decision) = classify_goal_ownership(path, base, local, remote) {
             self.decisions.insert(path.to_string(), decision);
         }
@@ -224,6 +233,28 @@ mod tests {
             "rounds": []
         }))
         .unwrap()
+    }
+
+    #[test]
+    fn planning_conflicts_require_an_explicit_decision_but_disjoint_writes_do_not() {
+        let mut policy = GoalOwnershipPolicy::default();
+        policy.include(
+            "planning/cards/GOAL.json",
+            Some(b"base"),
+            Some(b"left"),
+            Some(b"right"),
+        );
+        assert!(matches!(
+            policy.decision("planning/cards/GOAL.json"),
+            Some(GoalOwnership::Ambiguous { .. })
+        ));
+        policy.include(
+            "planning/boards/board.json",
+            Some(b"base"),
+            Some(b"changed"),
+            Some(b"base"),
+        );
+        assert!(policy.decision("planning/boards/board.json").is_none());
     }
 
     #[test]

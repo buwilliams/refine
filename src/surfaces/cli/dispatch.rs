@@ -13,6 +13,7 @@ mod goals;
 mod hub;
 mod logs;
 mod nodes;
+mod planning;
 mod projects;
 mod sync;
 mod system;
@@ -153,6 +154,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
         } => return sync::dispatch_daemon(preview, authority, paths),
         Commands::Goal { action } => return dispatch_goal_daemon(action),
         Commands::Feature { action } => return dispatch_feature_daemon(action),
+        Commands::Planning { action } => return planning::planning(action),
         Commands::Todo { action } => return dispatch_todo(action),
         Commands::Workflow { action } => return dispatch_workflow_daemon(action),
         Commands::Node { action } => return dispatch_node_daemon(action),
@@ -205,6 +207,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
         command @ Commands::Sync { .. } => sync::dispatch_command(command),
         command @ Commands::Goal { .. } => goals::dispatch_command(command),
         command @ Commands::Feature { .. } => features::dispatch_command(command),
+        Commands::Planning { action } => planning::planning(action),
         command @ Commands::Todo { .. } => todos::dispatch_command(command),
         command @ Commands::Workflow { .. } => workflow::dispatch_command(command),
     }
@@ -587,7 +590,10 @@ fn direct_work_item_service(target_root: &Path) -> RefineResult<FileWorkItemServ
 
 pub(super) fn explicit_target_root_path(command: &Commands) -> Option<&PathBuf> {
     match command {
-        Commands::Skills { .. } | Commands::Templates { .. } | Commands::Hub { .. } => None,
+        Commands::Planning { .. }
+        | Commands::Skills { .. }
+        | Commands::Templates { .. }
+        | Commands::Hub { .. } => None,
         Commands::Config { action } => match action {
             ConfigAction::Show { target_root, .. } => target_root.as_ref(),
             ConfigAction::Providers { .. } => None,

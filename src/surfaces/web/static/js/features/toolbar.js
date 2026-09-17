@@ -150,7 +150,7 @@ function loadChatStateFromStorage() {
     if (parsed && typeof parsed === "object" && parsed.tabs) {
       chatState.tabs = Object.fromEntries(
         Object.entries(parsed.tabs).filter(([, tab]) => {
-          if (tab?.mode === "supervisor") return false;
+          if (["supervisor", "todo"].includes(tab?.mode)) return false;
           if (parsed.version === CHAT_TABS_STORAGE_VERSION) return true;
           const legacyDefault = ["standalone", "system", "files", "terminal"].includes(tab?.mode);
           return !legacyDefault || !!tab?.sessionId;
@@ -232,7 +232,6 @@ function resetChatForProjectSwitch() {
   systemOperationState.messages = [];
   systemOperationState.logTab = { mode: "system", logEntries: [], logQuery: "", logFollowing: false };
   resetFilesState();
-  resetTodoState();
   resetTerminalState();
   saveChatStateToStorage();
   drawToolbar();
@@ -332,7 +331,6 @@ function nextToolbarLabel(mode) {
     standalone: "Agent in Worktree",
     system: "System",
     files: "Files",
-    todo: "Todo List",
     terminal: "Terminal",
     plan: "Planning Agent",
   }[mode] || "Tool";
@@ -341,11 +339,8 @@ function nextToolbarLabel(mode) {
 }
 
 async function createToolbarTab(mode, options = {}) {
-  if (!["agent", "standalone", "system", "files", "todo", "terminal", "plan", "skill"].includes(mode)) return;
-  if (mode === "todo") {
-    const existing = Object.keys(chatState.tabs).find((id) => chatState.tabs[id]?.mode === "todo");
-    if (existing) return activateToolbarTab(existing);
-  }
+  if (!["agent", "standalone", "system", "files", "terminal", "plan", "skill"].includes(mode)) return;
+
   const tabId = nextToolbarTabId(mode);
   chatState.tabs[tabId] = normalizeInteractiveTerminalTab({
     goalId: null,
@@ -469,7 +464,6 @@ function drawToolbar() {
   ensureStandaloneTab();
   const active = currentToolbarTab();
   const filesActive = active?.mode === "files";
-  const todoActive = active?.mode === "todo";
   const systemActive = active?.mode === "system";
   const terminalActive = toolbarTabUsesTerminal(active);
   const goalLogsActive = active?.mode === "goal_logs";
@@ -493,8 +487,6 @@ function drawToolbar() {
          data-testid="toolbar-body">
       ${filesActive
         ? renderFilesPanel()
-        : todoActive
-          ? renderTodoPanel()
         : systemActive
           ? renderSystemPanel()
           : terminalActive
@@ -505,7 +497,6 @@ function drawToolbar() {
     </div>
   `, () => {
     if (filesActive) bindFilesPanel(root);
-    if (todoActive) bindTodoPanel(root);
     if (systemActive) {
       bindGoalLogPanel(root, systemOperationState.logTab);
       wireSystemStateRecovery();
@@ -527,9 +518,7 @@ function drawToolbar() {
     if (filesActive && !filesState.entriesByPath[""] && !filesState.loading) {
       loadFilesDirectory("", { expand: true, redraw: true });
     }
-    if (todoActive && state.lastReporter && todoState.reporter !== state.lastReporter && !todoState.loading) {
-      void loadTodoListsForReporter(state.lastReporter);
-    }
+
     if (terminalActive) {
       const terminal = terminalStateFor(chatState.activeTabId);
       if (terminal?.sessionId && !terminal.statusChecked) {
@@ -551,7 +540,6 @@ function drawChatDock() { drawToolbar(); }
 function toolbarTabTitle(tab) {
   if (tab.mode === "agent") return "General-purpose agent terminal";
   if (tab.mode === "files") return "File browser";
-  if (tab.mode === "todo") return "Reporter todo lists";
   if (tab.mode === "system") return "System operations";
   if (toolbarTabUsesTerminal(tab)) return `${tab.label} terminal`;
   if (tab.mode === "goal_logs") return `Live logs for Goal ${tab.goalId}`;

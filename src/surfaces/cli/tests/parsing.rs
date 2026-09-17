@@ -41,6 +41,7 @@ fn explicit_target_root_path_detects_internal_cli_escape_hatch() {
     let target_root = PathBuf::from("/tmp/refine-state");
     let command = Commands::Goal {
         action: GoalAction::Create {
+            status: "backlog".into(),
             name: "direct write".to_string(),
             target_root: Some(target_root.clone()),
             id: None,
@@ -448,4 +449,35 @@ fn feature_import_parses_structured_project_spec_with_shared_import_service() {
     assert_eq!(goal.goal.reporter.as_deref(), Some("Product"));
 
     fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn planning_cli_retains_concurrency_and_retry_arguments() {
+    let parsed = Cli::try_parse_from([
+        "refine",
+        "planning",
+        "apply",
+        "card.move",
+        "--request-id",
+        "move-once",
+        "--goal-id",
+        "GOAL1",
+        "--board-id",
+        "board",
+        "--lane-id",
+        "ready",
+        "--expected-revision",
+        "3",
+        "--data",
+        r#"{"position":10}"#,
+    ])
+    .unwrap();
+    assert!(
+        matches!(parsed.command, Commands::Planning { action: PlanningCliAction::Apply { operation, request_id, expected_revision: Some(3), goal_id: Some(goal_id), .. } } if operation == "card.move" && request_id == "move-once" && goal_id == "GOAL1")
+    );
+    let draft =
+        Cli::try_parse_from(["refine", "goal", "create", "An idea", "--status", "draft"]).unwrap();
+    assert!(
+        matches!(draft.command, Commands::Goal { action: GoalAction::Create { status, .. } } if status == "draft")
+    );
 }

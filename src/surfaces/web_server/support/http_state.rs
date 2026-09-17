@@ -68,6 +68,8 @@ pub(in crate::surfaces::web_server) fn normalize_api_path(path: &str) -> String 
         format!("/guidance{rest}")
     } else if let Some(rest) = path.strip_prefix("/api/reporters") {
         format!("/reporters{rest}")
+    } else if let Some(rest) = path.strip_prefix("/api/planning") {
+        format!("/planning{rest}")
     } else if let Some(rest) = path.strip_prefix("/api/todos") {
         format!("/todos{rest}")
     } else if let Some(rest) = path.strip_prefix("/api/target-app") {

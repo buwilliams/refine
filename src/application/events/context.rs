@@ -16,6 +16,7 @@ pub fn goal_context(goal: &Value) -> Value {
             "id",
             "name",
             "description",
+            "planning",
             "status",
             "node_id",
             "priority",

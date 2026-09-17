@@ -9,6 +9,7 @@ mod imports;
 mod imports_parity;
 mod nodes_fleet;
 mod operations_processes;
+mod planning;
 mod project_runtime;
 mod quality_guidance;
 mod static_surface;

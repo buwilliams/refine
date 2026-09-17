@@ -25,6 +25,7 @@ pub fn install(config: &mut AutomationConfig) {
         })
         .bindings
         .push(Binding {
+            planning: None,
             id: ID.into(),
             skill_id: ID.into(),
             enabled: true,
@@ -61,6 +62,7 @@ fn install_metrics(config: &mut AutomationConfig) {
     event.id = id.into();
     event.name = "Update Metrics Hub".into();
     event.bindings.push(Binding {
+        planning: None,
         id: id.into(),
         skill_id: id.into(),
         enabled: true,

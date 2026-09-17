@@ -206,7 +206,7 @@ async function openSkillEditor(original = null, clone = false, defaults = {}) {
     if (!isNodeContextGenerationCurrent(generation)) return;
     sources = catalog.sources; revision = current.revision;
     item = original ? structuredClone(current.item) : {id: newSkillId(), name: "", prompt: "", enabled: true, scope: {node_id: null}, parameters: []};
-    trigger = current.trigger || {source: defaults.source || "custom", mode: "blocking", order: 0, inputs: {}};
+    trigger = current.trigger || {source: defaults.source || "custom", mode: "blocking", order: 0, inputs: {}, planning: defaults.planning || null};
     if (clone) { item.id = newSkillId(); item.name += " copy"; trigger = {...trigger, id: undefined}; }
   } catch (error) { showActionError(error); return; }
   finally { automationEditorOpening = false; }
@@ -217,6 +217,7 @@ async function openSkillEditor(original = null, clone = false, defaults = {}) {
     </nav></div>
     <div class="settings-pane active automation-instructions" role="tabpanel" id="automation-panel-instructions" aria-labelledby="automation-tab-instructions" data-skill-panel="instructions">${renderSettingsMarkdownField({id: "automation-prompt", title: "Instructions", value: item.prompt, rows: 16})}</div>
     <div class="settings-pane" role="tabpanel" id="automation-panel-settings" aria-labelledby="automation-tab-settings" data-skill-panel="settings" hidden>
+    <div class="form-row" data-planning-filters><label>Board filter<input data-planning-board-filter value="${htmlEscape(trigger.planning?.board_id || "")}" placeholder="All boards"></label><label>Lane filter<input data-planning-lane-filter value="${htmlEscape(trigger.planning?.lane_id || "")}" placeholder="All lanes"></label></div>
     <div class="form-row"><label for="automation-name">Name</label><input type="text" id="automation-name" required value="${htmlEscape(item.name)}"></div>
     <div class="automation-fields"><div class="form-row"><label for="automation-trigger">Trigger</label><select id="automation-trigger" data-trigger-source required>${[["Manual", sources.filter(source => source === "custom")], ["Automatic", sources.filter(source => source !== "custom")]].map(([label, values]) => `<optgroup label="${label}">${values.map(source => `<option value="${htmlEscape(source)}" ${source === trigger.source ? "selected" : ""}>${htmlEscape(skillTriggerLabel(source))}</option>`).join("")}</optgroup>`).join("")}</select></div>
     ${automationScopeControl("data-scope", item.scope)}<div class="form-row"><label>Status</label>${automationChoices("data-enabled", "Status", [["true", "Enabled"], ["false", "Disabled"]], item.enabled)}</div></div>
@@ -275,6 +276,7 @@ async function openSkillEditor(original = null, clone = false, defaults = {}) {
   function updateTrigger() {
     const source = root.querySelector("[data-trigger-source]").value;
     root.querySelector("[data-automatic-options]").hidden = source === "custom";
+    root.querySelector("[data-planning-filters]").hidden = editing || !source.startsWith("planning.lane.");
     root.querySelector("[data-trigger-help]").textContent = source === "custom" ? "Run from New Goal → Skills or the CLI. Web runs open in an agent tab." : "Runs automatically at this point. Refine supplies the context and expected result.";
   }
   root.querySelector("[data-add-parameter]").onclick = () => {
@@ -330,7 +332,7 @@ async function openSkillEditor(original = null, clone = false, defaults = {}) {
         const scope = readAutomationScope(root.querySelector("[data-scope]"));
         const source = root.querySelector("[data-trigger-source]").value;
         const edited = {id: item.id, name: root.querySelector("#automation-name").value.trim(), prompt: root.querySelector("[data-prompt]").value, enabled: root.querySelector("[data-enabled]").dataset.value === "true", scope, parameters: readParameters(root), provenance: item.provenance || null};
-        await api("PUT", path, {revision, item: edited, ...(!editing ? {trigger: {id: trigger.id, source, mode: source === "custom" ? "blocking" : root.querySelector("[data-mode]").dataset.value, order: Number(root.querySelector("[data-order]").value), inputs: readInputs()}} : {})});
+        await api("PUT", path, {revision, item: edited, ...(!editing ? {trigger: {id: trigger.id, source, mode: source === "custom" ? "blocking" : root.querySelector("[data-mode]").dataset.value, order: Number(root.querySelector("[data-order]").value), inputs: readInputs(), planning: source.startsWith("planning.") ? {board_id:root.querySelector("[data-planning-board-filter]").value.trim()||null,lane_id:root.querySelector("[data-planning-lane-filter]").value.trim()||null} : null}} : {})});
       }
       root._close(); await refreshSettings({force: true}); await refreshManualSkills();
       if (!remove && defaults.onSaved) await defaults.onSaved(item.id);

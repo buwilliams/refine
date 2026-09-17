@@ -62,7 +62,7 @@ test("windows use history and full-height content without stopping sessions or l
     await page.evaluate(() => { window.savedDashboard = document.getElementById("dash"); });
     await page.locator('[data-testid="toolbar-add"]').click();
     assert.deepEqual(await page.locator("[data-add-toolbar-tab]").allTextContents(),
-      ["Agent", "Agent in Worktree", "System", "Files", "Todo List", "Terminal", "Planning Agent"]);
+      ["Agent", "Agent in Worktree", "System", "Files", "Terminal", "Planning Agent"]);
     await page.locator('[data-add-toolbar-tab="terminal"]').click();
     await page.locator(".xterm-screen").waitFor();
     await page.waitForFunction(() => terminalStateFor()?.connected);

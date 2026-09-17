@@ -13,6 +13,7 @@ pub mod imports;
 pub mod maintenance;
 pub mod operations;
 pub mod persistence_sync;
+pub mod planning;
 pub mod projects;
 pub mod protocol;
 pub mod system;

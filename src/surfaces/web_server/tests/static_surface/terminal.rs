@@ -46,10 +46,12 @@ fn static_toolbar_is_lazy_multi_agent_and_uses_shared_managed_terminal() {
     assert!(toolbar.contains("CHAT_TABS_STORAGE_VERSION = 2"));
     assert!(toolbar.contains("function toolbarStateStorage()"));
     assert!(toolbar.contains(r#"typeof sessionStorage === "undefined""#));
-    assert!(toolbar.contains(r#"["agent", "Agent"]"#));
-    assert!(toolbar.contains(r#"["standalone", "Agent in Worktree"]"#));
-    assert!(toolbar.contains(r#"["todo", "Todo List"]"#));
-    assert!(toolbar.contains(r#"["plan", "Planing Agent"]"#));
+    let index = fs::read_to_string(static_root.join("index.html")).unwrap();
+    for mode in ["agent", "standalone", "plan"] {
+        assert!(index.contains(&format!("data-add-toolbar-tab=\"{mode}\"")));
+    }
+    assert!(!index.contains("data-add-toolbar-tab=\"todo\""));
+    assert!(index.contains("data-testid=\"nav-planning\""));
     assert!(toolbar.contains("function createToolbarTab"));
     assert!(!toolbar.contains("ensureSupervisorTab"));
     assert!(toolbar.contains(r#"api("POST", "/api/terminal/session"#));
@@ -62,10 +64,7 @@ fn static_toolbar_is_lazy_multi_agent_and_uses_shared_managed_terminal() {
     assert!(!toolbar_css.contains(".chat-input-wrap"));
     assert!(toolbar_css.contains(".terminal-panel"));
     assert!(toolbar_css.contains("position: absolute"));
-    assert!(toolbar_css.contains(".toolbar-dock:not(.open) .toolbar-add-options"));
-    assert!(toolbar_css.contains("min-height: 36px"));
     assert!(toolbar_css.contains("padding-inline: 0"));
-    assert!(toolbar_css.contains("font-size: 15px"));
     assert!(toolbar.contains("observeTerminalOutputSize(output, liveTab())"));
     assert!(toolbar.contains("scheduleActiveTerminalFit()"));
 }

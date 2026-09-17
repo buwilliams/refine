@@ -37,6 +37,7 @@ enum ToolBinding {
     SkillTrigger,
     WorkflowControl,
     RoundDelete,
+    PlanningCommand,
 }
 
 /// A capability the MCP surface exposes to clients.
@@ -62,6 +63,11 @@ impl McpTool {
     /// arguments are missing or invalid.
     pub fn build_request(&self, arguments: &Value) -> Result<RequestParts, String> {
         match &self.binding {
+            ToolBinding::PlanningCommand => Ok(RequestParts {
+                method: "POST".into(),
+                path: "/planning/commands".into(),
+                body: Some(arguments.clone()),
+            }),
             ToolBinding::RoundDelete => {
                 let id = arguments["goal_id"]
                     .as_str()
@@ -209,6 +215,55 @@ impl McpTool {
 /// `refine_request` escape hatch covers everything else, including writes.
 pub fn tool_catalog() -> Vec<McpTool> {
     vec![
+        McpTool {
+            name: "refine_planning",
+            description: "Read shared project boards, lanes, Goal cards, routing and durable action results. Every node sees the same project state.",
+            input_schema: empty_schema,
+            binding: ToolBinding::Api {
+                method: "GET",
+                path: "/planning",
+                path_params: &[],
+            },
+        },
+        McpTool {
+            name: "refine_planning_command",
+            description: "Create or edit shared boards/lanes/cards, move or release a Goal card, or migrate Todo Lists. Read revisions first and reuse request_id on retry. Returns an action receipt; pending actions execute on the Goal owner.",
+            input_schema: || {
+                json!({"type":"object","additionalProperties":false,"required":["operation","request_id"],"properties":{
+                    "operation":{"enum":["board.create","board.update","board.archive","lane.create","lane.update","lane.reorder","lane.delete","card.create","card.attach","card.update","card.move","card.archive","card.detach","card.apply","migrate"]},
+                    "request_id":{"type":"string"},"expected_revision":{"type":"integer","minimum":0},"board_id":{"type":"string"},"lane_id":{"type":"string"},"goal_id":{"type":"string"},"actor":{"type":"string"},"data":{"type":"object","properties":{
+                        "name":{"type":"string"},"description":{"type":"string"},"reporter":{"type":"string"},
+                        "priority":{"type":"string","enum":["low","medium","high"]},
+                        "routing":{"type":["string","null"],"description":"Explicit node ID, auto for least-loaded eligible node, or null to inherit card -> lane -> board."},
+                        "action":{"type":"string","enum":["none","accept_into_backlog","release"]},
+                        "archived":{"type":"boolean"},"position":{"type":"number"},
+                        "expected_goal_revision":{"type":"integer","minimum":0,"description":"Required when card.update edits Goal metadata."},
+                        "lane_ids":{"type":"array","items":{"type":"string"},"description":"Complete lane order for lane.reorder."}
+                    }}
+                }})
+            },
+            binding: ToolBinding::PlanningCommand,
+        },
+        McpTool {
+            name: "refine_planning_action",
+            description: "Inspect a Project Planning action and its waiting reason, selected node and Skill invocations.",
+            input_schema: || json!({"type":"object","required":["id"],"properties":{"id":{"type":"string"}}}),
+            binding: ToolBinding::Api {
+                method: "GET",
+                path: "/planning/actions/{id}",
+                path_params: &["id"],
+            },
+        },
+        McpTool {
+            name: "refine_cancel_planning_action",
+            description: "Cancel a pending planning action. Completed moves and workflow transitions remain as history.",
+            input_schema: || json!({"type":"object","required":["id"],"properties":{"id":{"type":"string"}}}),
+            binding: ToolBinding::Api {
+                method: "POST",
+                path: "/planning/actions/{id}/cancel",
+                path_params: &["id"],
+            },
+        },
         McpTool {
             name: "refine_list_templates",
             description: "List editable system prompt Templates, defaults, revisions and variables. Use refine_request for edits and previews through /templates.",

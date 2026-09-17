@@ -208,6 +208,7 @@ function registerNavigationCommand(id, title, hash, keywords = []) {
   });
 }
 
+registerNavigationCommand("nav.planning", "Project Planning", "#/planning", ["boards", "cards", "todo"]);
 registerNavigationCommand("nav.dashboard", "Dashboard", "#/", ["home"]);
 registerNavigationCommand("nav.features", "Features", "#/features", ["feature", "planning"]);
 registerNavigationCommand("nav.goals", "Goals", "#/goals", ["issues", "work"]);
@@ -298,8 +299,6 @@ for (const [id, title, mode, aliases, keywords] of [
     ["agent", "open-agent"], ["chat", "assistant"]],
   ["system.open", "System operations", "system",
     ["system", "system-operations", "open-system"], ["activity", "runtime", "logs"]],
-  ["todo.open", "Todo List", "todo",
-    ["todo", "todos", "todo-list"], ["reporter", "tasks", "checklist"]],
   ["terminal.open", "Terminal", "terminal",
     ["terminal", "shell", "open-terminal"], ["command line", "console"]],
   ["agent-worktree.open", "Agent in Worktree", "standalone",

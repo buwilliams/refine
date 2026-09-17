@@ -6,10 +6,11 @@ use serde_json::Value;
 
 use super::workflow::GoalStatus;
 
-pub const SCHEMA_VERSION: u32 = 3;
+pub const SCHEMA_VERSION: u32 = 4;
 pub const MAX_CONFIG_BYTES: usize = 16 * 1024 * 1024;
 pub const CUSTOM_EVENT_ID: &str = "custom";
-pub const WORKFLOW_STEPS: [&str; 10] = [
+pub const WORKFLOW_STEPS: [&str; 11] = [
+    "draft",
     "backlog",
     "todo",
     "plan",
@@ -111,9 +112,20 @@ pub enum BindingMode {
     Context,
 }
 
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct PlanningFilter {
+    #[serde(default)]
+    pub board_id: Option<String>,
+    #[serde(default)]
+    pub lane_id: Option<String>,
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Binding {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub planning: Option<PlanningFilter>,
     pub id: String,
     pub skill_id: String,
     #[serde(default = "enabled")]
@@ -210,7 +222,11 @@ pub fn system_catalog() -> Vec<String> {
                 format!("workflow.{step}.success"),
             ]
         })
-        .chain(std::iter::once("node.startup.ready".into()))
+        .chain([
+            "planning.lane.enter".into(),
+            "planning.lane.exit".into(),
+            "node.startup.ready".into(),
+        ])
         .collect()
 }
 
@@ -251,7 +267,7 @@ impl AutomationConfig {
         {
             return Err("Events/Skills configuration exceeds 16 MiB".into());
         }
-        if ![1, 2, SCHEMA_VERSION].contains(&self.schema_version) {
+        if ![1, 2, 3, SCHEMA_VERSION].contains(&self.schema_version) {
             return Err("unsupported Events/Skills schema".into());
         }
         if self.events.len() > 1024 || self.skills.len() > 1024 {
@@ -309,6 +325,23 @@ impl AutomationConfig {
                     return Err("invalid or repeated binding ID".into());
                 }
                 validate_scope(&binding.scope)?;
+                if let Some(filter) = &binding.planning {
+                    if !event
+                        .source
+                        .as_deref()
+                        .is_some_and(|s| s.starts_with("planning.lane."))
+                    {
+                        return Err("planning filters require a lane trigger".into());
+                    }
+                    if filter
+                        .board_id
+                        .iter()
+                        .chain(filter.lane_id.iter())
+                        .any(|id| !valid_id(id))
+                    {
+                        return Err("invalid planning filter identifier".into());
+                    }
+                }
                 let skill = self.skills.get(&binding.skill_id).ok_or_else(|| {
                     format!(
                         "binding {} references missing Skill {}",
@@ -351,7 +384,7 @@ impl AutomationConfig {
                 }
                 for (name, path) in &binding.inputs {
                     if !skill.parameters.iter().any(|p| &p.name == name)
-                        || !["goal.", "system.", "event."]
+                        || !["goal.", "system.", "event.", "planning."]
                             .iter()
                             .any(|prefix| path.starts_with(prefix))
                         || path.split('.').any(|p| !valid_id(p))

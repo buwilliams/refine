@@ -18,6 +18,8 @@ struct SkillEventBinding {
 #[serde(deny_unknown_fields)]
 struct SkillTrigger {
     #[serde(default)]
+    planning: Option<PlanningFilter>,
+    #[serde(default)]
     id: Option<String>,
     source: String,
     #[serde(default)]
@@ -111,6 +113,22 @@ impl FileEventService {
                 if config.schema_version < 2 {
                     super::migration::single_trigger_skills(config)?;
                 }
+                for source in system_catalog() {
+                    config
+                        .events
+                        .entry(source.clone())
+                        .or_insert_with(|| EventDefinition {
+                            id: source.clone(),
+                            name: source.clone(),
+                            kind: EventKind::System,
+                            source: Some(source),
+                            enabled: true,
+                            scope: Scope::default(),
+                            parameters: vec![],
+                            bindings: vec![],
+                            on_success: None,
+                        });
+                }
                 config.schema_version = SCHEMA_VERSION;
                 Ok(())
             })?
@@ -150,7 +168,7 @@ impl FileEventService {
             .ok_or_else(|| RefineError::NotFound(format!("Skill {id}")))?;
         let triggers: Vec<_> = config.events.values().flat_map(|event| {
             event.bindings.iter().filter(|b| b.skill_id == id).map(|b| {
-                json!({"id": b.id, "source": event.source.as_deref().unwrap_or(CUSTOM_EVENT_ID), "mode": b.mode, "order": b.order, "inputs": b.inputs})
+                json!({"id": b.id, "source": event.source.as_deref().unwrap_or(CUSTOM_EVENT_ID), "mode": b.mode, "order": b.order, "inputs": b.inputs, "planning": b.planning})
             })
         }).collect();
         Ok(
@@ -343,6 +361,7 @@ impl FileEventService {
                         Some(vec![SkillEventBinding {
                             event_id,
                             binding: Binding {
+                                planning: trigger.planning,
                                 id: trigger
                                     .id
                                     .unwrap_or_else(|| format!("trigger-{}", uuid::Uuid::new_v4())),

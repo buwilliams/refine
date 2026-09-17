@@ -701,89 +701,42 @@ test("Agent terminal refits after leaving a window and collapsing the rail", { s
   }
 });
 
-test("Todo List renders an item-first workspace with responsive list navigation", { skip: SKIP }, async () => {
-  const app = await openApp();
+test("Project Planning renders shared lanes on desktop and mobile", { skip: SKIP }, async () => {
+  const app = await openApp({ fixture(pathname) {
+    if (pathname === "/api/planning") return {
+      boards: [{ id: "shared", name: "Shared work", revision: 1, lanes: [
+        { id: "ideas", name: "Ideas", action: "none" },
+        { id: "ready", name: "Ready", action: "release" },
+        { id: "done", name: "Done", action: "none" }
+      ] }],
+      cards: [{ placement: { goal_id: "GOAL1", board_id: "shared", lane_id: "ideas", revision: 1, position: 1 }, goal: { ...GOAL, name: "Read paper", status: "draft", reporter: "Another Reporter" } }],
+      actions: [], migration: true
+    };
+    return apiFixture(pathname);
+  } });
   try {
-    await assertScreenRenders(app, { route: "#/", marker: "#dash" });
-    await app.page.setViewportSize({ width: 1100, height: 800 });
-    await app.page.evaluate(() => {
-      state.lastReporter = "Reporter";
-      chatState.tabs = {
-        todo: {
-          goalId: null,
-          label: "Todo List",
-          mode: "todo",
-          sessionId: null,
-        },
-      };
-      chatState.activeTabId = "todo";
-      chatState.open = true;
-      chatState.bodyHeight = 430;
-      todoState.reporter = "Reporter";
-      todoState.selectedListId = "release";
-      todoState.lists = [
-        {
-          id: "release",
-          name: "Release",
-          items: [
-            { id: "ship", text: "Ship the candidate", done: false },
-            { id: "notes", text: "Write release notes", done: true },
-          ],
-        },
-        {
-          id: "later",
-          name: "Later",
-          items: [],
-        },
-      ];
-      drawToolbar();
-    });
-
-    const wideScreen = await app.page.evaluate(() => {
-      const rail = document.querySelector(".todo-list-rail").getBoundingClientRect();
-      const workspace = document.querySelector(".todo-workspace").getBoundingClientRect();
-      const composer = document.querySelector(".todo-add-form").getBoundingClientRect();
-      const items = document.querySelector(".todo-item-scroll").getBoundingClientRect();
-      return {
-        railBeforeWorkspace: rail.right <= workspace.left,
-        composerBeforeItems: composer.bottom <= items.bottom && composer.top < items.top,
-        title: document.querySelector('[data-testid="todo-list-title"]').textContent,
-        openCount: document.querySelector(".todo-list-nav-item.active .todo-list-nav-count").textContent,
-        completedCount: document.querySelector(".todo-completed-section h4 span").textContent,
-      };
-    });
-    assert.deepEqual(wideScreen, {
-      railBeforeWorkspace: true,
-      composerBeforeItems: true,
-      title: "Release",
-      openCount: "1",
-      completedCount: "1",
-    });
-
-    await app.page.locator('[data-todo-item-id="ship"] [data-todo-edit]').click();
-    await app.page.waitForSelector('[data-todo-item-id="ship"] [data-todo-edit-form]');
-    assert.equal(
-      await app.page.locator('[data-todo-item-id="ship"] [data-todo-edit-text]').inputValue(),
-      "Ship the candidate",
-    );
-
-    await app.page.setViewportSize({ width: 700, height: 800 });
-    const mobile = await app.page.evaluate(() => {
-      const rail = document.querySelector(".todo-list-rail").getBoundingClientRect();
-      const workspace = document.querySelector(".todo-workspace").getBoundingClientRect();
-      return {
-        railAboveWorkspace: rail.bottom <= workspace.top,
-        listFlow: getComputedStyle(document.querySelector(".todo-list-nav")).display,
-      };
-    });
-    assert.deepEqual(mobile, {
-      railAboveWorkspace: true,
-      listFlow: "flex",
-    });
+    await app.page.goto(`${app.origin}/#/planning`);
+    await app.page.locator(".planning-card").waitFor();
+    assert.equal(await app.page.locator(".planning-lane").count(), 3);
+    assert.match(await app.page.locator(".planning-card").innerText(), /Another Reporter/);
+    assert.match(await app.page.locator('[data-lane="ready"]').innerText(), /Releases work/);
+    for (const width of [1100, 390]) {
+      await app.page.setViewportSize({ width, height: 844 });
+      const geometry = await app.page.locator(".planning-lanes").evaluate(el => ({
+        overflow: getComputedStyle(el).overflowX,
+        right: el.getBoundingClientRect().right,
+        viewport: innerWidth
+      }));
+      assert.equal(geometry.overflow, "auto");
+      assert.ok(geometry.right <= geometry.viewport, JSON.stringify(geometry));
+      await app.page.getByRole("button", { name: "Move", exact: true }).click();
+      await app.page.locator('.modal-backdrop [data-lane]').selectOption("done");
+      await app.page.keyboard.press("Escape");
+      await app.page.locator('.modal-backdrop').waitFor({ state: "detached" });
+    }
+    if (process.env.REFINE_PLANNING_SCREENSHOT) await app.page.screenshot({ path: process.env.REFINE_PLANNING_SCREENSHOT });
     assert.deepEqual(app.pageErrors, []);
-  } finally {
-    await app.close();
-  }
+  } finally { await app.close(); }
 });
 
 test("Agent tab round trip retains xterm and scrollback while returning to latest output", { skip: SKIP }, async () => {

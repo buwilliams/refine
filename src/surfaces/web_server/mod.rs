@@ -87,6 +87,10 @@ pub const API_GROUPS: &[ApiRouteGroup] = &[
         capability: "internal system occurrences and legacy configuration compatibility",
     },
     ApiRouteGroup {
+        prefix: "/planning",
+        capability: "Shared project boards, lanes, Goal cards, routing and durable lane actions",
+    },
+    ApiRouteGroup {
         prefix: "/templates",
         capability: "editable system prompt Templates and rendering previews",
     },
@@ -124,7 +128,7 @@ pub const API_GROUPS: &[ApiRouteGroup] = &[
     },
     ApiRouteGroup {
         prefix: "/todos",
-        capability: "Reporter-scoped todo lists and items",
+        capability: "legacy Todo compatibility before Project Planning migration",
     },
     ApiRouteGroup {
         prefix: "/nodes",
@@ -254,6 +258,7 @@ pub use http::{HttpRequest, LocalHttpDaemon, WireResponse};
 
 mod hub_routes;
 mod outcome_routes;
+mod planning_routes;
 mod template_routes;
 
 mod hub_host;

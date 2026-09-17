@@ -14,7 +14,7 @@
   <link rel="stylesheet" href="/static/css/templates.css">
   <link rel="stylesheet" href="/static/css/workflow-settings.css">
   <link rel="stylesheet" href="/static/css/toolbar.css">
-  <link rel="stylesheet" href="/static/css/toolbar-todo.css">
+  <link rel="stylesheet" href="/static/css/planning.css">
   <link rel="stylesheet" href="/static/vendor/xterm/xterm.css">
   <link rel="stylesheet" href="/static/css/theme.css">
   <link rel="stylesheet" href="/static/css/navigation.css">
@@ -65,6 +65,7 @@
         <summary class="rail-section-heading" title="Main navigation"><svg class="rail-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="/static/vendor/lucide/navigation.svg#compass"></use></svg><span class="rail-copy">Main</span><span class="rail-section-state" aria-hidden="true"><svg class="rail-icon rail-section-open-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="/static/vendor/lucide/navigation.svg#plus"></use></svg><svg class="rail-icon rail-section-close-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="/static/vendor/lucide/navigation.svg#minus"></use></svg></span></summary>
         <nav class="nav rail-main" aria-label="Main" data-testid="primary-nav">
           <a class="rail-row" href="#/" data-route="dashboard" data-node-scope-destination="dashboard" data-testid="nav-dashboard" title="Dashboard"><svg class="rail-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="/static/vendor/lucide/navigation.svg#layout-dashboard"></use></svg><span class="rail-copy">Dashboard</span></a>
+          <a class="rail-row" href="#/planning" data-route="planning" data-testid="nav-planning" title="Project Planning"><svg class="rail-icon" aria-hidden="true" viewBox="0 0 24 24"><use href="/static/vendor/lucide/navigation.svg#layers"></use></svg><span class="rail-copy">Project Planning</span></a>
           <a class="rail-row" href="#/features" data-route="features" data-testid="nav-features" title="Features"><svg class="rail-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="/static/vendor/lucide/navigation.svg#layers"></use></svg><span class="rail-copy">Features</span></a>
           <a class="rail-row" href="#/goals" data-route="goals" data-node-scope-destination="goals" data-testid="nav-goals" title="Goals"><svg class="rail-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="/static/vendor/lucide/navigation.svg#target"></use></svg><span class="rail-copy">Goals</span></a>
           <a class="rail-row" href="#/changes" data-route="changes" data-testid="nav-changes" title="Changes"><svg class="rail-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="/static/vendor/lucide/navigation.svg#git-pull-request"></use></svg><span class="rail-copy">Changes</span></a>
@@ -80,7 +81,6 @@
             <button type="button" data-add-toolbar-tab="standalone"><svg class="rail-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="/static/vendor/lucide/navigation.svg#git-branch"></use></svg>Agent in Worktree</button>
             <button type="button" data-add-toolbar-tab="system"><svg class="rail-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="/static/vendor/lucide/navigation.svg#activity"></use></svg>System</button>
             <button type="button" data-add-toolbar-tab="files"><svg class="rail-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="/static/vendor/lucide/navigation.svg#folder-open"></use></svg>Files</button>
-            <button type="button" data-add-toolbar-tab="todo"><svg class="rail-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="/static/vendor/lucide/navigation.svg#list-checks"></use></svg>Todo List</button>
             <button type="button" data-add-toolbar-tab="terminal"><svg class="rail-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="/static/vendor/lucide/navigation.svg#square-terminal"></use></svg>Terminal</button>
             <button type="button" data-add-toolbar-tab="plan"><svg class="rail-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="/static/vendor/lucide/navigation.svg#notebook-pen"></use></svg>Planning Agent</button>
           </div>
@@ -206,7 +206,7 @@
   <script src="/static/js/features/terminal-clipboard.js"></script>
   <script src="/static/js/features/terminal-keyboard.js"></script>
   <script src="/static/js/features/toolbar.js"></script>
-  <script src="/static/js/features/toolbar-todo.js"></script>
+  <script src="/static/js/features/planning.js"></script>
   <script src="/static/js/features/guide.js"></script>
   <script src="/static/js/features/settings_target_app_tests.js"></script>
   <script src="/static/js/features/settings_application.js"></script>

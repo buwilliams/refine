@@ -1,4 +1,5 @@
 use super::*;
+use serde_json::json;
 
 impl FileWorkItemService {
     pub fn create_goal_summary(
@@ -6,6 +7,41 @@ impl FileWorkItemService {
         name: &str,
         id: Option<&str>,
     ) -> RefineResult<GoalSummaryProjection> {
+        self.create_goal_in_step(name, id, GoalStatus::Backlog, None, None, None)
+    }
+
+    pub fn create_goal_in_step(
+        &self,
+        name: &str,
+        id: Option<&str>,
+        status: GoalStatus,
+        description: Option<&str>,
+        reporter: Option<&str>,
+        priority: Option<&str>,
+    ) -> RefineResult<GoalSummaryProjection> {
+        self.create_goal_record(name, id, status, description, reporter, priority, None)
+    }
+
+    pub(in crate::application::work_items::service) fn create_goal_record(
+        &self,
+        name: &str,
+        id: Option<&str>,
+        status: GoalStatus,
+        description: Option<&str>,
+        reporter: Option<&str>,
+        priority: Option<&str>,
+        historical: Option<&Value>,
+    ) -> RefineResult<GoalSummaryProjection> {
+        if !matches!(status, GoalStatus::Draft | GoalStatus::Backlog) {
+            return Err(RefineError::InvalidInput(
+                "New Goals must start in Draft or Backlog".into(),
+            ));
+        }
+        let priority = GoalPriority::parse_wire(priority.unwrap_or("low"))
+            .ok_or_else(|| RefineError::InvalidInput("Invalid priority".into()))?;
+        if let Some(reporter) = reporter {
+            Self::validate_goal_reporter(reporter)?;
+        }
         let name = name.trim();
         if name.is_empty() {
             return Err(RefineError::InvalidInput(
@@ -16,9 +52,10 @@ impl FileWorkItemService {
             .map(|id| id.trim().to_uppercase())
             .filter(|id| !id.is_empty())
             .unwrap_or_else(new_ulid_like);
-        if goal_id.len() < 3 {
+        if goal_id.len() < 3 || !crate::model::automation::valid_id(&goal_id) {
             return Err(RefineError::InvalidInput(
-                "Goal id must be at least three characters".to_string(),
+                "Goal id must be 3 to 120 letters, digits, dots, underscores or hyphens"
+                    .to_string(),
             ));
         }
 
@@ -33,9 +70,13 @@ impl FileWorkItemService {
         let mut object = Map::new();
         object.insert("id".to_string(), Value::String(goal_id.clone()));
         object.insert("name".to_string(), Value::String(name.to_string()));
-        object.insert("status".to_string(), Value::String("backlog".to_string()));
-        object.insert("priority".to_string(), Value::String("low".to_string()));
-        object.insert("reporter".to_string(), Value::Null);
+        object.insert("status".to_string(), json!(status));
+        object.insert("priority".to_string(), json!(priority));
+        object.insert("reporter".to_string(), json!(reporter));
+        object.insert(
+            "description".to_string(),
+            json!(description.unwrap_or_default()),
+        );
         object.insert("branch_name".to_string(), Value::Null);
         object.insert("target_branch".to_string(), Value::Null);
         object.insert("base_commit".to_string(), Value::Null);
@@ -47,7 +88,21 @@ impl FileWorkItemService {
         object.insert("updated".to_string(), Value::String(now));
         object.insert("notes".to_string(), Value::Array(Vec::new()));
         object.insert("rounds".to_string(), Value::Array(Vec::new()));
-        write_json_atomically(&goal_path, &Value::Object(object))?;
+        if let Some(historical) = historical {
+            for key in ["created", "updated", "planning_origin"] {
+                if let Some(value) = historical.get(key).filter(|value| !value.is_null()) {
+                    object.insert(key.into(), value.clone());
+                }
+            }
+        }
+        let value = Value::Object(object);
+        if let Some(reporter) = reporter {
+            self.with_goal_reporter_registered(reporter, || {
+                write_json_atomically(&goal_path, &value)
+            })?;
+        } else {
+            write_json_atomically(&goal_path, &value)?;
+        }
         self.show_goal_summary(&goal_id)
     }
 
@@ -139,6 +194,15 @@ impl FileWorkItemService {
                 })?;
                 object.insert("feature_blocking_notice".to_string(), notice);
             }
+        }
+        let planning_path = self
+            .refine_dir
+            .join("planning/cards")
+            .join(format!("{goal_id}.json"));
+        if planning_path.exists() {
+            let placement: Value =
+                crate::infrastructure::storage::automation::read_json(&planning_path)?;
+            object.insert("planning".into(), placement);
         }
         self.attach_round_logs(goal_id, object)?;
         Ok(value)

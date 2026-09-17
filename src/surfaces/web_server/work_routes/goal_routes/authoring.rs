@@ -30,6 +30,62 @@ impl InProcessWebServer {
                 .and_then(Value::as_str)
                 .map(str::to_string)
         };
+        if let Some(status) = field("status") {
+            if !["draft", "backlog"].contains(&status.as_str()) {
+                return error_response(RefineError::InvalidInput(
+                    "New Goals start in Draft or Backlog".into(),
+                ));
+            }
+            if status == "draft" {
+                let feature_id = field("feature_id").filter(|id| !id.is_empty());
+                if let Some(feature_id) = feature_id.as_ref() {
+                    let validation = service
+                        .show_feature_summary(feature_id)
+                        .and_then(|feature| {
+                            if feature.feature.node_id.as_deref().unwrap_or("default")
+                                != service.active_node_id()?
+                            {
+                                return Err(RefineError::Conflict(
+                                    "Create the Draft on the Feature's node".into(),
+                                ));
+                            }
+                            Ok(())
+                        });
+                    if let Err(error) = validation {
+                        return error_response(error);
+                    }
+                }
+                return match service
+                    .create_goal_in_step(
+                        &field("name").unwrap_or_else(|| {
+                            field("prompt")
+                                .unwrap_or_default()
+                                .lines()
+                                .next()
+                                .unwrap_or_default()
+                                .chars()
+                                .take(120)
+                                .collect()
+                        }),
+                        field("id").as_deref(),
+                        GoalStatus::Draft,
+                        field("description").or_else(|| field("prompt")).as_deref(),
+                        field("reporter").as_deref(),
+                        field("priority").as_deref(),
+                    )
+                    .and_then(|goal| {
+                        if let Some(feature_id) = feature_id.as_deref() {
+                            service.assign_goal_to_feature(feature_id, &goal.goal.id)?;
+                            service.show_goal_summary(&goal.goal.id)
+                        } else {
+                            Ok(goal)
+                        }
+                    }) {
+                    Ok(goal) => ApiResponse::json(201, json!({"created":true,"goal":goal.goal})),
+                    Err(error) => error_response(error),
+                };
+            }
+        }
         let result = match service.author_goal_from_projection(
             GoalAuthoringRequest {
                 id: field("id"),

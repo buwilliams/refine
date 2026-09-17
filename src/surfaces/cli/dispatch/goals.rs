@@ -5,13 +5,20 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
         Commands::Goal {
             action:
                 GoalAction::Create {
+                    status,
                     name,
                     target_root: Some(target_root),
                     id,
                 },
         } => {
-            let goal = direct_work_item_service(&target_root)?
-                .create_goal_summary(&name, id.as_deref())?;
+            let goal = direct_work_item_service(&target_root)?.create_goal_in_step(
+                &name,
+                id.as_deref(),
+                GoalStatus::parse_wire(&status).unwrap(),
+                None,
+                None,
+                None,
+            )?;
             println!(
                 "{}",
                 serde_json::to_string_pretty(&json!({"goal": goal.goal})).unwrap()
@@ -376,6 +383,7 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
 pub(super) fn dispatch_goal_daemon(action: GoalAction) -> RefineResult<()> {
     let response = match action {
         GoalAction::Create {
+            status,
             name,
             target_root: None,
             id,
@@ -384,6 +392,7 @@ pub(super) fn dispatch_goal_daemon(action: GoalAction) -> RefineResult<()> {
             "/work/goals",
             Some(json!({
                 "name": name,
+                "status":status,
                 "id": id
             })),
         )?,

@@ -58,6 +58,21 @@ impl InProcessWebServer {
             return self.handle_event_capability(request, &raw_path);
         }
 
+        if request.path == "/planning" || request.path.starts_with("/planning/") {
+            return self.handle_planning(request);
+        }
+        if request.path.starts_with("/todos")
+            && self
+                .current_refine_dir()
+                .ok()
+                .flatten()
+                .is_some_and(|r| r.join("planning/migration.json").exists())
+        {
+            return ApiResponse::json(
+                410,
+                json!({"error":"Todo Lists have moved to Project Planning. Use /planning."}),
+            );
+        }
         if request.path == "/templates" || request.path.starts_with("/templates/") {
             return self.handle_templates(request);
         }

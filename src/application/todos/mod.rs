@@ -219,7 +219,10 @@ impl FileTodoService {
     pub fn reassign_reporter(&self, old: &str, new: &str) -> RefineResult<()> {
         let old = validate_reporter(old)?.to_string();
         let new = validate_reporter(new)?.to_string();
-        if old == new || !self.path().exists() {
+        if old == new
+            || !self.path().exists()
+            || self.refine_dir.join("planning/migration.json").exists()
+        {
             return Ok(());
         }
         self.mutate(|store| {
@@ -243,10 +246,20 @@ impl FileTodoService {
     }
 
     fn load(&self) -> RefineResult<TodoStore> {
+        self.ensure_not_migrated()?;
         read_store(&self.path())
     }
 
+    fn ensure_not_migrated(&self) -> RefineResult<()> {
+        if self.refine_dir.join("planning/migration.json").exists() {
+            return Err(RefineError::Conflict(
+                "Todo Lists moved to Project Planning; use refine planning".into(),
+            ));
+        }
+        Ok(())
+    }
     fn mutate<T>(&self, action: impl FnOnce(&mut TodoStore) -> RefineResult<T>) -> RefineResult<T> {
+        self.ensure_not_migrated()?;
         fs::create_dir_all(&self.refine_dir).map_err(|error| {
             RefineError::Io(format!(
                 "failed to create todo state directory {}: {error}",
@@ -273,6 +286,7 @@ impl FileTodoService {
             ))
         })?;
         let result = (|| {
+            self.ensure_not_migrated()?;
             let mut store = self.load()?;
             let value = action(&mut store)?;
             write_store(&self.path(), &store)?;

@@ -56,7 +56,7 @@ fn migration_preserves_content_is_idempotent_and_stale_writes_cannot_erase_edits
     std::fs::create_dir_all(&service.refine_dir).unwrap();
     std::fs::write(service.refine_dir.join("guidance.json"), r#"[{"id":"context","name":"Accessibility","rule":"For interfaces","instructions":"Support keyboard navigation","enabled":false}]"#).unwrap();
     let config = service.config().unwrap();
-    assert_eq!(config.events.len(), 43);
+    assert_eq!(config.events.len(), 49);
     assert!(!system_catalog().iter().any(|s| s.contains("sync")));
     assert!(
         config.skills["guidance-context"]
@@ -231,6 +231,7 @@ print(json.dumps(contract))
             .iter()
             .enumerate()
             .map(|(order, id)| Binding {
+                planning: None,
                 id: (*id).into(),
                 skill_id: (*id).into(),
                 enabled: true,
@@ -567,6 +568,7 @@ fn add_gate(service: &FileEventService, source: &str, missing_input: bool) {
     }
     config.skills.insert(skill.id.clone(), skill);
     let binding = Binding {
+        planning: None,
         id: "gate".into(),
         skill_id: "gate".into(),
         enabled: true,

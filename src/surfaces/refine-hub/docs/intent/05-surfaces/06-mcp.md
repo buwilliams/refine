@@ -50,3 +50,5 @@ As agent-native interaction grows, MCP may become a primary way external assista
 Future versions may add streaming, richer tool schemas, or protocol capability scoping. Those should be intentional steps that preserve the core intent: an always-available, standard, local protocol over the same durable Application every other Surface uses.
 
 Explicit human exception controls share the Application capability: `refine_workflow_control` with `force: true` selects any step on the current Round and stops active execution. `refine_delete_round` requires Goal identity, zero-based Round index, and expected revision; it removes the Round and associated records and parks the Goal in Backlog. Bulk step assignment is available through the shared `/work/goals/bulk` route using `refine_request`. These controls bypass automated transition requirements while preserving node ownership and concurrent-edit checks.
+
+Shared board, lane and card commands use the durable [Project Planning](../03-application/06-project-planning.md#surfaces) service. Every mutation carries a retry identity and applicable revisions; queued work is inspected through its action receipt.

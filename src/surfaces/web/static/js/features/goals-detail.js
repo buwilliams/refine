@@ -124,6 +124,7 @@ async function loadGoalDetail(goalId) {
 // from done). Failed Goals normally go back to todo and rerun; candidate-stage
 // failures use the latest workflow transition to requeue the isolated branch.
 const GOAL_WORKFLOW = {
+  draft: { forward: { label: "Backlog →", next: "backlog" } },
   backlog:      { forward: { label: "Todo →",     next: "todo"   } },
   todo:         { back:    { label: "← Backlog",  next: "backlog" } },
   // plan / implement / quality / governance: automation owns these states.
@@ -300,7 +301,7 @@ function drawGoalDetail(goal) {
     ? `Node owner: ${nodeDisplayName} (${goal.node_id})`
     : `Node owner: ${nodeDisplayName}`;
 
-  const canEditRequest = goal.status === "backlog" || goal.status === "todo";
+  const canEditRequest = ["draft", "backlog", "todo"].includes(goal.status);
   const isLatestEditable = !!latest && canEditRequest;
   const canSubmitNewRound = goal.status === "review" || goal.status === "failed" ||
     (!latest && canEditRequest);
@@ -318,12 +319,14 @@ function drawGoalDetail(goal) {
   // Review approval remains a separate integration action. Explicit step
   // assignments use the menu below.
   const primaryStep = {
+    draft: "backlog",
     backlog: "todo",
     review: "done",
     failed: "todo",
     cancelled: "failed",
   }[goal.status] || "todo";
   const workflow = workflowForGoal(goal, latest);
+  const planningLink = goal.planning ? `<a href="#/planning?board=${encodeURIComponent(goal.planning.board_id)}">Open on project board</a>` : "";
   const forwardBtn = workflow.forward ? `
     <button id="btn-state-forward" data-testid="goal-state-forward">${htmlEscape(workflow.forward.label)}</button>
   ` : "";
@@ -350,13 +353,13 @@ function drawGoalDetail(goal) {
           <details class="nav-menu goal-action-menu goal-step-menu" data-testid="goal-step-menu"${stepMenuOpen ? " open" : ""}>
             <summary class="btn goal-action-more" aria-label="Set workflow step" data-testid="goal-step-toggle"></summary>
             <div class="nav-menu-panel goal-action-panel">
-            ${["backlog", "todo", "plan", "implement", "quality", "governance", "review", "done", "failed", "cancelled"].map(step =>
+            ${["draft", "backlog", "todo", "plan", "implement", "quality", "governance", "review", "done", "failed", "cancelled"].map(step =>
               `<button type="button" class="nav-menu-item" data-goal-step="${step}" data-testid="goal-step-${step}">${workflowStatusLabel(step)}</button>`).join("")}
             <p class="muted small">Moves stop active agents. Done changes status without merging code.</p>
             </div>
           </details>
         </div>
-        ${goal.status === "review" ? forwardBtn : ""}
+        ${planningLink}${goal.status === "review" ? forwardBtn : ""}
         <button class="secondary" type="button" id="btn-watch-logs" data-testid="goal-action-watch-logs">View Logs</button>
         <div class="goal-action-group">
           <button class="goal-action-primary secondary" id="btn-open-agent" data-testid="goal-open-agent"
@@ -386,6 +389,7 @@ function drawGoalDetail(goal) {
         ${goal.branch_name ? ` · branch <code>${goal.branch_name}</code>` : ""}
       </div>
       ${renderGoalFeatureAssociation(goal)}
+      ${goal.description ? `<section data-testid="goal-description"><h3>Description</h3><p style="white-space:pre-wrap;overflow-wrap:anywhere">${htmlEscape(goal.description)}</p></section>` : ""}
       <h3>Rounds (${rounds.length})</h3>
       ${rounds.length === 0 ? `<p class="muted">No rounds yet.</p>` :
         rounds.map((rnd, idx) => renderRound(

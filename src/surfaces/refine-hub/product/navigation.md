@@ -6,7 +6,7 @@ The left rail is the home for navigation. Your selected screen fills the content
 
 **Node** selects the node you are working with. Open its dropdown to select a node or choose **Add Node…** to create one. Use **Settings → Nodes** for connections and fleet management.
 
-**Reporter** chooses who submits new Goals and whose Todo lists are shown. Its dropdown includes **Add new reporter…**. Use **Settings → Reporters** to manage existing reporters.
+**Reporter** chooses who submits new Goals. Its dropdown includes **Add new reporter…**. Use **Settings → Reporters** to manage existing reporters.
 
 Both menus identify their context with a heading. Node, Reporter, and Tools open their menus beside the top of the row, moving upward when needed to fit the screen. Their full rows respond to clicks and keyboard focus.
 
@@ -15,6 +15,7 @@ Both menus identify their context with a heading. Node, Reporter, and Tools open
 | Screen | Use it to |
 | --- | --- |
 | Dashboard | Review work that needs attention and see overall progress. |
+| Project Planning | Organize shared boards, lanes and Goal cards, and release ready work to nodes. |
 | Features | Organize related Goals around a larger outcome. |
 | Goals | Create, filter, and follow Goals and their rounds. |
 | Changes | Inspect integrated changes and available follow-up actions. |
@@ -25,15 +26,15 @@ Click the **Main** header to show or hide its links. This does not change the se
 
 ## Tools and open windows
 
-Open **Tools**, marked with a wrench, to choose Agent, Agent in Worktree, System, Files, Todo List, Terminal, or Planning Agent. Existing windows remain listed below the menu when the dropdown closes. Select a window to give it the full content area.
+Open **Tools**, marked with a wrench, to choose Agent, Agent in Worktree, System, Files, Terminal, or Planning Agent. Existing windows remain listed below the menu when the dropdown closes. Select a window to give it the full content area.
 
 Switching screens preserves running sessions. Returning to the underlying Main screen restores its mounted content. Browser Back and Forward also move between screens and windows. A window’s close action is labeled **Close and stop** when it owns a running terminal or agent.
 
 ![Tools dropdown beside the Skills and Hubs sections](../releases/images/4.3.2/tools.png?v=e2d28a7d484d)
 
-**Files** opens the file browser and preview. **System** contains logs, health information, and diagnostics. **Todo List** gives the current Reporter a full-width workspace, with lists on the left and tasks on the right. Todo checklists are separate from workflow Goals.
+**Files** opens the file browser and preview. **System** contains logs, health information, and diagnostics.
 
-![Todo List using the available content width](../releases/images/4.3.2/todo.png?v=c5caf4fbb63d)
+**Project Planning** is a main screen shared across project nodes. Create a personal board for a todo list, or configure a lane to accept or release work. Cards are Goals in Draft until accepted; a lane named Done does not claim that software was delivered. [Use Project Planning](planning.md).
 
 ## Control: processes and target-app actions
 

@@ -115,7 +115,7 @@ test("Goal actions follow current status, retain every step, and recover from re
     }
     await page.getByTestId("goal-step-primary").click();
     assert.equal(await page.evaluate(() => requests.at(-1).body.to), "todo");
-    for (const step of ["backlog", "todo", "plan", "implement", "quality", "governance", "review", "done", "failed", "cancelled"]) {
+    for (const step of ["draft", "backlog", "todo", "plan", "implement", "quality", "governance", "review", "done", "failed", "cancelled"]) {
       await page.getByTestId("goal-step-toggle").click();
       const panel = await page.locator(".goal-step-menu .nav-menu-panel").boundingBox();
       assert.ok(panel.x >= 0, "step choices must stay inside the viewport");
@@ -162,7 +162,7 @@ test("Goal actions follow current status, retain every step, and recover from re
       assert.equal(request.body.expected_revision, revision);
       assert.equal(request.body.force, true);
       assert.deepEqual(await page.locator(".goal-step-menu [data-goal-step]").evaluateAll(buttons => buttons.map(button => button.dataset.goalStep)),
-        ["backlog", "todo", "plan", "implement", "quality", "governance", "review", "done", "failed", "cancelled"]);
+        ["draft", "backlog", "todo", "plan", "implement", "quality", "governance", "review", "done", "failed", "cancelled"]);
     }
     // A rejected move must surface its error without claiming success. A later
     // refresh must let the same modal submit the new action and revision.

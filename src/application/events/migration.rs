@@ -72,6 +72,7 @@ fn build_config(originals: &serde_json::Map<String, Value>, quality: &Value) -> 
             role.filter(|r| ["plan", "implement", "quality", "governance"].contains(r))
         {
             bindings.push(Binding {
+                planning: None,
                 id: format!("default-{role}"),
                 skill_id: format!("default-{role}"),
                 enabled: true,
@@ -144,6 +145,7 @@ fn build_config(originals: &serde_json::Map<String, Value>, quality: &Value) -> 
                 .expect("default Event")
                 .bindings
                 .push(Binding {
+                    planning: None,
                     id: id.clone(),
                     skill_id: id.clone(),
                     enabled: true,
@@ -163,8 +165,10 @@ fn build_config(originals: &serde_json::Map<String, Value>, quality: &Value) -> 
 pub(crate) fn pristine_config_bytes() -> Vec<u8> {
     use crate::application::agent_io::prompts::{PromptEngine, PromptTemplate};
     let quality = json!({"configured":false,"business_requirements":"","instructions":PromptEngine::load(PromptTemplate::QualityDefaultInstructions),"tests":[],"legacy_commands":[],"enabled":"1"});
-    serde_json::to_vec_pretty(&build_config(&Default::default(), &quality))
-        .expect("static defaults are serializable")
+    let mut config = build_config(&Default::default(), &quality);
+    single_trigger_skills(&mut config).expect("pristine Skills are valid");
+    super::hub_skill::install(&mut config);
+    serde_json::to_vec_pretty(&config).expect("static defaults are serializable")
 }
 
 /// Split authored assignments without changing binding identities, ordering,

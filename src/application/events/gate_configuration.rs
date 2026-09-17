@@ -98,6 +98,7 @@ pub(super) fn occurrence_configuration(
         .as_array()
         .and_then(|r| r.last())
         .and_then(|round| round["gate_configurations"].get(&key))
+        .or_else(|| goal["lifecycle_gate_configurations"].get(&key))
         .map(|value| {
             serde_json::from_value(value.clone())
                 .map_err(|e| RefineError::Serialization(e.to_string()))
@@ -116,6 +117,10 @@ pub(super) fn pin_lifecycle_entry(
         "{}:{node}:{source}",
         goal["event_generation"].as_u64().unwrap_or(0)
     );
+    if !goal["lifecycle_gate_configurations"].is_object() {
+        goal["lifecycle_gate_configurations"] = json!({});
+    }
+    goal["lifecycle_gate_configurations"][&key] = json!(select_source(config, node, source));
     if let Some(round) = goal["rounds"].as_array_mut().and_then(|r| r.last_mut()) {
         if !round["gate_configurations"].is_object() {
             round["gate_configurations"] = json!({});
@@ -126,7 +131,7 @@ pub(super) fn pin_lifecycle_entry(
 
 /// A manual Entry keeps its admitted occurrence snapshot. Its Skill definitions
 /// must not replace definitions independently selected for the requested Exit.
-pub(super) fn transition_entry_configuration(
+pub(crate) fn transition_entry_configuration(
     goal: &Value,
     current: &AutomationConfig,
     node: &str,

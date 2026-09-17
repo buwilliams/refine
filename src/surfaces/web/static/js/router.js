@@ -5,6 +5,7 @@
 // `#main`.
 const routes = {
   dashboard: renderDashboard,
+  planning: renderPlanning,
   features: renderFeaturesList,
   features_new: renderFeatureNew,
   goals: renderGoalsList,
@@ -28,6 +29,7 @@ function parseHash() {
     catch { return { route: "dashboard" }; }
   }
   if (parts.length === 0) return { route: "dashboard" };
+  if (parts[0] === "planning") return { route: "planning" };
   if (parts[0] === "goals") {
     if (parts.length === 1) return { route: "goals" };
     if (parts[1] === "new") return { route: "goals_new" };

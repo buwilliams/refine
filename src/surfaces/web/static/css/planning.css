@@ -1,0 +1,74 @@
+.planning-page {
+  padding: 1.25rem;
+  max-width: 100%;
+}
+.planning-lanes {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  overflow-x: auto;
+  padding: 1rem 0;
+  min-height: 60vh;
+}
+.planning-lane {
+  flex: 0 0 310px;
+  background: var(--bg-secondary, var(--bg));
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.8rem;
+  min-height: 240px;
+}
+.planning-lane header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.planning-lane h2 {
+  font-size: 1rem;
+  margin: 0.3rem 0;
+}
+.planning-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.9rem;
+  margin: 0.7rem 0;
+  overflow-wrap: anywhere;
+}
+.planning-card:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.planning-card > a {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+.planning-card p {
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+}
+.planning-card .actions {
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+.planning-lane-action {
+  font-size: 0.8rem;
+  color: var(--accent);
+}
+.planning-actions {
+  padding: 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.planning-actions > div {
+  padding: 0.3rem;
+}
+.planning-page select {
+  max-width: 24rem;
+}
+.status-draft {
+  background: var(--bg-secondary);
+  color: var(--muted);
+}

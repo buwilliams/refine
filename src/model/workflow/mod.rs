@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum GoalStatus {
+    Draft,
     Backlog,
     Todo,
     #[serde(alias = "in-progress")]
@@ -21,6 +22,7 @@ pub enum GoalStatus {
 impl GoalStatus {
     pub fn as_str(&self) -> &'static str {
         match self {
+            Self::Draft => "draft",
             Self::Backlog => "backlog",
             Self::Todo => "todo",
             Self::Plan => "plan",
@@ -36,6 +38,7 @@ impl GoalStatus {
 
     pub fn parse_wire(value: &str) -> Option<Self> {
         match value {
+            "draft" => Some(Self::Draft),
             "backlog" => Some(Self::Backlog),
             "todo" => Some(Self::Todo),
             "plan" | "in-progress" => Some(Self::Plan),
@@ -70,6 +73,7 @@ pub enum AutomatedGoalStatus {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum BulkStatusTarget {
+    Draft,
     Backlog,
     Todo,
     Review,
@@ -185,7 +189,14 @@ pub fn user_status_transition(from: &GoalStatus, to: &GoalStatus) -> TransitionD
 
     let allowed = matches!(
         (from, to),
-        (Backlog, Todo) | (Todo, Backlog) | (Done, Review) | (Failed, Todo) | (Cancelled, Todo)
+        (Draft, Backlog)
+            | (Backlog, Draft)
+            | (Draft, Cancelled)
+            | (Backlog, Todo)
+            | (Todo, Backlog)
+            | (Done, Review)
+            | (Failed, Todo)
+            | (Cancelled, Todo)
     );
 
     if allowed {
@@ -241,8 +252,8 @@ pub fn goal_operation_allowed(
         EditMetadata | EditNotes | Delete => {
             !matches!(status, Plan | Implement | Quality | Governance)
         }
-        SubmitNewRound => matches!(status, Todo | Failed | Review | Backlog),
-        EditLatestRound => matches!(status, Backlog | Todo | Review),
+        SubmitNewRound => matches!(status, Draft | Todo | Failed | Review | Backlog),
+        EditLatestRound => matches!(status, Draft | Backlog | Todo | Review),
         StartImplementation => matches!(status, Todo),
         CancelAutomation => is_automated_status(status),
         RetryAgent => matches!(status, Failed | Plan | Implement),

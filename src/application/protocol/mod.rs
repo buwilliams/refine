@@ -5,4 +5,5 @@
 // 4: Events and Skills replace the separate policy configuration APIs.
 // 5: Skills own one trigger; manual runs are independent of Goals.
 // 6: Explicit workflow outcomes, four lifecycle edges, and Hub surfaces.
-pub const API_CONTRACT_VERSION: &str = "6";
+// 7: Draft workflow step and shared Project Planning commands and triggers.
+pub const API_CONTRACT_VERSION: &str = "7";

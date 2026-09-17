@@ -73,7 +73,7 @@ function renderWorkflowAssignments(data, source) {
       const scope = skill.scope?.node_id || binding.scope?.node_id || event.scope?.node_id;
       return `<article class="workflow-assignment workflow-skill-card" data-workflow-assignment="${htmlEscape(skill.id)}">
         <strong>${htmlEscape(skill.name)}</strong>
-          <span class="muted small">${source === "custom" ? "Custom action" : `Order ${binding.order || 0}`} · ${htmlEscape({blocking:"Required",background:"Background",context:"Context only"}[binding.mode] || binding.mode || "Required")} · ${scope ? `Node: ${htmlEscape(scope)}` : "Project"}${disabled ? " · Disabled" : ""}</span>
+          <span class="muted small">${source === "custom" ? "Custom action" : `Order ${binding.order || 0}`} · ${htmlEscape({blocking:"Required",background:"Background",context:"Context only"}[binding.mode] || binding.mode || "Required")} · ${scope ? `Node: ${htmlEscape(scope)}` : "Project"}${disabled ? " · Disabled" : ""}${binding.planning ? ` · Board: ${htmlEscape(binding.planning.board_id || "all")} · Lane: ${htmlEscape(binding.planning.lane_id || "all")}` : ""}</span>
           ${source === "custom" && event.name && event.id !== "custom" ? `<span class="muted small">${htmlEscape(event.name)}</span>` : ""}
         <div class="workflow-assignment-actions"><button type="button" class="secondary" data-workflow-skill="${htmlEscape(skill.id)}" aria-label="Edit ${htmlEscape(skill.name)} Skill">Edit Skill</button><button type="button" class="secondary" data-workflow-preview="${index}">${binding.mode === "context" ? "Preview context" : "Preview prompt"}</button><button type="button" class="secondary" data-workflow-assignment-edit="${index}">Assignment settings</button>${source === "custom" ? `<button type="button" data-workflow-run="${htmlEscape(skill.id)}" ${disabled || binding.mode === "context" || (data.skills.manual_skill_ids && !data.skills.manual_skill_ids.includes(skill.id)) ? 'disabled title="This Skill is not available for manual execution on this node"' : ""}>Run Skill</button>` : ""}</div>
       </article>`;
@@ -193,6 +193,7 @@ async function openWorkflowAssignment(data, source, row = null) {
     <div class="form-row"><label for="assignment-mode">How it runs</label><select id="assignment-mode">${Object.entries({blocking:"Required",background:"Background",context:"Context only"}).map(([value,label]) => `<option value="${value}" ${value === (row?.binding.mode || "blocking") ? "selected" : ""}>${label}</option>`).join("")}</select></div>
     <div class="form-row"><label for="assignment-order">Order</label><input id="assignment-order" type="number" min="-2147483648" max="2147483647" step="1" required value="${row?.binding.order || 0}"></div>
     <div class="form-row"><label>Status</label>${automationChoices('id="assignment-enabled"', "Assignment status", [["true", "Enabled"], ["false", "Disabled"]], row?.binding.enabled !== false)}</div>
+    ${source.startsWith("planning.lane.") ? `<div class="form-row"><label>Board filter<input data-assignment-board value="${htmlEscape(row?.binding.planning?.board_id || "")}" placeholder="All boards"></label><label>Lane filter<input data-assignment-lane value="${htmlEscape(row?.binding.planning?.lane_id || "")}" placeholder="All lanes"></label></div>` : ""}
     <div data-assignment-inputs></div>`);
   automationEditor = root;
   const status = root.querySelector('#assignment-enabled');
@@ -227,7 +228,7 @@ async function openWorkflowAssignment(data, source, row = null) {
         if (!event) throw new Error('This event is no longer available. Refresh the Workflow.');
         const inputs = {...(row?.binding.inputs || {})};
         root.querySelectorAll('[data-assignment-input]').forEach(input => { if (input.value.trim()) inputs[input.dataset.assignmentInput] = input.value.trim(); else delete inputs[input.dataset.assignmentInput]; });
-        assignments.push({event_id:event.id, binding:{...row?.binding, id:row?.binding.id || newSkillId(), skill_id:skill.id, enabled:status.dataset.value === 'true', mode:root.querySelector('#assignment-mode').value, order:Number(order.value), scope:row?.binding.scope || skill.scope || {node_id:null}, inputs}});
+        assignments.push({event_id:event.id, binding:{...row?.binding, id:row?.binding.id || newSkillId(), skill_id:skill.id, enabled:status.dataset.value === 'true', mode:root.querySelector('#assignment-mode').value, order:Number(order.value), scope:row?.binding.scope || skill.scope || {node_id:null}, inputs, ...(source.startsWith("planning.lane.") ? {planning:{board_id:root.querySelector('[data-assignment-board]').value.trim() || null,lane_id:root.querySelector('[data-assignment-lane]').value.trim() || null}} : {})}});
       }
       await api('PUT', `/api/skills/${encodeURIComponent(skill.id)}`, {revision:current.revision, item:current.item, event_bindings:assignments});
       root._close(); await refreshSettings({force:true}); await refreshManualSkills();

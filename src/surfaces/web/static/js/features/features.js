@@ -10,7 +10,7 @@ const FEATURES_DEFAULT_DIR = {
   name: "asc", status: "asc", reporter: "asc", assignee: "asc", node: "asc", updated: "desc",
 };
 const FEATURES_STATUS_OPTIONS = [
-  "", "backlog", "todo", "plan", "implement", "quality", "governance",
+  "", "draft", "backlog", "todo", "plan", "implement", "quality", "governance",
   "review", "done", "failed", "cancelled",
 ];
 const FEATURE_WORKFLOW_PROTECTED_STATUSES = new Set([

@@ -117,3 +117,5 @@ As AI systems improve, the CLI should expose high-signal operations and machine-
 ## AI provider configuration
 
 `refine config providers show` reads the shared catalog and effective node selection. `refine config providers save --file providers.json` replaces the catalog with revision checking. `refine config providers select ID` sets the node override; omit ID to inherit the system default. See [Configure AI providers](../../ai-providers.md) for argument templates, stdin transport, session capabilities, and a custom CLI example.
+
+Shared board, lane and card commands use the durable [Project Planning](../03-application/06-project-planning.md#surfaces) service. Every mutation carries a retry identity and applicable revisions; queued work is inspected through its action receipt.

@@ -87,6 +87,7 @@ pub(crate) const RESIDENT_SEARCH_TEXT_LIMIT: usize = 512;
 pub(crate) fn goal_searchable_parts(object: &serde_json::Map<String, Value>) -> Vec<String> {
     let mut parts = vec![
         text(object.get("name")).unwrap_or_else(|| "Untitled Goal".to_string()),
+        text(object.get("description")).unwrap_or_default(),
         text(object.get("reporter")).unwrap_or_default(),
         text(object.get("assignee")).unwrap_or_default(),
     ];
@@ -209,6 +210,7 @@ pub(super) fn goal_status(goal: &serde_json::Map<String, Value>) -> GoalStatus {
                 GoalStatus::Quality
             }
         }
+        Some("draft") => GoalStatus::Draft,
         Some("review") => GoalStatus::Review,
         Some("done") => GoalStatus::Done,
         Some("failed") => GoalStatus::Failed,

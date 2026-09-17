@@ -35,8 +35,7 @@ The current implementation details that matter to intent are:
 - durable product state is associated with the target app but never appears at `<app>/.refine` or in the primary worktree: the local mutation projection is `<app>/.git/refine-live-state/` and the branch checkout is `<app>/.git/refine-state-worktree/.refine/`;
 - runtime state is separated from durable product state so processes and daemons can recover cleanly;
 - flat JSON-like records keep Goals, Features, settings, guidance, governance, and logs inspectable;
-- Reporter-scoped todo lists are durable target-app records, so the same Reporter
-  can open them from any Node synchronized with that app;
+- Project Planning boards, placements and actions are durable target-app records shared across synchronized Nodes; a card references one ordinary Goal;
 - a valid Reporter introduced by Goal creation, metadata editing, or Round authoring is
   registered under the same coordination boundary as the durable Goal write, keeping Goal
   references manageable through the shared Reporter capability regardless of which surface or

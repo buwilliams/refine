@@ -14,6 +14,7 @@ mod goals;
 mod hub;
 mod logs;
 mod nodes;
+mod planning;
 mod projects;
 mod skills;
 mod sync;
@@ -32,6 +33,7 @@ pub use fleet::FleetAction;
 pub use goals::GoalAction;
 pub use logs::LogAction;
 pub use nodes::NodeAction;
+pub use planning::PlanningCliAction;
 pub use projects::ProjectAction;
 pub use skills::SkillAction;
 pub use sync::CliSyncAuthority;
@@ -113,8 +115,14 @@ pub enum Commands {
         #[command(subcommand)]
         action: FeatureAction,
     },
-    /// Manage Reporter-owned Todo lists and items.
+    /// Manage shared Project Planning boards, lanes, and Goal cards.
     /// Uses the same durable capability as the web UI and daemon API.
+    Planning {
+        #[command(subcommand)]
+        action: PlanningCliAction,
+    },
+    /// Legacy Todo commands. Migrate with planning apply migrate, then use planning.
+    #[command(hide = true)]
     Todo {
         #[command(subcommand)]
         action: TodoAction,

@@ -7,6 +7,7 @@
   - [Target App](02-model/03-target-app.md)
   - [Fleet](02-model/04-fleet.md)
 - Application
+  - [Project Planning](03-application/06-project-planning.md)
   - Agents
     - [Overview](03-application/01-agents/00-overview.md)
     - Agent Operations
@@ -22,6 +23,7 @@
     - [Goal Agents](03-application/01-agents/10-goal-agents.md)
   - Workflow
     - [Overview](03-application/02-workflow/00-overview.md)
+    - [Draft](03-application/02-workflow/00-draft.md)
     - [Backlog](03-application/02-workflow/01-backlog.md)
     - [Todo](03-application/02-workflow/02-todo.md)
     - [Plan](03-application/02-workflow/03-plan.md)

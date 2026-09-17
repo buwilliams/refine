@@ -40,6 +40,14 @@ impl WorkflowEngine {
                 prepare_refine_dir(target)?,
                 &self.runtime_root,
             );
+            if !self.workflow_paused()? {
+                crate::application::planning::FilePlanningService::new(
+                    prepare_refine_dir(target)?,
+                    target,
+                    &self.runtime_root,
+                )?
+                .process_pending()?;
+            }
             events.dispatch_outcomes(target)?;
             if let Err(error) = events.dispatch_goal_events(target) {
                 eprintln!("refine Goal event materialization: {error}");

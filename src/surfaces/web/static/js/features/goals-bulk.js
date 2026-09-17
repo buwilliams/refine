@@ -7,6 +7,7 @@
 const BULK_PRIORITY_OPTIONS = ["low", "medium", "high"];
 const BULK_STATUS_OPTIONS = [
   { value: "__last_workflow_state", label: "(Last workflow state)" },
+  { value: "draft", label: "draft" },
   { value: "backlog", label: "backlog" },
   { value: "todo", label: "todo" },
   { value: "plan", label: "plan" },

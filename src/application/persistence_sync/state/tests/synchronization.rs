@@ -954,3 +954,79 @@ fn provider_catalog_adopts_remote_edits_and_preserves_node_inheritance() {
         "SyncedAgent"
     );
 }
+
+#[test]
+fn planning_release_crosses_real_state_sync_once_and_keeps_goal_identity() {
+    use crate::application::{
+        fleet::nodes::FileNodeRegistryService,
+        planning::{FilePlanningService, PlanningCommand},
+        work_items::FileWorkItemService,
+    };
+    use serde_json::json;
+    let fixture = SyncFixture::new("planning-release");
+    let root_a =
+        crate::infrastructure::storage::project_layout::prepare_refine_dir(&fixture.a).unwrap();
+    let root_b =
+        crate::infrastructure::storage::project_layout::prepare_refine_dir(&fixture.b).unwrap();
+    let nodes_a = FileNodeRegistryService::with_active_root(&root_a, fixture.a.join("run"));
+    nodes_a.create("worker-b").unwrap();
+    assert!(fixture.service(&fixture.a).sync().unwrap().ok);
+    assert!(fixture.service(&fixture.b).sync().unwrap().ok);
+    FileNodeRegistryService::with_active_root(&root_b, fixture.b.join("run"))
+        .activate("worker-b")
+        .unwrap();
+    let a = FilePlanningService::new(&root_a, &fixture.a, fixture.a.join("run")).unwrap();
+    let b = FilePlanningService::new(&root_b, &fixture.b, fixture.b.join("run")).unwrap();
+    let submit = |service: &FilePlanningService, body: serde_json::Value| {
+        let request: PlanningCommand = serde_json::from_value(body).unwrap();
+        let action = service.submit(request).unwrap();
+        service.process_pending().unwrap();
+        service.action(&action.id).unwrap()
+    };
+    let board = submit(
+        &a,
+        json!({"request_id":"create-board","operation":"board.create","data":{"name":"Team"}}),
+    )
+    .result;
+    let board_id = board["id"].as_str().unwrap();
+    let initial = board["lanes"][0]["id"].as_str().unwrap();
+    let release = board["lanes"][1]["id"].as_str().unwrap();
+    let configured = submit(
+        &a,
+        json!({"request_id":"configure","operation":"lane.update","board_id":board_id,"lane_id":release,"expected_revision":1,"data":{"action":"release","routing":"worker-b"}}),
+    );
+    assert_eq!(configured.state, "complete");
+    let card = submit(
+        &a,
+        json!({"request_id":"create-card","operation":"card.create","board_id":board_id,"lane_id":initial,"data":{"name":"Deliver one thing","reporter":"Buddy"}}),
+    );
+    assert_eq!(card.state, "complete", "{card:?}");
+    let id = card.result["goal_id"].as_str().unwrap();
+    fixture.service(&fixture.a).sync().unwrap();
+    fixture.service(&fixture.b).sync().unwrap();
+    let request = json!({"request_id":"release-card","operation":"card.move","board_id":board_id,"lane_id":release,"goal_id":id,"expected_revision":1});
+    let queued = submit(&b, request.clone());
+    assert_eq!(queued.state, "queued");
+    fixture.service(&fixture.b).sync().unwrap();
+    fixture.service(&fixture.a).sync().unwrap();
+    a.process_pending().unwrap();
+    let handoff = a.action("release-card").unwrap();
+    assert_eq!(handoff.state, "waiting", "{handoff:?}");
+    let work_a = FileWorkItemService::for_node(&root_a, "default");
+    let source = work_a.show_goal_detail(id).unwrap();
+    assert_eq!(source["status"], "backlog");
+    assert_eq!(source["node_id"], "worker-b");
+    assert_eq!(source["round_count"], 1);
+    assert!(fixture.service(&fixture.a).sync().unwrap().ok);
+    assert!(fixture.service(&fixture.b).sync().unwrap().ok);
+    b.process_pending().unwrap();
+    let completed = b.action("release-card").unwrap();
+    assert_eq!(completed.state, "complete", "{completed:?}");
+    let work_b = FileWorkItemService::for_node(&root_b, "worker-b");
+    let target = work_b.show_goal_detail(id).unwrap();
+    assert_eq!(target["status"], "todo");
+    assert_eq!(target["round_count"], 1);
+    let replay = submit(&b, request);
+    assert_eq!(replay.state, "complete");
+    assert_eq!(work_b.show_goal_detail(id).unwrap()["round_count"], 1);
+}
