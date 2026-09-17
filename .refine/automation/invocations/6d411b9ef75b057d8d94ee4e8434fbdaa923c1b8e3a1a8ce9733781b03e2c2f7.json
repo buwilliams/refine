@@ -482,11 +482,68 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "succeeded",
+  "results": {
+    "default-governance": {
+      "invocation_id": "6d411b9ef75b057d8d94ee4e8434fbdaa923c1b8e3a1a8ce9733781b03e2c2f7",
+      "binding_id": "default-governance",
+      "role": "governance",
+      "outcome": "success",
+      "summary": "Governance passed. The implementation meets the Goal: Main now opens a menu consistent with Tools and Planning, uses the panels icon, and retains each screen’s content, filters, selection, drafts, and scroll when switching screens or agents. The design fits the architecture by keeping screen lifetime in the browser surface, sharing navigation behavior, and reusing existing context safeguards. It supports Refine’s purpose by preserving users’ working context without interrupting agent sessions. No necessary corrections identified.",
+      "evidence": [
+        "src/surfaces/web/static/js/main-screens.js",
+        "src/surfaces/web/static/index.html",
+        "src/surfaces/web/static/js/node-context.js",
+        "/tmp/refine-main-governance-navigation.log",
+        "/tmp/refine-main-quality-verified-js.log",
+        "/tmp/refine-main-quality-baseline-rust.log"
+      ],
+      "artifacts": {
+        "limitations": [
+          "Browser verification used Chromium with intercepted daemon APIs; live provider processes were not exercised.",
+          "Persistence lasts within the page session, as planned and documented."
+        ],
+        "necessary_corrections": [],
+        "optional_improvements": [
+          "Update the four obsolete baseline test expectations separately."
+        ],
+        "verification": [
+          "Independently reran navigation browser tests: 30 passed, zero failures or skips.",
+          "Quality recorded 420 passing browser checks and 20 passing Rust static checks. Its four remaining failures were reproduced on the pinned base.",
+          "Quality fixes are committed in candidate 4c4ec00a49e614b6fb358275417066000cacd679; worktree is clean."
+        ]
+      }
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "default-governance",
+      "checkout": {
+        "observation": {
+          "branch": "refine/00000T1C895ZNHPSMGN4FJC000/round-1",
+          "head_commit": "4c4ec00a49e614b6fb358275417066000cacd679",
+          "status_porcelain": []
+        },
+        "tree": "39e8ed97fa1adcb82c72f06a6f72ec5d9dbb912d"
+      },
+      "checkout_recorded": true,
+      "diagnostic": null,
+      "host_bound_result": true,
+      "observational_violation": false,
+      "operation_id": null,
+      "process_id": "proc-1789678567950-1122601-11935",
+      "prompt_bytes": 7425,
+      "provider_session_id": null,
+      "purpose": "work",
+      "raw_output": "{\n  \"outcome\": \"success\",\n  \"summary\": \"Governance passed. The implementation meets the Goal: Main now opens a menu consistent with Tools and Planning, uses the panels icon, and retains each screen’s content, filters, selection, drafts, and scroll when switching screens or agents. The design fits the architecture by keeping screen lifetime in the browser surface, sharing navigation behavior, and reusing existing context safeguards. It supports Refine’s purpose by preserving users’ working context without interrupting agent sessions. No necessary corrections identified.\",\n  \"artifacts\": {\n    \"verification\": [\n      \"Independently reran navigation browser tests: 30 passed, zero failures or skips.\",\n      \"Quality recorded 420 passing browser checks and 20 passing Rust static checks. Its four remaining failures were reproduced on the pinned base.\",\n      \"Quality fixes are committed in candidate 4c4ec00a49e614b6fb358275417066000cacd679; worktree is clean.\"\n    ],\n    \"limitations\": [\n      \"Browser verification used Chromium with intercepted daemon APIs; live provider processes were not exercised.\",\n      \"Persistence lasts within the page session, as planned and documented.\"\n    ],\n    \"necessary_corrections\": [],\n    \"optional_improvements\": [\n      \"Update the four obsolete baseline test expectations separately.\"\n    ]\n  },\n  \"evidence\": [\n    \"src/surfaces/web/static/js/main-screens.js\",\n    \"src/surfaces/web/static/index.html\",\n    \"src/surfaces/web/static/js/node-context.js\",\n    \"/tmp/refine-main-governance-navigation.log\",\n    \"/tmp/refine-main-quality-verified-js.log\",\n    \"/tmp/refine-main-quality-baseline-rust.log\"\n  ]\n}\n",
+      "received_at": "2026-09-17T20:58:16.356203090+00:00",
+      "started_at": "2026-09-17T20:56:07.905504904+00:00",
+      "workflow_revision": 2
+    }
+  ],
   "created_at": "2026-09-17T20:56:06.484995762+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-17T20:58:17.705195831+00:00",
   "error": null,
   "action_applied": false
 }

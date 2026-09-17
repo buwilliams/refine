@@ -3,10 +3,30 @@
   "branch_name": "refine/00000T1C895ZNHPSMGN4FJC000/round-1",
   "candidate_commit": "4c4ec00a49e614b6fb358275417066000cacd679",
   "created": "2026-09-17T20:22:44Z",
-  "event_generation": 6,
+  "event_generation": 7,
   "feature_id": null,
   "feature_order": null,
   "id": "00000T1C895ZNHPSMGN4FJC000",
+  "integration_history": [
+    {
+      "complete": false,
+      "generation": 6,
+      "integration": {
+        "candidate_commit": "4c4ec00a49e614b6fb358275417066000cacd679",
+        "integrated_at": "2026-09-17T20:58:24.303132397+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n .../docs/intent/05-surfaces/03-browser/02-nav.md   |  12 +-\n .../docs/intent/05-surfaces/03-browser/04-main.md  |   2 +-\n src/surfaces/refine-hub/product/navigation.md      |  12 +-\n src/surfaces/web/static/css/navigation.css         |   4 +-\n src/surfaces/web/static/index.html                 |  26 +-\n src/surfaces/web/static/js/commands.js             |   5 +-\n src/surfaces/web/static/js/features/changes.js     |  19 +-\n src/surfaces/web/static/js/features/dashboard.js   |   7 +-\n src/surfaces/web/static/js/features/features.js    |  20 +-\n src/surfaces/web/static/js/features/goals-list.js  |  35 ++-\n src/surfaces/web/static/js/features/planning.js    |   3 +-\n src/surfaces/web/static/js/features/settings.js    |  16 +-\n src/surfaces/web/static/js/main-screens.js         | 227 +++++++++++++++\n src/surfaces/web/static/js/navigation.js           |  49 ++--\n src/surfaces/web/static/js/node-context.js         |   6 +-\n .../web/static/js/node-scope-navigation.js         |   3 +-\n src/surfaces/web/static/js/router.js               |  15 +-\n .../web_server/tests/static_surface/navigation.rs  |  39 +++\n tests/support/terminal_browser.js                  |   4 +-\n tests/support/web_app.js                           |   9 +-\n tests/web_hub.test.js                              |   9 +-\n tests/web_navigation_browser.test.js               | 324 ++++++++++++++++++++-\n tests/web_planning_polish.test.js                  |  30 +-\n tests/web_quick_actions_browser.test.js            |  11 +-\n tests/web_screen_render.test.js                    |  21 +-\n 25 files changed, 767 insertions(+), 141 deletions(-)\n create mode 100644 src/surfaces/web/static/js/main-screens.js",
+          "ok": true
+        },
+        "pushed": false,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "b6ba64780f7021a222e9fe54f3a2986782695427"
+      },
+      "round_idx": 0
+    }
+  ],
   "lifecycle_gate_configurations": {
     "1:default:workflow.backlog.enter": {
       "events": {
@@ -42,6 +62,26 @@
             "node_id": null
           },
           "source": "workflow.todo.enter"
+        }
+      },
+      "revision": 87,
+      "schema_version": 4,
+      "skills": {}
+    },
+    "7:default:workflow.failed.enter": {
+      "events": {
+        "workflow.failed.enter": {
+          "bindings": [],
+          "enabled": true,
+          "id": "workflow.failed.enter",
+          "kind": "system",
+          "name": "Workflow Failed Enter",
+          "on_success": null,
+          "parameters": [],
+          "scope": {
+            "node_id": null
+          },
+          "source": "workflow.failed.enter"
         }
       },
       "revision": 87,
@@ -88,49 +128,23 @@
       "created": "2026-09-17T20:22:44Z",
       "event_configuration": {
         "events": {
-          "workflow.governance.enter": {
-            "bindings": [
-              {
-                "enabled": true,
-                "id": "default-governance",
-                "inputs": {},
-                "mode": "blocking",
-                "order": 0,
-                "overrides": null,
-                "scope": {
-                  "node_id": null
-                },
-                "skill_id": "default-governance"
-              }
-            ],
+          "workflow.governance.exit": {
+            "bindings": [],
             "enabled": true,
-            "id": "workflow.governance.enter",
+            "id": "workflow.governance.exit",
             "kind": "system",
-            "name": "Workflow Governance Enter",
+            "name": "Workflow Governance Exit",
             "on_success": null,
             "parameters": [],
             "scope": {
               "node_id": null
             },
-            "source": "workflow.governance.enter"
+            "source": "workflow.governance.exit"
           }
         },
         "revision": 87,
         "schema_version": 4,
-        "skills": {
-          "default-governance": {
-            "enabled": true,
-            "id": "default-governance",
-            "name": "Governance",
-            "parameters": [],
-            "prompt": "{{templates.purpose}}\n\n{{templates.architecture}}\n\n## Governance\n\nVerify that the implementation meets the user-defined Goal, fits the system architecture, and serves the project's purpose.\n\n### Outcome\n\nA clear assessment of whether the implementation satisfies all three. Begin with the verdict, then briefly explain how the work meets the Goal, fits the architecture, and supports the project's purpose, using concrete evidence from the implementation and Quality results. For each gap, describe what falls short, why it matters, and the recommended correction. Separate necessary corrections from optional improvements.\n\n### Guardrails\n\n- Read the context that helps explain the user's Goal, the system architecture, and the project's purpose.\n- Compare the implementation with the user's desired outcome as well as the plan. Completing the plan and passing tests alone do not establish that the Goal is met.\n- Look for clear responsibilities, shared behavior implemented in one place, and interfaces that remain easy to use and maintain.\n- Judge design choices by how they serve the project. Allow sound approaches that differ from personal preference.\n- Group related issues by their underlying cause so the next step can address them together.",
-            "provenance": "refine-default-v1",
-            "role": "task",
-            "scope": {
-              "node_id": null
-            }
-          }
-        }
+        "skills": {}
       },
       "event_results": {
         "1c6c0506b526e8a9d699d3b8dfbb4837b592f6f93d711b9cea6cee7a70c0f85e": {
@@ -157,6 +171,45 @@
           },
           "round_idx": 0,
           "source": "workflow.plan.enter",
+          "state": "succeeded"
+        },
+        "6d411b9ef75b057d8d94ee4e8434fbdaa923c1b8e3a1a8ce9733781b03e2c2f7": {
+          "candidate_commit": "4c4ec00a49e614b6fb358275417066000cacd679",
+          "generation": 6,
+          "results": {
+            "default-governance": {
+              "artifacts": {
+                "limitations": [
+                  "Browser verification used Chromium with intercepted daemon APIs; live provider processes were not exercised.",
+                  "Persistence lasts within the page session, as planned and documented."
+                ],
+                "necessary_corrections": [],
+                "optional_improvements": [
+                  "Update the four obsolete baseline test expectations separately."
+                ],
+                "verification": [
+                  "Independently reran navigation browser tests: 30 passed, zero failures or skips.",
+                  "Quality recorded 420 passing browser checks and 20 passing Rust static checks. Its four remaining failures were reproduced on the pinned base.",
+                  "Quality fixes are committed in candidate 4c4ec00a49e614b6fb358275417066000cacd679; worktree is clean."
+                ]
+              },
+              "binding_id": "default-governance",
+              "evidence": [
+                "src/surfaces/web/static/js/main-screens.js",
+                "src/surfaces/web/static/index.html",
+                "src/surfaces/web/static/js/node-context.js",
+                "/tmp/refine-main-governance-navigation.log",
+                "/tmp/refine-main-quality-verified-js.log",
+                "/tmp/refine-main-quality-baseline-rust.log"
+              ],
+              "invocation_id": "6d411b9ef75b057d8d94ee4e8434fbdaa923c1b8e3a1a8ce9733781b03e2c2f7",
+              "outcome": "success",
+              "role": "governance",
+              "summary": "Governance passed. The implementation meets the Goal: Main now opens a menu consistent with Tools and Planning, uses the panels icon, and retains each screen’s content, filters, selection, drafts, and scroll when switching screens or agents. The design fits the architecture by keeping screen lifetime in the browser surface, sharing navigation behavior, and reusing existing context safeguards. It supports Refine’s purpose by preserving users’ working context without interrupting agent sessions. No necessary corrections identified."
+            }
+          },
+          "round_idx": 0,
+          "source": "workflow.governance.enter",
           "state": "succeeded"
         },
         "a2723463c9b2395ddff915155340d7d6e62b59f58a9beea42ad253030e8e1750": {
@@ -264,9 +317,9 @@
           "state": "succeeded"
         }
       },
-      "failure_at": "",
-      "failure_category": "",
-      "failure_message": "",
+      "failure_at": "2026-09-17T20:58:24Z",
+      "failure_category": "governance_integration",
+      "failure_message": "workflow coordination lock /home/buddy/projects/refine/run/8082/runtime/record-locks/6.lock was held by another operation for 0s",
       "gate_configurations": {
         "2:default:workflow.todo.enter": {
           "events": {
@@ -631,8 +684,113 @@
               }
             }
           }
+        },
+        "6:default:workflow.governance.exit": {
+          "events": {
+            "workflow.governance.exit": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.governance.exit",
+              "kind": "system",
+              "name": "Workflow Governance Exit",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.governance.exit"
+            }
+          },
+          "revision": 87,
+          "schema_version": 4,
+          "skills": {}
+        },
+        "6:default:workflow.governance.success": {
+          "events": {
+            "workflow.governance.success": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.governance.success",
+              "kind": "system",
+              "name": "workflow.governance.success",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.governance.success"
+            }
+          },
+          "revision": 87,
+          "schema_version": 4,
+          "skills": {}
+        },
+        "7:default:workflow.failed.enter": {
+          "events": {
+            "workflow.failed.enter": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.failed.enter",
+              "kind": "system",
+              "name": "Workflow Failed Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.failed.enter"
+            }
+          },
+          "revision": 87,
+          "schema_version": 4,
+          "skills": {}
         }
       },
+      "governance_candidate_commit": "4c4ec00a49e614b6fb358275417066000cacd679",
+      "governance_checked_at": "2026-09-17T20:58:18Z",
+      "governance_details": {
+        "candidate_commit": "4c4ec00a49e614b6fb358275417066000cacd679",
+        "configured": true,
+        "failed_actions": [],
+        "phase": "post_implementation",
+        "skill_results": [
+          {
+            "artifacts": {
+              "limitations": [
+                "Browser verification used Chromium with intercepted daemon APIs; live provider processes were not exercised.",
+                "Persistence lasts within the page session, as planned and documented."
+              ],
+              "necessary_corrections": [],
+              "optional_improvements": [
+                "Update the four obsolete baseline test expectations separately."
+              ],
+              "verification": [
+                "Independently reran navigation browser tests: 30 passed, zero failures or skips.",
+                "Quality recorded 420 passing browser checks and 20 passing Rust static checks. Its four remaining failures were reproduced on the pinned base.",
+                "Quality fixes are committed in candidate 4c4ec00a49e614b6fb358275417066000cacd679; worktree is clean."
+              ]
+            },
+            "binding_id": "workflow.governance.enter:default-governance",
+            "evidence": [
+              "src/surfaces/web/static/js/main-screens.js",
+              "src/surfaces/web/static/index.html",
+              "src/surfaces/web/static/js/node-context.js",
+              "/tmp/refine-main-governance-navigation.log",
+              "/tmp/refine-main-quality-verified-js.log",
+              "/tmp/refine-main-quality-baseline-rust.log"
+            ],
+            "invocation_id": "6d411b9ef75b057d8d94ee4e8434fbdaa923c1b8e3a1a8ce9733781b03e2c2f7",
+            "outcome": "success",
+            "role": "governance",
+            "summary": "Governance passed. The implementation meets the Goal: Main now opens a menu consistent with Tools and Planning, uses the panels icon, and retains each screen’s content, filters, selection, drafts, and scroll when switching screens or agents. The design fits the architecture by keeping screen lifetime in the browser surface, sharing navigation behavior, and reusing existing context safeguards. It supports Refine’s purpose by preserving users’ working context without interrupting agent sessions. No necessary corrections identified."
+          }
+        ],
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T1C895ZNHPSMGN4FJC000-round-1"
+      },
+      "governance_message": "Governance checks passed.",
+      "governance_recovery_analysis": null,
+      "governance_recovery_round_prompt": null,
+      "governance_rule_actions": [],
       "implementation_report": "workflow.implement.enter:default-implement: Implemented all six plan tasks within the browser surface. Changes remain in the worktree for Quality and Governance; no workflow transitions or integration actions were performed.",
       "implementation_reported_at": "2026-09-17T20:44:14Z",
       "logs": [],
@@ -833,19 +991,25 @@
       ],
       "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "updated": "2026-09-17T20:56:06Z",
+      "rule_state": "passed",
+      "updated": "2026-09-17T20:58:24Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-17T20:22:55Z",
         "generation": 2,
         "round_idx": 0,
         "workflow_revision": 2
       },
+      "workflow_failure_occurrence": {
+        "generation": 6,
+        "round_idx": 0
+      },
+      "workflow_git_remote": "origin",
       "workspace_branch": "refine/00000T1C895ZNHPSMGN4FJC000/round-1"
     }
   ],
-  "status": "governance",
+  "status": "failed",
   "target_branch": "main",
-  "updated": "2026-09-17T20:56:06Z",
+  "updated": "2026-09-17T20:58:24Z",
   "workflow_context": "",
   "workflow_controls": [
     {
@@ -938,7 +1102,17 @@
       "round_idx": 0,
       "to": "governance",
       "workflow_revision": 30
+    },
+    {
+      "at": "2026-09-17T20:58:24.682055317+00:00",
+      "forced": true,
+      "from": "governance",
+      "generation": 7,
+      "node_id": "default",
+      "round_idx": 0,
+      "to": "failed",
+      "workflow_revision": 38
     }
   ],
-  "workflow_revision": 31
+  "workflow_revision": 38
 }
