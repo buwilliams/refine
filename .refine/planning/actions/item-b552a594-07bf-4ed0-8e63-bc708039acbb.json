@@ -1,0 +1,39 @@
+{
+  "id": "item-b552a594-07bf-4ed0-8e63-bc708039acbb",
+  "command": {
+    "request_id": "item-b552a594-07bf-4ed0-8e63-bc708039acbb",
+    "operation": "card.delete",
+    "expected_revision": 1,
+    "board_id": "board-22b73e0ad03baca51bb02fe2",
+    "lane_id": null,
+    "goal_id": "PLN6A5750EEB0B24143EC804807",
+    "actor": "Buddy Williams",
+    "data": {
+      "expected_goal_revision": 1
+    }
+  },
+  "owner": "default",
+  "state": "complete",
+  "phase": "delete",
+  "created": "2026-09-17T21:22:43.221281362+00:00",
+  "result": {
+    "deleted": true,
+    "goal_id": "PLN6A5750EEB0B24143EC804807"
+  },
+  "message": null,
+  "target_node": null,
+  "before": {
+    "goal_id": "PLN6A5750EEB0B24143EC804807",
+    "board_id": "board-22b73e0ad03baca51bb02fe2",
+    "lane_id": "lane-7da10f95b1b1096b3bcdb9d6",
+    "position": 1789673308900.0,
+    "revision": 1,
+    "archived": false,
+    "routing": null,
+    "last_request_id": "item-7b90d0ef-9e83-4218-a422-e907e61be192"
+  },
+  "destination": null,
+  "behavior": "none",
+  "configuration": null,
+  "invocations": {}
+}
