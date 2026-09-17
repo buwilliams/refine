@@ -1,9 +1,9 @@
 {
   "base_commit": "b6ba64780f7021a222e9fe54f3a2986782695427",
   "branch_name": "refine/00000T19EJ0CNGHM85RBDXE000/round-3-execution-e18804c7-b49a-497f-9d29-053a3607d7cf",
-  "candidate_commit": "3d1f9341ce0ef06eca2810db63952a847309e88a",
+  "candidate_commit": "205e759898386f6ff65c2176fb0be6c86a80d873",
   "created": "2026-09-15T16:06:39Z",
-  "event_generation": 27,
+  "event_generation": 28,
   "feature_id": null,
   "feature_order": null,
   "id": "00000T19EJ0CNGHM85RBDXE000",
@@ -1743,11 +1743,11 @@
       "created": "2026-09-17T20:13:35Z",
       "event_configuration": {
         "events": {
-          "workflow.quality.enter": {
+          "workflow.governance.enter": {
             "bindings": [
               {
                 "enabled": true,
-                "id": "default-quality",
+                "id": "default-governance",
                 "inputs": {},
                 "mode": "blocking",
                 "order": 0,
@@ -1755,36 +1755,66 @@
                 "scope": {
                   "node_id": null
                 },
-                "skill_id": "default-quality"
+                "skill_id": "default-governance"
               }
             ],
             "enabled": true,
-            "id": "workflow.quality.enter",
+            "id": "workflow.governance.enter",
             "kind": "system",
-            "name": "Workflow Quality Enter",
+            "name": "Workflow Governance Enter",
             "on_success": null,
             "parameters": [],
             "scope": {
               "node_id": null
             },
-            "source": "workflow.quality.enter"
+            "source": "workflow.governance.enter"
           }
         },
         "revision": 87,
         "schema_version": 4,
         "skills": {
-          "default-quality": {
+          "default-governance": {
             "enabled": true,
-            "id": "default-quality",
-            "name": "Quality",
+            "id": "default-governance",
+            "name": "Governance",
             "parameters": [],
-            "prompt": "{{templates.purpose}}\n\n{{templates.architecture}}\n\n## Quality\n\nTest the implementation. Create and groom tests to cover the behavior described in the plan.\n\n### Outcome\n\nMeaningful tests cover the changed behavior and pass. Provide a brief report of the behavior tested, tests added or updated, commands run and their results, and any remaining failures or gaps. Include runtime or browser test results where useful. These results support Governance's verification of the work.\n\n### Guardrails\n\n- Test observable behavior, including relevant failure cases and effects on existing functionality. Tests should catch defects rather than mirror the implementation.\n- Keep useful tests, update tests for changed behavior, and remove obsolete or meaningless tests.\n- Investigate failures, correct problems in the implementation or tests, and rerun affected tests.\n- Choose tests suited to the change. Expand coverage when failures or affected behavior call for it.",
+            "prompt": "{{templates.purpose}}\n\n{{templates.architecture}}\n\n## Governance\n\nVerify that the implementation meets the user-defined Goal, fits the system architecture, and serves the project's purpose.\n\n### Outcome\n\nA clear assessment of whether the implementation satisfies all three. Begin with the verdict, then briefly explain how the work meets the Goal, fits the architecture, and supports the project's purpose, using concrete evidence from the implementation and Quality results. For each gap, describe what falls short, why it matters, and the recommended correction. Separate necessary corrections from optional improvements.\n\n### Guardrails\n\n- Read the context that helps explain the user's Goal, the system architecture, and the project's purpose.\n- Compare the implementation with the user's desired outcome as well as the plan. Completing the plan and passing tests alone do not establish that the Goal is met.\n- Look for clear responsibilities, shared behavior implemented in one place, and interfaces that remain easy to use and maintain.\n- Judge design choices by how they serve the project. Allow sound approaches that differ from personal preference.\n- Group related issues by their underlying cause so the next step can address them together.",
             "provenance": "refine-default-v1",
             "role": "task",
             "scope": {
               "node_id": null
             }
           }
+        }
+      },
+      "event_results": {
+        "f1d1dbf74f0d50210d9cdf1c46f7550e2b0d2088ed142ae5531944d5fbc5d3a1": {
+          "candidate_commit": "3d1f9341ce0ef06eca2810db63952a847309e88a",
+          "generation": 27,
+          "results": {
+            "default-quality": {
+              "artifacts": {
+                "directory": "target/quality-provider-checks/",
+                "report": "target/quality-provider-checks/report.md",
+                "screenshots": "target/quality-provider-checks/screenshots-full/",
+                "validation": "target/quality-provider-checks/validation.json"
+              },
+              "binding_id": "default-quality",
+              "evidence": [
+                "Fixed cross-tab draft loss and restored conflict-review controls after refresh; added browser regressions and a fake-provider test verifying failure never launches another configuration.",
+                "Full-run stages passed: 1,461 Rust tests, 437 browser/JavaScript tests with zero skips, 44 integration tests, smoke-provider, CLI, and Docker/SSH tests. Separate multi-instance synchronization passed.",
+                "Initial cargo test failed one obsolete navigation assertion, subsequently corrected and verified. cargo test -- --full still exits 1 on two unchanged workflow fixtures calling retired PATCH /api/governance; both failures reproduced on baseline.",
+                "Formatting and whitespace checks passed. Desktop and narrow-screen screenshots retained."
+              ],
+              "invocation_id": "f1d1dbf74f0d50210d9cdf1c46f7550e2b0d2088ed142ae5531944d5fbc5d3a1",
+              "outcome": "success",
+              "role": "quality",
+              "summary": "Changed provider behavior passes Quality after corrections. The repository-wide full command remains red on two independently reproduced baseline fixture failures; Governance should retain that validation limitation. Refine retains workflow and integration authority.\n\n"
+            }
+          },
+          "round_idx": 2,
+          "source": "workflow.quality.enter",
+          "state": "succeeded"
         }
       },
       "failure_at": "",
@@ -2008,6 +2038,92 @@
               }
             }
           }
+        },
+        "27:default:workflow.quality.exit": {
+          "events": {
+            "workflow.quality.exit": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.quality.exit",
+              "kind": "system",
+              "name": "Workflow Quality Exit",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.quality.exit"
+            }
+          },
+          "revision": 87,
+          "schema_version": 4,
+          "skills": {}
+        },
+        "27:default:workflow.quality.success": {
+          "events": {
+            "workflow.quality.success": {
+              "bindings": [],
+              "enabled": true,
+              "id": "workflow.quality.success",
+              "kind": "system",
+              "name": "workflow.quality.success",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.quality.success"
+            }
+          },
+          "revision": 87,
+          "schema_version": 4,
+          "skills": {}
+        },
+        "28:default:workflow.governance.enter": {
+          "events": {
+            "workflow.governance.enter": {
+              "bindings": [
+                {
+                  "enabled": true,
+                  "id": "default-governance",
+                  "inputs": {},
+                  "mode": "blocking",
+                  "order": 0,
+                  "overrides": null,
+                  "scope": {
+                    "node_id": null
+                  },
+                  "skill_id": "default-governance"
+                }
+              ],
+              "enabled": true,
+              "id": "workflow.governance.enter",
+              "kind": "system",
+              "name": "Workflow Governance Enter",
+              "on_success": null,
+              "parameters": [],
+              "scope": {
+                "node_id": null
+              },
+              "source": "workflow.governance.enter"
+            }
+          },
+          "revision": 87,
+          "schema_version": 4,
+          "skills": {
+            "default-governance": {
+              "enabled": true,
+              "id": "default-governance",
+              "name": "Governance",
+              "parameters": [],
+              "prompt": "{{templates.purpose}}\n\n{{templates.architecture}}\n\n## Governance\n\nVerify that the implementation meets the user-defined Goal, fits the system architecture, and serves the project's purpose.\n\n### Outcome\n\nA clear assessment of whether the implementation satisfies all three. Begin with the verdict, then briefly explain how the work meets the Goal, fits the architecture, and supports the project's purpose, using concrete evidence from the implementation and Quality results. For each gap, describe what falls short, why it matters, and the recommended correction. Separate necessary corrections from optional improvements.\n\n### Guardrails\n\n- Read the context that helps explain the user's Goal, the system architecture, and the project's purpose.\n- Compare the implementation with the user's desired outcome as well as the plan. Completing the plan and passing tests alone do not establish that the Goal is met.\n- Look for clear responsibilities, shared behavior implemented in one place, and interfaces that remain easy to use and maintain.\n- Judge design choices by how they serve the project. Allow sound approaches that differ from personal preference.\n- Group related issues by their underlying cause so the next step can address them together.",
+              "provenance": "refine-default-v1",
+              "role": "task",
+              "scope": {
+                "node_id": null
+              }
+            }
+          }
         }
       },
       "implementation_report": "workflow.implement.enter:default-implement: Round 3 provider behavior and Settings UX are implemented. Validation also exposed and corrected stale fixture assertions, a cleanup race, and shared Settings layout/pagination defects. Detailed results and retained visual evidence are linked through the artifact paths. No workflow transition, approval, integration, merge, or push was performed.",
@@ -2132,8 +2248,123 @@
         }
       ],
       "prompt": "Make AI providers configurable, with excellent Settings UX\n\nOutcome\nUsers can add, edit, and select named AI provider configurations without changing Refine code. Make this a simple, polished part of Refine that is easy to understand and pleasant to use.\n\nThis Round replaces the earlier scope and P1-P8 completion requirements. Automatic provider switching is not required. Do not implement selection policies, subscription-first routing, capacity probing/cooldowns, automatic paid fallback, shared spending orchestration, cross-provider handoffs, or automatic subscription recovery for this Round. When the selected provider fails or reaches its limit, report that clearly through the existing failure behavior; the user chooses what to do next.\n\nBehavior\n- A provider configuration has a stable ID and editable name, executable/path, distinct argument elements with supported context templates, context delivery, and local credential references where needed. Support two configurations of the same CLI with different arguments. Keep credential values outside synchronized state and diagnostics.\n- Store shared definitions and a system default. Each node may select an override or inherit the default; clearing its override restores inheritance. Explicit invocation selection takes precedence. Show the effective provider clearly.\n- Use the configured provider consistently through existing launch paths. Preserve existing built-in/custom provider behavior and supported session capabilities. Report invalid configuration and unsupported capabilities clearly. Keep one authoritative catalog and use existing validation, persistence, and conflict handling.\n\nUX and UI\nInspect neighboring Settings screens and shared components first. The provider list and editor must feel like a first-class part of the same product: matching typography, spacing, alignment, hierarchy, buttons, action placement, modal behavior, and responsive layout. Reuse established components and design tokens.\n- Make the list easy to scan, with obvious add/edit actions and clear shared-default versus node-override controls.\n- Use labeled controls, sensible defaults, concise help, and ordered argument rows that preserve each argument exactly, including spaces and templates. Ordinary setup must not require editing JSON. Put less common options in expandable sections.\n- Provide useful inline validation and clear loading, save, cancel, and success feedback. Preserve drafts through refreshes, failed saves, and revision conflicts, with a clear conflict-resolution action. Respect project/node context changes.\n- Support keyboard navigation, visible focus, associated labels, normal modal focus/Escape behavior, and narrow screens without overflow. Aim for an uncluttered, coherent finished experience, not just functioning controls.\n\nStarting point\nYou may ignore the earlier implementation and start fresh from current main if that is simpler and produces a better result. Reuse previous work only where it helps this outcome; do not complete or carry forward unwanted automation merely because it already exists. Preserve prior Round records, failures, logs, and available Git/worktree evidence. Work in the workflow-owned workspace through Refine's supported lifecycle.\n\nVerification\nVerify actual browser flows: add/edit a provider, configure two variants of one CLI, change the system default, set/clear a node override, and recover from invalid input and stale revisions without losing edits. Inspect desktop and narrow-screen renders against neighboring Settings and retain screenshots. Use fake providers to verify exact arguments/context, effective selection, compatibility, and credential exclusion. Run the repository's required checks, including cargo test and cargo test -- --full, sequentially; investigate failures and report exact results honestly. Tests for explicitly removed automatic-switching behavior are no longer acceptance requirements; update affected tests and documentation to match this scope while retaining useful coverage.\n\nFinish with a concise report of delivered behavior, browser/visual evidence, validation results, and any remaining gaps. Refine owns workflow transitions, integration, and review.",
+      "quality_agent_report": "workflow.quality.enter:default-quality: Changed provider behavior passes Quality after corrections. The repository-wide full command remains red on two independently reproduced baseline fixture failures; Governance should retain that validation limitation. Refine retains workflow and integration authority.\n\n",
+      "quality_candidate_commit": "205e759898386f6ff65c2176fb0be6c86a80d873",
+      "quality_checked_at": "2026-09-17T22:28:00Z",
+      "quality_details": {
+        "candidate_commit": "205e759898386f6ff65c2176fb0be6c86a80d873",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T19EJ0CNGHM85RBDXE000-round-3-execution-e18804c7-b49a-497f-9d29-053a3607d7cf",
+        "diagnostics": [
+          "Reused Skill review workflow.quality.enter:default-quality for final candidate content: automation/invocations/f1d1dbf74f0d50210d9cdf1c46f7550e2b0d2088ed142ae5531944d5fbc5d3a1.json"
+        ],
+        "evaluation_scope": "isolated_candidate",
+        "operation_id": "1a0b17bd33f112129d",
+        "provider_attempts": [],
+        "quality_proof": {
+          "checked_at": "2026-09-17T22:28:00Z",
+          "checked_candidate_commit": "205e759898386f6ff65c2176fb0be6c86a80d873",
+          "evaluation_scope": "isolated_candidate",
+          "goal_id": "00000T19EJ0CNGHM85RBDXE000",
+          "operation_id": "1a0b17bd33f112129d",
+          "results": [
+            {
+              "command": "",
+              "evidence": "Changed provider behavior passes Quality after corrections. The repository-wide full command remains red on two independently reproduced baseline fixture failures; Governance should retain that validation limitation. Refine retains workflow and integration authority.\n\n",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality"
+            }
+          ],
+          "round_idx": 2,
+          "schema_version": 1,
+          "skills": {
+            "invocations": {
+              "workflow.quality.enter:default-quality": "f1d1dbf74f0d50210d9cdf1c46f7550e2b0d2088ed142ae5531944d5fbc5d3a1"
+            },
+            "required_bindings": [
+              "workflow.quality.enter:default-quality"
+            ],
+            "requirements_id": "73692de4f6a0ac19c8f66f2c9e519de5bf06c52a2cc949f130d1cf0603693a17"
+          },
+          "source_candidate_commit": "205e759898386f6ff65c2176fb0be6c86a80d873",
+          "state": "passed"
+        },
+        "results": [
+          {
+            "command": "",
+            "evidence": "Changed provider behavior passes Quality after corrections. The repository-wide full command remains red on two independently reproduced baseline fixture failures; Governance should retain that validation limitation. Refine retains workflow and integration authority.\n\n",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality"
+          }
+        ],
+        "source_candidate_commit": "205e759898386f6ff65c2176fb0be6c86a80d873"
+      },
+      "quality_message": "Quality Skills reported success.",
+      "quality_requirements": {
+        "candidate_commit": "205e759898386f6ff65c2176fb0be6c86a80d873",
+        "id": "73692de4f6a0ac19c8f66f2c9e519de5bf06c52a2cc949f130d1cf0603693a17",
+        "node_id": "default",
+        "required_bindings": [
+          "workflow.quality.enter:default-quality"
+        ],
+        "selected": [
+          {
+            "attachments": [],
+            "binding": {
+              "binding": {
+                "enabled": true,
+                "id": "default-quality",
+                "inputs": {},
+                "mode": "blocking",
+                "order": 0,
+                "overrides": null,
+                "scope": {
+                  "node_id": null
+                },
+                "skill_id": "default-quality"
+              },
+              "parameters": {},
+              "skill": {
+                "enabled": true,
+                "id": "default-quality",
+                "name": "Quality",
+                "parameters": [],
+                "prompt": "{{templates.purpose}}\n\n{{templates.architecture}}\n\n## Quality\n\nTest the implementation. Create and groom tests to cover the behavior described in the plan.\n\n### Outcome\n\nMeaningful tests cover the changed behavior and pass. Provide a brief report of the behavior tested, tests added or updated, commands run and their results, and any remaining failures or gaps. Include runtime or browser test results where useful. These results support Governance's verification of the work.\n\n### Guardrails\n\n- Test observable behavior, including relevant failure cases and effects on existing functionality. Tests should catch defects rather than mirror the implementation.\n- Keep useful tests, update tests for changed behavior, and remove obsolete or meaningless tests.\n- Investigate failures, correct problems in the implementation or tests, and rerun affected tests.\n- Choose tests suited to the change. Expand coverage when failures or affected behavior call for it.",
+                "provenance": "refine-default-v1",
+                "role": "quality",
+                "scope": {
+                  "node_id": null
+                }
+              }
+            },
+            "contract_version": 1,
+            "key": "workflow.quality.enter:default-quality"
+          }
+        ]
+      },
+      "quality_skill_results": [
+        {
+          "artifacts": {
+            "directory": "target/quality-provider-checks/",
+            "report": "target/quality-provider-checks/report.md",
+            "screenshots": "target/quality-provider-checks/screenshots-full/",
+            "validation": "target/quality-provider-checks/validation.json"
+          },
+          "binding_id": "workflow.quality.enter:default-quality",
+          "evidence": [
+            "Fixed cross-tab draft loss and restored conflict-review controls after refresh; added browser regressions and a fake-provider test verifying failure never launches another configuration.",
+            "Full-run stages passed: 1,461 Rust tests, 437 browser/JavaScript tests with zero skips, 44 integration tests, smoke-provider, CLI, and Docker/SSH tests. Separate multi-instance synchronization passed.",
+            "Initial cargo test failed one obsolete navigation assertion, subsequently corrected and verified. cargo test -- --full still exits 1 on two unchanged workflow fixtures calling retired PATCH /api/governance; both failures reproduced on baseline.",
+            "Formatting and whitespace checks passed. Desktop and narrow-screen screenshots retained."
+          ],
+          "invocation_id": "f1d1dbf74f0d50210d9cdf1c46f7550e2b0d2088ed142ae5531944d5fbc5d3a1",
+          "outcome": "success",
+          "role": "quality",
+          "summary": "Changed provider behavior passes Quality after corrections. The repository-wide full command remains red on two independently reproduced baseline fixture failures; Governance should retain that validation limitation. Refine retains workflow and integration authority.\n\n"
+        }
+      ],
+      "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "updated": "2026-09-17T21:54:29Z",
+      "updated": "2026-09-17T22:28:02Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-17T20:13:37Z",
         "generation": 23,
@@ -2294,9 +2525,9 @@
       ]
     }
   ],
-  "status": "quality",
+  "status": "governance",
   "target_branch": "main",
-  "updated": "2026-09-17T21:54:29Z",
+  "updated": "2026-09-17T22:28:02Z",
   "workflow_context": "",
   "workflow_controls": [
     {
@@ -2677,7 +2908,17 @@
       "round_idx": 2,
       "to": "quality",
       "workflow_revision": 85
+    },
+    {
+      "at": "2026-09-17T22:28:01.684207670+00:00",
+      "forced": false,
+      "from": "quality",
+      "generation": 28,
+      "node_id": "default",
+      "round_idx": 2,
+      "to": "governance",
+      "workflow_revision": 96
     }
   ],
-  "workflow_revision": 87
+  "workflow_revision": 97
 }
