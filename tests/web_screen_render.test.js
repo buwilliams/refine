@@ -1,3 +1,4 @@
+const { selectMain } = require("./support/web_app");
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const { openApp, apiFixture, GOAL, FEATURE, SKIP } = require("./support/web_app");
@@ -145,7 +146,7 @@ test("Controls switches to dark mode and restores the stored theme on reload", {
   try {
     await app.page.emulateMedia({ colorScheme: "light" });
     await app.page.goto(`${app.origin}/#/`);
-    await app.page.locator('[data-testid="nav-settings"]').click();
+    await selectMain(app.page, "settings");
     await app.page.waitForSelector('[data-testid="create-menu-toggle"]');
     await app.page.evaluate(() => localStorage.removeItem("refine_color_theme"));
     await app.page.reload();
@@ -417,16 +418,17 @@ test("primary Dashboard and Goals navigation preserves current and all node scop
 
     // Keyboard activation follows the real primary Goals link and makes the
     // Dashboard's default current scope explicit in the Goals URL.
-    await app.page.locator('[data-testid="nav-goals"]').focus();
-    await app.page.locator('[data-testid="nav-goals"]').press("Enter");
+    await app.page.getByTestId("main-menu").click();
+    await app.page.locator('#main-screen-menu [data-main-open="goals"]').focus();
+    await app.page.keyboard.press("Enter");
     await app.page.waitForSelector('[data-testid="goals-table"]');
     assert.equal(hash(), "#/goals?node=current");
     assert.equal(await app.page.locator('[data-testid="goals-node-filter"]').inputValue(), "current");
 
-    await app.page.locator('[data-testid="nav-dashboard"]').click();
+    await selectMain(app.page, "dashboard");
     await app.page.waitForSelector("#dash");
     assert.equal(hash(), "#/");
-    await app.page.locator('[data-testid="nav-goals"]').click();
+    await selectMain(app.page, "goals");
     await app.page.waitForSelector('[data-testid="goals-table"]');
     assert.equal(hash(), "#/goals?node=current");
 
@@ -440,13 +442,14 @@ test("primary Dashboard and Goals navigation preserves current and all node scop
     await app.page.waitForSelector('[data-testid="goals-table"]');
     assert.equal(await app.page.locator('[data-testid="goals-node-filter"]').inputValue(), "current");
 
-    await app.page.locator('[data-testid="nav-dashboard"]').click();
+    await selectMain(app.page, "dashboard");
     await app.page.waitForSelector("#dash");
     await app.page.locator('[data-testid="dashboard-scope-all"]').click();
     await app.page.waitForFunction(() => location.hash === "#/?node=all");
     assert.equal(hash(), "#/?node=all");
 
-    await app.page.locator('[data-testid="nav-goals"]').click();
+    await app.page.getByRole("button", { name: "Close Goals", exact: true }).click();
+    await selectMain(app.page, "goals");
     await app.page.waitForSelector('[data-testid="goals-table"]');
     assert.equal(hash(), "#/goals?node=all");
     assert.equal(await app.page.locator('[data-testid="goals-node-filter"]').inputValue(), "all");
@@ -455,7 +458,7 @@ test("primary Dashboard and Goals navigation preserves current and all node scop
     await app.page.locator(".brand").click();
     await app.page.waitForSelector("#dash");
     assert.equal(hash(), "#/?node=all");
-    await app.page.locator('[data-testid="nav-goals"]').click();
+    await selectMain(app.page, "goals");
     await app.page.waitForSelector('[data-testid="goals-table"]');
     assert.equal(hash(), "#/goals?node=all");
     await app.page.reload();
@@ -488,7 +491,7 @@ test("Toolbar add menu closes when the user clicks outside it", { skip: SKIP }, 
     await app.page.locator('[data-testid="toolbar-add"]').click();
     assert.equal(await menu.evaluate((element) => element.open), true);
 
-    await app.page.locator("#rail-main-section > summary").click();
+    await app.page.locator("#main-screen-menu > summary").click();
     assert.equal(await menu.evaluate((element) => element.open), false);
     assert.deepEqual(app.pageErrors, []);
   } finally {

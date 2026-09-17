@@ -41,6 +41,7 @@ function syncNodeScopeNavigation(hash = location.hash) {
   $$('[data-node-scope-destination]').forEach((link) => {
     const surface = link.dataset.nodeScopeDestination;
     const baseHash = surface === "goals" ? "#/goals" : "#/";
-    link.setAttribute("href", nodeScopeNavigationHash(baseHash, hash));
+    const saved = typeof mainScreens !== "undefined" && mainScreens.open.get(surface);
+    link.setAttribute("href", saved?.hash || nodeScopeNavigationHash(baseHash, hash));
   });
 }

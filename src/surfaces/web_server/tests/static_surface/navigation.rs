@@ -1,6 +1,45 @@
 use super::*;
 
 #[test]
+fn static_main_menu_uses_retained_screen_rows() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surfaces/web/static");
+    let index = fs::read_to_string(root.join("index.html")).unwrap();
+    let navigation = fs::read_to_string(root.join("js/navigation.js")).unwrap();
+    let screens = fs::read_to_string(root.join("js/main-screens.js")).unwrap();
+    let menu = index
+        .split(r#"id="main-screen-menu""#)
+        .nth(1)
+        .unwrap()
+        .split("</details>")
+        .next()
+        .unwrap();
+    assert!(menu.contains("navigation.svg#panels-top-left"));
+    assert!(menu.contains(r#"aria-haspopup="menu""#));
+    assert!(menu.contains(r#"role="menu" aria-label="Main screens""#));
+    let mut previous = 0;
+    for destination in [
+        "dashboard",
+        "features",
+        "goals",
+        "changes",
+        "control",
+        "settings",
+    ] {
+        let position = menu
+            .find(&format!(r#"data-main-open="{destination}""#))
+            .unwrap();
+        assert!(position > previous);
+        previous = position;
+    }
+    assert!(index.contains(r#"id="rail-main-screens""#));
+    assert!(index.contains(r#"src="/static/js/main-screens.js""#));
+    assert!(!navigation.contains(r#"["rail-main-section", "rail-skills-section""#));
+    assert!(screens.contains("replaceWith(screen.host)"));
+    assert!(screens.contains("captureMainScreenRequest"));
+    assert!(screens.contains("data-close-main"));
+}
+
+#[test]
 fn static_rail_new_menu_exposes_shared_creation_commands() {
     let static_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surfaces/web/static");
     let index = fs::read_to_string(static_root.join("index.html")).unwrap();

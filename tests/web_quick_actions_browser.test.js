@@ -1,3 +1,4 @@
+const { selectMain } = require("./support/web_app");
 const assert = require('node:assert/strict');
 const test = require('node:test');
 const {openApp, apiFixture, SKIP} = require('./support/web_app');
@@ -14,13 +15,13 @@ test('Quick Actions controls pause and start independently, refresh availability
   try {
     const {page} = app;
     await page.goto(app.origin);
-    await page.locator('[data-testid="nav-settings"]').click();
+    await selectMain(page, "settings");
     await page.locator('#nav-create-menu > summary').click();
     const actions = page.locator('#quick-workflow-actions');
     await actions.getByRole('button', {name:'Pause workflow',exact:true}).click();
     assert.equal(writes.length,0);
     await page.getByTestId('modal-ok').click();
-    await page.locator('[data-testid="nav-settings"]').click();
+    await selectMain(page, "settings");
     await page.locator('#nav-create-menu > summary').click();
     await actions.getByRole('button', {name:'Unpause workflow',exact:true}).click();
     await actions.getByRole('button', {name:'Pause workflow',exact:true}).waitFor();
@@ -50,17 +51,17 @@ test('Target application actions honor configuration, confirm start and stop, an
   try {
     const {page}=app;
     await page.goto(app.origin);
-    await page.locator('[data-testid="nav-settings"]').click();
+    await selectMain(page, "settings");
     await page.locator('#nav-create-menu > summary').click();
     const actions=page.locator('#quick-target-actions');
     await actions.getByRole('button',{name:'Start target application',exact:true}).click();
     assert.equal(writes.length,0);
     await page.getByTestId('modal-ok').click();
-    await page.locator('[data-testid="nav-settings"]').click();
+    await selectMain(page, "settings");
     await page.locator('#nav-create-menu > summary').click();
     await actions.getByRole('button',{name:'Stop target application',exact:true}).click();
     await page.getByTestId('modal-ok').click();
-    await page.locator('[data-testid="nav-settings"]').click();
+    await selectMain(page, "settings");
     await page.locator('#nav-create-menu > summary').click();
     await actions.getByRole('button',{name:'Start target application',exact:true}).waitFor();
     assert.deepEqual(writes,['/api/target-app/start','/api/target-app/stop']);

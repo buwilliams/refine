@@ -1,18 +1,19 @@
+const { selectMain } = require("./support/web_app");
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const { openApp, apiFixture, SKIP } = require("./support/web_app");
 
-test("Main collapses independently of Tools, persists, and works in a mobile drawer", { skip: SKIP }, async () => {
+test("Main opens a menu while screen rows persist, and works in a mobile drawer", { skip: SKIP }, async () => {
   const app = await openApp();
   try {
     const { page } = app;
     await page.goto(app.origin);
     await page.locator("#dash").waitFor();
-    const header = page.locator("#rail-main-section > summary");
+    const header = page.locator("#main-screen-menu > summary");
     const box = await header.boundingBox();
     assert.ok(box.height >= 44);
     await header.click({ position: { x: 60, y: 22 } });
-    assert.equal(await page.locator('[data-testid="nav-dashboard"]').isVisible(), false);
+    assert.equal(await page.locator('[data-testid="nav-dashboard"]').isVisible(), true);
     assert.equal(await page.locator("#dash").isVisible(), true);
     assert.equal(await page.getByTestId("toolbar-add").isVisible(), true);
     await page.locator("#rail-toggle").click();
@@ -25,7 +26,7 @@ test("Main collapses independently of Tools, persists, and works in a mobile dra
     await page.locator("#mobile-rail-toggle").click();
     assert.equal(await page.locator("#rail-scrim").isVisible(), true);
     await header.click();
-    await page.locator('[data-testid="nav-features"]').click();
+    await page.locator('#main-screen-menu [data-main-open="features"]').click();
     assert.equal(await page.locator("#rail-scrim").isVisible(), false);
     assert.equal(await page.evaluate(() => document.body.scrollWidth <= innerWidth), true);
     await page.locator("#mobile-rail-toggle").click();
@@ -59,7 +60,13 @@ test("windows use history and full-height content without stopping sessions or l
     const { page } = app;
     await page.goto(app.origin);
     await page.locator("#dash").waitFor();
-    await page.evaluate(() => { window.savedDashboard = document.getElementById("dash"); });
+    await page.getByTestId("dashboard-scope-all").click();
+    await page.waitForFunction(() => location.hash === "#/?node=all");
+    await page.evaluate(() => {
+      window.savedDashboard = document.getElementById("dash");
+      savedDashboard.style.minHeight = "2200px";
+      document.getElementById("main").scrollTop = 240;
+    });
     await page.locator('[data-testid="toolbar-add"]').click();
     assert.deepEqual(await page.locator("[data-add-toolbar-tab]").allTextContents(),
       ["Agent", "Agent in Worktree", "System", "Files", "Terminal", "Planning Agent"]);
@@ -76,9 +83,11 @@ test("windows use history and full-height content without stopping sessions or l
     await page.keyboard.press("Escape");
     assert.equal(await page.evaluate(() => document.activeElement === terminalStateFor().term.textarea), true);
     assert.deepEqual(inputs, []);
-    await page.locator('[data-testid="nav-dashboard"]').click();
+    await selectMain(page, "dashboard");
     await page.locator("#dash").waitFor();
     assert.equal(await page.evaluate(() => savedDashboard === document.getElementById("dash")), true);
+    assert.equal(new URL(page.url()).hash, "#/?node=all");
+    assert.equal(await page.locator("#main").evaluate(el => el.scrollTop), 240);
     assert.equal(await page.locator('.navigation-rail [aria-current="page"]').count(), 1);
     await page.goBack();
     await page.locator(".xterm-screen").waitFor();
@@ -166,10 +175,10 @@ test("Control owns process management, preserves legacy links, and builds the ta
     await page.locator("#command-palette-input").fill("Control");
     assert.ok(await page.getByTestId("command-palette").getByText("Control", { exact: true }).count());
     await page.keyboard.press("Escape");
-    await page.getByTestId("nav-settings").click();
+    await selectMain(page, "settings");
     await page.getByTestId("settings-pane-application").waitFor();
     assert.equal(await page.getByTestId("settings-tab-processes").count(), 0);
-    await page.getByTestId("nav-control").click();
+    await selectMain(page, "control");
     await page.getByTestId("process-manager-table").waitFor();
     await page.reload();
     await page.getByTestId("process-manager-table").waitFor();
@@ -269,7 +278,7 @@ test("New stays below Search and supports keyboard, dismissal, and viewport posi
     assert.equal(await toggle.getAttribute("aria-label"), "New");
     assert.equal(await toggle.getAttribute("title"), "New");
     assert.equal(await toggle.locator("use").getAttribute("href"), "/static/vendor/lucide/navigation.svg#plus");
-    await page.locator("#rail-main-section > summary").click();
+    await page.locator("#main-screen-menu > summary").click();
     await toggle.focus();
     await page.keyboard.press("Enter");
     assert.deepEqual(await items.allTextContents(), ["New Goal", "New Plan", "New Feature", "Import"]);
@@ -527,6 +536,225 @@ for (const layout of ["desktop", "collapsed", "mobile"]) test(`New opens shared 
     assert.deepEqual(activations, ["node-b"]);
     assert.deepEqual(await page.evaluate(() => ({ node: state.project.active_node_id, reporter: state.lastReporter })), context);
     assert.deepEqual(await page.evaluate(() => newCommands), ["goal.new", "feature.new", "goal.import", "plan.open", "plan.open"].map(id => ({ id, inert: false, drawer: false, menus: 0 })));
+    assert.deepEqual(app.pageErrors, []);
+  } finally { await app.close(); }
+});
+
+for (const theme of ["light", "dark"]) test(`Main retains interacted Dashboard, filters, and scroll across screens (${theme})`, { skip: SKIP }, async () => {
+  const app = await openApp();
+  try {
+    const { page } = app;
+    await page.goto(app.origin);
+    await page.locator(".dashboard-status-grid").waitFor();
+    await page.evaluate(theme => { document.documentElement.dataset.theme = theme; }, theme);
+    await page.getByTestId("dashboard-scope-all").click();
+    await page.waitForFunction(() => location.hash === "#/?node=all");
+    await page.evaluate(() => {
+      window.savedMain = document.getElementById("main");
+      window.savedDashboard = document.getElementById("dash");
+      const panel = savedDashboard.querySelector("details");
+      if (panel) { panel.open = true; window.savedPanel = panel; }
+      // Make scroll deterministic independently of fixture row count.
+      savedDashboard.style.minHeight = "2200px";
+      savedMain.scrollTop = 320;
+    });
+    await selectMain(page, "goals");
+    await page.getByTestId("goals-table").waitFor();
+    await page.evaluate(() => {
+      window.savedGoals = document.getElementById("main");
+      document.getElementById("goals-filter-shell").open = true;
+      goalsExcludedIds.add("GOAL1");
+    });
+    await selectMain(page, "dashboard");
+    await page.locator("#dash").waitFor();
+    assert.equal(new URL(page.url()).hash, "#/?node=all");
+    assert.deepEqual(await page.evaluate(() => ({ same: savedMain === document.getElementById("main"), dash: savedDashboard === document.getElementById("dash"), scroll: savedMain.scrollTop, panel: !window.savedPanel || savedPanel.open })), { same: true, dash: true, scroll: 320, panel: true });
+    await page.getByTestId("main-menu").click();
+    await page.getByRole("menuitem", { name: "Dashboard", exact: true }).click();
+    assert.equal(await page.getByTestId("nav-dashboard").count(), 1);
+    await selectMain(page, "goals");
+    await page.getByTestId("goals-table").waitFor();
+    assert.equal(await page.evaluate(() => savedGoals === document.getElementById("main") && goalsExcludedIds.has("GOAL1") && document.getElementById("goals-filter-shell").open), true);
+    await page.evaluate(() => { location.hash = "#/goals?status=review&node=current"; });
+    await page.waitForFunction(() => document.getElementById("filter-status")?.value === "review");
+    await selectMain(page, "dashboard");
+    await selectMain(page, "goals");
+    await page.getByTestId("goals-table").waitFor();
+    assert.equal(new URL(page.url()).hash, "#/goals?status=review&node=current");
+    await page.getByRole("button", { name: "Close Goals", exact: true }).click();
+    await page.locator("#dash").waitFor();
+    assert.equal(await page.getByTestId("nav-dashboard").evaluate(el => el === document.activeElement), true);
+    await selectMain(page, "goals");
+    await page.getByTestId("goals-table").waitFor();
+    assert.equal(await page.evaluate(() => savedGoals === document.getElementById("main")), false);
+    assert.equal(await page.evaluate(() => goalsExcludedIds.size), 0);
+    assert.deepEqual(app.pageErrors, []);
+  } finally { await app.close(); }
+});
+
+test("Settings draft and tab survive Control, command search, and cancelled close", { skip: SKIP }, async () => {
+  const app = await openApp();
+  try {
+    const { page } = app;
+    await page.goto(`${app.origin}/#/settings/target-app`);
+    await page.getByTestId("settings-pane-target-app").waitFor();
+    await page.getByTestId("s-target-start-instructions-edit").click();
+    const input = page.locator('#main textarea').first();
+    await input.fill("Retain this unsaved instruction");
+    await page.evaluate(() => { window.savedSettings = document.getElementById("main"); });
+    await selectMain(page, "control");
+    await page.getByTestId("process-manager-table").waitFor();
+    await page.keyboard.press("Control+k");
+    await page.locator("#command-palette-input").fill("Settings");
+    await page.locator('[data-command-id="nav.settings"]').click();
+    await page.getByTestId("settings-pane-target-app").waitFor();
+    assert.equal(new URL(page.url()).hash, "#/settings/target-app");
+    assert.equal(await input.inputValue(), "Retain this unsaved instruction");
+    assert.equal(await page.evaluate(() => savedSettings === document.getElementById("main")), true);
+    await page.getByTestId("settings-tab-reporters").click();
+    await page.getByTestId("settings-pane-reporters").waitFor();
+    await page.waitForFunction(() => document.querySelector('[data-tab-pane="reporters"] .settings-tab-card')?.textContent.trim());
+    await page.getByTestId("settings-tab-target-app").click();
+    await page.getByTestId("settings-pane-target-app").waitFor();
+    assert.equal(await input.inputValue(), "Retain this unsaved instruction");
+    await page.getByRole("button", { name: "Close Settings", exact: true }).click();
+    await page.getByTestId("modal-cancel").click();
+    assert.equal(await input.inputValue(), "Retain this unsaved instruction");
+    await page.getByRole("button", { name: "Close Settings", exact: true }).click();
+    await page.getByTestId("modal-ok").click();
+    await page.getByTestId("process-manager-table").waitFor();
+    assert.equal(await page.getByTestId("nav-settings").count(), 0);
+    assert.deepEqual(app.pageErrors, []);
+  } finally { await app.close(); }
+});
+
+test("Main menu keyboard dismissal restores focus and leaves open screens visible", { skip: SKIP }, async () => {
+  const app = await openApp();
+  try {
+    const { page } = app;
+    await page.goto(app.origin);
+    await page.locator("#dash").waitFor();
+    const toggle = page.getByTestId("main-menu");
+    await toggle.focus();
+    await page.keyboard.press("ArrowDown");
+    assert.equal(await page.getByRole("menuitem", { name: "Dashboard", exact: true }).evaluate(el => el === document.activeElement), true);
+    await page.keyboard.press("End");
+    await page.keyboard.press("Escape");
+    assert.equal(await toggle.evaluate(el => el === document.activeElement), true);
+    assert.equal(await page.getByTestId("nav-dashboard").isVisible(), true);
+    await toggle.click();
+    await page.locator("#dash").click();
+    await page.waitForFunction(() => document.querySelector('[data-testid="main-menu"]').getAttribute("aria-expanded") === "false");
+    assert.deepEqual(app.pageErrors, []);
+  } finally { await app.close(); }
+});
+
+test("late Goals response cannot paint a reopened screen or another Main screen", { skip: SKIP }, async () => {
+  const app = await openApp();
+  let release;
+  try {
+    const { page } = app;
+    await page.goto(app.origin);
+    await page.locator("#dash").waitFor();
+    let pending;
+    await page.route("**/api/goals?**", async route => {
+      if (!route.request().url().includes("exclude_draft")) return route.fallback();
+      if (!pending) {
+        pending = route;
+        await new Promise(resolve => { release = resolve; });
+        return route.fulfill({ json: { goals: [{ id: "OLD", name: "Superseded response", status: "todo" }], facets: {}, page: {} } });
+      }
+      return route.fallback();
+    });
+    await selectMain(page, "goals");
+    await page.waitForFunction(() => document.getElementById("goals-table"));
+    while (!release) await new Promise(resolve => setTimeout(resolve, 10));
+    await selectMain(page, "features");
+    await page.locator("#features-table").waitFor();
+    await page.getByRole("button", { name: "Close Goals", exact: true }).click();
+    await selectMain(page, "goals");
+    await page.getByText("Smoke goal", { exact: true }).first().waitFor();
+    release();
+    await page.waitForTimeout(150);
+    assert.equal(await page.getByText("Superseded response").count(), 0);
+    assert.equal(await page.locator("#main").count(), 1);
+    assert.deepEqual(app.pageErrors, []);
+  } finally { release?.(); await app.close(); }
+});
+
+test("context changes invalidate clean screens and protect an inactive Settings draft", { skip: SKIP }, async () => {
+  const app = await openApp();
+  try {
+    const { page } = app;
+    await page.goto(`${app.origin}/#/settings/target-app`);
+    await page.getByTestId("settings-pane-target-app").waitFor();
+    await page.getByTestId("s-target-start-instructions-edit").click();
+    await page.locator('#main textarea').first().fill("Prior target draft");
+    await selectMain(page, "dashboard");
+    await page.locator("#dash").waitFor();
+    await page.evaluate(() => { window.priorDashboard = document.getElementById("dash"); });
+    const dirty = await page.evaluate(() => nodeContextDirtySurfaces().map(item => item.label));
+    assert.ok(dirty.includes("Settings"));
+    await page.evaluate(() => { window.contextSwitch = activateNodeContext("node-b"); });
+    await page.getByTestId("modal-cancel").click();
+    assert.equal(await page.evaluate(() => contextSwitch), false);
+    assert.equal(await page.evaluate(() => mainScreens.open.get("settings").dirty), true);
+    // Use the authoritative coordinator as SSE target-root changes do.
+    await page.evaluate(async () => {
+      await applyAuthoritativeNodeContext({ ...state.project, target_root: "/another-app" }, { nodes: state.project.nodes }, { changed: true, external: true });
+    });
+    await page.locator(".dashboard-status-grid").waitFor();
+    assert.equal(await page.evaluate(() => priorDashboard === document.getElementById("dash")), false);
+    await selectMain(page, "settings");
+    await page.getByTestId("settings-pane-target-app").waitFor();
+    assert.equal(await page.locator('#main textarea').first().inputValue(), "Prior target draft");
+    assert.equal(await page.locator('#main textarea').first().isDisabled(), true);
+    assert.equal(await page.getByTestId("node-context-stale-warning").first().isVisible(), true);
+    await page.evaluate(async () => {
+      await applyAuthoritativeNodeContext({ ...state.project, target_root: "/third-app" }, { nodes: state.project.nodes }, { changed: true });
+    });
+    await page.getByTestId("settings-pane-target-app").waitFor();
+    assert.equal(await page.getByTestId("node-context-stale-warning").count(), 0);
+    assert.equal(await page.locator('#main textarea').first().isDisabled(), false);
+    assert.deepEqual(app.pageErrors, []);
+  } finally { await app.close(); }
+});
+
+test("Goal and Feature modal dismissal restores the owning retained screen", { skip: SKIP }, async () => {
+  const app = await openApp();
+  try {
+    const { page } = app;
+    await page.goto(`${app.origin}/#/?node=all`);
+    await page.locator(".dashboard-status-grid").waitFor();
+    await page.evaluate(() => { window.owner = document.getElementById("main"); });
+    for (const [hash, marker] of [["#/goals/GOAL1", ".goal-detail-modal"], ["#/features/FEAT1", ".feature-modal"]]) {
+      await page.evaluate(hash => { location.hash = hash; }, hash);
+      await page.locator(marker).waitFor();
+      await page.locator(`${marker} .modal-close`).click();
+      await page.waitForFunction(() => location.hash === "#/?node=all");
+      assert.equal(await page.evaluate(() => owner === document.getElementById("main")), true);
+      assert.equal(await page.locator('.rail-main [aria-current="page"]').count(), 1);
+    }
+    await selectMain(page, "features");
+    await page.locator("#features-table").waitFor();
+    await page.goBack();
+    await page.locator("#dash").waitFor();
+    assert.equal(await page.evaluate(() => owner === document.getElementById("main")), true);
+    assert.deepEqual(app.pageErrors, []);
+  } finally { await app.close(); }
+});
+
+test("a clean Settings screen reconstructs after an authoritative Node change", { skip: SKIP }, async () => {
+  const app = await openApp();
+  try {
+    const { page } = app;
+    await page.goto(`${app.origin}/#/settings/application`);
+    await page.getByTestId("settings-pane-application").waitFor();
+    await page.evaluate(async () => {
+      await applyAuthoritativeNodeContext({ ...state.project, active_node_id: "node-b" }, { nodes: state.project.nodes }, { changed: true, surfacesPrepared: true });
+    });
+    await page.getByTestId("settings-pane-application").waitFor();
+    assert.equal(await page.locator("#main > h2").textContent(), "Settings");
     assert.deepEqual(app.pageErrors, []);
   } finally { await app.close(); }
 });

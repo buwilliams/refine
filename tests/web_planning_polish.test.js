@@ -1,3 +1,4 @@
+const { selectMain } = require("./support/web_app");
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const {
@@ -430,7 +431,7 @@ test(
     const app = await planningApp();
     try {
       const { page } = app;
-      await page.locator('[data-testid="nav-dashboard"]').click();
+      await selectMain(page, "dashboard");
       await page.locator(".dashboard-status-grid").waitFor();
       assert.equal(await page.getByTestId("workflow-status-draft").count(), 0);
       const dashboardLeft = await page
@@ -447,7 +448,7 @@ test(
         1,
       );
       await page.keyboard.press("Escape");
-      await page.locator('[data-testid="nav-goals"]').click();
+      await selectMain(page, "goals");
       await page.locator("#goals-table").waitFor();
       assert.equal(
         await page.locator('#goals-status option[value="draft"]').count(),

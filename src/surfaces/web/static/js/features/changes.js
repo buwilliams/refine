@@ -149,6 +149,7 @@ async function loadChanges() {
   if (state.currentRoute !== "changes") return;
   if (renderNoProjectIfDetached("Changes")) return;
   const nodeGeneration = captureNodeContextGeneration();
+  const screenCurrent = typeof captureMainScreenRequest === "function" ? captureMainScreenRequest() : () => true;
   const f = changesFiltersFromHash();
   const params = new URLSearchParams();
   if (f.q) params.set("q", f.q);
@@ -160,11 +161,11 @@ async function loadChanges() {
   params.set("offset", String((f.page - 1) * f.limit));
   try {
     const data = await api("GET", "/api/changes?" + params);
-    if (!isNodeContextGenerationCurrent(nodeGeneration) || state.currentRoute !== "changes") return;
+    if (!screenCurrent() || !isNodeContextGenerationCurrent(nodeGeneration) || state.currentRoute !== "changes") return;
     if (renderNoProjectIfApiDetached(data, "Changes")) return;
     drawChanges(data, f);
   } catch (e) {
-    if (!isNodeContextGenerationCurrent(nodeGeneration)) return;
+    if (!screenCurrent() || !isNodeContextGenerationCurrent(nodeGeneration)) return;
     const root = document.getElementById("changes-body");
     if (root) root.innerHTML = `<p class="muted">${htmlEscape(e.message)}</p>`;
   }

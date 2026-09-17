@@ -93,6 +93,7 @@ async function refreshDashboard() {
   }
   const refreshSeq = ++dashboardRefreshSeq;
   const nodeGeneration = captureNodeContextGeneration();
+  const screenCurrent = typeof captureMainScreenRequest === "function" ? captureMainScreenRequest() : () => true;
   try {
     const reporter = state.lastReporter || "";
     const scope = dashboardScopeFromHash();
@@ -104,16 +105,16 @@ async function refreshDashboard() {
         : Promise.resolve({ goals: [] }),
     ]);
     if (refreshSeq !== dashboardRefreshSeq || state.currentRoute !== "dashboard"
-        || !isNodeContextGenerationCurrent(nodeGeneration)) return;
+        || !screenCurrent() || !isNodeContextGenerationCurrent(nodeGeneration)) return;
     if (renderNoProjectIfApiDetached(d, "Dashboard")) return;
     if (refreshSeq !== dashboardRefreshSeq || state.currentRoute !== "dashboard"
-        || !isNodeContextGenerationCurrent(nodeGeneration)) return;
+        || !screenCurrent() || !isNodeContextGenerationCurrent(nodeGeneration)) return;
     state.dashboard = d;
     state.dashboardReviewSnapshot = { reviewsForReporter: reviews.goals || [], reporter };
     drawDashboard(d, state.dashboardReviewSnapshot);
   } catch (e) {
     if (refreshSeq !== dashboardRefreshSeq || state.currentRoute !== "dashboard"
-        || !isNodeContextGenerationCurrent(nodeGeneration)) return;
+        || !screenCurrent() || !isNodeContextGenerationCurrent(nodeGeneration)) return;
     const dash = document.getElementById("dash");
     const hasRenderedDashboard = !!dash?.querySelector(".dashboard-status-grid");
     if (dash && !hasRenderedDashboard) {

@@ -52,6 +52,7 @@ function goalsHash(parts) {
 
 async function renderGoalsList() {
   if (renderNoProjectIfDetached("Goals")) return;
+  const renderCurrent = typeof captureMainScreenRequest === "function" ? captureMainScreenRequest() : () => true;
   let reporterLoadError = null;
   await Promise.all([
     ensureGoalsNodeOptions(),
@@ -59,6 +60,7 @@ async function renderGoalsList() {
       reporterLoadError = error;
     }),
   ]);
+  if (!renderCurrent()) return;
   renderBanners(reporterLoadError ? [{
     severity: "error",
     message: `Could not load Reporter and Assignee filters: ${reporterLoadError.message || reporterLoadError}`,
@@ -335,6 +337,7 @@ async function refreshGoalsTable() {
   if (state.currentRoute !== "goals") return;
   if (renderNoProjectIfDetached("Goals")) return;
   const nodeGeneration = captureNodeContextGeneration();
+  const screenCurrent = typeof captureMainScreenRequest === "function" ? captureMainScreenRequest() : () => true;
   const f = goalsFilterFromHash();
   const params = new URLSearchParams({exclude_draft: "1"});
   if (f.status) params.set("status", f.status);
@@ -355,7 +358,7 @@ async function refreshGoalsTable() {
   params.set("facets", "1");
   try {
     const data = await api("GET", "/api/goals?" + params);
-    if (!isNodeContextGenerationCurrent(nodeGeneration) || state.currentRoute !== "goals") return;
+    if (!screenCurrent() || !isNodeContextGenerationCurrent(nodeGeneration) || state.currentRoute !== "goals") return;
     if (renderNoProjectIfApiDetached(data, "Goals")) return;
     const goals = data.goals || [];
     const facets = data.facets || {};
@@ -393,7 +396,7 @@ async function refreshGoalsTable() {
     _lastGoalsRender = { goals, state: renderState };
     drawGoalsTable(goals, renderState);
   } catch (e) {
-    if (!isNodeContextGenerationCurrent(nodeGeneration)) return;
+    if (!screenCurrent() || !isNodeContextGenerationCurrent(nodeGeneration)) return;
     const tbl = $("#goals-table");
     if (tbl) tbl.innerHTML = `<p class="muted">${htmlEscape(e.message)}</p>`;
   }

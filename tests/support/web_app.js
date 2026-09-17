@@ -230,4 +230,11 @@ async function openApp({
   };
 }
 
-module.exports = { openApp, apiFixture, GOAL, FEATURE, SKIP, BROWSER };
+async function selectMain(page, key) {
+  const row = page.getByTestId(`nav-${key}`);
+  if (await row.isVisible()) return row.click();
+  await page.getByTestId("main-menu").click();
+  await page.locator(`#main-screen-menu [data-main-open="${key}"]`).click();
+}
+
+module.exports = { selectMain, openApp, apiFixture, GOAL, FEATURE, SKIP, BROWSER };

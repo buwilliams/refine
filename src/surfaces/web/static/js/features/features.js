@@ -174,6 +174,7 @@ function updateFeaturesFilter(patch) {
 async function refreshFeaturesTable() {
   if (state.currentRoute !== "features") return;
   const nodeGeneration = captureNodeContextGeneration();
+  const screenCurrent = typeof captureMainScreenRequest === "function" ? captureMainScreenRequest() : () => true;
   const f = featuresFilterFromHash();
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries({
@@ -184,7 +185,7 @@ async function refreshFeaturesTable() {
     if (value !== "" && value != null) params.set(key, String(value));
   }
   const data = await api("GET", `/api/features?${params}`);
-  if (!isNodeContextGenerationCurrent(nodeGeneration) || state.currentRoute !== "features") return;
+  if (!screenCurrent() || !isNodeContextGenerationCurrent(nodeGeneration) || state.currentRoute !== "features") return;
   const renderState = { ...f, pageMeta: data.page || {} };
   _lastFeaturesRender = { features: data.features || [], state: renderState };
   drawFeaturesTable(_lastFeaturesRender.features, renderState);
@@ -726,6 +727,7 @@ function ensureFeatureModalUnderlay() {
 
 async function openFeatureDetailModal(featureId) {
   const nodeGeneration = captureNodeContextGeneration();
+  const screenCurrent = typeof captureMainScreenRequest === "function" ? captureMainScreenRequest() : () => true;
   ensureFeatureModalUnderlay();
   if (typeof closeGoalDetailModal === "function") {
     closeGoalDetailModal({ navigateAway: false });
@@ -733,10 +735,10 @@ async function openFeatureDetailModal(featureId) {
   closeFeatureModal({ navigateAway: false });
   try {
     const data = await api("GET", `/api/features/${encodeURIComponent(featureId)}`);
-    if (!isNodeContextGenerationCurrent(nodeGeneration)) return;
+    if (!screenCurrent() || !isNodeContextGenerationCurrent(nodeGeneration)) return;
     openFeatureModal(data.feature, { navigateAway: true });
   } catch (e) {
-    if (!isNodeContextGenerationCurrent(nodeGeneration)) return;
+    if (!screenCurrent() || !isNodeContextGenerationCurrent(nodeGeneration)) return;
     const root = document.createElement("div");
     root.className = "modal-backdrop";
     root.innerHTML = `
