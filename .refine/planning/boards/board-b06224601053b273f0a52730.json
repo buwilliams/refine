@@ -1,0 +1,24 @@
+{
+  "id": "board-b06224601053b273f0a52730",
+  "name": "Buddy's Todo",
+  "revision": 1,
+  "archived": false,
+  "routing": null,
+  "lanes": [
+    {
+      "id": "lane-481e11910dd0f499bb809832",
+      "name": "Ideas",
+      "action": "none",
+      "routing": null
+    },
+    {
+      "id": "lane-a1128604fe62ddb7bafb0b2d",
+      "name": "Done",
+      "action": "none",
+      "routing": null
+    }
+  ],
+  "created": "2026-09-17T16:16:27.386863195+00:00",
+  "reporter": null,
+  "last_request_id": "item-d1babf36-c585-4f85-916f-d2a9481aa5e2"
+}

@@ -1,0 +1,51 @@
+{
+  "id": "item-d1babf36-c585-4f85-916f-d2a9481aa5e2",
+  "command": {
+    "request_id": "item-d1babf36-c585-4f85-916f-d2a9481aa5e2",
+    "operation": "board.create",
+    "expected_revision": null,
+    "board_id": null,
+    "lane_id": null,
+    "goal_id": null,
+    "actor": "Buddy Williams",
+    "data": {
+      "name": "Buddy's Todo",
+      "routing": null
+    }
+  },
+  "owner": "default",
+  "state": "complete",
+  "phase": "prepare",
+  "created": "2026-09-17T16:16:27.383699279+00:00",
+  "result": {
+    "archived": false,
+    "created": "2026-09-17T16:16:27.386863195+00:00",
+    "id": "board-b06224601053b273f0a52730",
+    "lanes": [
+      {
+        "action": "none",
+        "id": "lane-481e11910dd0f499bb809832",
+        "name": "Ideas",
+        "routing": null
+      },
+      {
+        "action": "none",
+        "id": "lane-a1128604fe62ddb7bafb0b2d",
+        "name": "Done",
+        "routing": null
+      }
+    ],
+    "last_request_id": "item-d1babf36-c585-4f85-916f-d2a9481aa5e2",
+    "name": "Buddy's Todo",
+    "reporter": null,
+    "revision": 1,
+    "routing": null
+  },
+  "message": null,
+  "target_node": null,
+  "before": null,
+  "destination": null,
+  "behavior": "none",
+  "configuration": null,
+  "invocations": {}
+}
