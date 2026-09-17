@@ -550,6 +550,22 @@ impl FilePlanningService {
                     if c.data.get("routing").is_some() {
                         lane.routing = route(&c.data)?
                     }
+                    if let Some(position) = c.data.get("position") {
+                        let position = position
+                            .as_u64()
+                            .and_then(|value| usize::try_from(value).ok())
+                            .filter(|value| *value < b.lanes.len())
+                            .ok_or_else(|| {
+                                invalid("Lane position must be an existing zero-based index")
+                            })?;
+                        let current = b
+                            .lanes
+                            .iter()
+                            .position(|lane| Some(&lane.id) == c.lane_id.as_ref())
+                            .unwrap();
+                        let lane = b.lanes.remove(current);
+                        b.lanes.insert(position, lane);
+                    }
                 }
                 "lane.reorder" => {
                     let ids: Vec<String> = serde_json::from_value(c.data["lane_ids"].clone())

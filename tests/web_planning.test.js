@@ -67,7 +67,7 @@ async function fixture() {
     window.hubModal = (title, content) => {
       const r = document.createElement("div");
       r.className = "modal-backdrop";
-      r.innerHTML = `<h2>${title}</h2>${content}`;
+      r.innerHTML = `<div role="dialog"><h2 class="modal-title">${title}</h2><div class="modal-body">${content}</div><div class="modal-actions"><button data-delete hidden>Delete</button><button data-close>Close</button><button data-save hidden>Save</button></div></div>`;
       r._close = () => r.remove();
       r._nodeGeneration = 1;
       document.body.append(r);

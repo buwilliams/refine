@@ -236,7 +236,7 @@ pub fn tool_catalog() -> Vec<McpTool> {
                         "priority":{"type":"string","enum":["low","medium","high"]},
                         "routing":{"type":["string","null"],"description":"Explicit node ID, auto for least-loaded eligible node, or null to inherit card -> lane -> board."},
                         "action":{"type":"string","enum":["none","accept_into_backlog","release"]},
-                        "archived":{"type":"boolean"},"position":{"type":"number"},
+                        "archived":{"type":"boolean"},"position":{"type":"number","description":"Card ordering value, or a zero-based lane index for lane.update (saved atomically with other lane settings)."},
                         "expected_goal_revision":{"type":"integer","minimum":0,"description":"Required when card.update edits Goal metadata."},
                         "lane_ids":{"type":"array","items":{"type":"string"},"description":"Complete lane order for lane.reorder."}
                     }}

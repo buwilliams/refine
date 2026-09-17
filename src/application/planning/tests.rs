@@ -769,3 +769,53 @@ fn deleting_board_rejects_pending_card_actions() {
         "complete"
     );
 }
+
+#[test]
+fn lane_settings_and_position_save_atomically() {
+    let f = Fixture::new();
+    let board = f.board();
+    let lane_id = &board.lanes[0].id;
+    for position in [json!(-1), json!(0.5), json!(board.lanes.len()), json!("1")] {
+        let action = f.apply(
+            "lane.update",
+            Some(&board.id),
+            Some(lane_id),
+            None,
+            Some(board.revision),
+            json!({"name":"Changed", "position":position}),
+        );
+        assert_eq!(action.state, "failed");
+        let snapshot = f.service.snapshot().unwrap();
+        assert_eq!(snapshot["boards"][0]["revision"], board.revision);
+        assert_eq!(
+            snapshot["boards"][0]["lanes"][0]["name"],
+            board.lanes[0].name
+        );
+    }
+    let action = f.apply(
+        "lane.update",
+        Some(&board.id),
+        Some(lane_id),
+        None,
+        Some(board.revision),
+        json!({"name":"Ready", "action":"release", "position":1}),
+    );
+    assert_eq!(action.state, "complete", "{:?}", action.message);
+    assert_eq!(action.result["revision"], board.revision + 1);
+    assert_eq!(action.result["lanes"][1]["id"], *lane_id);
+    assert_eq!(action.result["lanes"][1]["name"], "Ready");
+    assert_eq!(action.result["lanes"][1]["action"], "release");
+    let stale = f.apply(
+        "lane.update",
+        Some(&board.id),
+        Some(lane_id),
+        None,
+        Some(board.revision),
+        json!({"name":"Stale", "position":0}),
+    );
+    assert_eq!(stale.state, "failed");
+    assert_eq!(
+        f.service.snapshot().unwrap()["boards"][0]["lanes"][1]["name"],
+        "Ready"
+    );
+}

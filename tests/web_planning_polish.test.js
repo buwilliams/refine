@@ -68,6 +68,8 @@ async function planningApp() {
   const app = await openApp({
     fixture(path, request) {
       if (path === "/api/planning") return structuredClone(snapshot);
+      if (path === "/api/skills/catalog")
+        return { sources: ["custom", "planning.lane.enter"] };
       if (path === "/api/features/FEAT1")
         return {
           feature: {
@@ -102,6 +104,30 @@ async function planningApp() {
         const body = request.postDataJSON();
         requests.push(body);
         let result = {};
+        if (
+          body.operation === "lane.update" ||
+          body.operation === "lane.delete"
+        ) {
+          const board = snapshot.boards.find(
+            (board) => board.id === body.board_id,
+          );
+          if (body.expected_revision !== board.revision)
+            return {
+              state: "failed",
+              message: "Board changed. Reopen lane settings.",
+            };
+          const index = board.lanes.findIndex(
+            (lane) => lane.id === body.lane_id,
+          );
+          const [lane] = board.lanes.splice(index, 1);
+          if (body.operation === "lane.update") {
+            const { position = index, ...settings } = body.data;
+            Object.assign(lane, settings);
+            board.lanes.splice(position, 0, lane);
+          }
+          board.revision++;
+          result = structuredClone(board);
+        }
         if (body.operation === "board.delete") {
           snapshot.boards = snapshot.boards.filter(
             (board) => board.id !== body.board_id,
@@ -616,6 +642,244 @@ test(
         await page.locator('[data-close-planning-board="board"]').count(),
         0,
       );
+      assert.deepEqual(app.pageErrors, []);
+    } finally {
+      await app.close();
+    }
+  },
+);
+
+for (const theme of ["light", "dark"]) {
+  test(
+    `Planning card titles and shared menus keep white text on blue hover and focus (${theme})`,
+    { skip: SKIP },
+    async () => {
+      const app = await planningApp();
+      try {
+        const { page } = app;
+        app.snapshot.cards[1].goal.status = "backlog";
+        await page.reload();
+        await page.locator(".planning-card-title[href]").waitFor();
+        await page.evaluate(
+          (theme) => (document.documentElement.dataset.theme = theme),
+          theme,
+        );
+        const assertHighlight = async (locator, label) => {
+          const colors = await locator.evaluate((el) => {
+            const style = getComputedStyle(el);
+            const probe = document.createElement("span");
+            probe.style.color = "var(--color-primary-hover)";
+            el.append(probe);
+            const blue = getComputedStyle(probe).color;
+            probe.remove();
+            return {
+              background: style.backgroundColor,
+              foreground: style.color,
+              blue,
+            };
+          });
+          assert.equal(
+            colors.background,
+            colors.blue,
+            `${label}: blue background`,
+          );
+          assert.equal(
+            colors.foreground,
+            "rgb(255, 255, 255)",
+            `${label}: white foreground`,
+          );
+        };
+        const checkStates = async (locator, label) => {
+          await locator.hover();
+          await assertHighlight(locator, `${label} hover`);
+          await page.mouse.move(0, 0);
+          await locator.focus();
+          await page.keyboard.press("Tab");
+          await page.keyboard.press("Shift+Tab");
+          assert.equal(
+            await locator.evaluate((el) => el.matches(":focus-visible")),
+            true,
+          );
+          await assertHighlight(locator, `${label} keyboard focus`);
+          await locator.evaluate((el) => el.blur());
+        };
+        await checkStates(
+          page.locator("button.planning-card-title"),
+          "Draft title",
+        );
+        await checkStates(page.locator("a.planning-card-title"), "Goal title");
+        await page.getByTestId("planning-menu").click();
+        await checkStates(
+          page.locator("[data-planning-create-board]"),
+          "Create board",
+        );
+        await checkStates(
+          page.locator("#planning-board-options a").first(),
+          "Board menu item",
+        );
+        await page.keyboard.press("Escape");
+        await page.getByTestId("toolbar-add").click();
+        await checkStates(
+          page.locator('[data-add-toolbar-tab="files"]'),
+          "Tool menu item",
+        );
+        assert.deepEqual(app.pageErrors, []);
+      } finally {
+        await app.close();
+      }
+    },
+  );
+}
+
+for (const mobile of [false, true]) {
+  test(
+    `Lane settings use one footer and save position with settings (${mobile ? "mobile" : "desktop"})`,
+    { skip: SKIP },
+    async () => {
+      const app = await planningApp();
+      try {
+        const { page } = app;
+        await page.setViewportSize(
+          mobile ? { width: 390, height: 844 } : { width: 1280, height: 900 },
+        );
+        await page.locator('[data-lane-settings="ideas"]').click();
+        const editor = page.locator(".planning-lane-editor");
+        assert.equal(
+          await editor.locator('.modal-body button[type="submit"]').count(),
+          0,
+        );
+        assert.equal(await editor.locator("[data-delete]").isDisabled(), true);
+        assert.deepEqual(
+          await editor
+            .locator(".modal-actions button:visible")
+            .allTextContents(),
+          ["Delete lane", "Cancel", "Save"],
+        );
+        await editor.getByLabel("Name", { exact: true }).fill("Discovery");
+        await editor
+          .getByLabel("Position", { exact: true })
+          .selectOption({ value: "2" });
+        // Opening a related Skill editor must not discard unsaved lane fields.
+        await editor
+          .getByRole("button", { name: "Add Skill", exact: true })
+          .click();
+        const skill = page.getByRole("dialog", {
+          name: "New Skill",
+          exact: true,
+        });
+        await skill.waitFor();
+        assert.equal(
+          await skill.locator("[data-trigger-source]").inputValue(),
+          "planning.lane.enter",
+        );
+        assert.equal(
+          await skill.locator("[data-planning-lane-filter]").inputValue(),
+          "ideas",
+        );
+        await skill.locator("[data-close]").click();
+        assert.equal(
+          await editor.getByLabel("Name", { exact: true }).inputValue(),
+          "Discovery",
+        );
+        assert.equal(
+          await editor.getByLabel("Position", { exact: true }).inputValue(),
+          "2",
+        );
+        assert.equal(app.requests.length, 0);
+        const geometry = await editor
+          .locator(".modal-actions button:visible")
+          .evaluateAll((buttons) =>
+            buttons.map((button) => {
+              const box = button.getBoundingClientRect();
+              return { top: box.top, right: box.right, left: box.left };
+            }),
+          );
+        assert.equal(new Set(geometry.map((box) => box.top)).size, 1);
+        assert.ok(
+          geometry.every(
+            (box) => box.left >= 0 && box.right <= (mobile ? 390 : 1280),
+          ),
+        );
+        await page.screenshot({
+          path: `/tmp/refine-lane-settings-${mobile ? "mobile" : "desktop"}.png`,
+        });
+        await editor.getByRole("button", { name: "Save", exact: true }).click();
+        await editor.waitFor({ state: "detached" });
+        assert.equal(app.requests.length, 1);
+        assert.equal(app.requests[0].operation, "lane.update");
+        assert.equal(app.requests[0].data.position, 2);
+        assert.equal(app.requests[0].data.name, "Discovery");
+        await page.waitForFunction(
+          () =>
+            document.querySelector(".planning-lanes")?.lastElementChild?.dataset
+              .lane === "ideas",
+        );
+        assert.deepEqual(
+          app.snapshot.boards[0].lanes.map((lane) => lane.id),
+          ["ready", "done", "ideas"],
+        );
+        await page.locator('[data-lane-settings="done"]').click();
+        await editor
+          .getByRole("button", { name: "Delete lane", exact: true })
+          .click();
+        const confirmation = page.getByRole("alertdialog", {
+          name: "Delete lane",
+          exact: true,
+        });
+        await confirmation
+          .getByRole("button", { name: "Cancel", exact: true })
+          .click();
+        assert.equal(app.requests.length, 1);
+        await editor
+          .getByRole("button", { name: "Delete lane", exact: true })
+          .click();
+        await confirmation
+          .getByRole("button", { name: "Delete lane", exact: true })
+          .click();
+        await editor.waitFor({ state: "detached" });
+        assert.equal(app.requests.at(-1).operation, "lane.delete");
+        assert.deepEqual(app.pageErrors, []);
+      } finally {
+        await app.close();
+      }
+    },
+  );
+}
+
+test(
+  "Lane settings keep unsaved fields when a board revision conflicts",
+  { skip: SKIP },
+  async () => {
+    const app = await planningApp();
+    try {
+      const { page } = app;
+      await page.locator('[data-lane-settings="ideas"]').click();
+      const editor = page.locator(".planning-lane-editor");
+      await editor.getByLabel("Name", { exact: true }).fill("Keep this draft");
+      await editor
+        .getByLabel("Position", { exact: true })
+        .selectOption({ value: "2" });
+      app.snapshot.boards[0].revision++;
+      await editor.getByRole("button", { name: "Save", exact: true }).click();
+      await editor
+        .getByRole("alert")
+        .filter({ hasText: "Board changed" })
+        .waitFor();
+      assert.equal(
+        await editor.getByLabel("Name", { exact: true }).inputValue(),
+        "Keep this draft",
+      );
+      assert.equal(
+        await editor.getByLabel("Position", { exact: true }).inputValue(),
+        "2",
+      );
+      assert.equal(
+        await editor
+          .getByRole("button", { name: "Save", exact: true })
+          .isEnabled(),
+        true,
+      );
+      assert.equal(app.snapshot.boards[0].lanes[0].id, "ideas");
       assert.deepEqual(app.pageErrors, []);
     } finally {
       await app.close();

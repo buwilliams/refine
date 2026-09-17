@@ -38,6 +38,8 @@ CLI, API and MCP call the same application service:
 
 Command operations are `board.create`, `board.update`, `board.archive`, `lane.create`, `lane.update`, `lane.reorder`, `lane.delete`, `card.create`, `card.attach`, `card.update`, `card.move`, `card.archive`, `card.detach`, `card.apply`, and `migrate`. A lane can be deleted only when empty, including archived placements. Board archive is reversible.
 
+`lane.update` accepts an optional integer `position`, the lane's zero-based index in the board. Name, action, routing, and position are saved together under one board revision; an invalid position leaves the board unchanged.
+
 ```sh
 refine planning apply board.create --request-id team-board --data '{"name":"Team"}'
 refine planning list

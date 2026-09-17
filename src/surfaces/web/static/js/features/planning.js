@@ -188,7 +188,7 @@ function planningCardHtml(card, board) {
     goal = card.goal || {},
     esc = htmlEscape;
   return `<article class="planning-card" draggable="${!board.archived}" data-card="${esc(p.goal_id)}" tabindex="0" aria-label="${esc(goal.name || p.goal_id)}">
-    ${goal.status === "draft" ? `<button class="planning-card-title" data-card-edit="${esc(p.goal_id)}">${esc(goal.name || p.goal_id)}</button>` : `<a class="planning-card-title" href="#/goals/${encodeURIComponent(p.goal_id)}">${esc(goal.name || p.goal_id)}</a>`}
+    ${goal.status === "draft" ? `<button class="planning-card-title primary-highlight" data-card-edit="${esc(p.goal_id)}">${esc(goal.name || p.goal_id)}</button>` : `<a class="planning-card-title primary-highlight" href="#/goals/${encodeURIComponent(p.goal_id)}">${esc(goal.name || p.goal_id)}</a>`}
     <span class="planning-status status-${esc(goal.status || "draft")}">${esc(workflowStatusLabel(goal.status || "draft"))}</span>
     ${goal.description ? `<p>${esc(goal.description.slice(0, 180))}</p>` : ""}
     ${card.error ? `<p role="alert">${esc(card.error)}</p>` : ""}
@@ -283,7 +283,12 @@ function bindPlanning(board) {
             lane_id: l.id,
             expected_revision: board.revision,
           },
-          { name: l.name, action: l.action, routing: l.routing || "" },
+          {
+            name: l.name,
+            position: board.lanes.indexOf(l),
+            action: l.action,
+            routing: l.routing || "",
+          },
           board,
         );
       }),
@@ -680,46 +685,81 @@ function planningMove(card) {
 }
 function planningEdit(title, operation, fields, values, board) {
   const esc = htmlEscape;
+  const laneEditor = operation === "lane.update";
+  const formId = `planning-editor-${planningRequestId()}`;
+  const hasCards =
+    laneEditor &&
+    planningSnapshot.cards.some(
+      (card) =>
+        card.placement.board_id === board.id &&
+        card.placement.lane_id === fields.lane_id,
+    );
   const input = (key, value) =>
-    key === "routing"
-      ? `<select name="routing">${[["", "Inherit from lane or board"], ["auto", "Automatic: least loaded node"], ...(planningSnapshot?.nodes || []).filter((n) => !n.archived).map((n) => [n.id, `${n.display_name || n.id}${n.enabled ? "" : " (disabled)"}`]), ...(value && value !== "auto" && !(planningSnapshot?.nodes || []).some((n) => n.id === value) ? [[value, value]] : [])].map(([id, label]) => `<option value="${esc(id)}" ${id === value ? "selected" : ""}>${esc(label)}</option>`).join("")}</select>`
-      : key === "action"
-        ? `<select name="action">${[
-            ["none", "Organize only"],
-            ["accept_into_backlog", "Accept into Backlog"],
-            ["release", "Release to execution"],
-          ]
-            .map(
-              ([id, label]) =>
-                `<option value="${id}" ${id === value ? "selected" : ""}>${label}</option>`,
-            )
-            .join("")}</select>`
-        : key === "priority"
-          ? `<select name="priority">${["low", "medium", "high"].map((priority) => `<option value="${priority}" ${priority === value ? "selected" : ""}>${priority[0].toUpperCase() + priority.slice(1)}</option>`).join("")}</select>`
-          : key === "description"
-            ? `<textarea name="description" rows="6">${esc(value)}</textarea>`
-            : `<input name="${key}" value="${esc(value)}" ${key === "name" ? "required" : ""} ${key === "routing" ? 'placeholder="Inherit, auto, or node ID"' : ""}>`;
+    key === "position"
+      ? `<select name="position">${board.lanes.map((lane, index) => `<option value="${index}" ${index === value ? "selected" : ""}>${index + 1}${index === 0 ? " · First" : index === board.lanes.length - 1 ? " · Last" : ""}</option>`).join("")}</select>`
+      : key === "routing"
+        ? `<select name="routing">${[["", "Inherit from lane or board"], ["auto", "Automatic: least loaded node"], ...(planningSnapshot?.nodes || []).filter((n) => !n.archived).map((n) => [n.id, `${n.display_name || n.id}${n.enabled ? "" : " (disabled)"}`]), ...(value && value !== "auto" && !(planningSnapshot?.nodes || []).some((n) => n.id === value) ? [[value, value]] : [])].map(([id, label]) => `<option value="${esc(id)}" ${id === value ? "selected" : ""}>${esc(label)}</option>`).join("")}</select>`
+        : key === "action"
+          ? `<select name="action">${[
+              ["none", "Organize only"],
+              ["accept_into_backlog", "Accept into Backlog"],
+              ["release", "Release to execution"],
+            ]
+              .map(
+                ([id, label]) =>
+                  `<option value="${id}" ${id === value ? "selected" : ""}>${label}</option>`,
+              )
+              .join("")}</select>`
+          : key === "priority"
+            ? `<select name="priority">${["low", "medium", "high"].map((priority) => `<option value="${priority}" ${priority === value ? "selected" : ""}>${priority[0].toUpperCase() + priority.slice(1)}</option>`).join("")}</select>`
+            : key === "description"
+              ? `<textarea name="description" rows="6">${esc(value)}</textarea>`
+              : `<input name="${key}" value="${esc(value)}" ${key === "name" ? "required" : ""} ${key === "routing" ? 'placeholder="Inherit, auto, or node ID"' : ""}>`;
   const root = hubModal(
     title,
-    `<form>${"expected_goal_revision" in values ? `<input type="hidden" name="expected_goal_revision" value="${values.expected_goal_revision}">` : ""}${Object.entries(
+    `<form id="${formId}">${"expected_goal_revision" in values ? `<input type="hidden" name="expected_goal_revision" value="${values.expected_goal_revision}">` : ""}${Object.entries(
       values,
     )
       .filter(([key]) => key !== "expected_goal_revision")
       .map(
         ([key, value]) =>
-          `<label class="form-row">${esc({ goal_id: "Goal ID", routing: "Execution routing" }[key] || key[0].toUpperCase() + key.slice(1))}${input(key, value)}</label>`,
+          `<div class="form-row"><label for="${formId}-${key}">${esc({ goal_id: "Goal ID", routing: "Execution routing" }[key] || key[0].toUpperCase() + key.slice(1))}</label>${input(key, value).replace(/^<(input|select|textarea)\b/, `<$1 id="${formId}-${key}"`)}</div>`,
       )
       .join(
         "",
-      )}<p role="alert" data-error></p><button type="submit">Save</button></form>${operation === "card.update" ? "<button data-detach>Remove from board</button>" : ""}${board && operation === "board.update" ? `<button data-archive>${board.archived ? "Restore" : "Archive"} board</button><button class="danger" data-delete-board>Delete board</button>` : ""}${board && operation === "lane.update" ? "<button data-lane-left>Move lane left</button><button data-lane-right>Move lane right</button><button data-delete>Delete empty lane</button><button data-skill>Add lane Skill</button>" : ""}`,
+      )}<p class="form-error" role="alert" data-error></p></form>${operation === "card.update" ? '<button class="secondary" data-detach>Remove from board</button>' : ""}${board && operation === "board.update" ? `<button class="secondary" data-archive>${board.archived ? "Restore" : "Archive"} board</button><button class="danger" data-delete-board>Delete board</button>` : ""}${laneEditor ? '<section class="planning-editor-section" aria-label="Lane Skills"><div><h3>Skills</h3><p>Run a Skill when a card enters this lane.</p></div><button class="secondary" type="button" data-skill>Add Skill</button></section>' : ""}${hasCards ? '<p class="muted small" id="planning-lane-delete-hint">Move or remove all cards, including archived cards, before deleting this lane.</p>' : ""}`,
   );
   root.classList.add("planning-editor");
+  // Reuse the modal's single action footer, including native form submission.
+  const form = root.querySelector("form");
+  const saveButton = root.querySelector("[data-save]");
+  saveButton.hidden = false;
+  saveButton.type = "submit";
+  saveButton.setAttribute("form", formId);
+  root.querySelector("[data-close]").textContent = "Cancel";
+  const heading = root.querySelector(".modal-title");
+  heading.id = `${formId}-title`;
+  root
+    .querySelector('[role="dialog"]')
+    .setAttribute("aria-labelledby", heading.id);
+  if (laneEditor) {
+    root.classList.add("planning-lane-editor");
+    const deleteButton = root.querySelector("[data-delete]");
+    deleteButton.hidden = false;
+    deleteButton.textContent = "Delete lane";
+    deleteButton.disabled = hasCards;
+    if (hasCards)
+      deleteButton.setAttribute(
+        "aria-describedby",
+        "planning-lane-delete-hint",
+      );
+  }
   root.querySelector("input:not([type=hidden]), textarea, select")?.focus();
   const submit = planningSubmitter(operation);
   let saving = false;
   root.querySelector("form").onsubmit = async (e) => {
     e.preventDefault();
-    if (saving) return;
+    if (saving || root._busy) return;
     if (!isNodeContextGenerationCurrent(root._nodeGeneration)) {
       root.querySelector("[data-error]").textContent =
         "Project or node changed. Reopen this editor before saving.";
@@ -727,6 +767,7 @@ function planningEdit(title, operation, fields, values, board) {
     }
     saving = true;
     const data = Object.fromEntries(new FormData(e.target));
+    if (laneEditor) data.position = Number(data.position);
     if ("expected_goal_revision" in data)
       data.expected_goal_revision = Number(data.expected_goal_revision);
     if ("routing" in data) data.routing = data.routing.trim() || null;
@@ -736,6 +777,9 @@ function planningEdit(title, operation, fields, values, board) {
       delete data.goal_id;
     }
     try {
+      saveButton.disabled = true;
+      form.inert = true;
+      root._busy = true;
       const action = await submit(args, data);
       if (operation === "board.create" && action.result?.id) {
         planningBoardId = action.result.id;
@@ -751,6 +795,9 @@ function planningEdit(title, operation, fields, values, board) {
       root.querySelector("[data-error]").textContent = error.message;
     } finally {
       saving = false;
+      root._busy = false;
+      saveButton.disabled = false;
+      form.inert = false;
     }
   };
   root.querySelector("[data-detach]")?.addEventListener("click", () =>
@@ -789,34 +836,28 @@ function planningEdit(title, operation, fields, values, board) {
         await refreshPlanningNavigation();
       });
     });
-  for (const [selector, delta] of [
-    ["[data-lane-left]", -1],
-    ["[data-lane-right]", 1],
-  ])
-    root.querySelector(selector)?.addEventListener("click", () =>
-      hubAction(root, async () => {
-        const ids = board.lanes.map((l) => l.id),
-          at = ids.indexOf(fields.lane_id),
-          to = Math.max(0, Math.min(ids.length - 1, at + delta));
-        [ids[at], ids[to]] = [ids[to], ids[at]];
-        await planningCommand(
-          "lane.reorder",
-          { board_id: board.id, expected_revision: board.revision },
-          { lane_ids: ids },
-        );
+  if (laneEditor)
+    root.querySelector("[data-delete]").addEventListener("click", async () => {
+      if (
+        root._busy ||
+        !(await modalConfirm(
+          `Delete “${values.name}”? This cannot be undone.`,
+          {
+            title: "Delete lane",
+            okLabel: "Delete lane",
+            danger: true,
+          },
+        ))
+      )
+        return;
+      await hubAction(root, async () => {
+        await planningCommand("lane.delete", fields);
         root._close();
-        refreshPlanning();
-      }),
-    );
-  root.querySelector("[data-delete]")?.addEventListener("click", () =>
-    hubAction(root, async () => {
-      await planningCommand("lane.delete", fields);
-      root._close();
-      refreshPlanning();
-    }),
-  );
+        await refreshPlanning();
+      });
+    });
   root.querySelector("[data-skill]")?.addEventListener("click", () => {
-    root._close();
+    if (root._busy) return;
     openSkillEditor(null, false, {
       source: "planning.lane.enter",
       planning: { board_id: fields.board_id, lane_id: fields.lane_id },
@@ -912,7 +953,9 @@ function renderPlanningNavigation(snapshot) {
     button.onclick = () =>
       closePlanningBoardView(button.dataset.closePlanningBoard);
   });
-  options.innerHTML = links || '<a href="#/planning" data-route="planning" data-testid="nav-planning">Open Project Planning</a>';
+  options.innerHTML =
+    links ||
+    '<a href="#/planning" data-route="planning" data-testid="nav-planning">Open Project Planning</a>';
   options.querySelectorAll("a").forEach((link) => {
     link.onclick = () => {
       document.getElementById("planning-board-menu").open = false;

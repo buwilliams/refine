@@ -24,11 +24,6 @@
   stroke-linecap: round;
 }
 .toolbar-add-button::-webkit-details-marker { display: none; }
-.toolbar-add-button:hover,
-.toolbar-add-button:focus-visible {
-  background: var(--color-primary-hover);
-  color: white;
-}
 .toolbar-add-options {
   position: absolute;
   top: calc(100% + 6px);
@@ -60,11 +55,6 @@
   background: transparent;
   color: var(--fg);
   border: 0;
-}
-.toolbar-add-options :is(button, a):hover,
-.toolbar-add-options :is(button, a):focus-visible {
-  background: var(--color-primary-hover);
-  color: white;
 }
 .toolbar-dock-body > .actions { flex: 0 0 auto; }
 .toolbar-dock-body [data-testid="standalone-worktree-path"] {

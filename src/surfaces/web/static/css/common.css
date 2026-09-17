@@ -395,7 +395,11 @@ button.danger, .btn.danger {
 }
 button.subtle, .btn.subtle       { background: transparent; color: var(--muted); border-color: transparent; box-shadow: none; }
 button:disabled, .btn:disabled   { opacity: 0.5; cursor: not-allowed; }
-button:hover:not(:disabled), .btn:hover, .button-primary:hover {
+/* Keep the fill and foreground together for controls that opt into blue highlights. */
+button:hover:not(:disabled), .btn:hover, .button-primary:hover,
+.primary-highlight:is(:hover, :focus-visible):not(:disabled),
+.toolbar-add-button:is(:hover, :focus-visible),
+.toolbar-add-options :is(button, a):is(:hover, :focus-visible):not(:disabled) {
   filter: none;
   background: var(--color-primary-hover);
   border-color: var(--color-primary-hover);
