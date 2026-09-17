@@ -205,6 +205,31 @@ async function planningApp() {
   return { ...app, requests, snapshot };
 }
 
+test("Planning composer and Dashboard retain their state through Back and Forward", { skip: SKIP }, async () => {
+  const app = await planningApp();
+  try {
+    const { page } = app;
+    await page.locator('[data-planning-add="ideas"]').click();
+    const input = page.getByRole("combobox", { name: "Card title or existing Goal" });
+    await input.fill("Unsubmitted planning idea");
+    await input.evaluate(el => { window.retainedComposer = el; });
+    await selectMain(page, "dashboard");
+    await page.locator(".dashboard-status-grid").waitFor();
+    await page.getByTestId("dashboard-contributor-rankings-panel").locator("summary").click();
+    await page.evaluate(() => { window.retainedDashboard = document.getElementById("dash"); });
+    await page.goBack();
+    await input.waitFor();
+    assert.equal(await input.inputValue(), "Unsubmitted planning idea");
+    assert.equal(await input.evaluate(el => el === retainedComposer), true);
+    await page.goForward();
+    await page.locator(".dashboard-status-grid").waitFor();
+    assert.equal(await page.evaluate(() => document.getElementById("dash") === retainedDashboard), true);
+    assert.equal(await page.getByTestId("dashboard-contributor-rankings-panel").evaluate(el => el.open), true);
+    assert.deepEqual(app.requests, []);
+    assert.deepEqual(app.pageErrors, []);
+  } finally { await app.close(); }
+});
+
 test(
   "Planning has its own board navigation, aligned controls, distinct surfaces, and shared input styles",
   { skip: SKIP },

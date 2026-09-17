@@ -3,6 +3,35 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 const { openApp, apiFixture, SKIP } = require("./support/web_app");
 
+for (const [screen, shell, input] of [
+  ["goals", "#goals-filter-shell", "#search"],
+  ["features", "#features-filter-shell", "#features-search"],
+  ["changes", "#changes-filter-shell", "#changes-q"],
+]) test(`pending ${screen} search stays with its screen during navigation`, { skip: SKIP }, async () => {
+  const app = await openApp();
+  try {
+    const { page } = app;
+    await page.goto(`${app.origin}/#/${screen}`);
+    await page.locator(`${shell} > summary`).click();
+    // Dispatch typing and navigation in one turn, before the search debounce.
+    await page.locator(input).evaluate(el => {
+      window.searchControl = el;
+      el.value = "retained search";
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+      openMainScreen("dashboard");
+    });
+    await page.locator(".dashboard-status-grid").waitFor();
+    await page.waitForTimeout(350);
+    assert.equal(new URL(page.url()).hash, screen === "goals" ? "#/?node=all" : "#/");
+    assert.deepEqual(app.pageErrors, []);
+    await selectMain(page, screen);
+    await page.locator(input).waitFor();
+    assert.equal(await page.locator(input).inputValue(), "retained search");
+    assert.equal(await page.locator(input).evaluate(el => el === searchControl), true);
+    assert.equal(new URLSearchParams(new URL(page.url()).hash.split("?")[1]).get("q"), "retained search");
+  } finally { await app.close(); }
+});
+
 test("Main opens a menu while screen rows persist, and works in a mobile drawer", { skip: SKIP }, async () => {
   const app = await openApp();
   try {
@@ -39,7 +68,8 @@ test("Main opens a menu while screen rows persist, and works in a mobile drawer"
   } finally { await app.close(); }
 });
 
-test("windows use history and full-height content without stopping sessions or losing the main screen", { skip: SKIP }, async () => {
+for (const mode of ["terminal", "agent"]) test(`${mode} windows use history and full-height content without stopping sessions or losing the main screen`, { skip: SKIP }, async () => {
+  const label = mode === "agent" ? "Agent" : "Terminal";
   let starts = 0;
   const stops = [], inputs = [];
   const app = await openApp({ fixture(path, request) {
@@ -70,7 +100,7 @@ test("windows use history and full-height content without stopping sessions or l
     await page.locator('[data-testid="toolbar-add"]').click();
     assert.deepEqual(await page.locator("[data-add-toolbar-tab]").allTextContents(),
       ["Agent", "Agent in Worktree", "System", "Files", "Terminal", "Planning Agent"]);
-    await page.locator('[data-add-toolbar-tab="terminal"]').click();
+    await page.locator(`[data-add-toolbar-tab="${mode}"]`).click();
     await page.locator(".xterm-screen").waitFor();
     await page.waitForFunction(() => terminalStateFor()?.connected);
     assert.match(page.url(), /#\/windows\//);
@@ -101,13 +131,13 @@ test("windows use history and full-height content without stopping sessions or l
     await page.locator('[data-add-toolbar-tab="files"]').click();
     await page.waitForFunction(() => currentToolbarTab()?.mode === "files");
     await page.getByTestId("toolbar-add").click();
-    assert.equal(await page.locator('#rail-windows a').filter({ hasText: "Terminal" }).isVisible(), true);
+    assert.equal(await page.locator('#rail-windows a').filter({ hasText: label }).isVisible(), true);
     await page.getByTestId("toolbar-add").click();
-    assert.equal(await page.locator('#rail-windows a').filter({ hasText: "Terminal" }).isVisible(), true);
-    await page.locator('#rail-windows a').filter({ hasText: "Terminal" }).click();
-    await page.waitForFunction(() => currentToolbarTab()?.mode === "terminal");
+    assert.equal(await page.locator('#rail-windows a').filter({ hasText: label }).isVisible(), true);
+    await page.locator('#rail-windows a').filter({ hasText: label }).click();
+    await page.waitForFunction(mode => currentToolbarTab()?.mode === mode, mode);
     await page.locator('#rail-windows .rail-window-row.active').hover();
-    await page.getByRole("button", { name: "Close and stop Terminal", exact: true }).click();
+    await page.getByRole("button", { name: `Close and stop ${label}`, exact: true }).click();
     await page.waitForFunction(() => currentToolbarTab()?.mode === "files");
     assert.deepEqual(stops, ["/api/terminal/session-1/stop"]);
     assert.equal(starts, 1);
@@ -560,11 +590,9 @@ for (const theme of ["light", "dark"]) test(`Main retains interacted Dashboard, 
     });
     await selectMain(page, "goals");
     await page.getByTestId("goals-table").waitFor();
-    await page.evaluate(() => {
-      window.savedGoals = document.getElementById("main");
-      document.getElementById("goals-filter-shell").open = true;
-      goalsExcludedIds.add("GOAL1");
-    });
+    await page.getByTestId("goals-filter-summary").click();
+    await page.getByTestId("goals-row-select").first().uncheck();
+    await page.evaluate(() => { window.savedGoals = document.getElementById("main"); });
     await selectMain(page, "dashboard");
     await page.locator("#dash").waitFor();
     assert.equal(new URL(page.url()).hash, "#/?node=all");
@@ -574,7 +602,8 @@ for (const theme of ["light", "dark"]) test(`Main retains interacted Dashboard, 
     assert.equal(await page.getByTestId("nav-dashboard").count(), 1);
     await selectMain(page, "goals");
     await page.getByTestId("goals-table").waitFor();
-    assert.equal(await page.evaluate(() => savedGoals === document.getElementById("main") && goalsExcludedIds.has("GOAL1") && document.getElementById("goals-filter-shell").open), true);
+    assert.equal(await page.evaluate(() => savedGoals === document.getElementById("main") && document.getElementById("goals-filter-shell").open), true);
+    assert.equal(await page.getByTestId("goals-row-select").first().isChecked(), false);
     await page.evaluate(() => { location.hash = "#/goals?status=review&node=current"; });
     await page.waitForFunction(() => document.getElementById("filter-status")?.value === "review");
     await selectMain(page, "dashboard");
@@ -645,6 +674,41 @@ test("Main menu keyboard dismissal restores focus and leaves open screens visibl
     await toggle.click();
     await page.locator("#dash").click();
     await page.waitForFunction(() => document.querySelector('[data-testid="main-menu"]').getAttribute("aria-expanded") === "false");
+    assert.deepEqual(app.pageErrors, []);
+  } finally { await app.close(); }
+});
+
+for (const theme of ["light", "dark"]) test(`Main menu remains usable across rail layouts (${theme})`, { skip: SKIP }, async () => {
+  const app = await openApp();
+  try {
+    const { page } = app;
+    await page.emulateMedia({ colorScheme: theme });
+    await page.goto(app.origin);
+    await page.locator(".dashboard-status-grid").waitFor();
+    const toggle = page.getByTestId("main-menu");
+    for (const layout of ["desktop", "collapsed", "mobile"]) {
+      const viewport = layout === "mobile" ? { width: 390, height: 844 } : { width: 1280, height: 900 };
+      await page.setViewportSize(viewport);
+      if (layout === "collapsed") await page.locator("#rail-toggle").click();
+      if (layout === "mobile") await page.locator("#mobile-rail-toggle").click();
+      await toggle.click();
+      const menu = page.getByRole("menu", { name: "Main screens", exact: true });
+      await menu.waitFor();
+      await page.waitForFunction(() => document.querySelector('#main-screen-menu .nav-menu-panel').style.top !== "");
+      const box = await menu.boundingBox();
+      assert.ok(box.x >= 0 && box.y >= 0 && box.x + box.width <= viewport.width && box.y + box.height <= viewport.height);
+      assert.deepEqual(await menu.getByRole("menuitem").allTextContents(), ["Dashboard", "Features", "Goals", "Changes", "Control", "Settings"]);
+      for (const item of await menu.getByRole("menuitem").all()) {
+        assert.equal(await item.locator("span").isVisible(), true, `${layout} menu labels stay visible`);
+      }
+      assert.equal(await toggle.locator("use").getAttribute("href"), "/static/vendor/lucide/navigation.svg#panels-top-left");
+      assert.ok(await toggle.locator("use").evaluate(el => el.getBBox().width > 0));
+      assert.equal(await page.locator("html").getAttribute("data-theme"), theme);
+      await page.keyboard.press("Escape");
+      assert.equal(await toggle.evaluate(el => el === document.activeElement), true);
+      assert.equal(await page.getByTestId("nav-dashboard").isVisible(), true);
+      if (layout !== "collapsed") assert.equal(await page.getByRole("button", { name: "Close Dashboard", exact: true }).count(), 1);
+    }
     assert.deepEqual(app.pageErrors, []);
   } finally { await app.close(); }
 });

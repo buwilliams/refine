@@ -125,8 +125,12 @@ async function renderFeaturesList() {
     </details>
     <div id="features-table" data-testid="features-table"><p class="muted">Loading...</p></div>
   `;
-  bindOnce($("#features-search"), "input", debounce((e) =>
-    updateFeaturesFilter({ q: e.target.value, page: 1 }), 250));
+  const filterHost = document.getElementById("main");
+  const refreshFilteredFeatures = debounce(() => {
+    if (document.getElementById("main") === filterHost) refreshFeaturesTable();
+  }, 250);
+  bindOnce($("#features-search"), "input", (e) =>
+    updateFeaturesFilter({ q: e.target.value, page: 1 }, refreshFilteredFeatures));
   bindOnce($("#features-status"), "change", (e) =>
     updateFeaturesFilter({ status: e.target.value, page: 1 }));
   bindOnce($("#features-reporter"), "change", (e) =>
@@ -154,7 +158,7 @@ async function renderFeaturesList() {
   await refreshFeaturesTable();
 }
 
-function updateFeaturesFilter(patch) {
+function updateFeaturesFilter(patch, refresh = refreshFeaturesTable) {
   const current = featuresFilterFromHash();
   const next = {
     q: "q" in patch ? patch.q : current.q,
@@ -168,7 +172,7 @@ function updateFeaturesFilter(patch) {
     dir: "dir" in patch ? patch.dir : current.dir,
   };
   history.replaceState(null, "", featuresHash(next));
-  refreshFeaturesTable();
+  refresh();
 }
 
 async function refreshFeaturesTable() {

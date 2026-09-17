@@ -176,23 +176,29 @@ async function renderGoalsList() {
   // `#main` from scratch — that destroys the focused search input mid-
   // keystroke. Sort-header clicks go through the same path
   // (`refreshGoalsTable`); see drawGoalsTable.
-  bindOnce($("#search"), "input", debounce(() => {
-    updateGoalsFilter({ q: $("#search").value, page: 1 });
-  }, 250));
+  // Save filters immediately so navigating before the debounce expires retains
+  // the typed value. Only the data request waits, and it belongs to this host.
+  const filterHost = document.getElementById("main");
+  const refreshFilteredGoals = debounce(() => {
+    if (document.getElementById("main") === filterHost) refreshGoalsTable();
+  }, 250);
+  bindOnce($("#search"), "input", (e) => {
+    updateGoalsFilter({ q: e.target.value, page: 1 }, refreshFilteredGoals);
+  });
   bindOnce($("#filter-status"), "change", (e) =>
     updateGoalsFilter({ status: e.target.value, page: 1 }));
   bindOnce($("#filter-reporter"), "change", (e) =>
     updateGoalsFilter({ reporter: e.target.value, page: 1 }));
   bindOnce($("#filter-assignee"), "change", (e) =>
     updateGoalsFilter({ assignee: e.target.value, page: 1 }));
-  bindOnce($("#filter-feature"), "input", debounce((e) =>
-    updateGoalsFilter({ feature: e.target.value.trim(), page: 1 }), 250));
+  bindOnce($("#filter-feature"), "input", (e) =>
+    updateGoalsFilter({ feature: e.target.value.trim(), page: 1 }, refreshFilteredGoals));
   bindOnce($("#filter-node"), "change", (e) =>
     updateGoalsFilter({ node: e.target.value, page: 1 }));
-  bindOnce($("#filter-rounds-gte"), "input", debounce((e) =>
-    updateGoalsFilter({ rounds_gte: e.target.value, page: 1 }), 250));
-  bindOnce($("#filter-rounds-lte"), "input", debounce((e) =>
-    updateGoalsFilter({ rounds_lte: e.target.value, page: 1 }), 250));
+  bindOnce($("#filter-rounds-gte"), "input", (e) =>
+    updateGoalsFilter({ rounds_gte: e.target.value, page: 1 }, refreshFilteredGoals));
+  bindOnce($("#filter-rounds-lte"), "input", (e) =>
+    updateGoalsFilter({ rounds_lte: e.target.value, page: 1 }, refreshFilteredGoals));
   bindOnce($("#goals-severity"), "change", (e) =>
     updateGoalsFilter({ severity: e.target.value, page: 1 }));
   bindOnce($("#goals-category"), "change", (e) =>
@@ -278,7 +284,7 @@ function goalsFilterFromHash() {
 // Patch one or more filter fields and refresh the table without
 // triggering a full view re-render. The URL stays in sync via
 // `history.replaceState` so reload / share / back behave correctly.
-function updateGoalsFilter(patch) {
+function updateGoalsFilter(patch, refresh = refreshGoalsTable) {
   const current = goalsFilterFromHash();
   const next = {
     q: "q" in patch ? patch.q : current.q,
@@ -299,7 +305,7 @@ function updateGoalsFilter(patch) {
   };
   history.replaceState(null, "", goalsHash(next));
   syncNodeScopeNavigation(location.hash);
-  refreshGoalsTable();
+  refresh();
 }
 
 function goalsWorkflowStatusHash(status, filter = goalsFilterFromHash()) {

@@ -101,9 +101,13 @@ async function renderChanges() {
       </div>
     </details>
     <div id="changes-body" data-testid="changes-body"><p class="muted">Loading...</p></div>`;
-  bindOnce($("#changes-q"), "input", debounce(() => {
-    updateChangesFilter({ q: $("#changes-q").value, page: 1 });
-  }, 250));
+  const filterHost = document.getElementById("main");
+  const refreshFilteredChanges = debounce(() => {
+    if (document.getElementById("main") === filterHost) loadChanges();
+  }, 250);
+  bindOnce($("#changes-q"), "input", (e) => {
+    updateChangesFilter({ q: e.target.value, page: 1 }, refreshFilteredChanges);
+  });
   bindOnce($("#changes-status"), "change", (e) =>
     updateChangesFilter({ status: e.target.value, page: 1 }));
   bindOnce($("#changes-priority"), "change", (e) =>
@@ -123,7 +127,7 @@ async function renderChanges() {
   await loadChanges();
 }
 
-function updateChangesFilter(patch) {
+function updateChangesFilter(patch, refresh = loadChanges) {
   const current = changesFiltersFromHash();
   const next = {
     q: "q" in patch ? patch.q : current.q,
@@ -136,7 +140,7 @@ function updateChangesFilter(patch) {
     period: "period" in patch ? patch.period : current.period,
   };
   history.replaceState(null, "", changesHashFromFilters(next));
-  loadChanges();
+  refresh();
 }
 
 function updateChangesSort(key) {
