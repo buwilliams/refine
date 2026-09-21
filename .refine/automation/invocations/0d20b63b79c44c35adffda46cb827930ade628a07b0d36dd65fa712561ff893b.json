@@ -1,10 +1,10 @@
 {
-  "id": "76a5aab8256cdaba0f58a0d9588c2264f33173015d88b4540d7629558ea1fdbc",
+  "id": "0d20b63b79c44c35adffda46cb827930ade628a07b0d36dd65fa712561ff893b",
   "event": {
-    "id": "node.startup.ready",
-    "name": "Node Startup Ready",
-    "kind": "system",
-    "source": "node.startup.ready",
+    "id": "custom",
+    "name": "Fetch Goals from Email",
+    "kind": "custom",
+    "source": null,
     "enabled": true,
     "scope": {
       "node_id": null
@@ -12,10 +12,10 @@
     "parameters": [],
     "bindings": [
       {
-        "id": "trigger-2124c51c-8d1f-44b7-8a07-7a989a68227f",
-        "skill_id": "fetch-goals-from-email-on-startup",
+        "id": "trigger-2748a40c-20f1-4533-851a-d3d752e56013",
+        "skill_id": "fetch-goals-from-email",
         "enabled": true,
-        "mode": "background",
+        "mode": "blocking",
         "order": 0,
         "scope": {
           "node_id": "default"
@@ -39,9 +39,7 @@
     "workflow_revision": null,
     "candidate_commit": null,
     "data": {
-      "event": {
-        "daemon_port": 8082
-      },
+      "event": {},
       "goal": {
         "rounds": []
       },
@@ -56,9 +54,11 @@
       }
     },
     "metadata": {
-      "event_operation_id": "1a0c4f87b9f10b50",
+      "event_operation_id": "1a0c4f8b4d910b51",
+      "manual_skill_id": "fetch-goals-from-email",
+      "requested_parameters": {},
       "started_bindings": {
-        "trigger-2124c51c-8d1f-44b7-8a07-7a989a68227f": "2026-09-21T17:16:54.071769973+00:00"
+        "trigger-2748a40c-20f1-4533-851a-d3d752e56013": "2026-09-21T17:17:08.719681661+00:00"
       },
       "template_snapshot": {
         "records": {
@@ -364,10 +364,10 @@
   "bindings": [
     {
       "binding": {
-        "id": "trigger-2124c51c-8d1f-44b7-8a07-7a989a68227f",
-        "skill_id": "fetch-goals-from-email-on-startup",
+        "id": "trigger-2748a40c-20f1-4533-851a-d3d752e56013",
+        "skill_id": "fetch-goals-from-email",
         "enabled": true,
-        "mode": "background",
+        "mode": "blocking",
         "order": 0,
         "scope": {
           "node_id": "default"
@@ -376,72 +376,25 @@
         "inputs": {}
       },
       "skill": {
-        "id": "fetch-goals-from-email-on-startup",
-        "name": "Fetch Goals from Email on startup",
-        "prompt": "Queue the Custom Skill `fetch-goals-from-email` once for this startup occurrence. Run system.refine_executable with arguments `skills trigger fetch-goals-from-email --request-id startup-email-<invocation_id>`, copying invocation_id exactly from the Skill execution context supplied by Refine. Set REFINE_DAEMON_PORT to the daemon_port parameter for that command. Use safely quoted arguments. Report the queued invocation ID, then complete this startup Skill immediately. Do not wait for the child Skill: releasing this agent slot lets it run even when concurrency is limited to one. Reuse the same request ID if the command needs a retry; do not create a polling loop or fetch email directly. If the target Skill is missing or disabled, report that error without changing its configuration.",
+        "id": "fetch-goals-from-email",
+        "name": "Fetch Goals from Email",
+        "prompt": "Fetch new email requests into the selected project's Backlog. This Skill authorizes creation of ordinary Goals from the configured mailbox. Use system.refine_executable to run `system fetch-email-goals --runtime-root <system.runtime_root> --target-root <system.project_root>`, passing each value as a separate, safely quoted argument. This one-shot capability owns secret access, the target-bound sender allowlist, MIME extraction, remote acknowledgement, deterministic Goal IDs, and durable retry records. Do not read or print the mail token, author duplicate Goals yourself, rewrite email source, or modify the request ledger. Inspect the JSON result and report the imported or recovered Goal IDs and any errors. A batch is limited to 25 remote messages; if fetched_count equals batch_limit, fetch another batch, up to ten batches per invocation, then report whether more mail may remain. Stop on a failed command and report the retained retry evidence. Fetching does not approve Goals, change Review decisions, or send email replies. Follow docs/runbooks/development-request-email.md for connection errors.",
         "role": "task",
         "enabled": true,
         "scope": {
           "node_id": "default"
         },
-        "parameters": [
-          {
-            "name": "daemon_port",
-            "description": "",
-            "kind": "number",
-            "required": true,
-            "default": 8082,
-            "choices": []
-          }
-        ],
+        "parameters": [],
         "provenance": null
       },
-      "parameters": {
-        "daemon_port": 8082
-      }
+      "parameters": {}
     }
   ],
-  "state": "succeeded",
-  "results": {
-    "trigger-2124c51c-8d1f-44b7-8a07-7a989a68227f": {
-      "invocation_id": "76a5aab8256cdaba0f58a0d9588c2264f33173015d88b4540d7629558ea1fdbc",
-      "binding_id": "trigger-2124c51c-8d1f-44b7-8a07-7a989a68227f",
-      "role": "task",
-      "outcome": "success",
-      "summary": "Queued fetch-goals-from-email invocation 0d20b63b79c44c35adffda46cb827930ade628a07b0d36dd65fa712561ff893b using request ID startup-email-76a5aab8256cdaba0f58a0d9588c2264f33173015d88b4540d7629558ea1fdbc. Completing this startup Skill immediately without waiting for the child Skill.",
-      "evidence": [],
-      "artifacts": null
-    }
-  },
-  "attempts": [
-    {
-      "attempt": 0,
-      "binding_id": "trigger-2124c51c-8d1f-44b7-8a07-7a989a68227f",
-      "checkout": {
-        "observation": {
-          "branch": "main",
-          "head_commit": "d7e2baee6a81106554c10afc7e39d49daa3159c6",
-          "status_porcelain": []
-        },
-        "tree": "abf4e0205f07bab93f4bb86ec2d2574a6817c050"
-      },
-      "checkout_recorded": true,
-      "diagnostic": null,
-      "host_bound_result": true,
-      "observational_violation": false,
-      "operation_id": null,
-      "process_id": "proc-1790011014148-4277-3",
-      "prompt_bytes": 2204,
-      "provider_session_id": null,
-      "purpose": "work",
-      "raw_output": "{\"outcome\":\"success\",\"summary\":\"Queued fetch-goals-from-email invocation 0d20b63b79c44c35adffda46cb827930ade628a07b0d36dd65fa712561ff893b using request ID startup-email-76a5aab8256cdaba0f58a0d9588c2264f33173015d88b4540d7629558ea1fdbc. Completing this startup Skill immediately without waiting for the child Skill.\"}",
-      "received_at": "2026-09-21T17:17:07.783370566+00:00",
-      "started_at": "2026-09-21T17:16:54.088126945+00:00",
-      "workflow_revision": null
-    }
-  ],
-  "created_at": "2026-09-21T17:16:50.937978982+00:00",
-  "completed_at": "2026-09-21T17:17:07.840833153+00:00",
+  "state": "running",
+  "results": {},
+  "attempts": [],
+  "created_at": "2026-09-21T17:17:01.278479458+00:00",
+  "completed_at": null,
   "error": null,
   "action_applied": false
 }
