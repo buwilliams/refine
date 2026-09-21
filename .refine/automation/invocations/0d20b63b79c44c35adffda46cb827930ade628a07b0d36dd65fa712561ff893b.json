@@ -390,11 +390,51 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "succeeded",
+  "results": {
+    "trigger-2748a40c-20f1-4533-851a-d3d752e56013": {
+      "invocation_id": "0d20b63b79c44c35adffda46cb827930ade628a07b0d36dd65fa712561ff893b",
+      "binding_id": "trigger-2748a40c-20f1-4533-851a-d3d752e56013",
+      "role": "task",
+      "outcome": "success",
+      "summary": "Fetched 0 messages. No Goals imported or recovered; no errors. Batch limit was 25, so no further fetch was needed.",
+      "evidence": [
+        "{\"batch_limit\":25,\"errors\":[],\"exit_code\":0,\"fetched_count\":0,\"goal_ids\":[]}"
+      ],
+      "artifacts": {
+        "memory": ""
+      }
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "trigger-2748a40c-20f1-4533-851a-d3d752e56013",
+      "checkout": {
+        "observation": {
+          "branch": "main",
+          "head_commit": "d7e2baee6a81106554c10afc7e39d49daa3159c6",
+          "status_porcelain": []
+        },
+        "tree": "abf4e0205f07bab93f4bb86ec2d2574a6817c050"
+      },
+      "checkout_recorded": true,
+      "diagnostic": null,
+      "host_bound_result": true,
+      "observational_violation": false,
+      "operation_id": null,
+      "process_id": "proc-1790011028759-4277-39",
+      "prompt_bytes": 2487,
+      "provider_session_id": null,
+      "purpose": "work",
+      "raw_output": "{\"outcome\":\"success\",\"summary\":\"Fetched 0 messages. No Goals imported or recovered; no errors. Batch limit was 25, so no further fetch was needed.\",\"evidence\":[{\"exit_code\":0,\"fetched_count\":0,\"batch_limit\":25,\"goal_ids\":[],\"errors\":[]}],\"artifacts\":{\"memory\":\"\"}}",
+      "received_at": "2026-09-21T17:17:43.934381902+00:00",
+      "started_at": "2026-09-21T17:17:08.736487808+00:00",
+      "workflow_revision": null
+    }
+  ],
   "created_at": "2026-09-21T17:17:01.278479458+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-21T17:17:43.986986087+00:00",
   "error": null,
   "action_applied": false
 }
