@@ -1,5 +1,4 @@
 mod resume;
-mod session_contract;
 use super::*;
 
 struct ProviderCommandExecution<'a> {
@@ -202,47 +201,8 @@ impl HostAgentProviderService {
         &self,
         spec: &ProviderSpec,
         binary: String,
-        mut request: ProviderLaunchRequest<'_>,
+        request: ProviderLaunchRequest<'_>,
     ) -> RefineResult<PreparedProviderLaunch> {
-        let mode = if request.interactive {
-            &spec.definition.interactive
-        } else {
-            &spec.definition.automated
-        };
-        if (request.session_id.is_some()
-            || matches!(
-                request.interactive_session,
-                Some(ProviderSessionContinuity::Resume(_))
-            ))
-            && mode.resume_args.is_none()
-        {
-            return Err(RefineError::InvalidInput(format!(
-                "{} does not support provider-session resume",
-                spec.display_name
-            )));
-        }
-        if matches!(
-            request.interactive_session,
-            Some(ProviderSessionContinuity::Pin(_))
-        ) && mode.pin_args.is_none()
-        {
-            return Err(RefineError::InvalidInput(format!(
-                "{} does not support pinning provider sessions",
-                spec.display_name
-            )));
-        }
-        if let Some(session) = request.session_id {
-            self.check_session_contract(spec, session)?;
-        }
-        if let Some(session) = request.interactive_session {
-            let (ProviderSessionContinuity::Pin(id) | ProviderSessionContinuity::Resume(id)) =
-                session;
-            self.check_session_contract(spec, id)?;
-            self.remember_session_contract(spec, id)?;
-        }
-        request.environment = request
-            .environment
-            .with_credentials(&spec.definition.credentials)?;
         let capability = if request.interactive {
             spec.interactive_prompt_capability()
         } else {
@@ -369,24 +329,21 @@ impl HostAgentProviderService {
         );
         let supervisor = FileProcessSupervisor::new(self.prompt_runtime_root()?);
         crate::infrastructure::git::worktrees::validate_workspace_launch(&metadata, cwd)?;
-        let process = supervisor.launch_with_prepared_environment(
-            ManagedProcessSpec {
-                owner: ProcessOwner::Agent,
-                command: prepared.binary,
-                args: prepared.args,
-                cwd: cwd.map(|path| path.display().to_string()),
-                env: Vec::new(),
-                stdin: prepared.stdin,
-                limits: Some(ProcessResourceLimits {
-                    kill_on_parent_exit: false,
-                    ..Default::default()
-                }),
-                authorization_command: Some(prepared.authorization_command),
-                sensitive: false,
-                metadata,
-            },
-            &prepared.launch_environment,
-        )?;
+        let process = supervisor.launch(ManagedProcessSpec {
+            owner: ProcessOwner::Agent,
+            command: prepared.binary,
+            args: prepared.args,
+            cwd: cwd.map(|path| path.display().to_string()),
+            env: Vec::new(),
+            stdin: prepared.stdin,
+            limits: Some(ProcessResourceLimits {
+                kill_on_parent_exit: false,
+                ..Default::default()
+            }),
+            authorization_command: Some(prepared.authorization_command),
+            sensitive: false,
+            metadata,
+        })?;
 
         // Keep a prompt-file lease alive until the provider exits. If the
         // daemon terminates first, the process metadata keeps the artifact
@@ -476,7 +433,7 @@ impl HostAgentProviderService {
         let args = std::iter::once(prepared.binary.clone())
             .chain(prepared.args.clone())
             .collect::<Vec<_>>();
-        let result = self.run_provider_command_result_with_output(
+        self.run_provider_command_result_with_output(
             ProviderCommandExecution {
                 args: &args,
                 stdin: prepared.stdin,
@@ -489,11 +446,7 @@ impl HostAgentProviderService {
                 stall_timeout_seconds: invocation.stall_timeout_seconds,
             },
             on_output,
-        )?;
-        if let Some(session) = &result.provider_session_id {
-            self.remember_session_contract(&spec, session)?;
-        }
-        Ok(result)
+        )
     }
 
     fn run_provider_command_result_with_output<F>(
@@ -611,10 +564,7 @@ impl AgentProviderService for HostAgentProviderService {
     }
 
     fn authenticate(&self, provider: &str) -> RefineResult<()> {
-        let spec = self.spec(provider)?;
-        EffectiveLaunchEnvironment::assemble(&ProcessOwner::Agent, &[])?
-            .with_credentials(&spec.definition.credentials)?;
-        let capability = self.detect_spec(spec);
+        let capability = self.detect_spec(self.spec(provider)?);
         if capability.installed {
             Ok(())
         } else {
@@ -635,13 +585,7 @@ impl AgentProviderService for HostAgentProviderService {
     }
 
     fn diagnose(&self, provider: &str) -> RefineResult<Vec<String>> {
-        let spec = self.spec(provider)?;
-        if let Err(error) = EffectiveLaunchEnvironment::assemble(&ProcessOwner::Agent, &[])?
-            .with_credentials(&spec.definition.credentials)
-        {
-            return Ok(vec![error.to_string()]);
-        }
-        let capability = self.detect_spec(spec);
+        let capability = self.detect_spec(self.spec(provider)?);
         if capability.installed {
             Ok(vec![format!(
                 "{} CLI found at {}",
@@ -656,6 +600,3 @@ impl AgentProviderService for HostAgentProviderService {
         }
     }
 }
-
-#[cfg(all(test, target_os = "linux"))]
-mod detached_credentials_tests;

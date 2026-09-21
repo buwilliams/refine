@@ -243,23 +243,7 @@ pub(crate) fn goal_cancel_uses_active_node_and_rejects_foreign_owner(fixture: &I
 }
 
 pub(crate) fn goal_workflow_actions_start_retry_and_undo(fixture: &IntegrationFixture) {
-    let authored_goal = |name: &str| {
-        let id = fixture.create_goal(name);
-        fixture.assert_success(
-            "author workflow Round",
-            &fixture.run_refine(&[
-                "goal",
-                "round",
-                &id,
-                "--reporter",
-                "refine-smoke",
-                "--prompt",
-                name,
-            ]),
-        );
-        id
-    };
-    let started_id = authored_goal("goal action start");
+    let started_id = fixture.create_goal("goal action start");
     let started = fixture.run_refine(&["goal", "start", &started_id]);
     fixture.assert_success("goal start", &started);
     assert_eq!(fixture.json_stdout(&started)["goal"]["status"], "todo");
@@ -277,7 +261,7 @@ pub(crate) fn goal_workflow_actions_start_retry_and_undo(fixture: &IntegrationFi
         &fixture.run_refine(&["goal", "delete", &started_id]),
     );
 
-    let quality_id = authored_goal("goal action quality retry");
+    let quality_id = fixture.create_goal("goal action quality retry");
     seed_goal_status(fixture, &quality_id, "failed");
     let retried_quality = fixture.run_refine(&["goal", "retry", &quality_id, "--stage", "quality"]);
     fixture.assert_success("goal retry quality", &retried_quality);
@@ -300,7 +284,7 @@ pub(crate) fn goal_workflow_actions_start_retry_and_undo(fixture: &IntegrationFi
         &fixture.run_refine(&["goal", "delete", &quality_id]),
     );
 
-    let governance_id = authored_goal("goal action governance retry");
+    let governance_id = fixture.create_goal("goal action governance retry");
     seed_goal_status(fixture, &governance_id, "failed");
     let retried_governance =
         fixture.run_refine(&["goal", "retry", &governance_id, "--stage", "governance"]);
@@ -323,7 +307,7 @@ pub(crate) fn goal_workflow_actions_start_retry_and_undo(fixture: &IntegrationFi
         &fixture.run_refine(&["goal", "delete", &governance_id]),
     );
 
-    let cancelled_id = authored_goal("goal action undo cancelled");
+    let cancelled_id = fixture.create_goal("goal action undo cancelled");
     let cancelled = fixture.run_refine(&["goal", "cancel", &cancelled_id]);
     fixture.assert_success("goal cancel for undo", &cancelled);
     let reopened = fixture.run_refine(&["goal", "undo", &cancelled_id]);

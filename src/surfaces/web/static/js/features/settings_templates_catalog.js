@@ -62,10 +62,7 @@ function bindTemplatesCatalog(data) {
   bindAutomationRows(section, "[data-template-id]", row => openTemplateEditor(row.dataset.templateId));
   bindAutomationRows(section, "[data-resource-skill]", row => openSkillEditor(data.workflowData.skills.items.find(skill => skill.id === row.dataset.resourceSkill)));
   section.querySelector("[data-resource-new]")?.addEventListener("click", () => openSkillEditor());
-  // Keep local pagination on the retained section across Settings morphs.
-  const generation = captureNodeContextGeneration();
-  let page = section._resourceGeneration === generation ? section._resourcePage || 0 : 0;
-  section._resourceGeneration = generation;
+  let page = 0;
   const filter = () => {
     const query = section.querySelector("[data-template-catalog-search]").value.trim().toLowerCase();
     const kind = section.querySelector("[data-resource-type]").value;
@@ -73,7 +70,6 @@ function bindTemplatesCatalog(data) {
     const matching = rows.filter(row => row.dataset.templateSearch.includes(query) && (!kind || row.dataset.resourceKind === kind));
     const size = 50;
     page = Math.min(page, Math.max(0, Math.ceil(matching.length / size) - 1));
-    section._resourcePage = page;
     rows.forEach(row => { row.hidden = true; });
     matching.slice(page * size, (page + 1) * size).forEach(row => { row.hidden = false; });
     section.querySelector("[data-template-catalog-empty]").hidden = matching.length > 0;

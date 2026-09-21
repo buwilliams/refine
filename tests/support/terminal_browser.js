@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const { openApp, apiFixture, selectMain, SKIP } = require('./web_app');
+const { openApp, apiFixture, SKIP } = require('./web_app');
 
 // Real bootstrap, controls, shared terminal lifecycle, and xterm. Only daemon
 // traffic and provider output are fixtures; no live Refine process is launched.
@@ -45,7 +45,7 @@ async function openTerminalApp({ mac = false, platform, profile = 'agent', mockC
       await page.locator('[data-testid="terminal-stop"]').waitFor();
     };
     if (profile === 'skill') {
-      await selectMain(page, 'settings');
+      await page.getByTestId('nav-settings').click();
       await page.locator('#nav-create-menu > summary').click();
       await page.locator('[data-manual-skill="inspect"]').click();
       const modal = page.locator('[data-testid="automation-modal"]');

@@ -64,7 +64,6 @@ async function renderPlanning() {
   await refreshPlanning();
 }
 async function refreshPlanning() {
-  const screenCurrent = typeof captureMainScreenRequest === "function" ? captureMainScreenRequest() : () => true;
   const generation = ++planningRefresh;
   const nodeGeneration = captureNodeContextGeneration();
   try {
@@ -72,7 +71,7 @@ async function refreshPlanning() {
       cache: false,
     });
     if (
-      !screenCurrent() || generation !== planningRefresh ||
+      generation !== planningRefresh ||
       state.currentRoute !== "planning" ||
       !isNodeContextGenerationCurrent(nodeGeneration)
     )

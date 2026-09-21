@@ -66,7 +66,7 @@ function hydrateNodeSelector(project, registry) {
 }
 
 function nodeContextDirtySurfaces() {
-  const dirty = typeof mainScreenDirtySurfaces === "function" ? mainScreenDirtySurfaces() : [];
+  const dirty = [];
   if (typeof hubEditor !== "undefined" && hubEditor?.isConnected && hubEditor.dataset.nodeContextDirty === "true") dirty.push({label: hubEditor.dataset.nodeContextLabel || "Hub", root: hubEditor});
   if (typeof automationEditor !== "undefined" && automationEditor?.dataset.nodeContextDirty === "true") dirty.push({label: "Events or Skills", root: automationEditor});
   const newGoal = document.querySelector("[data-testid='new-goal-modal']");
@@ -162,9 +162,8 @@ function closeCleanNodeContextModals() {
 async function refreshNodeContextRoute({ preservedDirty = [] } = {}) {
   // A modal draft can remain stale above a freshly reconciled underlay. An
   // inline settings draft cannot: refreshing that route would overwrite it.
-  if (preservedDirty.some((item) => item.root && (item.root === document.getElementById("main") || document.getElementById("main")?.contains?.(item.root)))) return;
+  if (preservedDirty.some((item) => item.label === "Target App settings")) return;
   const route = state.currentRoute;
-  if (typeof mainScreens !== "undefined" && !document.getElementById("main")?.children.length && route !== "window") return navigate();
   if (route === "dashboard" && typeof refreshDashboard === "function") return refreshDashboard();
   if (route === "goals" && typeof refreshGoalsTable === "function") return refreshGoalsTable();
   if (route === "features" && typeof refreshFeaturesTable === "function") return refreshFeaturesTable();
@@ -196,7 +195,6 @@ async function applyAuthoritativeNodeContext(project, registry, {
   };
   if (changed) {
     nodeContextGeneration += 1;
-    if (typeof invalidateMainScreenContext === "function") invalidateMainScreenContext({ external });
     if (typeof refreshManualSkills === "function") refreshManualSkills();
     if (typeof refreshHubs === "function") refreshHubs();
     if (typeof refreshPlanningNavigation === "function") refreshPlanningNavigation();

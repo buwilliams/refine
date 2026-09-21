@@ -1,8 +1,6 @@
 use super::super::*;
 
-pub(crate) fn system_status_reports_reachable_daemon_with_disabled_workflow(
-    fixture: &IntegrationFixture,
-) {
+pub(crate) fn system_status_reports_healthy_daemon(fixture: &IntegrationFixture) {
     let port = fixture.port.to_string();
     let runtime_root = fixture.runtime_root.display().to_string();
     let output = fixture.run_refine(&[
@@ -29,13 +27,6 @@ pub(crate) fn system_status_reports_reachable_daemon_with_disabled_workflow(
         .iter()
         .find(|value| value["port"].as_u64() == Some(fixture.port.into()))
         .expect("test daemon port should be listed");
-    // This suite deliberately disables agent automation. Reachability must
-    // remain true while shared workflow health truthfully reports no worker.
-    assert_eq!(status["daemon_healthy"], false, "{status:#}");
-    assert_eq!(status["workflow_health"]["healthy"], false);
-    assert_eq!(
-        status["workflow_health"]["reason"],
-        "expected one workflow worker; observed 0"
-    );
+    assert_eq!(status["daemon_healthy"], true);
     assert_eq!(status["web_available"], true);
 }

@@ -52,7 +52,6 @@ function goalsHash(parts) {
 
 async function renderGoalsList() {
   if (renderNoProjectIfDetached("Goals")) return;
-  const renderCurrent = typeof captureMainScreenRequest === "function" ? captureMainScreenRequest() : () => true;
   let reporterLoadError = null;
   await Promise.all([
     ensureGoalsNodeOptions(),
@@ -60,7 +59,6 @@ async function renderGoalsList() {
       reporterLoadError = error;
     }),
   ]);
-  if (!renderCurrent()) return;
   renderBanners(reporterLoadError ? [{
     severity: "error",
     message: `Could not load Reporter and Assignee filters: ${reporterLoadError.message || reporterLoadError}`,
@@ -176,29 +174,23 @@ async function renderGoalsList() {
   // `#main` from scratch — that destroys the focused search input mid-
   // keystroke. Sort-header clicks go through the same path
   // (`refreshGoalsTable`); see drawGoalsTable.
-  // Save filters immediately so navigating before the debounce expires retains
-  // the typed value. Only the data request waits, and it belongs to this host.
-  const filterHost = document.getElementById("main");
-  const refreshFilteredGoals = debounce(() => {
-    if (document.getElementById("main") === filterHost) refreshGoalsTable();
-  }, 250);
-  bindOnce($("#search"), "input", (e) => {
-    updateGoalsFilter({ q: e.target.value, page: 1 }, refreshFilteredGoals);
-  });
+  bindOnce($("#search"), "input", debounce(() => {
+    updateGoalsFilter({ q: $("#search").value, page: 1 });
+  }, 250));
   bindOnce($("#filter-status"), "change", (e) =>
     updateGoalsFilter({ status: e.target.value, page: 1 }));
   bindOnce($("#filter-reporter"), "change", (e) =>
     updateGoalsFilter({ reporter: e.target.value, page: 1 }));
   bindOnce($("#filter-assignee"), "change", (e) =>
     updateGoalsFilter({ assignee: e.target.value, page: 1 }));
-  bindOnce($("#filter-feature"), "input", (e) =>
-    updateGoalsFilter({ feature: e.target.value.trim(), page: 1 }, refreshFilteredGoals));
+  bindOnce($("#filter-feature"), "input", debounce((e) =>
+    updateGoalsFilter({ feature: e.target.value.trim(), page: 1 }), 250));
   bindOnce($("#filter-node"), "change", (e) =>
     updateGoalsFilter({ node: e.target.value, page: 1 }));
-  bindOnce($("#filter-rounds-gte"), "input", (e) =>
-    updateGoalsFilter({ rounds_gte: e.target.value, page: 1 }, refreshFilteredGoals));
-  bindOnce($("#filter-rounds-lte"), "input", (e) =>
-    updateGoalsFilter({ rounds_lte: e.target.value, page: 1 }, refreshFilteredGoals));
+  bindOnce($("#filter-rounds-gte"), "input", debounce((e) =>
+    updateGoalsFilter({ rounds_gte: e.target.value, page: 1 }), 250));
+  bindOnce($("#filter-rounds-lte"), "input", debounce((e) =>
+    updateGoalsFilter({ rounds_lte: e.target.value, page: 1 }), 250));
   bindOnce($("#goals-severity"), "change", (e) =>
     updateGoalsFilter({ severity: e.target.value, page: 1 }));
   bindOnce($("#goals-category"), "change", (e) =>
@@ -284,7 +276,7 @@ function goalsFilterFromHash() {
 // Patch one or more filter fields and refresh the table without
 // triggering a full view re-render. The URL stays in sync via
 // `history.replaceState` so reload / share / back behave correctly.
-function updateGoalsFilter(patch, refresh = refreshGoalsTable) {
+function updateGoalsFilter(patch) {
   const current = goalsFilterFromHash();
   const next = {
     q: "q" in patch ? patch.q : current.q,
@@ -305,7 +297,7 @@ function updateGoalsFilter(patch, refresh = refreshGoalsTable) {
   };
   history.replaceState(null, "", goalsHash(next));
   syncNodeScopeNavigation(location.hash);
-  refresh();
+  refreshGoalsTable();
 }
 
 function goalsWorkflowStatusHash(status, filter = goalsFilterFromHash()) {
@@ -343,7 +335,6 @@ async function refreshGoalsTable() {
   if (state.currentRoute !== "goals") return;
   if (renderNoProjectIfDetached("Goals")) return;
   const nodeGeneration = captureNodeContextGeneration();
-  const screenCurrent = typeof captureMainScreenRequest === "function" ? captureMainScreenRequest() : () => true;
   const f = goalsFilterFromHash();
   const params = new URLSearchParams({exclude_draft: "1"});
   if (f.status) params.set("status", f.status);
@@ -364,7 +355,7 @@ async function refreshGoalsTable() {
   params.set("facets", "1");
   try {
     const data = await api("GET", "/api/goals?" + params);
-    if (!screenCurrent() || !isNodeContextGenerationCurrent(nodeGeneration) || state.currentRoute !== "goals") return;
+    if (!isNodeContextGenerationCurrent(nodeGeneration) || state.currentRoute !== "goals") return;
     if (renderNoProjectIfApiDetached(data, "Goals")) return;
     const goals = data.goals || [];
     const facets = data.facets || {};
@@ -402,7 +393,7 @@ async function refreshGoalsTable() {
     _lastGoalsRender = { goals, state: renderState };
     drawGoalsTable(goals, renderState);
   } catch (e) {
-    if (!screenCurrent() || !isNodeContextGenerationCurrent(nodeGeneration)) return;
+    if (!isNodeContextGenerationCurrent(nodeGeneration)) return;
     const tbl = $("#goals-table");
     if (tbl) tbl.innerHTML = `<p class="muted">${htmlEscape(e.message)}</p>`;
   }

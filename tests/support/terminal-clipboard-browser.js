@@ -51,12 +51,6 @@ async function openTerminalApp({ platform = "Linux x86_64", onInput, insecure = 
   await page.addInitScript((platform) => {
     Object.defineProperty(navigator, "platform", { get: () => platform });
     localStorage.setItem("refine_last_reporter", "Clipboard test");
-    // Clipboard fixtures have a live session. An empty finite SSE response
-    // otherwise starts a reconnect loop that races paste-error feedback.
-    window.EventSource = class extends EventTarget {
-      constructor(url) { super(); this.url = url; }
-      close() {}
-    };
   }, platform);
   page.on("pageerror", (error) => errors.push(error.message));
   await page.route("**/api/**", async (route) => {

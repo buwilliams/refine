@@ -32,7 +32,6 @@ pub(super) fn pump_pty_output(
     transcript_path: &Path,
     activity: &Mutex<Instant>,
     child_exited: &AtomicBool,
-    mut redactor: crate::infrastructure::process::redaction::Redactor,
 ) -> RefineResult<()> {
     let mut buffer = [0_u8; 4096];
     let mut eof_retry = PTY_EOF_RETRY_INITIAL;
@@ -51,9 +50,6 @@ pub(super) fn pump_pty_output(
         match reader.read(&mut buffer) {
             Ok(0) => {
                 if child_exited.load(Ordering::SeqCst) {
-                    transcript
-                        .write_all(&redactor.push(&[], true))
-                        .map_err(|e| RefineError::Io(e.to_string()))?;
                     return Ok(());
                 }
                 thread::sleep(eof_retry);
@@ -62,14 +58,12 @@ pub(super) fn pump_pty_output(
             Ok(count) => {
                 eof_retry = PTY_EOF_RETRY_INITIAL;
                 *activity.lock().expect("Goal Agent activity clock poisoned") = Instant::now();
-                transcript
-                    .write_all(&redactor.push(&buffer[..count], false))
-                    .map_err(|error| {
-                        RefineError::Io(format!(
-                            "failed to append Goal Agent transcript {}: {error}",
-                            transcript_path.display()
-                        ))
-                    })?;
+                transcript.write_all(&buffer[..count]).map_err(|error| {
+                    RefineError::Io(format!(
+                        "failed to append Goal Agent transcript {}: {error}",
+                        transcript_path.display()
+                    ))
+                })?;
                 transcript.flush().map_err(|error| {
                     RefineError::Io(format!(
                         "failed to flush Goal Agent transcript {}: {error}",
@@ -80,9 +74,6 @@ pub(super) fn pump_pty_output(
             Err(error) if error.kind() == std::io::ErrorKind::Interrupted => {}
             Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
                 if child_exited.load(Ordering::SeqCst) {
-                    transcript
-                        .write_all(&redactor.push(&[], true))
-                        .map_err(|e| RefineError::Io(e.to_string()))?;
                     return Ok(());
                 }
                 thread::sleep(Duration::from_millis(10));

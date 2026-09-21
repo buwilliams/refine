@@ -190,16 +190,8 @@ impl FileProcessSupervisor {
         })?;
         #[cfg(test)]
         run_capture_hook(&self.runtime_root, "before_capture", &process);
-        let mut stdout = capture::Capture::new(
-            stdout,
-            &stdout_path,
-            environment.map(|e| e.redactor()).unwrap_or_default(),
-        );
-        let mut stderr = capture::Capture::new(
-            stderr,
-            &stderr_path,
-            environment.map(|e| e.redactor()).unwrap_or_default(),
-        );
+        let mut stdout = capture::Capture::new(stdout, &stdout_path);
+        let mut stderr = capture::Capture::new(stderr, &stderr_path);
         let mut status = None;
         #[cfg(target_os = "linux")]
         let launch_scope: Option<owned_groups::launch_scope::LaunchScope> = process

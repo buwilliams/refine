@@ -177,13 +177,11 @@ test('Existing Skills can be reused and assignment edits preserve other triggers
     await modal.locator('#assignment-order').fill('9');
     await modal.locator('[data-save]').click();
     await modal.waitFor({state:'detached'});
-    await page.waitForFunction(() => document.querySelector('[data-workflow-assignment="review"]')?.textContent.includes('Order 9 · Background'));
     assert.match(await card.innerText(), /Order 9 · Background/);
     assert.equal(data.requests.at(-1).body.event_bindings.find(row => row.event_id === 'event-2').binding.enabled, true);
     await card.locator('[data-workflow-assignment-edit]').click();
     await modal.locator('[data-delete]').click();
     await modal.waitFor({state:'detached'});
-    await card.waitFor({state:'detached'});
     assert.equal(await card.count(), 0);
     save = data.requests.at(-1).body;
     assert.equal(save.event_bindings.length, 1);

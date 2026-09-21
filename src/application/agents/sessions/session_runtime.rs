@@ -55,7 +55,6 @@ where
         mut lifecycle,
         master,
         mut reader,
-        redactor,
         mut writer,
         artifact_handoff,
         completion_timeout,
@@ -87,7 +86,6 @@ where
             &reader_path,
             &reader_activity,
             &reader_child_exited,
-            redactor,
         )
     }));
 

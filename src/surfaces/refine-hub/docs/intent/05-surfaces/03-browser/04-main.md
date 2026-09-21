@@ -25,7 +25,7 @@ Current implementation details that matter to intent:
 - hash routing determines the active main view;
 - Goal and Feature details open as modal overlays over the current context;
 - list filters use URL-backed state so views can be refreshed or shared;
-- switching open Main screens retains selection; closing a list releases its selection, and Node/target-app reconciliation invalidates retained data;
+- leaving list routes clears selection state where stale bulk selection would be dangerous;
 - detached/no-app state is a first-class UI mode.
 
 The main surface should not treat every feature as a bespoke page. Shared list, modal, workflow, and error patterns should make the app easier to understand.

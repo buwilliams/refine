@@ -962,7 +962,6 @@ fn pump_scripted_pty(steps: Vec<std::io::Result<Vec<u8>>>) -> (RefineResult<()>,
         &transcript_path,
         &activity,
         &child_exited,
-        Default::default(),
     );
     let advanced = *activity.lock().unwrap() > started;
     let contents = fs::read_to_string(&transcript_path).unwrap();

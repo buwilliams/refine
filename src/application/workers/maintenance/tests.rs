@@ -181,10 +181,6 @@ fn corrupt_group_and_stalled_workflow_do_not_block_other_deadlines() {
     assert!(FileProcessSupervisor::process_is_alive(&worker).unwrap());
     std::fs::remove_file(bad).unwrap();
     stop(&supervisor);
-    // Scope exit precedes the launcher's final archive write. Do not delete
-    // the fixture while that writer can recreate its cleanup lock directory.
-    supervisor.wait_for_reaper_idle(&process.id).unwrap();
-    supervisor.wait_for_reaper_idle(&worker.id).unwrap();
     std::fs::remove_dir_all(root).unwrap();
 }
 

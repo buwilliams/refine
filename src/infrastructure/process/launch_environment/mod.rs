@@ -46,11 +46,9 @@ pub const QUALITY_SHELL_TOOL_DISCOVERY_ENV: &[&str] = &[
     "DOTNET_ROOT_X86",
 ];
 
-#[derive(Clone, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct EffectiveLaunchEnvironment {
     entries: Vec<(OsString, OsString)>,
-    secrets: Vec<Vec<u8>>,
-    credential_targets: Vec<String>,
 }
 
 impl EffectiveLaunchEnvironment {
@@ -102,11 +100,7 @@ impl EffectiveLaunchEnvironment {
         }
         let entries = entries.into_values().collect::<Vec<_>>();
         validate_environment(&entries)?;
-        Ok(Self {
-            entries,
-            secrets: Vec::new(),
-            credential_targets: Vec::new(),
-        })
+        Ok(Self { entries })
     }
 
     #[cfg(test)]
@@ -124,28 +118,6 @@ impl EffectiveLaunchEnvironment {
             shell,
             overrides,
         )
-    }
-
-    /// Explicit credential references opt in after ordinary API-key removal.
-    pub fn with_credentials(mut self, references: &BTreeMap<String, String>) -> RefineResult<Self> {
-        for (target, source) in references {
-            let value = env::var(source).ok().filter(|v| !v.is_empty()).ok_or_else(||
-                RefineError::InvalidInput(format!("credential reference {source} is missing on this host; set it in the launching process environment")))?;
-            validate_environment_entry(OsStr::new(target), OsStr::new(&value))?;
-            self.entries.retain(|(key, _)| key != target.as_str());
-            self.entries.push((target.into(), value.clone().into()));
-            self.secrets.push(value.into_bytes());
-            self.credential_targets.push(target.clone());
-        }
-        Ok(self)
-    }
-
-    pub(crate) fn credential_targets(&self) -> &[String] {
-        &self.credential_targets
-    }
-
-    pub(crate) fn redactor(&self) -> crate::infrastructure::process::redaction::Redactor {
-        crate::infrastructure::process::redaction::Redactor::new(self.secrets.clone())
     }
 
     pub fn apply_to_command(&self, command: &mut Command) {
@@ -523,13 +495,5 @@ mod tests {
         )
         .unwrap_err();
         assert!(invalid.to_string().contains("cannot contain '='"));
-    }
-}
-
-impl std::fmt::Debug for EffectiveLaunchEnvironment {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("EffectiveLaunchEnvironment")
-            .field("entry_count", &self.entries.len())
-            .finish_non_exhaustive()
     }
 }

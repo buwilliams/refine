@@ -41,9 +41,6 @@ pub struct ProviderDefinition {
     pub id: String,
     pub name: String,
     pub executable: String,
-    /// Child environment variable -> launching host environment variable (names only).
-    #[serde(default)]
-    pub credentials: std::collections::BTreeMap<String, String>,
     pub automated: LaunchMode,
     pub interactive: LaunchMode,
     #[serde(default = "plain")]
@@ -98,26 +95,6 @@ impl ProviderCatalog {
                 "plain" | "claude_json" | "codex_json" | "copilot_json"
             ) {
                 return Err(invalid(format!("unsupported output format for {}", p.id)));
-            }
-            for (target, source) in &p.credentials {
-                if !valid_credential_name(target) || !valid_credential_name(source) {
-                    return Err(invalid(format!(
-                        "provider {} credential references require environment variable names (letters, digits, underscores)",
-                        p.id
-                    )));
-                }
-                if target.starts_with("REFINE_")
-                    || target.starts_with("GIT_")
-                    || matches!(
-                        target.as_str(),
-                        "PATH" | "HOME" | "LD_PRELOAD" | "LD_LIBRARY_PATH"
-                    )
-                {
-                    return Err(invalid(format!(
-                        "provider {} credential target is reserved",
-                        p.id
-                    )));
-                }
             }
             for (interactive, mode) in [(false, &p.automated), (true, &p.interactive)] {
                 if interactive && mode.transport == ProviderPromptCapability::NativeStdin {
@@ -228,7 +205,6 @@ impl ProviderDefinition {
             id: id.into(),
             name: id.into(),
             executable: id.into(),
-            credentials: Default::default(),
             automated: mode.clone(),
             interactive: mode,
             output_format: plain(),
@@ -239,12 +215,4 @@ impl ProviderDefinition {
 pub fn defaults() -> ProviderCatalog {
     serde_json::from_str(include_str!("providers_defaults.json"))
         .expect("valid built-in provider catalog")
-}
-
-fn valid_credential_name(name: &str) -> bool {
-    !name.is_empty()
-        && name
-            .bytes()
-            .enumerate()
-            .all(|(i, c)| c == b'_' || c.is_ascii_alphabetic() || (i > 0 && c.is_ascii_digit()))
 }

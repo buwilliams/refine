@@ -318,11 +318,9 @@ Default: node_modules, .git, .refine, run.
 
 <h3 id="runtime-ai-provider">AI provider</h3>
 
-AI provider chooses which named local CLI configuration Refine drives for agents, chat, imports, conflict resolution, and pre-flight checks. **Shared AI providers** lets you add or edit executable paths, ordered argument rows, context delivery, and local credential references without JSON. Two configurations can use the same executable with different arguments.
+AI provider chooses which local CLI Refine drives for agents, chat, imports, conflict resolution, and pre-flight checks.
 
-Set a shared system default, or choose a provider just for this node. **Use system default** clears the node override. Runtime shows the effective provider and its selection source. Drafts survive refreshes and reloads; revision conflicts offer a reviewable merge with the latest catalog. Provider failures use existing failure handling, without automatic switching.
-
-Initial system default: Claude Code. See [Configure AI providers](../docs/ai-providers.md) for templates, credentials, and session behavior.
+Default: Claude Code.
 
 ## Skills
 

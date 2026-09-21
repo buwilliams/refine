@@ -1,4 +1,3 @@
-const { selectMain } = require("./support/web_app");
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const { openApp, apiFixture, GOAL, SKIP } = require("./support/web_app");
@@ -51,7 +50,7 @@ test("Hub uses the existing origin and manages sites and paginated records", { s
   try {
     await page.context().route("**/hub/sites/reports/", route => route.fulfill({ contentType: "text/html", body: "<title>Hosted report</title>Report" }));
     await page.goto(`${app.origin}/#/goals`);
-    await selectMain(page, "settings");
+    await page.getByTestId("nav-settings").click();
     await page.getByTestId("create-menu-toggle").click();
     const popupReady = page.waitForEvent("popup");
     await page.locator('[data-hub-open="reports"]').click();
@@ -59,7 +58,7 @@ test("Hub uses the existing origin and manages sites and paginated records", { s
     await popup.waitForURL(`${app.origin}/hub/sites/reports/`);
     assert.equal(await popup.title(), "Hosted report");
     await popup.close();
-    await selectMain(page, "settings");
+    await page.getByTestId("nav-settings").click();
     await page.getByTestId("create-menu-toggle").click();
     await page.locator('[data-hub-add]').click();
     assert.equal(await page.getByTestId('hub-modal').locator('[data-name]').getAttribute('id'), 'hub-site-name');
@@ -138,7 +137,7 @@ test("Hub modal rows open from cells and keyboards; Controls uses the shared men
   const page = app.page;
   try {
     await page.goto(`${app.origin}/#/goals`);
-    await selectMain(page, "settings");
+    await page.getByTestId("nav-settings").click();
     await page.getByTestId("create-menu-toggle").click();
     await page.locator('[data-hub-add]').waitFor();
     const menu = await page.locator('#nav-hubs button').evaluateAll(buttons => buttons.map(button => ({
@@ -155,7 +154,7 @@ test("Hub modal rows open from cells and keyboards; Controls uses the shared men
       assert.equal(item.width, menu[0].width);
       assert.equal(item.textOffset, menu[0].textOffset);
     }
-    await selectMain(page, "settings");
+    await page.getByTestId("nav-settings").click();
     await page.getByTestId("create-menu-toggle").click();
     await page.goto(`${app.origin}/#/settings/hubs`);
     await page.locator('[data-hub-new-site]').waitFor();

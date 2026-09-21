@@ -61,20 +61,17 @@
         <div class="nav-menu-panel nav-picker-options"><div class="nav-menu-label rail-picker-heading">Reporter</div><div role="listbox" aria-label="Choose Reporter"></div></div>
       </details>
       </div>
-      <section class="rail-section" id="rail-main-section" aria-label="Main screens">
-        <details class="nav-menu nav-context-picker" id="main-screen-menu">
-          <summary class="nav-context-summary nav-picker-summary rail-window-add" data-testid="main-menu" aria-label="Main" aria-haspopup="menu" aria-expanded="false" title="Open a screen"><svg class="rail-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="/static/vendor/lucide/navigation.svg#panels-top-left"></use></svg><span class="nav-picker-copy rail-copy">Main</span><span class="nav-context-more" aria-hidden="true"></span></summary>
-          <div class="nav-menu-panel" role="menu" aria-label="Main screens">
-          <a class="nav-menu-item" role="menuitem" href="#/" data-main-open="dashboard" data-node-scope-destination="dashboard" title="Dashboard"><svg class="rail-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="/static/vendor/lucide/navigation.svg#layout-dashboard"></use></svg><span>Dashboard</span></a>
-          <a class="nav-menu-item" role="menuitem" href="#/features" data-main-open="features" title="Features"><svg class="rail-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="/static/vendor/lucide/navigation.svg#layers"></use></svg><span>Features</span></a>
-          <a class="nav-menu-item" role="menuitem" href="#/goals" data-main-open="goals" data-node-scope-destination="goals" title="Goals"><svg class="rail-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="/static/vendor/lucide/navigation.svg#target"></use></svg><span>Goals</span></a>
-          <a class="nav-menu-item" role="menuitem" href="#/changes" data-main-open="changes" title="Changes"><svg class="rail-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="/static/vendor/lucide/navigation.svg#git-pull-request"></use></svg><span>Changes</span></a>
-          <a class="nav-menu-item" role="menuitem" href="#/control" data-main-open="control" title="Control"><svg class="rail-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="/static/vendor/lucide/navigation.svg#sliders-horizontal"></use></svg><span>Control</span></a>
-          <a class="nav-menu-item" role="menuitem" href="#/settings/application" data-main-open="settings" title="Settings"><svg class="rail-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="/static/vendor/lucide/navigation.svg#settings"></use></svg><span>Settings</span></a>
-          </div>
-        </details>
-        <nav class="nav rail-main rail-window-list" id="rail-main-screens" aria-label="Main" data-testid="primary-nav"></nav>
-      </section>
+      <details class="rail-section" id="rail-main-section" open>
+        <summary class="rail-section-heading" title="Main navigation"><svg class="rail-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="/static/vendor/lucide/navigation.svg#compass"></use></svg><span class="rail-copy">Main</span><span class="rail-section-state" aria-hidden="true"><svg class="rail-icon rail-section-open-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="/static/vendor/lucide/navigation.svg#plus"></use></svg><svg class="rail-icon rail-section-close-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="/static/vendor/lucide/navigation.svg#minus"></use></svg></span></summary>
+        <nav class="nav rail-main" aria-label="Main" data-testid="primary-nav">
+          <a class="rail-row" href="#/" data-route="dashboard" data-node-scope-destination="dashboard" data-testid="nav-dashboard" title="Dashboard"><svg class="rail-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="/static/vendor/lucide/navigation.svg#layout-dashboard"></use></svg><span class="rail-copy">Dashboard</span></a>
+          <a class="rail-row" href="#/features" data-route="features" data-testid="nav-features" title="Features"><svg class="rail-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="/static/vendor/lucide/navigation.svg#layers"></use></svg><span class="rail-copy">Features</span></a>
+          <a class="rail-row" href="#/goals" data-route="goals" data-node-scope-destination="goals" data-testid="nav-goals" title="Goals"><svg class="rail-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="/static/vendor/lucide/navigation.svg#target"></use></svg><span class="rail-copy">Goals</span></a>
+          <a class="rail-row" href="#/changes" data-route="changes" data-testid="nav-changes" title="Changes"><svg class="rail-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="/static/vendor/lucide/navigation.svg#git-pull-request"></use></svg><span class="rail-copy">Changes</span></a>
+          <a class="rail-row" href="#/control" data-route="control" data-testid="nav-control" title="Control"><svg class="rail-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="/static/vendor/lucide/navigation.svg#sliders-horizontal"></use></svg><span class="rail-copy">Control</span></a>
+          <a class="rail-row" href="#/settings/application" data-route="settings" data-testid="nav-settings" title="Settings"><svg class="rail-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="/static/vendor/lucide/navigation.svg#settings"></use></svg><span class="rail-copy">Settings</span></a>
+        </nav>
+      </details>
       <section class="rail-section rail-windows-section" id="rail-windows-section" aria-label="Open tools">
         <details class="nav-menu nav-context-picker toolbar-add-menu" data-testid="toolbar-add-menu">
           <summary class="nav-context-summary nav-picker-summary rail-window-add" data-testid="toolbar-add" aria-label="Tools" title="Open a tool"><svg class="rail-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="/static/vendor/lucide/navigation.svg#wrench"></use></svg><span class="nav-picker-copy rail-copy">Tools</span><span class="nav-context-more" aria-hidden="true"></span></summary>
@@ -243,7 +240,6 @@
   <script src="/static/js/commands.js"></script>
   <script src="/static/js/command-palette.js"></script>
   <script src="/static/js/features/reporter-onboarding.js"></script>
-  <script src="/static/js/main-screens.js"></script>
   <script src="/static/js/navigation.js"></script>
   <script src="/static/js/router.js"></script>
   <script src="/static/js/init.js"></script>

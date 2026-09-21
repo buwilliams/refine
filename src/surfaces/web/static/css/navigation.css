@@ -51,12 +51,12 @@ svg.rail-icon { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-line
 .rail-window-close:hover { background: var(--color-danger-soft); color: var(--error); }
 .rail-description { margin: 8px 10px; color: var(--muted); font-size: 12px; line-height: 1.6; }
 .navigation-rail .nav-menu-panel, .navigation-rail .toolbar-add-options { position: fixed; top: auto; left: 248px; width: 240px; max-width: calc(100vw - 80px); max-height: min(60vh, 420px); overflow-y: auto; z-index: 150; box-shadow: var(--shadow-popover); }
-.toolbar-add-options :is(button, a), #main-screen-menu .nav-menu-item { display: flex; align-items: center; justify-content: flex-start; gap: 10px; box-shadow: none; font-weight: 500; min-height: 40px; border-radius: 6px; padding: 8px 12px; }
+.toolbar-add-options :is(button, a) { display: flex; align-items: center; justify-content: flex-start; gap: 10px; box-shadow: none; font-weight: 500; min-height: 40px; border-radius: 6px; padding: 8px 12px; }
 #rail-new-options { min-width: 0; max-width: calc(100vw - 16px); max-height: min(420px, calc(100dvh - 16px)); box-sizing: border-box; }
-#rail-new-options .nav-menu-item:focus-visible, #main-screen-menu .nav-menu-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; background: var(--color-surface-muted); }
+#rail-new-options .nav-menu-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; background: var(--color-surface-muted); }
 .workspace { position: relative; flex: 1; min-width: 0; min-height: 0; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
 .workspace #main { padding: 24px 28px; }
-.workspace-tools { flex: 0 0 auto; order: 0; position: absolute; top: 18px; right: 28px; padding: 0; z-index: 20; }
+.workspace-tools { position: absolute; top: 18px; right: 28px; padding: 0; z-index: 20; }
 .workspace-tools summary { padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); cursor: pointer; color: var(--muted); font-size: 12px; }
 .workspace-tools .nav-menu-panel { left: auto; right: 0; max-height: 70vh; overflow-y: auto; }
 .workspace .toolbar-dock { position: relative; inset: auto; display: flex; flex-direction: column; flex: 1; min-height: 0; min-width: 0; z-index: auto; border: 0; box-shadow: none; }

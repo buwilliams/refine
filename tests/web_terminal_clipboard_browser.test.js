@@ -101,13 +101,10 @@ test(`${profile}: real xterm preserves interruption and exactly-once bracketed p
       terminalStateFor().term.focus();
       return new Promise((resolve) => terminalStateFor().term.write("\x1b[?2004h", resolve));
     });
-    const interrupted = app.page.waitForResponse(response => new URL(response.url()).pathname.endsWith('/input'));
     await app.page.keyboard.press("Control+c");
-    await interrupted;
     await app.page.waitForTimeout(30);
     assert.deepEqual(app.requests, ["\x03"]);
     app.requests.length = 0;
-    const pasted = app.page.waitForResponse(response => new URL(response.url()).pathname.endsWith('/input'));
     await app.page.evaluate(() => {
       const data = new DataTransfer();
       data.setData("text/plain", "one\r\ntwo\n");
@@ -116,7 +113,6 @@ test(`${profile}: real xterm preserves interruption and exactly-once bracketed p
       }));
     });
     await app.page.waitForTimeout(30);
-    await pasted;
     assert.deepEqual(app.requests, ["\x1b[200~one\rtwo\r\x1b[201~"]);
     await selectOutput(app.page);
     const outside = await app.page.evaluate(() => {
