@@ -38,3 +38,7 @@ An enterprise gateway must cover every route and make the backend inaccessible b
 - Alternate hostnames, direct ports and proxy header spoofing do not bypass entry controls; cross-origin mutation requests are rejected by the deployed protection layer.
 - A representative action connects the initiating human, run/Goal, worker, target identity, time, outcome and approval record without logging secrets.
 - The host can stop execution and revoke downstream access independently of agent cooperation.
+
+## Existing browser-request protection
+
+Refine checks Origin/Referer against the request host on non-GET HTTP requests. The helper permits requests with neither header; it does not establish caller identity. Preserve this protection through proxy configuration and test it alongside authentication. See the [source trace](01-how-it-works.md#implementation-details-that-affect-the-controls), [operating plan](06-operating-plan.md) and [verification workbook](09-verification.md).

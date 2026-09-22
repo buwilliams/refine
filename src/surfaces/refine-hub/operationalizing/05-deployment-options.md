@@ -30,3 +30,5 @@ Re-enable access only after the deployment owner has approved the configuration 
 4. Record approval for the intended use, monitor the deployment, and reassess controls when access, tools or configuration change.
 
 Choose based on the required workflow and evidence. NIST's zero-trust architecture rejects implicit trust based only on network location or device ownership; host controls remain necessary within the overall design. [NIST SP 800-207](https://www.nist.gov/publications/zero-trust-architecture).
+
+Implement the chosen option through the [operating plan](06-operating-plan.md), including identity, IP, dependency, monitoring and recovery controls.

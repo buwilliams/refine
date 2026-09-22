@@ -27,3 +27,7 @@ Explicitly track gaps: native multi-user authentication and authorization, attri
 ## Approval boundary
 
 Start with synthetic or approved non-production data and no production authority. Expand access only against named use cases and recorded evidence. The deployment owner records approval, remaining control gaps and accepted residual risk.
+
+## Put the controls into operation
+
+Follow the [enterprise operating plan](06-operating-plan.md) for owners, rollout gates and ongoing activities. Use the [verification workbook](09-verification.md) to retain evidence. Include [IP and contractual protections](07-intellectual-property.md) and [artifact controls](08-artifacts-and-providers.md) in supplier, data and change-management reviews.

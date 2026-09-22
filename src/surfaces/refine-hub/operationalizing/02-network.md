@@ -30,3 +30,9 @@ For remote use, test gateway coverage of the entire control surface, including A
 The infrastructure owner records actual listener addresses, inbound rules, DNS names, proxy routes, TLS termination, Git remotes, model endpoints, tools and secrets backends. Test from an allowed client and a denied network. Capture egress during representative work with synthetic data and reconcile every destination with the allowlist.
 
 Include logs, crash reports, backups, package registries, software updates, downloaded dependencies and optional integrations in the final data-flow inventory. Do not copy credentials into the diagram or evidence pack.
+
+## Artifact, evidence and backup routes
+
+Add worker/CI connections to the internal artifact service, its approved upstream registries, controlled publishing to the private release repository, and the authorized deployment path. Record actual endpoints, protocols, identities and data for each; HTTPS is the intended transport where supported. Deny direct package-download bypass. The [artifact flow](08-artifacts-and-providers.md) explains these proposed controls.
+
+Also map host, gateway and target-system logs to the protected security log store, and state/configuration to the backup store. Restrict readers, encrypt transfers and verify retention and restore. Apply [provider contract review](07-intellectual-property.md) to external recipients, including model services and hosted repositories. These routes are deployment requirements, not built-in integrations claimed for Refine.
