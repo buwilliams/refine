@@ -123,6 +123,7 @@ pub fn page(name: &str) -> RefineResult<Vec<u8>> {
     let groups = [
         ("Start here", "product/"),
         ("What's new", "releases/"),
+        ("Operationalizing Refine", "operationalizing/"),
         ("Runbooks", "docs/runbooks/"),
         ("Design intent", "docs/intent/"),
         ("About Refine", ""),
@@ -149,6 +150,7 @@ pub fn page(name: &str) -> RefineResult<Vec<u8>> {
                 && if prefix.is_empty() {
                     !path.starts_with("product/")
                         && !path.starts_with("releases/")
+                        && !path.starts_with("operationalizing/")
                         && !path.starts_with("docs/runbooks/")
                         && !path.starts_with("docs/intent/")
                         && *path != "index.md"

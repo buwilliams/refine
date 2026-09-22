@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 660" role="img" aria-labelledby="title desc">
+<title id="title">Current logical Refine network</title><desc id="desc">A browser controls a Refine node over configurable HTTP. The node contains a daemon, provider CLIs, tools, repository, state and secrets. It connects to Git, model services and optional target applications. Other nodes synchronize through Git. This is source-derived, not a measured deployment.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#537060"/></marker></defs>
+<style>text{font-family:Arial,sans-serif;fill:#183c2d}.title{font-size:25px;font-weight:bold}.head{font-size:20px;font-weight:bold}.label{font-size:15px}.small{font-size:14px}.box{fill:#eef3eb;stroke:#537060;stroke-width:1.5}.flow{fill:none;stroke:#537060;stroke-width:2;marker-end:url(#arrow)}</style>
+<rect width="1100" height="660" fill="#fafbf7"/><text x="30" y="40" class="title">Refine today / logical connections</text><text x="30" y="67" class="small">Source baseline 4.3.2 · 22 September 2026 · Verify the installed configuration</text>
+<rect class="box" x="25" y="142" width="210" height="95" rx="8"/><text class="head" x="45" y="177">Browser / API client</text><text class="label" x="45" y="207">Human control + events</text>
+<rect x="335" y="105" width="390" height="445" rx="12" fill="#fff" stroke="#537060" stroke-dasharray="7 5"/><text x="355" y="135" class="head">Host / effective OS permissions</text>
+<rect class="box" x="355" y="155" width="350" height="85" rx="8"/><text class="head" x="375" y="186">Refine daemon</text><text class="label" x="375" y="217">HTTP API · MCP · terminal / SSE</text>
+<path class="flow" d="M235 190H355"/><text class="small" x="245" y="160">HTTP</text><text class="small" x="240" y="218">TCP 8082*</text>
+<path class="flow" d="M530 240V290"/><text class="small" x="545" y="273">Local execution</text>
+<rect class="box" x="355" y="292" width="350" height="95" rx="8"/><text class="head" x="375" y="324">Provider CLIs + configured tools</text><text class="label" x="375" y="354">Processes · APIs · optional browser tools</text>
+<path class="flow" d="M530 387V428"/>
+<rect class="box" x="355" y="430" width="350" height="90" rx="8"/><text class="head" x="375" y="460">Code · state · local credentials</text><text class="label" x="375" y="490">Git worktrees / state + host secret backend</text>
+<rect class="box" x="845" y="110" width="230" height="90" rx="8"/><text class="head" x="865" y="142">Git remote</text><text class="label" x="865" y="172">Code + refine/state</text>
+<path class="flow" d="M705 175H845"/><text class="small" x="742" y="146">HTTPS / SSH</text>
+<rect class="box" x="845" y="280" width="230" height="90" rx="8"/><text class="head" x="865" y="312">Model service</text><text class="label" x="865" y="342">Context + responses</text>
+<path class="flow" d="M705 325H845"/><text class="small" x="739" y="304">HTTPS*</text>
+<rect class="box" x="845" y="443" width="230" height="90" rx="8"/><text class="head" x="865" y="475">Optional target apps</text><text class="label" x="865" y="505">Delegated / tool authority</text>
+<path class="flow" d="M705 370H785V488H845"/><text class="small" x="803" y="423">Tool-specific</text>
+<rect class="box" x="25" y="405" width="210" height="95" rx="8"/><text class="head" x="45" y="439">CLI / MCP clients</text><text class="label" x="45" y="470">Shared capabilities</text><path class="flow" d="M235 451H290V225H355"/>
+<text x="30" y="591" class="label">* Start default: 0.0.0.0:8082. Model destinations depend on the provider. Git traffic is bidirectional.</text><text x="30" y="619" class="label">Other Refine nodes synchronize through Git. Optional tooling can add flows beyond this diagram.</text>
+</svg>

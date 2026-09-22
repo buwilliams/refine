@@ -13,6 +13,10 @@
 <a class="hub-card" href="docs/runbooks/README.md"><span class="card-index">03 / OPERATE</span><strong>Keep work moving</strong><p>Set up your fleet, manage upgrades, and find a clear path through recovery.</p><span class="card-action">Open the runbooks →</span></a>
 </div>
 
+## Operationalizing Refine
+
+<div><a class="hub-release" href="operationalizing/00-overview.md"><div><strong>Bring Refine into an enterprise environment</strong><p>Architecture, network boundaries, authentication, user emulation, SOC 2 readiness and deployment choices.</p></div><span class="release-arrow" aria-hidden="true">↗</span></a></div>
+
 ## What you need to know
 
 <div><a class="hub-release" href="releases/4.3.2.md"><div><strong>Inside Refine 4.3.2</strong><p>The Tools menu, dedicated Control screen, Skills and Hubs sections, and Search from every screen. See what changed and how to use it.</p></div><span class="release-arrow" aria-hidden="true">↗</span></a></div>
