@@ -77,10 +77,10 @@ fn run(mode: &str, socket: Option<&str>) -> RefineResult<()> {
         }
     };
     connection
-        .set_read_timeout(Some(Duration::from_secs(5)))
+        .set_read_timeout(Some(Duration::from_secs(60)))
         .map_err(io_error)?;
     connection
-        .set_write_timeout(Some(Duration::from_secs(5)))
+        .set_write_timeout(Some(Duration::from_secs(60)))
         .map_err(io_error)?;
     let request: Request = receive(&mut connection)?;
     if mode == "workload" {
@@ -143,7 +143,7 @@ fn run(mode: &str, socket: Option<&str>) -> RefineResult<()> {
     }
     let (mut parent, inherited) = UnixStream::pair().map_err(io_error)?;
     parent
-        .set_write_timeout(Some(Duration::from_secs(5)))
+        .set_write_timeout(Some(Duration::from_secs(60)))
         .map_err(io_error)?;
     let mut child = helper_command("workload", &inherited)?
         .spawn()
@@ -169,10 +169,33 @@ fn run(mode: &str, socket: Option<&str>) -> RefineResult<()> {
     drop(parent);
     drop(connection);
     // The guardian must not hold the workload's output or input streams open.
+    // Redirect stderr to a per-guardian log file so finish()'s error prints are
+    // captured for diagnosis instead of being swallowed by the closed fd.
     unsafe {
         libc::close(0);
         libc::close(1);
-        libc::close(2);
+        let log_path = format!("/tmp/refine-guardian-{}.log\0", libc::getpid());
+        let log_fd = libc::open(
+            log_path.as_ptr() as *const libc::c_char,
+            libc::O_WRONLY | libc::O_CREAT | libc::O_APPEND,
+            0o644 as libc::c_uint,
+        );
+        if log_fd >= 0 {
+            // Write a start marker + timestamp so we can tell a crash from an orderly exit.
+            let marker = format!(
+                "[guardian pid={} started at monotonic_ns={} parent_pid={}]\n",
+                libc::getpid(),
+                std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_nanos(),
+                libc::getppid(),
+            );
+            let _ = libc::write(log_fd, marker.as_ptr() as *const libc::c_void, marker.len());
+            libc::dup2(log_fd, 2);
+            if log_fd != 2 {
+                libc::close(log_fd);
+            }
+        } else {
+            libc::close(2);
+        }
     }
     let mut leader_status = None;
     let watch_parent = request

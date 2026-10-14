@@ -45,10 +45,10 @@ impl ScopeLaunch {
         let metadata = proof.metadata().map_err(io_error)?;
         let (connection, inherited) = UnixStream::pair().map_err(io_error)?;
         connection
-            .set_read_timeout(Some(Duration::from_secs(5)))
+            .set_read_timeout(Some(Duration::from_secs(60)))
             .map_err(io_error)?;
         connection
-            .set_write_timeout(Some(Duration::from_secs(5)))
+            .set_write_timeout(Some(Duration::from_secs(60)))
             .map_err(io_error)?;
         let mut helper = helper_command("guardian", &inherited)?;
         helper.env_clear();
@@ -135,7 +135,7 @@ impl ScopeLaunch {
         details: &mut String,
     ) -> RefineResult<u32> {
         if let Some(listener) = self.listener.take() {
-            let deadline = Instant::now() + Duration::from_secs(5);
+            let deadline = Instant::now() + Duration::from_secs(60);
             loop {
                 match listener.accept() {
                     Ok((connection, _)) => {
@@ -158,10 +158,10 @@ impl ScopeLaunch {
                             ));
                         }
                         connection
-                            .set_read_timeout(Some(Duration::from_secs(5)))
+                            .set_read_timeout(Some(Duration::from_secs(60)))
                             .map_err(io_error)?;
                         connection
-                            .set_write_timeout(Some(Duration::from_secs(5)))
+                            .set_write_timeout(Some(Duration::from_secs(60)))
                             .map_err(io_error)?;
                         self.connection = connection;
                         break;
