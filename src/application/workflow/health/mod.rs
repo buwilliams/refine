@@ -13,8 +13,8 @@ mod ticks;
 #[cfg(test)]
 pub(crate) use ticks::install_test_observation;
 pub(crate) use ticks::scheduler_tick;
-pub const SILENCE_MS: i64 = 30_000;
-pub const STARTUP_MS: i64 = 30_000;
+pub const SILENCE_MS: i64 = 300_000;
+pub const STARTUP_MS: i64 = 300_000;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct WorkflowHealth {
