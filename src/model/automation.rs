@@ -461,6 +461,31 @@ where
         .collect())
 }
 
+/// Normalize common agent synonyms to the three canonical outcome values.
+/// Case-insensitive, trims whitespace. Pass-through for anything that does not
+/// map so `validate()` still catches genuinely malformed outcomes rather than
+/// silently swallowing them.
+pub(crate) fn normalize_outcome(raw: &str) -> String {
+    match raw.trim().to_ascii_lowercase().as_str() {
+        "success" | "succeeded" | "pass" | "passed" | "ok" | "complete" | "completed" | "done" => {
+            "success".into()
+        }
+        "failure" | "fail" | "failed" | "finding" => "failure".into(),
+        "error" | "errored" | "fault" | "fatal" | "crash" | "crashed" => "error".into(),
+        _ => raw.to_string(),
+    }
+}
+
+pub(crate) fn deserialize_outcome_normalized<'de, D>(
+    deserializer: D,
+) -> Result<String, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let raw: String = String::deserialize(deserializer)?;
+    Ok(normalize_outcome(&raw))
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct SkillResult {
@@ -468,6 +493,7 @@ pub struct SkillResult {
     pub binding_id: String,
     pub role: String,
     /// success, failure (a finding), or error (execution infrastructure/contract).
+    #[serde(deserialize_with = "deserialize_outcome_normalized")]
     pub outcome: String,
     #[serde(default)]
     pub summary: String,

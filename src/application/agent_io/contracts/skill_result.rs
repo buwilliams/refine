@@ -33,6 +33,7 @@ impl crate::application::agent_io::structured_output::Contract for SkillResult {
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct SkillReport {
+    #[serde(deserialize_with = "crate::model::automation::deserialize_outcome_normalized")]
     pub outcome: String,
     #[serde(default)]
     pub summary: String,
