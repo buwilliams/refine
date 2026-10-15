@@ -71,7 +71,7 @@ pub(crate) fn decode_result(
     host_bound: bool,
 ) -> crate::error::RefineResult<SkillResult> {
     use crate::application::agent_io::structured_output::{
-        Contract, DecodeOptions, decode_structured,
+        Contract, DecodeOptions, Selection, decode_structured,
     };
     use crate::error::RefineError;
     let identity = [
@@ -79,9 +79,18 @@ pub(crate) fn decode_result(
         ("binding_id", binding_id),
         ("role", role),
     ];
+    // A completion report is always an Object (possibly wrapped by an envelope
+    // field) or a JSON String layer that unwraps to one. Governance verdicts
+    // legitimately cite arrays and other primitives in prose while explaining
+    // the diff; those must not compete with the final verdict. Selecting the
+    // last object-or-string candidate in document order preserves the
+    // designed "verdict follows reasoning" semantics for SkillReport.
+    let is_report_candidate: &dyn Fn(&Value) -> bool =
+        &|value| matches!(value, Value::Object(_) | Value::String(_));
     let result: SkillResult = decode_structured(
         output,
-        &DecodeOptions::with_envelopes(SkillReport::LABEL, SkillReport::ENVELOPE_FIELDS),
+        &DecodeOptions::with_envelopes(SkillReport::LABEL, SkillReport::ENVELOPE_FIELDS)
+            .selecting(Selection::LastMatching(is_report_candidate)),
         |value| {
             if let Some(object) = value.as_object_mut() {
                 // Ignore provider extensions only at this boundary; persisted
@@ -307,37 +316,56 @@ mod tests {
     }
 
     #[test]
-    fn distinct_completions_and_conflicting_envelopes_remain_ambiguous() {
-        for (raw, diagnostic) in [
-            (
-                r#"Review: {"outcome":"failure"} Final: {"outcome":"success"}"#,
-                "2 distinct JSON candidates",
-            ),
-            (
-                r#"{"result":{"outcome":"success"},"skill_result":{"outcome":"failure"}}"#,
-                "ambiguous completion envelope fields",
-            ),
-            (
-                r#"Review: "{\"outcome\":\"failure\"}" Final: {"outcome":"success"}"#,
-                "2 distinct JSON candidates",
-            ),
-            (
-                r#"Review: {"outcome":"success"} Earlier: "{\"outcome\":\"failure\"}""#,
-                "2 distinct JSON candidates",
-            ),
-            (
-                r#"Review: {"outcome":"success","checklist":[1]} Final: {"outcome":"success","checklist":[2]}"#,
-                "2 distinct JSON candidates",
-            ),
-            (
-                r#"Review: {"outcome":"success","evidence":[42]} Final: {"outcome":"success","evidence":["42"]}"#,
-                "2 distinct JSON candidates",
-            ),
+    fn conflicting_envelope_fields_remain_ambiguous_and_the_last_verdict_wins() {
+        // A single object naming both envelope fields is still ambiguous:
+        // envelope conflicts live inside one JSON value and cannot be
+        // disambiguated by document order.
+        let error = decode_result(
+            r#"{"result":{"outcome":"success"},"skill_result":{"outcome":"failure"}}"#,
+            "i",
+            "b",
+            "quality",
+            true,
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(
+            error.contains("ambiguous completion envelope fields"),
+            "{error}"
+        );
+
+        // Distinct completions in prose select the last object in document
+        // order: agents legitimately quote JSON while reasoning before the
+        // verdict, so the terminal candidate is treated as the decision.
+        for raw in [
+            r#"Review: {"outcome":"failure"} Final: {"outcome":"success"}"#,
+            r#"Review: "{\"outcome\":\"failure\"}" Final: {"outcome":"success"}"#,
+            r#"Review: {"outcome":"success","checklist":[1]} Final: {"outcome":"success","checklist":[2]}"#,
+            r#"Review: {"outcome":"success","evidence":[42]} Final: {"outcome":"success","evidence":["42"]}"#,
         ] {
-            let error = decode_result(raw, "i", "b", "quality", true)
-                .unwrap_err()
-                .to_string();
-            assert!(error.contains(diagnostic), "{error}");
+            let result = decode_result(raw, "i", "b", "quality", true)
+                .unwrap_or_else(|error| panic!("input {raw:?} failed: {error}"));
+            assert_eq!(result.outcome, "success", "input: {raw}");
+        }
+    }
+
+    #[test]
+    fn array_and_primitive_citations_in_prose_do_not_compete_with_the_verdict() {
+        // Governance verdicts routinely cite existing code fragments while
+        // explaining a diff; array literals, quoted numbers, and bare
+        // primitives in that prose parse as JSON but must not be treated as
+        // rival completion candidates.
+        let outputs = [
+            "Diff adds `[pageSizeOptions]=\"[10, 20, 50, 100, 250, 0]\"`, matching precedent `[9, 10, 20, 50, 0]`.\n\
+             {\"outcome\":\"success\",\"summary\":\"ok\"}",
+            "The value `42` is preserved. Verdict: {\"outcome\":\"success\",\"summary\":\"ok\"}",
+            "Ranges considered: [1, 2, 3] and [4, 5, 6]. {\"outcome\":\"success\",\"summary\":\"ok\"}",
+        ];
+        for raw in outputs {
+            let result = decode_result(raw, "i", "b", "governance", true)
+                .unwrap_or_else(|error| panic!("input {raw:?} failed: {error}"));
+            assert_eq!(result.outcome, "success", "input: {raw}");
+            assert_eq!(result.summary, "ok", "input: {raw}");
         }
     }
 
