@@ -36,7 +36,10 @@ pub(crate) struct SkillReport {
     pub outcome: String,
     #[serde(default)]
     pub summary: String,
-    #[serde(default)]
+    #[serde(
+        default,
+        deserialize_with = "crate::model::automation::deserialize_evidence_as_strings"
+    )]
     pub evidence: Vec<String>,
     #[serde(default)]
     pub artifacts: Value,

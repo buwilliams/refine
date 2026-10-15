@@ -438,6 +438,29 @@ fn validate_scope(scope: &Scope) -> Result<(), String> {
     Ok(())
 }
 
+/// Deserialize `evidence` tolerantly: accept strings as-is, coerce any other
+/// JSON value (number, bool, object, array, null) to its JSON string form.
+/// Agents routinely emit richer shapes (an object with `{file, line}`, a
+/// bare integer, a nested array) and the strict `Vec<String>` requirement
+/// rejects the whole report with `evidence[0]: invalid type: map`. The schema
+/// documents strings as the canonical shape; this just stops dropping real
+/// agent work when the model picks a related-but-non-string shape.
+pub(crate) fn deserialize_evidence_as_strings<'de, D>(
+    deserializer: D,
+) -> Result<Vec<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let raw: Vec<Value> = Vec::deserialize(deserializer)?;
+    Ok(raw
+        .into_iter()
+        .map(|v| match v {
+            Value::String(s) => s,
+            other => other.to_string(),
+        })
+        .collect())
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct SkillResult {
@@ -448,7 +471,7 @@ pub struct SkillResult {
     pub outcome: String,
     #[serde(default)]
     pub summary: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_evidence_as_strings")]
     pub evidence: Vec<String>,
     #[serde(default)]
     pub artifacts: Value,
