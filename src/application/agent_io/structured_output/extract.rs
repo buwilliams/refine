@@ -339,8 +339,13 @@ fn standalone_json_spans(output: &str) -> Vec<&str> {
             if let Some(end) = quoted_span_end(output, start) {
                 let span = &output[start..end];
                 if let Ok(Value::String(encoded)) = serde_json::from_str(span) {
-                    if serde_json::from_str::<Value>(&encoded).is_ok() {
-                        spans.push(span);
+                    // Only accept string-wrapped JSON if it unwraps to an Object or Array.
+                    // String-wrapped primitives (numbers, booleans, null, or plain strings)
+                    // in prose should not compete with structured completion reports.
+                    if let Ok(inner) = serde_json::from_str::<Value>(&encoded) {
+                        if matches!(inner, Value::Object(_) | Value::Array(_)) {
+                            spans.push(span);
+                        }
                     }
                     // A complete quoted string owns every brace within it.
                     search_from = end;

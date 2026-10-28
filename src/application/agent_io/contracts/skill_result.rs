@@ -371,6 +371,27 @@ mod tests {
     }
 
     #[test]
+    fn string_wrapped_primitives_in_prose_do_not_compete_with_the_verdict() {
+        // String-wrapped primitives like "false" appear in prose when discussing
+        // boolean strings. The scanner finds "false" as a JSON string, unwraps it
+        // to the boolean false, which must not compete with the actual verdict.
+        // This was the root cause of goal 00000T13YRWGT0TAT91QJ8C01G governance failure.
+        let output = r#"Angular checkbox controls emit boolean strings ("true"/"false") but the database
+expects VARCHAR(1). The fix transforms booleans to single characters ('Y'/'N').
+
+```json
+{
+  "outcome": "success",
+  "summary": "Checkbox transformation prevents VARCHAR(1) truncation error"
+}
+```"#;
+        let result = decode_result(output, "i", "b", "governance", true)
+            .unwrap_or_else(|error| panic!("failed to parse governance output with string-wrapped boolean in prose: {error}"));
+        assert_eq!(result.outcome, "success");
+        assert!(result.summary.contains("Checkbox transformation"));
+    }
+
+    #[test]
     fn provider_extensions_do_not_bypass_transport_bounds() {
         use crate::application::agent_io::structured_output::DecodeOptions;
         let options = DecodeOptions::new("Skill completion report");

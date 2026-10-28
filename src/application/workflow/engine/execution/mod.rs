@@ -206,7 +206,9 @@ impl WorkflowEngine {
                     let failed = failed.clone();
                     discovery = Some(scope.spawn(move || contain("admission", || {
                         crate::infrastructure::process::supervisor::coordination::with_lock_timeout(Duration::from_millis(200), || {
-                            if self.workflow_paused()? || !self.target_still_attached(worker_registry)? { return Ok(Vec::new()); }
+                            if self.workflow_paused()? || !self.target_still_attached(worker_registry)? {
+                                return Ok(Vec::new());
+                            }
                             #[cfg(test)]
                             test_hooks::scheduler(self)?;
                             let skills_first = super::admission::skills_first(&self.runtime_root);
