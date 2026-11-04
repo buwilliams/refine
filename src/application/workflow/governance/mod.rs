@@ -1,6 +1,7 @@
 use crate::model::JsonObject;
 use serde::{Deserialize, Serialize};
 
+pub(crate) mod compile_gate;
 pub mod integration;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
