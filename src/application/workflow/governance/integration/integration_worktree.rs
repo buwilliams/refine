@@ -59,6 +59,37 @@ pub(crate) fn integration_worktree_path(
     Ok(repo_git.git_path("refine-integration")?.join("target"))
 }
 
+/// Refine-owned detached worktree reserved for the Governance compile gate.
+///
+/// Kept at a different path from the integration worktree on purpose: a build
+/// command leaves residue (dist/, target/, bin/, lockfile churn) that would
+/// defeat the integration worktree's between-integrations persistence (it
+/// would detect dirtiness and purge every time, costing a full worktree add
+/// on each integration — minutes on a large repo). This gate worktree has
+/// no persistence contract; purging on every call is intentional so each
+/// build sees a pristine checkout of the exact candidate commit with no
+/// cross-round residue from a prior build.
+pub(crate) fn ensure_compile_gate_worktree(
+    repo_git: &FileGitWorktreeService,
+    runtime_root: &Path,
+    anchor_commit: &str,
+) -> RefineResult<IntegrationWorktree> {
+    let path = repo_git.git_path("refine-compile-gate")?.join("target");
+    let git = FileGitWorktreeService::with_runtime_root(&path, runtime_root)
+        .with_process_context_from(repo_git);
+    // Purge any prior gate tree unconditionally — not just when the directory
+    // is on disk. A crash between `git worktree add` and the directory
+    // materializing (OOM, SIGKILL, host reboot) can leave the git worktree
+    // registration behind without the physical path; a path-only existence
+    // check would skip purge and then ensure_detached_worktree would fail
+    // with "already registered" every subsequent run until a human intervenes.
+    // purge_worktree tolerates a missing path and handles the dangling-
+    // registration case.
+    repo_git.purge_worktree(&path)?;
+    repo_git.ensure_detached_worktree(&path, anchor_commit)?;
+    Ok(IntegrationWorktree { path, git })
+}
+
 /// Tear the integration worktree down so the next integration recreates it
 /// fresh. The tree is Refine-owned, so nothing in it is ever user work — no
 /// stash, no quarantine. Returns the removed path, or `None` when no tree

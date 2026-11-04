@@ -24,7 +24,7 @@ pub(super) fn now_timestamp() -> String {
     Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string()
 }
 
-pub(super) fn parse_allowed_commands(raw: &str) -> BTreeSet<String> {
+pub(crate) fn parse_allowed_commands(raw: &str) -> BTreeSet<String> {
     raw.split([',', '\n'])
         .map(str::trim)
         .filter(|command| !command.is_empty())

@@ -87,6 +87,7 @@ mod secrets;
 pub use policy::FileSecurityService;
 pub use secrets::NativeSecretStore;
 
+pub(crate) use host_commands::parse_allowed_commands;
 use host_commands::*;
 
 #[cfg(test)]

@@ -31,7 +31,7 @@ use checkout_sync::{
     CheckoutSyncOutcome, record_intended_checkout_sync, repair_pending_checkout_sync,
     sync_human_checkout_after_ref_move,
 };
-use integration_worktree::ensure_integration_worktree;
+pub(super) use integration_worktree::{ensure_compile_gate_worktree, ensure_integration_worktree};
 use transaction::{CheckoutSyncWindow, clear_checkout_sync_window, record_checkout_sync_window};
 
 pub use reconciliation::{AlreadyMergedResolution, AlreadyMergedResolutionDisposition};
