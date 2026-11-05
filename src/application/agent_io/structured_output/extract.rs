@@ -179,7 +179,22 @@ fn select_json_candidate(
                 return last_matching(vec![value], matches, label);
             }
         },
-        Err(error) => error,
+        Err(error) => {
+            // Agents occasionally emit a complete-looking single JSON object
+            // whose terminal `}` is dropped by an upstream stream-capture
+            // race. When the output starts with `{` but fails to parse, try
+            // once with a repaired closer; a genuinely malformed object still
+            // fails and surfaces the original error unchanged.
+            if let Some(value) = try_repair_terminal_brace(output) {
+                match options.selection {
+                    Selection::Single => return Ok(value),
+                    Selection::LastMatching(matches) => {
+                        return last_matching(vec![value], matches, label);
+                    }
+                }
+            }
+            error
+        }
     };
 
     let fenced = fenced_contents(output);
@@ -322,6 +337,20 @@ fn fenced_contents(output: &str) -> Vec<&str> {
         offset = close + 3;
     }
     contents
+}
+
+/// Repair a single-object output whose terminal `}` was dropped by an upstream
+/// stream-capture race. Returns Some only when the output starts with `{`,
+/// otherwise fails to parse, and parses cleanly with exactly one `}` appended.
+/// A genuinely malformed object still fails the retry and returns None.
+fn try_repair_terminal_brace(output: &str) -> Option<Value> {
+    if !output.starts_with('{') {
+        return None;
+    }
+    let mut repaired = String::with_capacity(output.len() + 1);
+    repaired.push_str(output);
+    repaired.push('}');
+    serde_json::from_str::<Value>(&repaired).ok()
 }
 
 /// Standalone objects, arrays, and stringified JSON in document order. A valid
@@ -496,6 +525,37 @@ mod tests {
             r#"The stringified result follows: "{\"name\":\"ready\",\"count\":2}" done."#,
         ] {
             assert_eq!(decode(output).unwrap(), expected, "output: {output}");
+        }
+    }
+
+    #[test]
+    fn repairs_output_missing_only_the_terminal_object_brace() {
+        // Reproduces the pathology observed in production: a single-object
+        // agent response whose final `}` is dropped by an upstream
+        // stream-capture race, leaving a 1-brace deficit. Decoding must
+        // recover the value rather than report a misleading schema error.
+        let expected = Fixture {
+            name: "ready".to_string(),
+            count: 2,
+        };
+        let truncated = r#"{"name":"ready","count":2"#;
+        assert_eq!(decode(truncated).unwrap(), expected);
+    }
+
+    #[test]
+    fn truncation_repair_does_not_swallow_genuinely_malformed_output() {
+        // A single-brace append must not rescue outputs whose damage runs
+        // deeper than a dropped terminal `}` — those need to surface the real
+        // JSON error so operators notice.
+        for broken in [
+            r#"{"name":"ready","count":2,"#,         // trailing comma before truncation
+            r#"{"name":"ready" "count":2}"#,         // missing comma
+            r#"{"name":"ready","count":"#,           // value missing
+        ] {
+            assert!(
+                decode(broken).is_err(),
+                "expected decode to fail for {broken:?}"
+            );
         }
     }
 
