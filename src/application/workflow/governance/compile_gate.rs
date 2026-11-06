@@ -17,7 +17,7 @@
 //! not touched, so `verify_reviewed_candidate_before_publication`'s working-
 //! tree equality check keeps holding.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use serde_json::{Map, Value, json};
 
@@ -170,6 +170,15 @@ fn execute_locked(
         Ok(cwd) => cwd,
         Err(error) => return Ok(infrastructure(error)),
     };
+    // Pre-exec existence + executable check for the program `sh -c` would
+    // otherwise invoke. Without this, a missing path and a non-executable
+    // file both surface as shell exit 127/126 and get classified as
+    // BuildFailed ("fix your build") — but the real cause is an operator
+    // config problem, not a code problem. Pre-check here so the recovery
+    // prompt the LLM sees names the right cause.
+    if let Err(error) = verify_command_path_exists(command, &cwd) {
+        return Ok(infrastructure(error));
+    }
     let spec = build_spec(cwd, command, timeout_seconds, goal_id, round_idx, candidate_commit);
     let supervisor = FileProcessSupervisor::new(runtime_root);
     let result = supervisor.run_to_completion_with_output(spec, |_, _| {
@@ -232,6 +241,58 @@ impl Drop for CompileGateWorktreeGuard<'_> {
             );
         }
     }
+}
+
+/// Pre-exec existence + executable check for the program the gate would
+/// otherwise hand to `sh -c`. Scope is deliberately narrow: only tokens that
+/// *look like paths* (contain `/`) are checked. Bare command names like
+/// `cargo` or `make` resolve through `PATH` at exec time — reimplementing
+/// `PATH` search here invites divergence from `sh`'s own rules and would
+/// classify a missing `cargo` as InfrastructureFailed when today it reads
+/// as a honest shell `command not found`. The path case is the one with the
+/// actual misclassification bug.
+///
+/// `cwd` is the resolved worktree cwd the command will be spawned into, so
+/// relative paths (the common form — e.g. `./scripts/compile-check.sh`)
+/// resolve the way `sh` will resolve them after it inherits that cwd.
+fn verify_command_path_exists(command: &str, cwd: &Path) -> Result<(), String> {
+    let Some(program) = command.split_whitespace().next() else {
+        return Err("governance_compile_command is empty".into());
+    };
+    if !program.contains('/') {
+        return Ok(());
+    }
+    let path = if Path::new(program).is_absolute() {
+        PathBuf::from(program)
+    } else {
+        cwd.join(program)
+    };
+    if !path.exists() {
+        return Err(format!(
+            "governance_compile_command path does not exist: {}",
+            path.display()
+        ));
+    }
+    // Also catch the exit-126 case (file exists but isn't executable), which
+    // misreads the same way under shell exec. Unix-only — Windows execution
+    // semantics don't key off a +x bit.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let meta = std::fs::metadata(&path).map_err(|error| {
+            format!(
+                "cannot stat governance_compile_command path {}: {error}",
+                path.display()
+            )
+        })?;
+        if meta.permissions().mode() & 0o111 == 0 {
+            return Err(format!(
+                "governance_compile_command path is not executable: {}",
+                path.display()
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn resolve_cwd(worktree_root: &Path, agent_subpath: &str) -> Result<std::path::PathBuf, String> {
@@ -752,6 +813,102 @@ mod tests {
                 );
             }
             other => panic!("expected BuildFailed, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn verify_command_path_exists_passes_bare_command_names() {
+        // Bare names resolve through PATH at exec time — the check must not
+        // reimplement PATH search, so bare names always pass verification.
+        let cwd = std::env::temp_dir();
+        assert!(verify_command_path_exists("cargo build", &cwd).is_ok());
+        assert!(verify_command_path_exists("make test", &cwd).is_ok());
+        assert!(verify_command_path_exists("definitely-not-a-real-binary-xyz", &cwd).is_ok());
+    }
+
+    #[test]
+    fn verify_command_path_exists_rejects_absolute_missing_path() {
+        let cwd = std::env::temp_dir();
+        let err = verify_command_path_exists("/nonexistent/path/to/script.sh", &cwd).unwrap_err();
+        assert!(err.contains("does not exist"), "got: {err}");
+        assert!(err.contains("/nonexistent/path/to/script.sh"), "got: {err}");
+    }
+
+    #[test]
+    fn verify_command_path_exists_resolves_relative_paths_against_cwd() {
+        // Relative paths must resolve against the gate's cwd, matching how
+        // `sh` will resolve them after it inherits that cwd — not against the
+        // daemon's cwd.
+        let fx = GitFixture::new("verify-relative");
+        // Create a script under the fixture's repo and point at it via a
+        // relative path. With cwd=&fx.repo, the check should succeed.
+        let script = fx.repo.join("build.sh");
+        fs::write(&script, "#!/bin/sh\ntrue\n").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(&script, fs::Permissions::from_mode(0o755)).unwrap();
+        }
+        assert!(verify_command_path_exists("./build.sh --fast", &fx.repo).is_ok());
+        // Same relative path against a different cwd must fail — proves the
+        // check honors cwd rather than falling back to the daemon's cwd.
+        let elsewhere = std::env::temp_dir().join("empty-verify-cwd-fixture");
+        fs::create_dir_all(&elsewhere).unwrap();
+        let err = verify_command_path_exists("./build.sh", &elsewhere).unwrap_err();
+        assert!(err.contains("does not exist"), "got: {err}");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn verify_command_path_exists_rejects_existing_but_non_executable_file() {
+        use std::os::unix::fs::PermissionsExt;
+        let fx = GitFixture::new("verify-noexec");
+        let script = fx.repo.join("not-exec.sh");
+        fs::write(&script, "#!/bin/sh\ntrue\n").unwrap();
+        fs::set_permissions(&script, fs::Permissions::from_mode(0o644)).unwrap();
+        let err = verify_command_path_exists("./not-exec.sh", &fx.repo).unwrap_err();
+        assert!(err.contains("not executable"), "got: {err}");
+    }
+
+    #[test]
+    fn run_compile_gate_bad_path_reports_infrastructure_failed() {
+        // End-to-end: a configured governance_compile_command pointing at a
+        // path that does not exist must surface as InfrastructureFailed with
+        // a summary that names the path, NOT BuildFailed with "exited 127".
+        // Observed misclassification during live testing on ipsapp01 was the
+        // reason for the pre-exec path check.
+        let fx = GitFixture::new("bad-path");
+        let settings = settings_with(&[(
+            "governance_compile_command",
+            "/absolutely/not/here/compile.sh",
+        )]);
+        let outcome = run_compile_gate(
+            &fx.repo_git(),
+            &fx.runtime_root,
+            &settings,
+            "GOAL1",
+            0,
+            &fx.candidate_commit,
+            "",
+            &no_heartbeat(),
+        )
+        .unwrap();
+        match outcome {
+            CompileGateOutcome::InfrastructureFailed { summary } => {
+                assert!(
+                    summary.contains("does not exist"),
+                    "expected a path-doesn't-exist diagnosis, got: {summary:?}"
+                );
+                assert!(
+                    summary.contains("/absolutely/not/here/compile.sh"),
+                    "summary should name the offending path, got: {summary:?}"
+                );
+            }
+            other => panic!(
+                "expected InfrastructureFailed for a bad path, got {other:?} — \
+                 would be misclassified as BuildFailed and tell the operator \
+                 to fix their build instead of their config"
+            ),
         }
     }
 
