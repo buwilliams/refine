@@ -2,11 +2,11 @@ use super::{
     ApiRequest, ApiResponse, ConfigService, InProcessWebServer, PathBuf, RefineError,
     TerminalLaunchSpec, TerminalSessionLaunchSurface, Value, cleanup_failed_terminal_worktree,
     create_terminal_standalone_worktree, default_interactive_shell, error_response,
-    files_read_response, files_search_response, files_tree_response, find_goal_agent_session, json,
-    query_param, resume_terminal_standalone_worktree, runtime_root_unavailable,
-    target_root_unavailable, terminal_events_range, terminal_input_response,
-    terminal_profile_prompt, terminal_resize_response, terminal_session_start_response,
-    terminal_status_response, terminal_stop_response,
+    files_read_response, files_search_response, files_tree_response, files_write_response,
+    find_goal_agent_session, json, query_param, resume_terminal_standalone_worktree,
+    runtime_root_unavailable, target_root_unavailable, terminal_events_range,
+    terminal_input_response, terminal_profile_prompt, terminal_resize_response,
+    terminal_session_start_response, terminal_status_response, terminal_stop_response,
 };
 use crate::application::work_items::FileWorkItemService;
 
@@ -46,6 +46,28 @@ impl InProcessWebServer {
             .unwrap_or(128_000)
             .clamp(1, 512_000);
         match files_read_response(&target_root, &path, offset, limit) {
+            Ok(value) => ApiResponse::json(200, value),
+            Err(error) => error_response(error),
+        }
+    }
+
+    pub(crate) fn handle_files_write(&self, request: ApiRequest) -> ApiResponse {
+        let Some(target_root) = self.target_root() else {
+            return target_root_unavailable("write source file");
+        };
+        let body = request.body.unwrap_or_else(|| json!({}));
+        let path = body
+            .get("path")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string();
+        let content = body
+            .get("content")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string();
+        let executable = body.get("executable").and_then(Value::as_bool);
+        match files_write_response(&target_root, &path, &content, executable) {
             Ok(value) => ApiResponse::json(200, value),
             Err(error) => error_response(error),
         }
