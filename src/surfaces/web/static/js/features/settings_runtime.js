@@ -258,6 +258,8 @@ function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli, providers = {}
       })}
     </section>
 
+    ${renderCompileGateSection(s)}
+
     <section class="settings-section">
       <h3>AI Provider</h3>
       ${providers.selection_error ? `<p role="alert">${htmlEscape(providers.selection_error)}</p>` : ""}
@@ -415,6 +417,8 @@ async function autosaveSettingsRuntime(options = {}) {
     state_sync_auto_recovery: $("#s-state-sync-auto-recovery").value,
     state_sync_agent_resolution: $("#s-state-sync-agent-resolution").value,
     file_browser_ignore_patterns: $("#s-file-browser-ignore").value,
+    governance_compile_command: $("#s-governance-compile-command").value,
+    governance_compile_timeout_seconds: $("#s-governance-compile-timeout").value,
   });
   if (options.refresh) {
     await refreshSettingsTab(options.refreshTab || readSettingsTab(), { force: true });
@@ -427,7 +431,7 @@ function bindNodeRuntimeConfigControls(providers = {}) {
   const root = document.querySelector('[data-tab-pane="runtime"]');
   const autosaveRuntime = bindSettingsAutosave(
     root,
-    "#s-cap, #s-automatic-resource-budget-percent, #s-pattern, #s-error-timeout, #s-idle, #s-hard, #s-worker-memory, #s-ui-memory, #s-worker-cpu-priority, #s-resource-isolation, #s-agent-limit-pause, #s-chat-idle, #s-worktree-cleanup-delay, #s-state-sync-debounce, #s-project-update-pulse, #s-state-sync-stale-threshold, #s-state-sync-auto-recovery, #s-state-sync-agent-resolution, #s-file-browser-ignore",
+    "#s-cap, #s-automatic-resource-budget-percent, #s-pattern, #s-error-timeout, #s-idle, #s-hard, #s-worker-memory, #s-ui-memory, #s-worker-cpu-priority, #s-resource-isolation, #s-agent-limit-pause, #s-chat-idle, #s-worktree-cleanup-delay, #s-state-sync-debounce, #s-project-update-pulse, #s-state-sync-stale-threshold, #s-state-sync-auto-recovery, #s-state-sync-agent-resolution, #s-file-browser-ignore, #s-governance-compile-command, #s-governance-compile-timeout",
     autosaveSettingsRuntime,
     { event: "settings-editable-commit" },
   );
@@ -494,6 +498,7 @@ function bindNodeRuntimeConfigControls(providers = {}) {
     });
   });
   bindSettingsEditableFields(root);
+  bindCompileGateSection(root);
   return autosaveRuntime;
 }
 

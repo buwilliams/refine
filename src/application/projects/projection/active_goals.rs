@@ -74,15 +74,14 @@ impl ActiveGoalIndex {
 
     /// Whether a Goal in this status still affects scheduling.
     ///
-    /// Mirrors the eligibility rules exactly: Review, Done, and Cancelled
+    /// Mirrors the eligibility rules exactly: Review, Done, Cancelled, and Failed
     /// release a Feature's ordering queue and are not schedulable, so nothing
-    /// the scheduler computes can depend on them. Backlog and Failed do still
-    /// hold their Feature's queue, so both remain resident despite not being
-    /// directly runnable.
+    /// the scheduler computes can depend on them. Backlog remains resident despite
+    /// not being directly runnable because it still holds its Feature's queue.
     pub fn holds_scheduler_attention(status: &GoalStatus) -> bool {
         !matches!(
             status,
-            GoalStatus::Review | GoalStatus::Done | GoalStatus::Cancelled
+            GoalStatus::Review | GoalStatus::Done | GoalStatus::Cancelled | GoalStatus::Failed
         )
     }
 

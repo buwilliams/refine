@@ -138,14 +138,27 @@ impl WorkflowEngine {
         let mut load = self.observed_execution_load()?;
         let mut result = Vec::new();
         for goal in goals {
-            let assessment = items.show_goal_detail(&goal.id).and_then(|detail| {
-                self.workflow_blocking_reason(&goal, &detail, &eligibility, &policy.active_node_id)
-            });
+            let detail = match items.show_goal_detail(&goal.id) {
+                Ok(detail) => detail,
+                Err(error) => {
+                    eprintln!("refine Goal admission: {} needs recovery: {error}", goal.id);
+                    continue;
+                }
+            };
+
+            // Skip goals that are done or in review - they're not launchable
+            if let Some(status) = detail.get("status").and_then(|s| s.as_str()) {
+                if matches!(status, "done" | "review" | "cancelled" | "failed") {
+                    continue;
+                }
+            }
+
+            let assessment = self.workflow_blocking_reason(&goal, &detail, &eligibility, &policy.active_node_id);
             match assessment {
                 Ok(None) => {}
                 Ok(Some(_)) => continue,
                 Err(error) => {
-                    eprintln!("refine Goal admission: {} needs recovery: {error}", goal.id);
+                    eprintln!("refine Goal admission: {} blocking check failed: {error}", goal.id);
                     continue;
                 }
             }

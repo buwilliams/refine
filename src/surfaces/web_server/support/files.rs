@@ -349,6 +349,104 @@ pub(in crate::surfaces::web_server) fn files_read_response(
     }))
 }
 
+pub(in crate::surfaces::web_server) const FILES_WRITE_MAX_BYTES: usize = 256 * 1024;
+
+pub(in crate::surfaces::web_server) fn files_write_response(
+    target_root: &Path,
+    path: &str,
+    content: &str,
+    executable: Option<bool>,
+) -> RefineResult<Value> {
+    let rel_path = normalize_file_path(path)?;
+    if rel_path.as_os_str().is_empty() {
+        return Err(RefineError::InvalidInput(
+            "file path is required".to_string(),
+        ));
+    }
+    if content.len() > FILES_WRITE_MAX_BYTES {
+        return Err(RefineError::InvalidInput(format!(
+            "file content exceeds the {FILES_WRITE_MAX_BYTES}-byte write limit"
+        )));
+    }
+    if is_binary_bytes(content.as_bytes()) {
+        return Err(RefineError::InvalidInput(
+            "binary content is not supported for file write".to_string(),
+        ));
+    }
+    let absolute = target_root.join(&rel_path);
+    let parent = absolute.parent().ok_or_else(|| {
+        RefineError::InvalidInput(format!(
+            "file path {} has no parent directory",
+            display_rel_path(&rel_path)
+        ))
+    })?;
+    if !parent.exists() {
+        return Err(RefineError::NotFound(format!(
+            "parent directory for {} does not exist",
+            display_rel_path(&rel_path)
+        )));
+    }
+    if absolute.exists() && !absolute.is_file() {
+        return Err(RefineError::InvalidInput(format!(
+            "source path {} is not a file",
+            display_rel_path(&rel_path)
+        )));
+    }
+    #[cfg(unix)]
+    let prior_executable = {
+        use std::os::unix::fs::MetadataExt;
+        absolute
+            .metadata()
+            .ok()
+            .map(|metadata| metadata.mode() & 0o111 != 0)
+    };
+    #[cfg(not(unix))]
+    let prior_executable: Option<bool> = None;
+    fs::write(&absolute, content.as_bytes()).map_err(|error| {
+        RefineError::Io(format!(
+            "failed to write source file {}: {error}",
+            absolute.display()
+        ))
+    })?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let want_executable = executable.unwrap_or_else(|| prior_executable.unwrap_or(false));
+        let mode = if want_executable { 0o755 } else { 0o644 };
+        fs::set_permissions(&absolute, fs::Permissions::from_mode(mode)).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to set permissions on {}: {error}",
+                absolute.display()
+            ))
+        })?;
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = executable;
+        let _ = prior_executable;
+    }
+    let size = content.as_bytes().len();
+    let executable_now = {
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::MetadataExt;
+            absolute
+                .metadata()
+                .map(|metadata| metadata.mode() & 0o111 != 0)
+                .unwrap_or(false)
+        }
+        #[cfg(not(unix))]
+        {
+            false
+        }
+    };
+    Ok(json!({
+        "path": display_rel_path(&rel_path),
+        "size": size,
+        "executable": executable_now
+    }))
+}
+
 pub(in crate::surfaces::web_server) fn files_search_response(
     target_root: &Path,
     query: &str,

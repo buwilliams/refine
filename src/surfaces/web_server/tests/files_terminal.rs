@@ -107,6 +107,94 @@ fn web_server_serves_source_file_tree_read_and_search() {
 }
 
 #[test]
+fn web_server_writes_source_file_with_executable_bit() {
+    let temp_root = unique_temp_dir("http-files-write");
+    let refine_dir = temp_root.join(".refine");
+    fs::create_dir_all(temp_root.join("scripts")).unwrap();
+    fs::create_dir_all(&refine_dir).unwrap();
+    fs::write(refine_dir.join("refine.json"), "{}").unwrap();
+    let mut server = server_with_projection();
+    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
+
+    let create = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/files/write".to_string(),
+        body: Some(json!({
+            "path": "scripts/compile-check.sh",
+            "content": "#!/bin/sh\necho ok\n",
+            "executable": true,
+        })),
+    });
+    assert_eq!(create.status, 200, "body: {:?}", create.body);
+    assert_eq!(create.body["path"], "scripts/compile-check.sh");
+    assert_eq!(create.body["size"], 18);
+    #[cfg(unix)]
+    {
+        assert_eq!(create.body["executable"], true);
+        use std::os::unix::fs::MetadataExt;
+        let mode = std::fs::metadata(temp_root.join("scripts/compile-check.sh"))
+            .unwrap()
+            .mode();
+        assert_eq!(mode & 0o777, 0o755);
+    }
+
+    let read = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/files/read?path=scripts/compile-check.sh".to_string(),
+        body: None,
+    });
+    assert_eq!(read.status, 200);
+    assert_eq!(read.body["content"], "#!/bin/sh\necho ok\n");
+
+    // A rewrite that drops `executable` preserves the existing executable bit.
+    let rewrite = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/files/write".to_string(),
+        body: Some(json!({
+            "path": "scripts/compile-check.sh",
+            "content": "#!/bin/sh\necho changed\n",
+        })),
+    });
+    assert_eq!(rewrite.status, 200, "body: {:?}", rewrite.body);
+    #[cfg(unix)]
+    assert_eq!(rewrite.body["executable"], true);
+
+    let traversal = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/files/write".to_string(),
+        body: Some(json!({
+            "path": "../escape.sh",
+            "content": "x",
+        })),
+    });
+    assert_eq!(traversal.status, 400);
+    assert_eq!(traversal.body["error"]["code"], "invalid_input");
+
+    let binary = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/files/write".to_string(),
+        body: Some(json!({
+            "path": "scripts/payload.bin",
+            "content": "ok\0zero",
+        })),
+    });
+    assert_eq!(binary.status, 400);
+    assert_eq!(binary.body["error"]["code"], "invalid_input");
+
+    let no_parent = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/files/write".to_string(),
+        body: Some(json!({
+            "path": "no/such/dir/file.sh",
+            "content": "x",
+        })),
+    });
+    assert_eq!(no_parent.status, 404);
+
+    remove_temp_dir(&temp_root);
+}
+
+#[test]
 fn web_server_runs_interactive_terminal_session() {
     let temp_root = unique_temp_dir("http-terminal");
     let refine_dir = temp_root.join(".refine");

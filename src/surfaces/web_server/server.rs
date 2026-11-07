@@ -488,6 +488,10 @@ impl InProcessWebServer {
             return self.handle_files_read(&raw_path);
         }
 
+        if request.method == "POST" && request.path == "/files/write" {
+            return self.handle_files_write(request);
+        }
+
         if request.method == "GET" && request.path == "/files/search" {
             return self.handle_files_search(&raw_path);
         }
